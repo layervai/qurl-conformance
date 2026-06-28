@@ -5,6 +5,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   release-please:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
       # GitHub Actions, repo layervai/qurl-conformance, workflow
       # release-please.yml, environment npm-publish).
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance
         working-directory: npm
 
   publish-pypi:
@@ -85,3 +88,6 @@ jobs:
         with:
           # Must override — default is repo-root dist/, but we build in python/.
           packages-dir: python/dist/
+          # Set PEP 740 attestation behavior explicitly rather than relying
+          # on the default.
+          attestations: true
