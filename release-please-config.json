@@ -1,12 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "separate-pull-requests": false,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
   "plugins": [
     { "type": "linked-versions", "groupName": "qurl-conformance", "components": ["go", "npm", "python"] }
   ],
   "packages": {
-    ".": { "release-type": "go", "component": "go", "include-component-in-tag": false, "bump-minor-pre-major": true, "bump-patch-for-minor-pre-major": true },
-    "npm": { "release-type": "node", "component": "npm", "bump-minor-pre-major": true, "bump-patch-for-minor-pre-major": true },
-    "python": { "release-type": "python", "component": "python", "bump-minor-pre-major": true, "bump-patch-for-minor-pre-major": true }
+    ".": { "release-type": "go", "component": "go", "include-component-in-tag": false },
+    "npm": { "release-type": "node", "component": "npm" },
+    "python": { "release-type": "python", "component": "python" }
   }
 }
