@@ -11,12 +11,13 @@ vectors are **behavioral**: a consumer recomputes/re-verifies rather than trusti
 a stored boolean, so a verifier that drifts from the contract fails its own run.
 
 This file (the JSON) is the single source of truth. This README is the schema +
-vocabulary + class-to-entry-point map. The two artifacts in this directory are:
+vocabulary + class-to-entry-point map. The three artifacts in this directory are:
 
 | Artifact | Role |
 | --- | --- |
 | `qv2_conformance_vectors.json` | the conformance classes (claims/secret parse, strict base64url, fragment shape, relay allowlist, server-id) |
 | `issuer_signature_vectors.json` | the issuer-signature golden vectors the signature class composes by reference |
+| `relay_knock_golden.json` | the relay-knock Noise-handshake golden packets (artifact `qurl-relay-knock-golden-vectors`), a separate layer (see below) |
 
 ---
 
@@ -219,12 +220,15 @@ Noise-handshake packet byte vectors (the KNK/ACK wire bytes of the handshake) ar
 intentionally **out** of this artifact, by *layer*. The qURL claims/signature/
 fragment layer is distinct from the Noise handshake layer, and a verifier of the
 qURL layer cannot construct or verify a Noise packet. Folding handshake bytes in
-here would couple two layers that are correctly separate. If a language-agnostic
-Noise-handshake vector set is ever worthwhile, it belongs in its **own** artifact
-at the handshake layer, not in this one.
+here would couple two layers that are correctly separate. That language-agnostic
+Noise-handshake vector set now exists as its **own** sibling artifact at the
+handshake layer — `relay_knock_golden.json` (`qurl-relay-knock-golden-vectors`),
+which pins the deterministic relay-knock packet and a frozen server-sealed ack
+reply — not folded into this one.
 
 **Net: one source of truth per layer.** Signature bytes: one file, composed by
-reference. Verify-path classes: this file.
+reference. Verify-path classes: this file. Relay-knock handshake bytes:
+`relay_knock_golden.json`.
 
 ---
 

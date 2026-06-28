@@ -27,6 +27,7 @@ package conformance
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -335,6 +336,18 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	}
 	if rf.SchemaVersion == 0 {
 		return nil, fmt.Errorf("conformance: relay-knock file missing schema_version")
+	}
+	// Fail closed on a blank load-bearing field: a consumer that re-runs the
+	// golden bytes (rebuild knock.packet_hex / decrypt ack.packet_hex) must not
+	// silently "pass" on an empty packet or body.
+	if rf.Knock.PacketHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing knock.packet_hex")
+	}
+	if rf.Knock.BodyHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing knock.body_hex")
+	}
+	if rf.Ack.PacketHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing ack.packet_hex")
 	}
 	return &rf, nil
 }
