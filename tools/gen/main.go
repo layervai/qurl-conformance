@@ -29,7 +29,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "gen: FAILED:", err)
 		os.Exit(1)
 	}
-	fmt.Println("gen: OK — wrote vectors/issuer_signature_vectors.json (selfVerify passed)")
+	fmt.Println("gen: OK — regenerated issuer_signature_vectors.json + fragment accept vector (selfVerify passed)")
 }
 
 func run() error {
@@ -44,7 +44,6 @@ func run() error {
 		return err
 	}
 
-	// Throwaway P-256 resource key (valid DER SPKI, ~91 bytes).
 	rpriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
@@ -82,7 +81,6 @@ func run() error {
 	pub.X.FillBytes(xb)
 	pub.Y.FillBytes(yb)
 
-	// Reject vectors derived deterministically from the one signature.
 	r := new(big.Int).SetBytes(rawSig[:32])
 	s := new(big.Int).SetBytes(rawSig[32:])
 	n := elliptic.P256().Params().N
@@ -94,7 +92,6 @@ func run() error {
 		return err
 	}
 
-	// selfVerify BEFORE writing — never emit an inconsistent artifact.
 	if err := qv2.VerifyRawIssuerSignature(pub, claimsB64, rawSig); err != nil {
 		return fmt.Errorf("accept must verify: %w", err)
 	}
@@ -133,5 +130,52 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile("../../vectors/issuer_signature_vectors.json", append(out, '\n'), 0o644)
+	if err := os.WriteFile("../../vectors/issuer_signature_vectors.json", append(out, '\n'), 0o644); err != nil {
+		return err
+	}
+
+	// Rebuild the fragment-class accept vector from the fresh claims/sig + a fixed
+	// throwaway secret. The fragment class is shape-only (ParseFragment does not
+	// verify the signature), so a stale signature would otherwise survive a key
+	// rotation undetected. Locate the old value and text-replace it so the file's
+	// curated formatting/ordering is preserved.
+	secretJSON, err := json.Marshal(map[string]string{"qurl_user_private_key_b64": raw(bytes.Repeat([]byte{0x09}, 32))})
+	if err != nil {
+		return err
+	}
+	newFragment := "qv2." + claimsB64 + "." + raw(secretJSON) + "." + raw(rawSig)
+	if _, err := qv2.ParseFragment(newFragment); err != nil {
+		return fmt.Errorf("rebuilt fragment must parse: %w", err)
+	}
+	const cfPath = "../../vectors/qv2_conformance_vectors.json"
+	cfBytes, err := os.ReadFile(cfPath)
+	if err != nil {
+		return err
+	}
+	var cfDoc struct {
+		Classes map[string]struct {
+			Vectors []struct {
+				Expect   string `json:"expect"`
+				Fragment string `json:"fragment"`
+			} `json:"vectors"`
+		} `json:"classes"`
+	}
+	if err := json.Unmarshal(cfBytes, &cfDoc); err != nil {
+		return err
+	}
+	var oldFragment string
+	for _, v := range cfDoc.Classes["fragment"].Vectors {
+		if v.Expect == "accept" && v.Fragment != "" {
+			oldFragment = v.Fragment
+			break
+		}
+	}
+	if oldFragment == "" {
+		return fmt.Errorf("no fragment-class accept vector with a fragment field found")
+	}
+	updated := bytes.Replace(cfBytes, []byte(oldFragment), []byte(newFragment), 1)
+	if bytes.Equal(updated, cfBytes) {
+		return fmt.Errorf("fragment replacement made no change (old value not found verbatim)")
+	}
+	return os.WriteFile(cfPath, updated, 0o644)
 }
