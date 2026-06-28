@@ -335,7 +335,7 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 		return nil, fmt.Errorf("conformance: relay-knock file has artifact %q, want %q", rf.Artifact, RelayKnockArtifactID)
 	}
 	if rf.SchemaVersion == 0 {
-		return nil, fmt.Errorf("conformance: relay-knock file missing schema_version")
+		return nil, errors.New("conformance: relay-knock file missing schema_version")
 	}
 	// Fail closed on a blank load-bearing field: a consumer that re-runs the
 	// golden bytes (rebuild knock.packet_hex / decrypt ack.packet_hex) must not
@@ -348,6 +348,9 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	}
 	if rf.Ack.PacketHex == "" {
 		return nil, errors.New("conformance: relay-knock file missing ack.packet_hex")
+	}
+	if rf.Ack.BodyHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing ack.body_hex")
 	}
 	return &rf, nil
 }

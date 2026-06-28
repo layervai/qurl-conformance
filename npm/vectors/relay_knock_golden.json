@@ -4,8 +4,8 @@
   "description": "NHP relay-knock Noise-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s).",
   "source_of_truth": "github.com/layervai/qurl-conformance",
   "notes": [
-    "knock: a conformant initiator (e.g. relayknock.BuildKnock) MUST reproduce knock.packet_hex byte-for-byte from the listed inputs.",
-    "ack: the server reply is generated at origin by the NHP server seal with a RANDOM server ephemeral key, so it is NOT reproducible by a client — consumers can only decrypt it (relayknock.DecryptReply MUST recover type=ACK, counter, timestamp_nanos, body_hex). Re-hosted here verbatim as a frozen golden value.",
+    "knock: a conformant initiator MUST reproduce knock.packet_hex byte-for-byte from the listed inputs.",
+    "ack: the server reply is generated at origin by the NHP server seal with a RANDOM server ephemeral key, so it is NOT reproducible by a client; a consumer can only decrypt it and MUST recover type=ACK, counter, timestamp_nanos, and body_hex. Re-hosted here verbatim as a frozen golden value.",
     "Origin: the NHP cross-language handshake fixtures; re-hosted and pinned here."
   ],
   "knock": {
