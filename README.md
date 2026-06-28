@@ -50,3 +50,5 @@ committed JSON is the artifact. Vectors are edited under `vectors/`.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Run `make gen-vectors` once per issuer-key rotation; it is NEVER run in CI (the accept signature uses a random nonce and is not reproducible).

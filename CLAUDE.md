@@ -23,3 +23,5 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - Keep the description/README consumer-neutral: this artifact is consumed by
   verifiers in multiple languages, so prose must not name any one implementation's
   private internals.
+
+Run `make gen-vectors` once per issuer-key rotation; it is NEVER run in CI (the accept signature uses a random nonce and is not reproducible).
