@@ -57,3 +57,25 @@ jobs:
       - name: python package smoke
         run: |
           cd python && python3 -c "import sys;sys.path.insert(0,'.');import qurl_conformance as q;r=q.relay_knock_vectors();assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'] and r['knock']['packet_hex'] and r['ack']['packet_hex'];print('py ok')"
+
+  # Slack build-completion card. Thin shim over the fleet-shared reusable in
+  # layervai/ops-routines-workflows (public mirror of private
+  # layervai/ops-routines); the Block Kit payload builder and gate-result
+  # aggregation live there. Adding/removing a gate is a one-line edit to
+  # `needs:` + `gates:` here.
+  notify:
+    name: Notify
+    needs: [conformance]
+    # `!cancelled()` rather than `always()`: this repo sets
+    # concurrency.cancel-in-progress, so a newer push to main cancels the
+    # in-flight run. `always()` would still post a yellow "cancelled" card for
+    # every superseded push. We notify on success and failure; we stay quiet
+    # only when the run is cancelled out from under us. Skipped on PRs.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    permissions: {}
+    uses: layervai/ops-routines-workflows/.github/workflows/notify.yml@1536c698add5777aa08c781bc674d1eba469b32d # v0.9.0
+    with:
+      header: "qURL Conformance Build"
+      gates: '{"Conformance": "${{ needs.conformance.result }}"}'
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
