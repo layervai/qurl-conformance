@@ -1,11 +1,12 @@
 {
   "name": "@layervai/qurl-conformance",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "qURL v2 cross-language conformance vectors",
   "license": "MIT",
   "type": "commonjs",
   "main": "index.js",
   "types": "index.d.ts",
+  "publishConfig": { "access": "public" },
   "files": ["vectors/", "index.js", "index.d.ts"],
   "exports": {
     ".": { "types": "./index.d.ts", "default": "./index.js" },
