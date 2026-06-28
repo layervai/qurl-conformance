@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qurl-conformance"
+version = "0.0.0"
+description = "qURL v2 cross-language conformance vectors"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+[tool.setuptools]
+packages = ["qurl_conformance"]
+
+[tool.setuptools.package-data]
+qurl_conformance = ["_data/*.json"]
