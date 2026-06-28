@@ -1,18 +1,30 @@
 {
   "name": "@layervai/qurl-conformance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "qURL v2 cross-language conformance vectors",
   "license": "MIT",
   "type": "commonjs",
   "main": "index.js",
   "types": "index.d.ts",
-  "publishConfig": { "access": "public" },
-  "files": ["vectors/", "index.js", "index.d.ts"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "vectors/",
+    "index.js",
+    "index.d.ts"
+  ],
   "exports": {
-    ".": { "types": "./index.d.ts", "default": "./index.js" },
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
     "./qv2_conformance_vectors.json": "./vectors/qv2_conformance_vectors.json",
     "./issuer_signature_vectors.json": "./vectors/issuer_signature_vectors.json",
     "./relay_knock_golden.json": "./vectors/relay_knock_golden.json"
   },
-  "repository": { "type": "git", "url": "git+https://github.com/layervai/qurl-conformance.git" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/layervai/qurl-conformance.git"
+  }
 }
