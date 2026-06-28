@@ -1,13 +1,24 @@
-// Package conformance is the single public source of truth for the qURL v2
-// cross-language conformance vectors. It embeds the two JSON artifacts under
-// vectors/ and exposes strict, typed loaders so any qURL v2 verifier — in any
-// language that can call this Go module, or that copies the JSON directly — can
-// re-run the same wire-truth against its own implementation.
+// Package conformance is the single public source of truth for the qURL
+// cross-language conformance vectors. It embeds the JSON artifacts under
+// vectors/ and exposes strict, typed loaders so any consumer — in any language
+// that can call this Go module, or that copies the JSON directly — can re-run
+// the same wire-truth against its own implementation.
 //
-// The artifacts are BEHAVIORAL: a consumer feeds each class's input through its
-// real parser/validator and asserts the declared accept/reject outcome (and, where
-// the class is about the distinction, the reject_class), rather than trusting a
-// stored boolean. A verifier that drifts from the contract fails its own run.
+// Two families live here, each under its own artifact id so they stay decoupled
+// by layer:
+//
+//   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
+//     issuer_signature_vectors.json): the claims/secret/base64/fragment/relay/
+//     server-id classes and the issuer-signature golden bytes.
+//   - The relay/NHP-handshake golden packets (relay_knock_golden.json): the
+//     deterministic relay-knock packet plus a frozen, server-sealed ack reply
+//     for the Noise handshake layer, which the qURL verify path does not import.
+//
+// The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
+// through its real parser/validator and asserts the declared accept/reject
+// outcome (and, where the class is about the distinction, the reject_class),
+// rather than trusting a stored boolean. A verifier that drifts from the
+// contract fails its own run.
 //
 // This module is stdlib-only and has no build-time dependencies; the generator
 // that produces the vectors is intentionally not part of it.
@@ -16,6 +27,7 @@ package conformance
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -246,4 +258,99 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 		return nil, fmt.Errorf("conformance: vector file has no vectors")
 	}
 	return &vf, nil
+}
+
+// RelayKnockArtifactID is the fixed identity string the relay-knock artifact's
+// top-level "artifact" field must carry. The loader enforces it so a consumer
+// that relies on "the loader rejects malformed files" cannot silently load a
+// DIFFERENT document into these structs. A consumer in another language should
+// assert the same id.
+const RelayKnockArtifactID = "qurl-relay-knock-golden-vectors"
+
+// RelayKnockFile is the top-level relay/NHP-handshake golden artifact: a
+// deterministic knock packet a conformant initiator must reproduce byte-for-byte,
+// plus a frozen ack reply (sealed at origin with a random server ephemeral, so it
+// is NOT reproducible by a client — only decryptable). Both cases decode into the
+// same RelayKnockCase, which carries the UNION of the fields either case uses.
+type RelayKnockFile struct {
+	Artifact      string         `json:"artifact"`
+	SchemaVersion int            `json:"schema_version"`
+	Description   string         `json:"description"`
+	SourceOfTruth string         `json:"source_of_truth"`
+	Notes         []string       `json:"notes"`
+	Knock         RelayKnockCase `json:"knock"`
+	Ack           RelayKnockCase `json:"ack"`
+}
+
+// RelayKnockCase is one golden packet (knock or ack). Every value is the exact
+// hex (or, for the numeric fields, the stringified value) the case uses; only the
+// fields relevant to a given case are populated. All fields are strings — including
+// timestamp_nanos, which exceeds 2^53 and so is carried as a decimal string rather
+// than a JSON number.
+type RelayKnockCase struct {
+	// ServerStaticPrivHex / ServerStaticPubHex are the server static X25519 key.
+	// The knock case carries both; the ack case carries only the public half.
+	ServerStaticPrivHex string `json:"server_static_priv_hex,omitempty"`
+	ServerStaticPubHex  string `json:"server_static_pub_hex"`
+	// DeviceStaticPrivHex / DeviceStaticPubHex are the initiator (device) static
+	// X25519 key, used by the knock case.
+	DeviceStaticPrivHex string `json:"device_static_priv_hex,omitempty"`
+	DeviceStaticPubHex  string `json:"device_static_pub_hex,omitempty"`
+	// AgentStaticPrivHex is the agent (responder-side decryptor) static private
+	// X25519 key, used by the ack case to open the reply. It is the same key as the
+	// knock case's device_static_priv_hex.
+	AgentStaticPrivHex string `json:"agent_static_priv_hex,omitempty"`
+	// EphemeralPrivHex is the fixed initiator ephemeral private key the knock case
+	// seals under (so the knock packet is deterministic).
+	EphemeralPrivHex string `json:"ephemeral_priv_hex,omitempty"`
+	// TimestampNanos is the handshake timestamp, decimal string (exceeds 2^53).
+	TimestampNanos string `json:"timestamp_nanos"`
+	// Counter is the knock counter as a decimal string.
+	Counter string `json:"counter,omitempty"`
+	// CounterHex is the ack counter as a hex string (no 0x prefix, no padding).
+	CounterHex string `json:"counter_hex,omitempty"`
+	// PreambleHex is the 32-bit knock preamble as a hex string.
+	PreambleHex string `json:"preamble_hex,omitempty"`
+	// BodyHex is the plaintext body the case carries, hex-encoded.
+	BodyHex string `json:"body_hex"`
+	// PacketHex is the full wire packet, hex-encoded: for knock, the value a
+	// conformant BuildKnock must reproduce; for ack, the frozen value a conformant
+	// DecryptReply must open.
+	PacketHex string `json:"packet_hex"`
+}
+
+// ParseRelayKnockFile strictly parses the relay-knock golden artifact from raw
+// bytes. It returns an error (never an empty/zero document) when the bytes are
+// malformed or are not the relay-knock artifact, so a consumer test FAILS rather
+// than silently skipping or misreading the contract. DisallowUnknownFields keeps a
+// typo'd or stale schema field from being ignored.
+func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	var rf RelayKnockFile
+	if err := dec.Decode(&rf); err != nil {
+		return nil, fmt.Errorf("conformance: parse relay-knock file: %w", err)
+	}
+	if rf.Artifact != RelayKnockArtifactID {
+		return nil, fmt.Errorf("conformance: relay-knock file has artifact %q, want %q", rf.Artifact, RelayKnockArtifactID)
+	}
+	if rf.SchemaVersion == 0 {
+		return nil, errors.New("conformance: relay-knock file missing schema_version")
+	}
+	// Fail closed on a blank load-bearing field: a consumer that re-runs the
+	// golden bytes (rebuild knock.packet_hex / decrypt ack.packet_hex) must not
+	// silently "pass" on an empty packet or body.
+	if rf.Knock.PacketHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing knock.packet_hex")
+	}
+	if rf.Knock.BodyHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing knock.body_hex")
+	}
+	if rf.Ack.PacketHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing ack.packet_hex")
+	}
+	if rf.Ack.BodyHex == "" {
+		return nil, errors.New("conformance: relay-knock file missing ack.body_hex")
+	}
+	return &rf, nil
 }

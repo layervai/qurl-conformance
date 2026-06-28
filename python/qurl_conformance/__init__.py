@@ -15,3 +15,8 @@ def qv2_vectors():
 def issuer_signature_vectors():
     """Return the parsed issuer_signature_vectors.json."""
     return _load("issuer_signature_vectors.json")
+
+
+def relay_knock_vectors():
+    """Return the parsed relay_knock_golden.json."""
+    return _load("relay_knock_golden.json")

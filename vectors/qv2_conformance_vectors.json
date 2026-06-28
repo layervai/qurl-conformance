@@ -9,7 +9,7 @@
     "strict_base64 inputs are the base64url string VERBATIM (the fault is in the encoding layer); a consumer feeds them straight to its strict base64url decoder.",
     "fragment inputs are full fragment bodies fed to ParseFragment, which does NOT verify the issuer signature -- the fragment class pins wire SHAPE only; signature accept/reject is the signature class.",
     "The signature class is COMPOSED from issuer_signature_vectors.json (already byte-shared by the Go and TS verifiers); it is referenced here, not duplicated, so there is exactly one copy of the signature bytes.",
-    "KNK/ACK Noise packet byte vectors are intentionally OUT of this artifact -- they belong to the Noise handshake layer (qurlv2 does not import the handshake layer), not the qURL claims/signature/fragment layer. They live as fixtures in other language implementations; see the README 'out-of-artifact-by-layer' note."
+    "KNK/ACK Noise handshake packet vectors live in the separate sibling artifact relay_knock_golden.json, not this one -- they belong to the Noise handshake layer, which the qURL v2 claims/signature/fragment layer does not import; the two families are split by layer."
   ],
   "signature_class": {
     "entry_point": "qv2.VerifyRawIssuerSignature(pub, claimsB64, rawSig)",
@@ -362,6 +362,13 @@
           "reason": "reuses the fill-0x70 golden vector whose 8-byte SHA-256 prefix exercises both base64url + -> - and / -> _ substitutions",
           "cell_public_key_b64": "cHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA",
           "server_id": "p8u_3-Ocffc"
+        },
+        {
+          "name": "cell_seq_1to32_golden",
+          "expect": "accept",
+          "reason": "reuses the seq-1to32 fingerprint golden vector input/output (cell key = 32 bytes of 0x01..0x20), shared with the relay-knock PubKeyFingerprint golden so the routing-id contract cannot fork",
+          "cell_public_key_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+          "server_id": "riFsLvUkejc"
         }
       ]
     }

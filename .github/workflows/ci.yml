@@ -52,8 +52,8 @@ jobs:
         run: cd tools/verify-sdk && go test ./...
 
       - name: npm package smoke
-        run: node -e "const c=require('./npm');if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer){process.exit(1)}console.log('npm ok')"
+        run: node -e "const c=require('./npm');const r=c.relayKnockVectors();if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer||!r.knock.packet_hex||!r.ack.packet_hex){process.exit(1)}console.log('npm ok')"
 
       - name: python package smoke
         run: |
-          cd python && python3 -c "import sys;sys.path.insert(0,'.');import qurl_conformance as q;assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'];print('py ok')"
+          cd python && python3 -c "import sys;sys.path.insert(0,'.');import qurl_conformance as q;r=q.relay_knock_vectors();assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'] and r['knock']['packet_hex'] and r['ack']['packet_hex'];print('py ok')"

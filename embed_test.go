@@ -116,12 +116,33 @@ func TestEmbeddedSignatureFileLoads(t *testing.T) {
 	}
 }
 
+func TestEmbeddedRelayKnockLoads(t *testing.T) {
+	rf, err := RelayKnockGolden()
+	if err != nil {
+		t.Fatalf("RelayKnockGolden(): %v", err)
+	}
+	if rf.Artifact != RelayKnockArtifactID {
+		t.Errorf("artifact = %q, want %q", rf.Artifact, RelayKnockArtifactID)
+	}
+	if rf.SchemaVersion == 0 {
+		t.Errorf("schema_version = 0, want non-zero")
+	}
+	if rf.Knock.PacketHex == "" {
+		t.Errorf("knock.packet_hex is empty")
+	}
+	if rf.Ack.PacketHex == "" {
+		t.Errorf("ack.packet_hex is empty")
+	}
+}
+
 func TestOpenKnownAndUnknown(t *testing.T) {
 	for _, name := range []string{
 		"qv2_conformance_vectors.json",
 		"vectors/qv2_conformance_vectors.json",
 		"issuer_signature_vectors.json",
 		"vectors/issuer_signature_vectors.json",
+		"relay_knock_golden.json",
+		"vectors/relay_knock_golden.json",
 	} {
 		b, err := Open(name)
 		if err != nil {

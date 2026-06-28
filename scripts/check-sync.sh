@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
-for f in qv2_conformance_vectors.json issuer_signature_vectors.json; do
+for f in qv2_conformance_vectors.json issuer_signature_vectors.json relay_knock_golden.json; do
   a=$(shasum -a 256 "vectors/$f" | awk '{print $1}')
   b=$(shasum -a 256 "npm/vectors/$f" | awk '{print $1}')
   c=$(shasum -a 256 "python/qurl_conformance/_data/$f" | awk '{print $1}')
