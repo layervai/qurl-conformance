@@ -44,11 +44,11 @@ schema and vocabulary.
 ## Scope
 
 This module is intentionally dependency-free (stdlib only). The generator that
-produces the vectors is not part of this repo and is never run in CI; the
-committed JSON is the artifact. Vectors are edited under `vectors/`.
+produces the vectors lives at `tools/gen` and is run via `make gen-vectors` once
+per issuer-key rotation; it is never run in CI (the accept signature uses a random
+nonce, so it is not reproducible). The committed JSON is the artifact. Vectors are
+edited under `vectors/`.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-Run `make gen-vectors` once per issuer-key rotation; it is NEVER run in CI (the accept signature uses a random nonce and is not reproducible).

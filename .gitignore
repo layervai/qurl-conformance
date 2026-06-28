@@ -1,0 +1,12 @@
+# Go build artifacts
+/tools/gen/gen
+*.test
+*.out
+# Python
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+# Node
+node_modules/

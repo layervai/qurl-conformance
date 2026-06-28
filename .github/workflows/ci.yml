@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: vectors + go + cross-language
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Root module — test/vet/fmt
+        run: |
+          go test ./...
+          go vet ./...
+          if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi
+
+      - name: Root module must be dependency-free
+        run: |
+          if grep -qE '^[[:space:]]*require[[:space:]]' go.mod; then
+            echo "::error::root go.mod must have no require directive (zero-dep embed module)"; grep -n require go.mod; exit 1
+          fi
+
+      - name: Sanitizer gate (no private-repo leakage in vectors/docs/packages)
+        run: |
+          if grep -rInE 'nhp-OWNED|nhp-owned|endpoints/server/internal|endpoints/js-agent|layervai/nhp|nhp/core|\bvendored\b|vendoring' vectors/ npm/vectors/ python/qurl_conformance/_data/ README.md 2>/dev/null; then
+            echo "::error::private-repo leak term found"; exit 1
+          fi
+
+      - name: Vector byte-identity (root == npm == python)
+        run: bash scripts/check-sync.sh
+
+      - name: Cross-language compat (verify-sdk via qurl-go exported API)
+        run: cd tools/verify-sdk && go test ./...
+
+      - name: npm package smoke
+        run: node -e "const c=require('./npm');if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer){process.exit(1)}console.log('npm ok')"
+
+      - name: python package smoke
+        run: |
+          cd python && python3 -c "import sys;sys.path.insert(0,'.');import qurl_conformance as q;assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'];print('py ok')"

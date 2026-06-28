@@ -15,13 +15,13 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 
 ## Hard rules
 
-- The generator that produces the vectors is intentionally NOT part of this repo
-  and is NEVER run in CI. The committed JSON is the artifact.
+- The generator that produces the vectors lives at `tools/gen` and is run via
+  `make gen-vectors` ONCE per issuer-key rotation. It is NEVER run in CI (the
+  accept signature uses a random nonce, so it is not reproducible). The committed
+  JSON is the artifact.
 - Do not regenerate keys or signatures here; the committed key/signature bytes are
   the contract.
 - Keep the module dependency-free (stdlib only): no `require` lines in `go.mod`.
 - Keep the description/README consumer-neutral: this artifact is consumed by
   verifiers in multiple languages, so prose must not name any one implementation's
   private internals.
-
-Run `make gen-vectors` once per issuer-key rotation; it is NEVER run in CI (the accept signature uses a random nonce and is not reproducible).
