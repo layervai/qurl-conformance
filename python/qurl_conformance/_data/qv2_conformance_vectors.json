@@ -362,6 +362,13 @@
           "reason": "reuses the fill-0x70 golden vector whose 8-byte SHA-256 prefix exercises both base64url + -> - and / -> _ substitutions",
           "cell_public_key_b64": "cHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA",
           "server_id": "p8u_3-Ocffc"
+        },
+        {
+          "name": "cell_seq_1to32_golden",
+          "expect": "accept",
+          "reason": "reuses the seq-1to32 fingerprint golden vector input/output (cell key = 32 bytes of 0x01..0x20), shared with the relay-knock PubKeyFingerprint golden so the routing-id contract cannot fork",
+          "cell_public_key_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+          "server_id": "riFsLvUkejc"
         }
       ]
     }
