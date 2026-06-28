@@ -29,12 +29,15 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this PR. Focus on:
-            - Idiomatic Go and clear, simple code
-            - Error handling (wrapping with context, failing closed on ambiguous results)
-            - Concurrency safety (data races, goroutine leaks, context cancellation)
-            - Security (no hardcoded credentials, proper input validation, safe crypto usage)
-            - Test coverage, including table-driven tests and race-sensitive paths
+            This repo is a multi-language conformance-vector package: a stdlib-only Go
+            module plus npm (TypeScript/JS) and Python wrappers, all distributing the same
+            JSON conformance vectors. Review the Go, TypeScript/JS, and Python wrapper code
+            and the conformance vector JSON. Focus on:
+            - Clear, simple, idiomatic code in whichever language the change touches (Go, TS/JS, Python)
+            - Conformance vector JSON: well-formed, schema-consistent, and byte-identical across the root/npm/python copies (no drift)
+            - Error handling (failing closed / hard-failing on malformed or missing fixtures rather than silently skipping)
+            - Security (no hardcoded credentials, proper input validation, safe crypto usage, no private-repo leakage in vectors or docs)
+            - Test coverage across all three language wrappers, including the cross-language compatibility checks
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
 

@@ -49,6 +49,17 @@ per issuer-key rotation; it is never run in CI (the accept signature uses a rand
 nonce, so it is not reproducible). The committed JSON is the artifact. Vectors are
 edited under `vectors/`.
 
+## Releases
+
+Versioning is automated with [Release Please](https://github.com/googleapis/release-please)
+in manifest mode: the Go module, the npm package, and the Python package are
+released together under one linked version (see `release-please-config.json`).
+Merging the release PR tags the repo, which is what releases the Go module.
+
+npm and PyPI **registry publishing on release is a token-gated follow-up** (it needs
+`NPM_TOKEN` / PyPI trusted publishing wired up); for now Release Please only
+automates the version-bump PRs and the Go tag.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -25,3 +25,13 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - Keep the description/README consumer-neutral: this artifact is consumed by
   verifiers in multiple languages, so prose must not name any one implementation's
   private internals.
+
+## Releases
+
+- Versioning is automated by Release Please in manifest mode (`release-please-config.json`,
+  `.release-please-manifest.json`, `.github/workflows/release-please.yml`). The Go
+  module, npm package, and Python package share one linked version.
+- Merging the release PR tags the repo and thereby releases the Go module.
+- npm/PyPI registry publishing on release is a token-gated follow-up (needs
+  `NPM_TOKEN` / PyPI trusted publishing); Release Please currently automates only
+  the version PRs + the Go tag.

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "separate-pull-requests": false,
+  "plugins": [
+    { "type": "linked-versions", "groupName": "qurl-conformance", "components": ["go", "npm", "python"] }
+  ],
+  "packages": {
+    ".": { "release-type": "go", "component": "go" },
+    "npm": { "release-type": "node", "component": "npm" },
+    "python": { "release-type": "python", "component": "python" }
+  }
+}

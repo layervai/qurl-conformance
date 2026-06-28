@@ -7,5 +7,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/layervai/qurl-go/security/advisories/new
+    url: https://github.com/layervai/qurl-conformance/security/advisories/new
     about: Do NOT open a public bug report for security issues. Private disclosure via GitHub Security Advisory.
