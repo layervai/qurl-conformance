@@ -205,7 +205,10 @@ type SignatureVector struct {
 	Name string `json:"name"`
 	// Expect is "accept" or "reject".
 	Expect string `json:"expect"`
-	// Reason documents why (and, for rejects, names the failure class).
+	// RejectClass is the machine-readable rejection class. It is present on reject
+	// vectors and absent on accept vectors.
+	RejectClass string `json:"reject_class,omitempty"`
+	// Reason documents why in human-readable prose.
 	Reason string `json:"reason"`
 	// ClaimsB64 is the exact base64url claims string (primary verify input).
 	ClaimsB64 string `json:"claims_b64"`

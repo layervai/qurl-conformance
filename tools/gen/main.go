@@ -122,8 +122,8 @@ func run() error {
 		},
 		"vectors": []map[string]any{
 			{"name": "accept_valid_low_s", "expect": "accept", "reason": "valid 64-byte low-S raw r||s signature over the exact claims bytes", "claims_b64": claimsB64, "sig_b64": raw(rawSig), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
-			{"name": "reject_high_s", "expect": "reject", "reason": "high_s", "claims_b64": claimsB64, "sig_b64": raw(highRaw), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
-			{"name": "reject_wrong_length_der", "expect": "reject", "reason": "wrong_length", "claims_b64": claimsB64, "sig_b64": raw(der), "sig_encoding": "der", "signing_input_b64": raw(signingInput)},
+			{"name": "reject_high_s", "expect": "reject", "reject_class": "high_s", "reason": "signature is not low-S normalized", "claims_b64": claimsB64, "sig_b64": raw(highRaw), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
+			{"name": "reject_wrong_length_der", "expect": "reject", "reject_class": "wrong_length", "reason": "signature is not exactly 64 bytes (raw r||s)", "claims_b64": claimsB64, "sig_b64": raw(der), "sig_encoding": "der", "signing_input_b64": raw(signingInput)},
 		},
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")

@@ -100,7 +100,15 @@ func TestEmbeddedSignatureFileLoads(t *testing.T) {
 		switch v.Expect {
 		case ExpectAccept:
 			sawAccept = true
+			if v.RejectClass != "" {
+				t.Errorf("accept signature vector %q has reject_class %q, want empty", v.Name, v.RejectClass)
+			}
 		case ExpectReject:
+			switch v.RejectClass {
+			case RejectClassHighS, RejectClassWrongLength:
+			default:
+				t.Errorf("reject signature vector %q has reject_class %q, want %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength)
+			}
 		default:
 			t.Errorf("vector %q has expect %q, want accept|reject", v.Name, v.Expect)
 		}
