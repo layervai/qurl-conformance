@@ -260,6 +260,22 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 	if len(vf.Vectors) == 0 {
 		return nil, fmt.Errorf("conformance: vector file has no vectors")
 	}
+	for _, v := range vf.Vectors {
+		switch v.Expect {
+		case ExpectAccept:
+			if v.RejectClass != "" {
+				return nil, fmt.Errorf("conformance: accept signature vector %q has reject_class %q", v.Name, v.RejectClass)
+			}
+		case ExpectReject:
+			switch v.RejectClass {
+			case RejectClassHighS, RejectClassWrongLength:
+			default:
+				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength)
+			}
+		default:
+			return nil, fmt.Errorf("conformance: signature vector %q has expect %q, want accept|reject", v.Name, v.Expect)
+		}
+	}
 	return &vf, nil
 }
 
