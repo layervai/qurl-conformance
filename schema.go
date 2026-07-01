@@ -205,7 +205,10 @@ type SignatureVector struct {
 	Name string `json:"name"`
 	// Expect is "accept" or "reject".
 	Expect string `json:"expect"`
-	// Reason documents why (and, for rejects, names the failure class).
+	// RejectClass is the machine-readable rejection class. It is present on reject
+	// vectors and absent on accept vectors.
+	RejectClass string `json:"reject_class,omitempty"`
+	// Reason documents why in human-readable prose.
 	Reason string `json:"reason"`
 	// ClaimsB64 is the exact base64url claims string (primary verify input).
 	ClaimsB64 string `json:"claims_b64"`
@@ -256,6 +259,22 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 	}
 	if len(vf.Vectors) == 0 {
 		return nil, fmt.Errorf("conformance: vector file has no vectors")
+	}
+	for _, v := range vf.Vectors {
+		switch v.Expect {
+		case ExpectAccept:
+			if v.RejectClass != "" {
+				return nil, fmt.Errorf("conformance: accept signature vector %q has reject_class %q", v.Name, v.RejectClass)
+			}
+		case ExpectReject:
+			switch v.RejectClass {
+			case RejectClassHighS, RejectClassWrongLength:
+			default:
+				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength)
+			}
+		default:
+			return nil, fmt.Errorf("conformance: signature vector %q has expect %q, want accept|reject", v.Name, v.Expect)
+		}
 	}
 	return &vf, nil
 }

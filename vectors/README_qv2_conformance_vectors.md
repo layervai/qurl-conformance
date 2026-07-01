@@ -129,8 +129,8 @@ sentinels for them.
 | `key_length` | decoded key has the wrong byte length | `secret_parse` only (see note) |
 | `fragment` | fragment wire-shape rejection | `fragment` |
 | `relay_url` | `relay_url` HTTPS/allowlist rejection | `relay_allowlist` |
-| `high_s` | signature is not low-S normalized | `signature` (in the composed file's `reason`) |
-| `wrong_length` | signature is not exactly 64 bytes (raw r\|\|s) | `signature` (in the composed file's `reason`) |
+| `high_s` | signature is not low-S normalized | `signature` (in the composed file's `reject_class`) |
+| `wrong_length` | signature is not exactly 64 bytes (raw r\|\|s) | `signature` (in the composed file's `reject_class`) |
 | `tamper` | valid signature verified against a (flipped) different message | `signature` (in `signature_class.tamper_derivation`, derived not stored) |
 
 Rules a consumer can rely on:
@@ -138,8 +138,9 @@ Rules a consumer can rely on:
 1. Every **reject** vector carries a `reject_class` from **its class's** allowed
    set above.
 2. Every **accept** vector carries **no** `reject_class`.
-3. The signature class is **composed** (its `reject_class` lives in the composed
-   file's `reason` field), so it is not in the per-class table.
+3. The signature class is **composed** (its stored reject vectors live in the
+   composed file and carry their own `reject_class`), so it is not in the
+   per-class `classes` table.
 
 **Note on `key_length` (claims vs secret).** A wrong-length **key** field is the
 same physical fault in both parse classes, but the artifact pins `key_length`

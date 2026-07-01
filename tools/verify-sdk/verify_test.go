@@ -47,7 +47,7 @@ func TestSignatureClass(t *testing.T) {
 				if verr == nil {
 					t.Fatal("reject unexpectedly verified")
 				}
-				switch v.Reason {
+				switch v.RejectClass {
 				case conformance.RejectClassHighS:
 					if !errors.Is(verr, qv2.ErrSignatureHighS) {
 						t.Fatalf("want ErrSignatureHighS, got %v", verr)
@@ -58,7 +58,7 @@ func TestSignatureClass(t *testing.T) {
 					}
 				default:
 					if !errors.Is(verr, qv2.ErrSignature) {
-						t.Fatalf("want ErrSignature, got %v", verr)
+						t.Fatalf("reject_class %q: want ErrSignature, got %v", v.RejectClass, verr)
 					}
 				}
 			default:

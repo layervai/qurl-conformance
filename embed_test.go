@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -97,12 +98,8 @@ func TestEmbeddedSignatureFileLoads(t *testing.T) {
 
 	var sawAccept bool
 	for _, v := range vf.Vectors {
-		switch v.Expect {
-		case ExpectAccept:
+		if v.Expect == ExpectAccept {
 			sawAccept = true
-		case ExpectReject:
-		default:
-			t.Errorf("vector %q has expect %q, want accept|reject", v.Name, v.Expect)
 		}
 		if v.ClaimsB64 == "" {
 			t.Errorf("vector %q has empty claims_b64", v.Name)
@@ -113,6 +110,16 @@ func TestEmbeddedSignatureFileLoads(t *testing.T) {
 	}
 	if !sawAccept {
 		t.Errorf("signature vector file has no accept vector (tamper derivation needs one)")
+	}
+}
+
+func TestParseVectorFileRejectsStaleSignatureRejectShape(t *testing.T) {
+	_, err := ParseVectorFile([]byte(`{"vectors":[{"name":"stale_reject","expect":"reject","reason":"high_s"}]}`))
+	if err == nil {
+		t.Fatal("ParseVectorFile() accepted a reject signature vector without reject_class")
+	}
+	if !strings.Contains(err.Error(), "reject_class") {
+		t.Fatalf("ParseVectorFile() error = %q, want reject_class", err)
 	}
 }
 
