@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/layervai/qurl-conformance/compare/python-v0.1.1...python-v0.1.2) (2026-07-01)
+
+
+### Bug Fixes
+
+* **vectors:** add signature reject_class ([#14](https://github.com/layervai/qurl-conformance/issues/14)) ([cdaee56](https://github.com/layervai/qurl-conformance/commit/cdaee567c8b424a025dc0d9c1c2d1644843407ea))
+
 ## [0.1.1](https://github.com/layervai/qurl-conformance/compare/python-v0.1.0...python-v0.1.1) (2026-06-28)
 
 
