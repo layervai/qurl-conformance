@@ -50,7 +50,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts two artifact families, each under its own `artifact` id:
+This module hosts three artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
