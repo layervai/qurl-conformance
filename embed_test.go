@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -142,6 +143,60 @@ func TestEmbeddedRelayKnockLoads(t *testing.T) {
 	}
 }
 
+func TestEmbeddedAgentRegistrationLoads(t *testing.T) {
+	af, err := AgentRegistrationGolden()
+	if err != nil {
+		t.Fatalf("AgentRegistrationGolden(): %v", err)
+	}
+	if af.Artifact != AgentRegistrationArtifactID {
+		t.Errorf("artifact = %q, want %q", af.Artifact, AgentRegistrationArtifactID)
+	}
+	if af.SchemaVersion == 0 {
+		t.Errorf("schema_version = 0, want non-zero")
+	}
+
+	// Every case must carry a non-empty packet_hex and body_hex.
+	for _, c := range []struct {
+		name string
+		c    AgentRegistrationCase
+	}{
+		{"otp", af.OTP},
+		{"reg_emailed", af.RegEmailed},
+		{"reg_preissued", af.RegPreissued},
+		{"rak_success", af.RakSuccess},
+		{"rak_error", af.RakError},
+	} {
+		if c.c.PacketHex == "" {
+			t.Errorf("%s.packet_hex is empty", c.name)
+		}
+		if c.c.BodyHex == "" {
+			t.Errorf("%s.body_hex is empty", c.name)
+		}
+	}
+
+	// conformance#19: the RAK cases must echo reg_emailed's counter. reg_emailed
+	// carries the counter as a decimal string; the RAK cases carry it as hex.
+	regCounter, err := strconv.ParseUint(af.RegEmailed.Counter, 10, 64)
+	if err != nil {
+		t.Fatalf("parse reg_emailed.counter %q: %v", af.RegEmailed.Counter, err)
+	}
+	for _, c := range []struct {
+		name string
+		hex  string
+	}{
+		{"rak_success", af.RakSuccess.CounterHex},
+		{"rak_error", af.RakError.CounterHex},
+	} {
+		rakCounter, err := strconv.ParseUint(c.hex, 16, 64)
+		if err != nil {
+			t.Fatalf("parse %s.counter_hex %q: %v", c.name, c.hex, err)
+		}
+		if rakCounter != regCounter {
+			t.Errorf("%s.counter_hex = %d, want %d (must echo reg_emailed.counter)", c.name, rakCounter, regCounter)
+		}
+	}
+}
+
 func TestOpenKnownAndUnknown(t *testing.T) {
 	for _, name := range []string{
 		"qv2_conformance_vectors.json",
@@ -150,6 +205,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/issuer_signature_vectors.json",
 		"relay_knock_golden.json",
 		"vectors/relay_knock_golden.json",
+		"agent_registration_golden.json",
+		"vectors/agent_registration_golden.json",
 	} {
 		b, err := Open(name)
 		if err != nil {
