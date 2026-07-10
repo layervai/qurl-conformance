@@ -20,6 +20,7 @@ trust.
 | `vectors/qv2_conformance_vectors.json` | the conformance classes: claims/secret parse, strict base64url, fragment shape, relay allowlist, server-id, and the composed signature class |
 | `vectors/issuer_signature_vectors.json` | the issuer-signature golden vectors (P-256 raw r\|\|s low-S) the signature class composes by reference |
 | `vectors/relay_knock_golden.json` | the relay/NHP-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s): a deterministic knock packet plus a frozen, server-sealed ack reply (see Scope) |
+| `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -28,10 +29,11 @@ trust.
 ```go
 import conformance "github.com/layervai/qurl-conformance"
 
-cf, err := conformance.ConformanceVectors()   // strict-parsed conformance artifact
-vf, err := conformance.SignatureVectors()     // strict-parsed issuer-signature vectors
-rk, err := conformance.RelayKnockGolden()     // strict-parsed relay-knock golden packets
-raw := conformance.QV2Vectors()               // raw bytes, if you drive your own parser
+cf, err := conformance.ConformanceVectors()        // strict-parsed conformance artifact
+vf, err := conformance.SignatureVectors()          // strict-parsed issuer-signature vectors
+rk, err := conformance.RelayKnockGolden()          // strict-parsed relay-knock golden packets
+ar, err := conformance.AgentRegistrationGolden()   // strict-parsed agent-registration golden packets
+raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
 The loaders fail (never return an empty document) on a malformed or unexpected
@@ -48,7 +50,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts two artifact families, each under its own `artifact` id:
+This module hosts three artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -63,6 +65,21 @@ This module hosts two artifact families, each under its own `artifact` id:
   recovered fields. It is re-hosted here verbatim as a frozen golden value. These
   packets originate from the NHP cross-language handshake fixtures and are pinned
   here.
+- **NHP agent registration** (`qurl-agent-registration-golden-vectors`,
+  `agent_registration_golden.json`) — the OTP/REG/RAK Noise-handshake golden
+  packets for agent enrollment, again a separate artifact from the verify path.
+  The `otp`, `reg_emailed`, and `reg_preissued` requests are **deterministic**: a
+  conformant initiator must reproduce each `packet_hex` byte-for-byte. The REG body
+  is `{usrId, devId, aspId, otp, usrData}` with `usrData` =
+  `{hostname, version, takeover}` (fields omitted when empty/false), matching the
+  live agent implementations byte-for-byte. The two REG packets differ in the body
+  `otp` value (an emailed code vs a pre-issued key secret) and in `usrData.takeover`
+  (omitted vs `true`); the framing is identical. The `rak_success` / `rak_error`
+  replies are
+  sealed at origin with a **random** server ephemeral, so they are **frozen**
+  decrypt-only, mirroring the relay-knock `ack`. The RAK cases echo
+  `reg_emailed`'s counter, so a consumer can validate the RAK-must-echo-its-REG
+  counter contract against a positive fixture. All keys/ids/secrets are synthetic.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

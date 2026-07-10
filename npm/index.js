@@ -8,4 +8,5 @@ module.exports = {
   qv2Vectors: () => load("qv2_conformance_vectors.json"),
   issuerSignatureVectors: () => load("issuer_signature_vectors.json"),
   relayKnockVectors: () => load("relay_knock_golden.json"),
+  agentRegistrationVectors: () => load("agent_registration_golden.json"),
 };

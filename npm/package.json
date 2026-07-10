@@ -21,7 +21,8 @@
     },
     "./qv2_conformance_vectors.json": "./vectors/qv2_conformance_vectors.json",
     "./issuer_signature_vectors.json": "./vectors/issuer_signature_vectors.json",
-    "./relay_knock_golden.json": "./vectors/relay_knock_golden.json"
+    "./relay_knock_golden.json": "./vectors/relay_knock_golden.json",
+    "./agent_registration_golden.json": "./vectors/agent_registration_golden.json"
   },
   "repository": {
     "type": "git",

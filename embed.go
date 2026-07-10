@@ -5,13 +5,14 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json
 var vectorsFS embed.FS
 
 const (
 	conformanceVectorsName = "vectors/qv2_conformance_vectors.json"
 	issuerSignatureName    = "vectors/issuer_signature_vectors.json"
 	relayKnockName         = "vectors/relay_knock_golden.json"
+	agentRegistrationName  = "vectors/agent_registration_golden.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -51,6 +52,19 @@ func RelayKnockVectors() []byte {
 	return b
 }
 
+// AgentRegistrationVectors returns the raw bytes of the embedded NHP
+// agent-registration golden packets (agent_registration_golden.json): the OTP/REG
+// requests and the RAK replies. The bytes are the canonical wire-truth; a consumer
+// that prefers to drive its own strict parser can feed these directly.
+func AgentRegistrationVectors() []byte {
+	b, err := vectorsFS.ReadFile(agentRegistrationName)
+	if err != nil {
+		// Unreachable: the file is embedded at build time.
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentRegistrationName, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -62,6 +76,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(issuerSignatureName)
 	case relayKnockName, "relay_knock_golden.json":
 		return vectorsFS.ReadFile(relayKnockName)
+	case agentRegistrationName, "agent_registration_golden.json":
+		return vectorsFS.ReadFile(agentRegistrationName)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -85,4 +101,11 @@ func SignatureVectors() (*VectorFile, error) {
 // the expected artifact.
 func RelayKnockGolden() (*RelayKnockFile, error) {
 	return ParseRelayKnockFile(RelayKnockVectors())
+}
+
+// AgentRegistrationGolden strictly parses the embedded NHP agent-registration
+// golden artifact into a typed document, returning an error if it is malformed or
+// is not the expected artifact.
+func AgentRegistrationGolden() (*AgentRegistrationFile, error) {
+	return ParseAgentRegistrationFile(AgentRegistrationVectors())
 }

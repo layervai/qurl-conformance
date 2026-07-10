@@ -373,3 +373,123 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	}
 	return &rf, nil
 }
+
+// AgentRegistrationArtifactID is the fixed identity string the agent-registration
+// artifact's top-level "artifact" field must carry. The loader enforces it so a
+// consumer that relies on "the loader rejects malformed files" cannot silently
+// load a DIFFERENT document into these structs. A consumer in another language
+// should assert the same id.
+const AgentRegistrationArtifactID = "qurl-agent-registration-golden-vectors"
+
+// AgentRegistrationFile is the top-level NHP agent-registration golden artifact:
+// the OTP request, the emailed-code and pre-issued-key REG requests (all three
+// DETERMINISTIC — a conformant initiator must reproduce packet_hex byte-for-byte),
+// and the server register-ack (RAK) success/error replies (FROZEN, sealed at
+// origin with a random server ephemeral, so NOT reproducible by a client — only
+// decryptable). Every case decodes into the same AgentRegistrationCase, which
+// carries the UNION of the fields the deterministic and frozen cases use.
+//
+// The reg_emailed → rak pair is counter-matched (rak_success/rak_error echo
+// reg_emailed's counter), so a consumer can validate the RAK-must-echo-its-REG
+// counter contract (conformance#19) against a positive fixture.
+type AgentRegistrationFile struct {
+	Artifact      string                `json:"artifact"`
+	SchemaVersion int                   `json:"schema_version"`
+	Description   string                `json:"description"`
+	SourceOfTruth string                `json:"source_of_truth"`
+	Notes         []string              `json:"notes"`
+	OTP           AgentRegistrationCase `json:"otp"`
+	RegEmailed    AgentRegistrationCase `json:"reg_emailed"`
+	RegPreissued  AgentRegistrationCase `json:"reg_preissued"`
+	RakSuccess    AgentRegistrationCase `json:"rak_success"`
+	RakError      AgentRegistrationCase `json:"rak_error"`
+}
+
+// AgentRegistrationCase is one golden packet: an OTP/REG initiator request or a
+// RAK reply. Every value is the exact hex (or, for the numeric fields, the
+// stringified value) the case uses; only the fields relevant to a given case are
+// populated. All fields are strings — including timestamp_nanos, which exceeds
+// 2^53 and so is carried as a decimal string rather than a JSON number.
+//
+// Deterministic cases (otp, reg_emailed, reg_preissued) carry the same fields as
+// relay_knock's knock: the server/device static keypairs, the fixed initiator
+// ephemeral, the timestamp/counter/preamble, the plaintext body, and the full
+// packet a conformant builder must reproduce. Frozen cases (rak_success,
+// rak_error) carry the ack-style fields: the server static PUBLIC key, the agent
+// (responder-side decryptor) static PRIVATE key, the counter as hex, the body,
+// and the frozen packet a conformant decryptor must open.
+type AgentRegistrationCase struct {
+	// ServerStaticPrivHex / ServerStaticPubHex are the server static X25519 key.
+	// Deterministic cases carry both; frozen (RAK) cases carry only the public half.
+	ServerStaticPrivHex string `json:"server_static_priv_hex,omitempty"`
+	ServerStaticPubHex  string `json:"server_static_pub_hex"`
+	// DeviceStaticPrivHex / DeviceStaticPubHex are the initiator (agent/device)
+	// static X25519 key, used by the deterministic OTP/REG cases.
+	DeviceStaticPrivHex string `json:"device_static_priv_hex,omitempty"`
+	DeviceStaticPubHex  string `json:"device_static_pub_hex,omitempty"`
+	// AgentStaticPrivHex is the agent (responder-side decryptor) static private
+	// X25519 key, used by the frozen RAK cases to open the reply. It is the same
+	// key as the deterministic cases' device_static_priv_hex.
+	AgentStaticPrivHex string `json:"agent_static_priv_hex,omitempty"`
+	// EphemeralPrivHex is the fixed initiator ephemeral private key the
+	// deterministic cases seal under (so the packet is reproducible).
+	EphemeralPrivHex string `json:"ephemeral_priv_hex,omitempty"`
+	// TimestampNanos is the handshake timestamp, decimal string (exceeds 2^53).
+	TimestampNanos string `json:"timestamp_nanos"`
+	// Counter is the deterministic-case counter as a decimal string.
+	Counter string `json:"counter,omitempty"`
+	// CounterHex is the frozen RAK counter as a hex string (no 0x prefix, no
+	// padding). It echoes reg_emailed's counter for the matched pair.
+	CounterHex string `json:"counter_hex,omitempty"`
+	// PreambleHex is the 32-bit HeaderCommon preamble as a hex string
+	// (deterministic cases).
+	PreambleHex string `json:"preamble_hex,omitempty"`
+	// BodyHex is the plaintext registration body the case carries, hex-encoded
+	// (AgentOTPMsg / AgentRegisterMsg / ServerRegisterAckMsg JSON).
+	BodyHex string `json:"body_hex"`
+	// PacketHex is the full wire packet, hex-encoded: for a deterministic case,
+	// the value a conformant builder must reproduce; for a frozen RAK case, the
+	// value a conformant decryptor must open.
+	PacketHex string `json:"packet_hex"`
+}
+
+// ParseAgentRegistrationFile strictly parses the agent-registration golden
+// artifact from raw bytes. It returns an error (never an empty/zero document)
+// when the bytes are malformed or are not the agent-registration artifact, so a
+// consumer test FAILS rather than silently skipping or misreading the contract.
+// DisallowUnknownFields keeps a typo'd or stale schema field from being ignored.
+func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	var af AgentRegistrationFile
+	if err := dec.Decode(&af); err != nil {
+		return nil, fmt.Errorf("conformance: parse agent-registration file: %w", err)
+	}
+	if af.Artifact != AgentRegistrationArtifactID {
+		return nil, fmt.Errorf("conformance: agent-registration file has artifact %q, want %q", af.Artifact, AgentRegistrationArtifactID)
+	}
+	if af.SchemaVersion == 0 {
+		return nil, errors.New("conformance: agent-registration file missing schema_version")
+	}
+	// Fail closed on a blank load-bearing field: a consumer that re-runs the
+	// golden bytes (rebuild the OTP/REG packet_hex / decrypt the RAK packet_hex)
+	// must not silently "pass" on an empty packet or body.
+	for _, c := range []struct {
+		name string
+		c    AgentRegistrationCase
+	}{
+		{"otp", af.OTP},
+		{"reg_emailed", af.RegEmailed},
+		{"reg_preissued", af.RegPreissued},
+		{"rak_success", af.RakSuccess},
+		{"rak_error", af.RakError},
+	} {
+		if c.c.PacketHex == "" {
+			return nil, fmt.Errorf("conformance: agent-registration file missing %s.packet_hex", c.name)
+		}
+		if c.c.BodyHex == "" {
+			return nil, fmt.Errorf("conformance: agent-registration file missing %s.body_hex", c.name)
+		}
+	}
+	return &af, nil
+}

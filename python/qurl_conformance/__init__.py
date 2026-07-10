@@ -20,3 +20,8 @@ def issuer_signature_vectors():
 def relay_knock_vectors():
     """Return the parsed relay_knock_golden.json."""
     return _load("relay_knock_golden.json")
+
+
+def agent_registration_vectors():
+    """Return the parsed agent_registration_golden.json."""
+    return _load("agent_registration_golden.json")
