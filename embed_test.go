@@ -305,16 +305,12 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	if fields := body("cookie_challenge"); len(fields["cookie"]) == 0 || len(fields["trxId"]) == 0 {
 		t.Errorf("cookie_challenge body = %v, want cookie and trxId", fields)
 	}
-	for _, field := range []string{"resHost", "acTokens"} {
-		values, err := stringMap("reject_wrong_resource", field)
-		if err != nil || values[resourceID] != "" {
-			t.Errorf("reject_wrong_resource %s = %v, %v; requested resource must be absent", field, values, err)
-		}
-	}
 	for _, tc := range []struct {
 		name  string
 		field string
 	}{
+		{"reject_wrong_resource", "resHost"},
+		{"reject_wrong_resource", "acTokens"},
 		{"reject_missing_ac_token", "acTokens"},
 		{"reject_empty_ac_token", "acTokens"},
 		{"reject_missing_resource_host", "resHost"},

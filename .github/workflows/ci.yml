@@ -52,11 +52,11 @@ jobs:
         run: cd tools/verify-sdk && go test ./...
 
       - name: npm package smoke
-        run: node -e "const c=require('./npm');const r=c.relayKnockVectors();const a=c.agentRegistrationVectors();const k=c.agentKnockApplicationVectors();if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer||!r.knock.packet_hex||!r.ack.packet_hex||!a.otp.packet_hex||!a.rak_success.packet_hex||!k.request.body_json||!k.reply_cases.length){process.exit(1)}console.log('npm ok')"
+        run: node -e "const c=require('./npm');const r=c.relayKnockVectors();const a=c.agentRegistrationVectors();const k=c.agentKnockApplicationVectors();const m=Object.fromEntries(k.reply_cases.map(v=>[v.name,v]));if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer||!r.knock.packet_hex||!r.ack.packet_hex||!a.otp.packet_hex||!a.rak_success.packet_hex||k.reply_cases.length!==12||m.ack_success.outcome!=='success'||m.ack_deny.reject_class!=='server_deny'||m.reject_counter_mismatch.request_counter===m.reject_counter_mismatch.reply_counter||!Array.isArray(JSON.parse(m.reject_malformed_ac_tokens_map.body_json).acTokens)){process.exit(1)}console.log('npm ok')"
 
       - name: python package smoke
         run: |
-          cd python && python3 -c "import sys;sys.path.insert(0,'.');import qurl_conformance as q;r=q.relay_knock_vectors();a=q.agent_registration_vectors();k=q.agent_knock_application_vectors();assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'] and r['knock']['packet_hex'] and r['ack']['packet_hex'] and a['otp']['packet_hex'] and a['rak_success']['packet_hex'] and k['request']['body_json'] and k['reply_cases'];print('py ok')"
+          cd python && python3 -c "import json,sys;sys.path.insert(0,'.');import qurl_conformance as q;r=q.relay_knock_vectors();a=q.agent_registration_vectors();k=q.agent_knock_application_vectors();m={v['name']:v for v in k['reply_cases']};assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'] and r['knock']['packet_hex'] and r['ack']['packet_hex'] and a['otp']['packet_hex'] and a['rak_success']['packet_hex'] and len(k['reply_cases'])==12 and m['ack_success']['outcome']=='success' and m['ack_deny']['reject_class']=='server_deny' and m['reject_counter_mismatch']['request_counter']!=m['reject_counter_mismatch']['reply_counter'] and isinstance(json.loads(m['reject_malformed_ac_tokens_map']['body_json'])['acTokens'],list);print('py ok')"
 
   # Slack build-completion card. Thin shim over the fleet-shared reusable in
   # layervai/ops-routines-workflows (public mirror of private

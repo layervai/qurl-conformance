@@ -99,8 +99,8 @@ reject labels.
 
 This repository publishes and validates the language-neutral contract; it does
 not pretend that a passing `tools/verify-sdk` run exercises this new artifact.
-The production serializer and reply interpreter are connector-owned. Before the
-OpenNHP removal may ship, `layervai/qurl-connector#421` Phase 1 D must consume
-this released artifact and derive every declared outcome through those real
-paths. Until that downstream gate is green, this artifact is contract input,
-not evidence that a connector implementation is compatible.
+Before any consumer relies on it for compatibility, that consumer must run the
+released artifact through its real production request serializer and reply
+interpreter and derive every declared outcome. Until that downstream gate is
+green, this artifact is contract input, not evidence that an implementation is
+compatible.
