@@ -652,9 +652,10 @@ func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
 	if !json.Valid([]byte(r.BodyJSON)) {
 		return errors.New("conformance: agent-knock request body_json is not valid JSON")
 	}
-	// Field order mirrors the producer wire struct. Equality here intentionally
-	// pins exact compact bytes, including wire names and omission of optional
-	// fields; consumers rebuild the same bytes from Request.Fields.
+	// Field order and json.Marshal's default HTML escaping mirror the Go
+	// producer wire struct. Equality here intentionally pins exact compact bytes,
+	// including wire names and omission of optional fields; consumers rebuild
+	// the same bytes from Request.Fields.
 	want, err := json.Marshal(struct {
 		HeaderType int    `json:"headerType"`
 		UserID     string `json:"usrId"`
@@ -696,8 +697,8 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 			return fmt.Errorf("conformance: deny agent-knock reply case %q must be matched NHP_ACK with reject_class %q", c.Name, AgentKnockRejectServerDeny)
 		}
 	case AgentKnockOutcomeRetry:
-		if c.RejectClass != AgentKnockRejectServerBusy || c.ReplyType != 7 {
-			return fmt.Errorf("conformance: retry agent-knock reply case %q must be NHP_COK with reject_class %q", c.Name, AgentKnockRejectServerBusy)
+		if c.RejectClass != AgentKnockRejectServerBusy || c.ReplyType != 7 || req != reply {
+			return fmt.Errorf("conformance: retry agent-knock reply case %q must be matched NHP_COK with reject_class %q", c.Name, AgentKnockRejectServerBusy)
 		}
 	case AgentKnockOutcomeReject:
 		switch c.RejectClass {

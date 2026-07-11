@@ -365,6 +365,25 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 
 func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 	raw := AgentKnockApplicationVectors()
+	mutateCase := func(t *testing.T, name string, mutate func(*AgentKnockReplyCase)) []byte {
+		t.Helper()
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for i := range doc.ReplyCases {
+			if doc.ReplyCases[i].Name == name {
+				mutate(&doc.ReplyCases[i])
+				b, err := json.Marshal(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return b
+			}
+		}
+		t.Fatalf("missing fixture case %q", name)
+		return nil
+	}
 
 	t.Run("unknown field", func(t *testing.T) {
 		var doc map[string]any
@@ -457,6 +476,42 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown outcome") {
 			t.Fatalf("error = %v, want unknown outcome", err)
+		}
+	})
+
+	t.Run("nonnumeric counter", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.RequestCounter = "not-a-counter"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "request_counter") {
+			t.Fatalf("error = %v, want invalid counter rejection", err)
+		}
+	})
+
+	t.Run("retry counter mismatch", func(t *testing.T) {
+		b := mutateCase(t, "cookie_challenge", func(c *AgentKnockReplyCase) {
+			c.ReplyCounter = "43"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "matched NHP_COK") {
+			t.Fatalf("error = %v, want retry counter rejection", err)
+		}
+	})
+
+	t.Run("success with reject class", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.RejectClass = AgentKnockRejectServerDeny
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "no reject_class") {
+			t.Fatalf("error = %v, want outcome/reject inconsistency rejection", err)
+		}
+	})
+
+	t.Run("unknown reject class", func(t *testing.T) {
+		b := mutateCase(t, "reject_wrong_resource", func(c *AgentKnockReplyCase) {
+			c.RejectClass = "maybe"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown reject_class") {
+			t.Fatalf("error = %v, want unknown reject class rejection", err)
 		}
 	})
 }
