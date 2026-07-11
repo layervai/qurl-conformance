@@ -22,6 +22,9 @@ The canonical bytes also use Go `encoding/json`'s default HTML escaping
 (`&`, `<`, and `>` become `\u0026`, `\u003c`, and `\u003e`). That is the
 producer serializer's behavior and therefore part of this byte-level golden,
 even though the synthetic schema-v1 identifiers do not exercise those escapes.
+Consumers whose default serializer differs (for example JavaScript or Python)
+must configure or post-process serialization to reproduce those escapes before
+performing the byte comparison; a semantic JSON comparison is not equivalent.
 
 | Wire field | Meaning |
 | --- | --- |
@@ -54,7 +57,9 @@ correlation metadata that remains outside the application JSON:
 
 Counters are decimal strings so uint64 precision survives JavaScript and other
 number-limited consumers. `reject_class` is absent on success and required on
-every other outcome.
+every other outcome. Despite its historical name, it classifies the reason for
+all non-success dispositions, including authenticated `deny` and `retry`
+outcomes as well as fail-closed client `reject` outcomes.
 
 | Outcome | Required handling |
 | --- | --- |
@@ -103,6 +108,12 @@ A missing vector is a hard failure, never a skipped test. The Go loader also
 rejects unknown/trailing artifact fields, unsupported schema versions, duplicate
 case names, missing mandatory cases, invalid counters, and unknown outcome or
 reject labels.
+
+The npm and Python packages intentionally expose the producer bytes through
+thin accessors, consistent with the other artifact families; they do not inherit
+the Go loader's strict semantic validation. Consumers in those languages must
+enforce the same closed schema and disposition rules in their production-path
+gate rather than treating a successful JSON parse as conformance.
 
 ## Consumer behavioral gate
 
