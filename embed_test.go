@@ -257,6 +257,114 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 			t.Errorf("missing reply case %q", name)
 		}
 	}
+	assertAgentKnockReplyBodySemantics(t, af)
+}
+
+func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationFile) {
+	t.Helper()
+	byName := make(map[string]AgentKnockReplyCase, len(af.ReplyCases))
+	for _, c := range af.ReplyCases {
+		byName[c.Name] = c
+	}
+	const resourceID = "tunnel-conformance-01"
+
+	body := func(name string) map[string]json.RawMessage {
+		t.Helper()
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(byName[name].BodyJSON), &fields); err != nil {
+			t.Fatalf("%s body: %v", name, err)
+		}
+		return fields
+	}
+	stringField := func(name, field string) string {
+		t.Helper()
+		var value string
+		if err := json.Unmarshal(body(name)[field], &value); err != nil {
+			t.Fatalf("%s.%s: %v", name, field, err)
+		}
+		return value
+	}
+	stringMap := func(name, field string) (map[string]string, error) {
+		var value map[string]string
+		err := json.Unmarshal(body(name)[field], &value)
+		return value, err
+	}
+
+	if got := stringField("ack_success", "errCode"); got != "0" {
+		t.Errorf("ack_success errCode = %q, want 0", got)
+	}
+	for _, field := range []string{"resHost", "acTokens"} {
+		values, err := stringMap("ack_success", field)
+		if err != nil || values[resourceID] == "" {
+			t.Errorf("ack_success %s = %v, %v; want requested non-empty value", field, values, err)
+		}
+	}
+	if got := stringField("ack_deny", "errCode"); got == "" || got == "0" {
+		t.Errorf("ack_deny errCode = %q, want non-success code", got)
+	}
+	if fields := body("cookie_challenge"); len(fields["cookie"]) == 0 || len(fields["trxId"]) == 0 {
+		t.Errorf("cookie_challenge body = %v, want cookie and trxId", fields)
+	}
+	for _, field := range []string{"resHost", "acTokens"} {
+		values, err := stringMap("reject_wrong_resource", field)
+		if err != nil || values[resourceID] != "" {
+			t.Errorf("reject_wrong_resource %s = %v, %v; requested resource must be absent", field, values, err)
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		field string
+	}{
+		{"reject_missing_ac_token", "acTokens"},
+		{"reject_empty_ac_token", "acTokens"},
+		{"reject_missing_resource_host", "resHost"},
+		{"reject_empty_resource_host", "resHost"},
+	} {
+		values, err := stringMap(tc.name, tc.field)
+		if err != nil || values[resourceID] != "" {
+			t.Errorf("%s %s = %v, %v; want requested value absent or empty", tc.name, tc.field, values, err)
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		field string
+	}{
+		{"reject_malformed_ac_tokens_map", "acTokens"},
+		{"reject_malformed_resource_host_map", "resHost"},
+	} {
+		if _, err := stringMap(tc.name, tc.field); err == nil {
+			t.Errorf("%s.%s decoded as map[string]string, want type error", tc.name, tc.field)
+		}
+	}
+}
+
+func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name            string
+		raw             []byte
+		duplicatePrefix string
+		parse           func([]byte) error
+	}{
+		{"qv2", QV2Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseConformanceFile(b); return err }},
+		{"issuer signature", IssuerSignatureVectors(), `{"description":"duplicate",`, func(b []byte) error { _, err := ParseVectorFile(b); return err }},
+		{"relay knock", RelayKnockVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseRelayKnockFile(b); return err }},
+		{"agent registration", AgentRegistrationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err }},
+		{"agent knock application", AgentKnockApplicationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentKnockApplicationFile(b); return err }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			duplicate := append([]byte(tc.duplicatePrefix), tc.raw[1:]...)
+			if err := tc.parse(duplicate); err == nil || !strings.Contains(err.Error(), "duplicate object key") {
+				t.Errorf("duplicate-key error = %v, want duplicate object key", err)
+			}
+			trailing := append(append([]byte(nil), tc.raw...), []byte("\n{}")...)
+			if err := tc.parse(trailing); err == nil || !strings.Contains(err.Error(), "multiple JSON values") {
+				t.Errorf("trailing-value error = %v, want multiple JSON values", err)
+			}
+		})
+	}
 }
 
 func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {

@@ -14,7 +14,9 @@ A breaking shape or semantic change requires a schema-version bump.
 
 `request.fields` carries semantic inputs. A consumer must pass those inputs
 through its real registered-agent request serializer and compare the result
-byte-for-byte with `request.body_json`. The compact JSON body contains exactly:
+byte-for-byte with `request.body_json`. The canonical form is compact JSON with
+no insignificant whitespace and keys in this exact order:
+`headerType`, `usrId`, `devId`, `aspId`, `resId`. The body contains exactly:
 
 | Wire field | Meaning |
 | --- | --- |
@@ -92,3 +94,13 @@ A missing vector is a hard failure, never a skipped test. The Go loader also
 rejects unknown/trailing artifact fields, unsupported schema versions, duplicate
 case names, missing mandatory cases, invalid counters, and unknown outcome or
 reject labels.
+
+## Consumer behavioral gate
+
+This repository publishes and validates the language-neutral contract; it does
+not pretend that a passing `tools/verify-sdk` run exercises this new artifact.
+The production serializer and reply interpreter are connector-owned. Before the
+OpenNHP removal may ship, `layervai/qurl-connector#421` Phase 1 D must consume
+this released artifact and derive every declared outcome through those real
+paths. Until that downstream gate is green, this artifact is contract input,
+not evidence that a connector implementation is compatible.

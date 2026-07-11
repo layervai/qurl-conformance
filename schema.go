@@ -237,10 +237,8 @@ type SignatureVector struct {
 // silently skipping or misreading the contract. DisallowUnknownFields keeps a
 // typo'd or stale schema field from being ignored.
 func ParseConformanceFile(data []byte) (*ConformanceFile, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var cf ConformanceFile
-	if err := dec.Decode(&cf); err != nil {
+	if err := strictDecodeArtifact(data, &cf); err != nil {
 		return nil, fmt.Errorf("conformance: parse conformance file: %w", err)
 	}
 	if cf.Artifact != ConformanceArtifactID {
@@ -259,10 +257,8 @@ func ParseConformanceFile(data []byte) (*ConformanceFile, error) {
 // It returns an error (never an empty/zero document) if the bytes are malformed,
 // so a consumer test FAILS rather than silently skipping the contract.
 func ParseVectorFile(data []byte) (*VectorFile, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var vf VectorFile
-	if err := dec.Decode(&vf); err != nil {
+	if err := strictDecodeArtifact(data, &vf); err != nil {
 		return nil, fmt.Errorf("conformance: parse vector file: %w", err)
 	}
 	if len(vf.Vectors) == 0 {
@@ -352,10 +348,8 @@ type RelayKnockCase struct {
 // than silently skipping or misreading the contract. DisallowUnknownFields keeps a
 // typo'd or stale schema field from being ignored.
 func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var rf RelayKnockFile
-	if err := dec.Decode(&rf); err != nil {
+	if err := strictDecodeArtifact(data, &rf); err != nil {
 		return nil, fmt.Errorf("conformance: parse relay-knock file: %w", err)
 	}
 	if rf.Artifact != RelayKnockArtifactID {
@@ -467,10 +461,8 @@ type AgentRegistrationCase struct {
 // consumer test FAILS rather than silently skipping or misreading the contract.
 // DisallowUnknownFields keeps a typo'd or stale schema field from being ignored.
 func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var af AgentRegistrationFile
-	if err := dec.Decode(&af); err != nil {
+	if err := strictDecodeArtifact(data, &af); err != nil {
 		return nil, fmt.Errorf("conformance: parse agent-registration file: %w", err)
 	}
 	if af.Artifact != AgentRegistrationArtifactID {
@@ -588,16 +580,8 @@ type AgentKnockReplyCase struct {
 // job: those bodies include intentional wrong-map shapes that must reach the
 // production parser.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
-	if err := rejectDuplicateJSONKeys(data); err != nil {
-		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var af AgentKnockApplicationFile
-	if err := dec.Decode(&af); err != nil {
-		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
-	}
-	if err := requireJSONEOF(dec); err != nil {
+	if err := strictDecodeArtifact(data, &af); err != nil {
 		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
 	}
 	if af.Artifact != AgentKnockApplicationArtifactID {
@@ -643,6 +627,19 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		}
 	}
 	return &af, nil
+}
+
+// strictDecodeArtifact applies the same fail-closed JSON contract to every
+// vector family: one top-level value, no duplicate object keys at any depth,
+// and no unknown typed fields. rejectDuplicateJSONKeys already walks through
+// EOF, so the typed decoder needs no redundant second trailing-data pass.
+func strictDecodeArtifact(data []byte, dst any) error {
+	if err := rejectDuplicateJSONKeys(data); err != nil {
+		return err
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	return dec.Decode(dst)
 }
 
 func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
