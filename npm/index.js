@@ -9,4 +9,5 @@ module.exports = {
   issuerSignatureVectors: () => load("issuer_signature_vectors.json"),
   relayKnockVectors: () => load("relay_knock_golden.json"),
   agentRegistrationVectors: () => load("agent_registration_golden.json"),
+  agentKnockApplicationVectors: () => load("agent_knock_application_vectors.json"),
 };

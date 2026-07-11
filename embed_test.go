@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -197,6 +198,175 @@ func TestEmbeddedAgentRegistrationLoads(t *testing.T) {
 	}
 }
 
+func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
+	af, err := AgentKnockApplication()
+	if err != nil {
+		t.Fatalf("AgentKnockApplication(): %v", err)
+	}
+	if af.Artifact != AgentKnockApplicationArtifactID {
+		t.Errorf("artifact = %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
+	}
+	if af.SchemaVersion != 1 {
+		t.Errorf("schema_version = %d, want 1", af.SchemaVersion)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal([]byte(af.Request.BodyJSON), &body); err != nil {
+		t.Fatalf("request.body_json: %v", err)
+	}
+	wantRequestKeys := map[string]bool{
+		"headerType": false,
+		"usrId":      false,
+		"devId":      false,
+		"aspId":      false,
+		"resId":      false,
+	}
+	if len(body) != len(wantRequestKeys) {
+		t.Fatalf("request body field count = %d, want %d: %v", len(body), len(wantRequestKeys), body)
+	}
+	for key := range body {
+		if _, ok := wantRequestKeys[key]; !ok {
+			t.Errorf("request body has unexpected key %q", key)
+		} else {
+			wantRequestKeys[key] = true
+		}
+	}
+	for key, present := range wantRequestKeys {
+		if !present {
+			t.Errorf("request body missing key %q", key)
+		}
+	}
+
+	wantCases := map[string]bool{
+		"ack_success": false, "ack_deny": false, "cookie_challenge": false,
+		"reject_wrong_resource": false, "reject_missing_ac_token": false,
+		"reject_empty_ac_token": false, "reject_missing_resource_host": false,
+		"reject_empty_resource_host": false, "reject_malformed_ac_tokens_map": false,
+		"reject_malformed_resource_host_map": false, "reject_counter_mismatch": false,
+		"reject_reply_type_mismatch": false,
+	}
+	for _, c := range af.ReplyCases {
+		if _, ok := wantCases[c.Name]; !ok {
+			t.Errorf("unexpected reply case %q", c.Name)
+			continue
+		}
+		wantCases[c.Name] = true
+	}
+	for name, present := range wantCases {
+		if !present {
+			t.Errorf("missing reply case %q", name)
+		}
+	}
+}
+
+func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
+	raw := AgentKnockApplicationVectors()
+
+	t.Run("unknown field", func(t *testing.T) {
+		var doc map[string]any
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc["unexpected"] = true
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown field") {
+			t.Fatalf("error = %v, want unknown field", err)
+		}
+	})
+
+	t.Run("duplicate field", func(t *testing.T) {
+		b := append([]byte(`{"artifact":"duplicate",`), raw[1:]...)
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), `duplicate object key "artifact"`) {
+			t.Fatalf("error = %v, want duplicate artifact field", err)
+		}
+	})
+
+	t.Run("trailing value", func(t *testing.T) {
+		b := append(append([]byte(nil), raw...), []byte("\n{}")...)
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "multiple JSON values") {
+			t.Fatalf("error = %v, want multiple JSON values", err)
+		}
+	})
+
+	t.Run("stale schema", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.SchemaVersion = 2
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 1") {
+			t.Fatalf("error = %v, want schema version rejection", err)
+		}
+	})
+
+	t.Run("request body drift", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.Request.BodyJSON = `{"headerType":1,"usrId":"wrong","devId":"agent-conformance-01","aspId":"agent","resId":"tunnel-conformance-01"}`
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "does not match fields") {
+			t.Fatalf("error = %v, want request body mismatch", err)
+		}
+	})
+
+	t.Run("missing mandatory case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.ReplyCases = doc.ReplyCases[1:]
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), `missing reply case "ack_success"`) {
+			t.Fatalf("error = %v, want missing ack_success", err)
+		}
+	})
+
+	t.Run("duplicate case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.ReplyCases = append(doc.ReplyCases, doc.ReplyCases[0])
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "duplicate") {
+			t.Fatalf("error = %v, want duplicate case", err)
+		}
+	})
+
+	t.Run("unknown disposition", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.ReplyCases[0].Outcome = "maybe"
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown outcome") {
+			t.Fatalf("error = %v, want unknown outcome", err)
+		}
+	})
+}
+
 func TestOpenKnownAndUnknown(t *testing.T) {
 	for _, name := range []string{
 		"qv2_conformance_vectors.json",
@@ -207,6 +377,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/relay_knock_golden.json",
 		"agent_registration_golden.json",
 		"vectors/agent_registration_golden.json",
+		"agent_knock_application_vectors.json",
+		"vectors/agent_knock_application_vectors.json",
 	} {
 		b, err := Open(name)
 		if err != nil {

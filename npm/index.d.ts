@@ -2,3 +2,4 @@ export declare function qv2Vectors(): unknown;
 export declare function issuerSignatureVectors(): unknown;
 export declare function relayKnockVectors(): unknown;
 export declare function agentRegistrationVectors(): unknown;
+export declare function agentKnockApplicationVectors(): unknown;

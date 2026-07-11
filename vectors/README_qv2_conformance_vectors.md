@@ -19,6 +19,7 @@ vocabulary + class-to-entry-point map. The artifacts in this directory are:
 | `issuer_signature_vectors.json` | the issuer-signature golden vectors the signature class composes by reference |
 | `relay_knock_golden.json` | the relay-knock Noise-handshake golden packets (artifact `qurl-relay-knock-golden-vectors`), a separate layer (see below) |
 | `agent_registration_golden.json` | the NHP agent-registration OTP/REG/RAK Noise-handshake golden packets (artifact `qurl-agent-registration-golden-vectors`), a separate layer (see below) |
+| `agent_knock_application_vectors.json` | registered-agent KNK/ACK application-body and disposition vectors (artifact `qurl-agent-knock-application-vectors`), separate from packet bytes |
 
 ---
 
@@ -234,6 +235,8 @@ requests and frozen server-sealed RAK replies — not folded into this one.
 reference. Verify-path classes: this file. Relay-knock handshake bytes:
 `relay_knock_golden.json`. Agent-registration handshake bytes:
 `agent_registration_golden.json`.
+Registered-agent knock application semantics:
+`agent_knock_application_vectors.json`.
 
 ---
 

@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Two families live here, each under its own artifact id so they stay decoupled
+// Four families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -13,6 +13,12 @@
 //   - The relay/NHP-handshake golden packets (relay_knock_golden.json): the
 //     deterministic relay-knock packet plus a frozen, server-sealed ack reply
 //     for the Noise handshake layer, which the qURL verify path does not import.
+//   - The NHP agent-registration golden packets
+//     (agent_registration_golden.json): deterministic OTP/REG requests plus
+//     frozen RAK replies.
+//   - The registered-agent knock application contract
+//     (agent_knock_application_vectors.json): exact KNK JSON plus already-
+//     decrypted ACK/COK disposition vectors, with no duplicate packet bytes.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject
@@ -29,6 +35,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
 )
 
 // Expectation constants for a vector's Expect field, shared by both artifacts.
@@ -492,4 +500,312 @@ func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
 		}
 	}
 	return &af, nil
+}
+
+// AgentKnockApplicationArtifactID is the fixed identity of the registered-agent
+// knock application-body artifact. It is deliberately separate from
+// RelayKnockArtifactID: this document starts after Noise decryption and carries
+// no packet bytes, private keys, nonces, or ciphertext.
+const AgentKnockApplicationArtifactID = "qurl-agent-knock-application-vectors"
+
+// Agent-knock application outcomes. A consumer drives each reply through its
+// real reply interpreter and derives one of these outcomes; it must not trust the
+// stored label without exercising the application parser and correlation gates.
+const (
+	AgentKnockOutcomeSuccess = "success"
+	AgentKnockOutcomeDeny    = "deny"
+	AgentKnockOutcomeRetry   = "retry"
+	AgentKnockOutcomeReject  = "reject"
+)
+
+// Agent-knock application reject classes form a closed, consumer-neutral
+// vocabulary. ServerDeny and ServerBusy are authenticated platform outcomes;
+// the other classes are fail-closed client validation failures.
+const (
+	AgentKnockRejectServerDeny    = "server_deny"
+	AgentKnockRejectServerBusy    = "server_busy"
+	AgentKnockRejectWrongResource = "wrong_resource"
+	AgentKnockRejectMissingToken  = "missing_token"
+	AgentKnockRejectMissingHost   = "missing_host"
+	AgentKnockRejectBodyParse     = "body_parse"
+	AgentKnockRejectCounter       = "counter"
+	AgentKnockRejectReplyType     = "reply_type"
+)
+
+// AgentKnockApplicationFile is the versioned application-layer contract for a
+// registered-agent NHP knock. Request carries one deterministic body golden;
+// ReplyCases cover success, authenticated deny, overload, and fail-closed
+// application/correlation negatives without duplicating Noise packet vectors.
+type AgentKnockApplicationFile struct {
+	Artifact      string                       `json:"artifact"`
+	SchemaVersion int                          `json:"schema_version"`
+	Description   string                       `json:"description"`
+	SourceOfTruth string                       `json:"source_of_truth"`
+	Notes         []string                     `json:"notes"`
+	Request       AgentKnockApplicationRequest `json:"request"`
+	ReplyCases    []AgentKnockReplyCase        `json:"reply_cases"`
+}
+
+// AgentKnockApplicationRequest pins the outer NHP type, semantic synthetic
+// inputs, and exact compact JSON body. Keeping the semantic inputs beside the
+// golden prevents a consumer from merely copying BodyJSON: it must construct
+// the body through its production serializer and compare the resulting bytes.
+type AgentKnockApplicationRequest struct {
+	WireType int                                `json:"wire_type"`
+	Fields   AgentKnockApplicationRequestFields `json:"fields"`
+	BodyJSON string                             `json:"body_json"`
+}
+
+// AgentKnockApplicationRequestFields names the five load-bearing registered-
+// agent fields without importing any producer implementation type.
+type AgentKnockApplicationRequestFields struct {
+	HeaderType    int    `json:"header_type"`
+	UserID        string `json:"user_id"`
+	DeviceID      string `json:"device_id"`
+	AuthServiceID string `json:"auth_service_id"`
+	ResourceID    string `json:"resource_id"`
+}
+
+// AgentKnockReplyCase is one already-decrypted reply disposition. Counter
+// values are decimal strings so JavaScript consumers never lose uint64
+// precision. BodyJSON stays raw so malformed application shapes survive the
+// artifact and reach the consumer's real parser.
+type AgentKnockReplyCase struct {
+	Name           string `json:"name"`
+	ReplyType      int    `json:"reply_type"`
+	RequestCounter string `json:"request_counter"`
+	ReplyCounter   string `json:"reply_counter"`
+	BodyJSON       string `json:"body_json"`
+	Outcome        string `json:"outcome"`
+	RejectClass    string `json:"reject_class,omitempty"`
+}
+
+// ParseAgentKnockApplicationFile strictly parses and validates the
+// application-body artifact. It rejects duplicate/unknown/trailing outer
+// fields, stale schema versions, missing mandatory cases, invalid
+// enums/counters, duplicate case names, and a request golden that does not
+// exactly match its semantic fields. Reply body semantics remain the consumer's
+// job: those bodies include intentional wrong-map shapes that must reach the
+// production parser.
+func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
+	if err := rejectDuplicateJSONKeys(data); err != nil {
+		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	var af AgentKnockApplicationFile
+	if err := dec.Decode(&af); err != nil {
+		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
+	}
+	if err := requireJSONEOF(dec); err != nil {
+		return nil, fmt.Errorf("conformance: parse agent-knock application file: %w", err)
+	}
+	if af.Artifact != AgentKnockApplicationArtifactID {
+		return nil, fmt.Errorf("conformance: agent-knock application file has artifact %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
+	}
+	if af.SchemaVersion != 1 {
+		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 1", af.SchemaVersion)
+	}
+	if af.Description == "" || af.SourceOfTruth == "" || len(af.Notes) == 0 {
+		return nil, errors.New("conformance: agent-knock application file missing description, source_of_truth, or notes")
+	}
+	if err := validateAgentKnockRequest(af.Request); err != nil {
+		return nil, err
+	}
+	if len(af.ReplyCases) == 0 {
+		return nil, errors.New("conformance: agent-knock application file has no reply_cases")
+	}
+
+	required := map[string]bool{
+		"ack_success": false, "ack_deny": false, "cookie_challenge": false,
+		"reject_wrong_resource": false, "reject_missing_ac_token": false,
+		"reject_empty_ac_token": false, "reject_missing_resource_host": false,
+		"reject_empty_resource_host": false, "reject_malformed_ac_tokens_map": false,
+		"reject_malformed_resource_host_map": false, "reject_counter_mismatch": false,
+		"reject_reply_type_mismatch": false,
+	}
+	seen := make(map[string]struct{}, len(af.ReplyCases))
+	for _, c := range af.ReplyCases {
+		if _, ok := seen[c.Name]; ok {
+			return nil, fmt.Errorf("conformance: duplicate agent-knock reply case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+		if _, ok := required[c.Name]; ok {
+			required[c.Name] = true
+		}
+		if err := validateAgentKnockReplyCase(c); err != nil {
+			return nil, err
+		}
+	}
+	for name, present := range required {
+		if !present {
+			return nil, fmt.Errorf("conformance: agent-knock application file missing reply case %q", name)
+		}
+	}
+	return &af, nil
+}
+
+func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
+	if r.WireType != 1 {
+		return fmt.Errorf("conformance: agent-knock request wire_type = %d, want NHP_KNK (1)", r.WireType)
+	}
+	if r.Fields.HeaderType != r.WireType {
+		return fmt.Errorf("conformance: agent-knock request header_type %d does not match wire_type %d", r.Fields.HeaderType, r.WireType)
+	}
+	if r.Fields.UserID == "" || r.Fields.DeviceID == "" || r.Fields.AuthServiceID == "" || r.Fields.ResourceID == "" {
+		return errors.New("conformance: agent-knock request has an empty required identity field")
+	}
+	if !json.Valid([]byte(r.BodyJSON)) {
+		return errors.New("conformance: agent-knock request body_json is not valid JSON")
+	}
+	// Field order mirrors the producer wire struct. Equality here intentionally
+	// pins exact compact bytes, including wire names and omission of optional
+	// fields; consumers rebuild the same bytes from Request.Fields.
+	want, err := json.Marshal(struct {
+		HeaderType int    `json:"headerType"`
+		UserID     string `json:"usrId"`
+		DeviceID   string `json:"devId"`
+		AspID      string `json:"aspId"`
+		ResourceID string `json:"resId"`
+	}{r.Fields.HeaderType, r.Fields.UserID, r.Fields.DeviceID, r.Fields.AuthServiceID, r.Fields.ResourceID})
+	if err != nil {
+		return fmt.Errorf("conformance: marshal agent-knock request golden: %w", err)
+	}
+	if !bytes.Equal(want, []byte(r.BodyJSON)) {
+		return fmt.Errorf("conformance: agent-knock request body_json does not match fields: got %s want %s", r.BodyJSON, want)
+	}
+	return nil
+}
+
+func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
+	if c.Name == "" || c.BodyJSON == "" {
+		return errors.New("conformance: agent-knock reply case missing name or body_json")
+	}
+	if !json.Valid([]byte(c.BodyJSON)) {
+		return fmt.Errorf("conformance: agent-knock reply case %q body_json is not valid JSON", c.Name)
+	}
+	req, err := strconv.ParseUint(c.RequestCounter, 10, 64)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-knock reply case %q request_counter: %w", c.Name, err)
+	}
+	reply, err := strconv.ParseUint(c.ReplyCounter, 10, 64)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-knock reply case %q reply_counter: %w", c.Name, err)
+	}
+	switch c.Outcome {
+	case AgentKnockOutcomeSuccess:
+		if c.RejectClass != "" || c.ReplyType != 2 || req != reply {
+			return fmt.Errorf("conformance: success agent-knock reply case %q must be matched NHP_ACK with no reject_class", c.Name)
+		}
+	case AgentKnockOutcomeDeny:
+		if c.RejectClass != AgentKnockRejectServerDeny || c.ReplyType != 2 || req != reply {
+			return fmt.Errorf("conformance: deny agent-knock reply case %q must be matched NHP_ACK with reject_class %q", c.Name, AgentKnockRejectServerDeny)
+		}
+	case AgentKnockOutcomeRetry:
+		if c.RejectClass != AgentKnockRejectServerBusy || c.ReplyType != 7 {
+			return fmt.Errorf("conformance: retry agent-knock reply case %q must be NHP_COK with reject_class %q", c.Name, AgentKnockRejectServerBusy)
+		}
+	case AgentKnockOutcomeReject:
+		switch c.RejectClass {
+		case AgentKnockRejectWrongResource, AgentKnockRejectMissingToken,
+			AgentKnockRejectMissingHost, AgentKnockRejectBodyParse:
+			if c.ReplyType != 2 || req != reply {
+				return fmt.Errorf("conformance: application reject case %q must be a matched NHP_ACK", c.Name)
+			}
+		case AgentKnockRejectCounter:
+			if c.ReplyType != 2 || req == reply {
+				return fmt.Errorf("conformance: counter reject case %q must be NHP_ACK with a non-echoed counter", c.Name)
+			}
+		case AgentKnockRejectReplyType:
+			if c.ReplyType == 2 || c.ReplyType == 7 || req != reply {
+				return fmt.Errorf("conformance: reply_type reject case %q must be a matched counter with neither NHP_ACK nor NHP_COK", c.Name)
+			}
+		default:
+			return fmt.Errorf("conformance: reject agent-knock reply case %q has unknown reject_class %q", c.Name, c.RejectClass)
+		}
+	default:
+		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
+	}
+	return nil
+}
+
+// requireJSONEOF rejects a second JSON value or trailing non-space bytes after a
+// successfully decoded artifact. json.Decoder.Decode alone accepts both.
+func requireJSONEOF(dec *json.Decoder) error {
+	var extra any
+	err := dec.Decode(&extra)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("trailing data: %w", err)
+	}
+	return errors.New("multiple JSON values")
+}
+
+// rejectDuplicateJSONKeys walks one raw JSON value before typed decoding. The
+// standard library otherwise accepts the last value for a repeated object key,
+// which would make a typo or malicious contract edit ambiguous across languages.
+func rejectDuplicateJSONKeys(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := walkJSONValue(dec); err != nil {
+		return err
+	}
+	return requireJSONEOF(dec)
+}
+
+func walkJSONValue(dec *json.Decoder) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := tok.(json.Delim)
+	if !ok {
+		return nil
+	}
+	switch delim {
+	case '{':
+		seen := make(map[string]struct{})
+		for dec.More() {
+			keyToken, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			key, ok := keyToken.(string)
+			if !ok {
+				return fmt.Errorf("object key has type %T, want string", keyToken)
+			}
+			if _, exists := seen[key]; exists {
+				return fmt.Errorf("duplicate object key %q", key)
+			}
+			seen[key] = struct{}{}
+			if err := walkJSONValue(dec); err != nil {
+				return err
+			}
+		}
+		end, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		if end != json.Delim('}') {
+			return fmt.Errorf("object ended with %v, want }", end)
+		}
+	case '[':
+		for dec.More() {
+			if err := walkJSONValue(dec); err != nil {
+				return err
+			}
+		}
+		end, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		if end != json.Delim(']') {
+			return fmt.Errorf("array ended with %v, want ]", end)
+		}
+	default:
+		return fmt.Errorf("unexpected JSON delimiter %q", delim)
+	}
+	return nil
 }
