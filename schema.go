@@ -600,13 +600,13 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		return nil, errors.New("conformance: agent-knock application file has no reply_cases")
 	}
 
-	required := map[string]bool{
-		"ack_success": false, "ack_deny": false, "cookie_challenge": false,
-		"reject_wrong_resource": false, "reject_missing_ac_token": false,
-		"reject_empty_ac_token": false, "reject_missing_resource_host": false,
-		"reject_empty_resource_host": false, "reject_malformed_ac_tokens_map": false,
-		"reject_malformed_resource_host_map": false, "reject_counter_mismatch": false,
-		"reject_reply_type_mismatch": false,
+	required := []string{
+		"ack_success", "ack_deny", "cookie_challenge",
+		"reject_wrong_resource", "reject_missing_ac_token",
+		"reject_empty_ac_token", "reject_missing_resource_host",
+		"reject_empty_resource_host", "reject_malformed_ac_tokens_map",
+		"reject_malformed_resource_host_map", "reject_counter_mismatch",
+		"reject_reply_type_mismatch",
 	}
 	seen := make(map[string]struct{}, len(af.ReplyCases))
 	for _, c := range af.ReplyCases {
@@ -614,15 +614,12 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 			return nil, fmt.Errorf("conformance: duplicate agent-knock reply case %q", c.Name)
 		}
 		seen[c.Name] = struct{}{}
-		if _, ok := required[c.Name]; ok {
-			required[c.Name] = true
-		}
 		if err := validateAgentKnockReplyCase(c); err != nil {
 			return nil, err
 		}
 	}
-	for name, present := range required {
-		if !present {
+	for _, name := range required {
+		if _, present := seen[name]; !present {
 			return nil, fmt.Errorf("conformance: agent-knock application file missing reply case %q", name)
 		}
 	}

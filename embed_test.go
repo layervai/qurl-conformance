@@ -385,19 +385,9 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
-	t.Run("duplicate field", func(t *testing.T) {
-		b := append([]byte(`{"artifact":"duplicate",`), raw[1:]...)
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), `duplicate object key "artifact"`) {
-			t.Fatalf("error = %v, want duplicate artifact field", err)
-		}
-	})
-
-	t.Run("trailing value", func(t *testing.T) {
-		b := append(append([]byte(nil), raw...), []byte("\n{}")...)
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "multiple JSON values") {
-			t.Fatalf("error = %v, want multiple JSON values", err)
-		}
-	})
+	// Duplicate-key and trailing-value behavior is covered for this parser and
+	// every older artifact parser by
+	// TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues.
 
 	t.Run("stale schema", func(t *testing.T) {
 		var doc AgentKnockApplicationFile
