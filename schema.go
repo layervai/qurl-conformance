@@ -697,8 +697,12 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 			return fmt.Errorf("conformance: deny agent-knock reply case %q must be matched NHP_ACK with reject_class %q", c.Name, AgentKnockRejectServerDeny)
 		}
 	case AgentKnockOutcomeRetry:
-		if c.RejectClass != AgentKnockRejectServerBusy || c.ReplyType != 7 || req != reply {
-			return fmt.Errorf("conformance: retry agent-knock reply case %q must be matched NHP_COK with reject_class %q", c.Name, AgentKnockRejectServerBusy)
+		// NHP_COK is an authenticated overload signal, not a completed
+		// transaction. The reference relay returns it before applying the
+		// ordinary reply-counter echo gate, so its two valid counters remain
+		// intentionally unconstrained relative to one another.
+		if c.RejectClass != AgentKnockRejectServerBusy || c.ReplyType != 7 {
+			return fmt.Errorf("conformance: retry agent-knock reply case %q must be NHP_COK with reject_class %q", c.Name, AgentKnockRejectServerBusy)
 		}
 	case AgentKnockOutcomeReject:
 		switch c.RejectClass {

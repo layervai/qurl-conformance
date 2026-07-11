@@ -488,12 +488,12 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
-	t.Run("retry counter mismatch", func(t *testing.T) {
+	t.Run("retry counter mismatch remains valid", func(t *testing.T) {
 		b := mutateCase(t, "cookie_challenge", func(c *AgentKnockReplyCase) {
 			c.ReplyCounter = "43"
 		})
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "matched NHP_COK") {
-			t.Fatalf("error = %v, want retry counter rejection", err)
+		if _, err := ParseAgentKnockApplicationFile(b); err != nil {
+			t.Fatalf("ParseAgentKnockApplicationFile = %v, want NHP_COK counters intentionally unconstrained", err)
 		}
 	})
 

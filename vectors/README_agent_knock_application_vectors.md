@@ -16,7 +16,7 @@ A breaking shape or semantic change requires a schema-version bump.
 through its real registered-agent request serializer and compare the result
 byte-for-byte with `request.body_json`. The canonical form is compact JSON with
 no insignificant whitespace and keys in this exact order:
-`headerType`, `usrId`, `devId`, `aspId`, `resId`. The body contains exactly:
+`headerType`, `usrId`, `devId`, `aspId`, `resId`.
 
 The canonical bytes also use Go `encoding/json`'s default HTML escaping
 (`&`, `<`, and `>` become `\u0026`, `\u003c`, and `\u003e`). That is the
@@ -60,7 +60,7 @@ every other outcome.
 | --- | --- |
 | `success` | usable admission; return the non-empty token and host for the requested `resId` |
 | `deny` | authenticated server denial; preserve `errCode` for classification |
-| `retry` | authenticated, counter-matched `NHP_COK` overload challenge; retry later |
+| `retry` | authenticated `NHP_COK` overload challenge; retry later |
 | `reject` | malformed, mis-correlated, or unusable reply; fail closed |
 
 Closed `reject_class` vocabulary:
@@ -82,9 +82,12 @@ Consumers must derive each declared outcome through their production paths:
 
 1. Construct the request body from `request.fields` and compare exact bytes with
    `request.body_json`.
-2. Require every `NHP_COK` and `NHP_ACK` to echo the request counter. Treat a
-   counter-matched `NHP_COK` as retry-later. For every admission reply, require
-   `NHP_ACK` before trusting its body.
+2. Treat `NHP_COK` as retry-later before applying the ordinary transaction
+   counter gate. Its request and reply counters must each be valid uint64 values
+   but are intentionally unconstrained relative to one another: the reference
+   relay treats a cookie challenge as an authenticated overload signal rather
+   than a completed transaction. For every admission reply, require `NHP_ACK`
+   and an echoed request counter before trusting its body.
 3. Decode the ACK body into typed fields: string `errCode`, string-to-string
    `resHost`, string `agentAddr`, and string-to-string `acTokens`. A wrong map
    type fails parsing; it must not become an empty success value silently.
