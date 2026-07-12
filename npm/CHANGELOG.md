@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/layervai/qurl-conformance/compare/npm-v0.1.2...npm-v0.1.3) (2026-07-12)
+
+
+### Features
+
+* add NHP agent-registration golden vectors (OTP/REG/RAK) ([#20](https://github.com/layervai/qurl-conformance/issues/20)) ([9332f91](https://github.com/layervai/qurl-conformance/commit/9332f910429cac98470266fe2e671f20964d2d2b))
+* **vectors:** add agent knock application contract ([#24](https://github.com/layervai/qurl-conformance/issues/24)) ([ba592ec](https://github.com/layervai/qurl-conformance/commit/ba592ecf18aa39369479d583b4c234343c675278))
+
 ## [0.1.2](https://github.com/layervai/qurl-conformance/compare/npm-v0.1.1...npm-v0.1.2) (2026-07-01)
 
 
