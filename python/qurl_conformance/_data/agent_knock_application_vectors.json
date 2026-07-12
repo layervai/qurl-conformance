@@ -1,0 +1,133 @@
+{
+  "artifact": "qurl-agent-knock-application-vectors",
+  "schema_version": 1,
+  "description": "Application-body and reply-disposition vectors for a registered agent NHP knock. These vectors begin after Noise decryption and do not duplicate packet bytes.",
+  "source_of_truth": "github.com/layervai/qurl-conformance",
+  "notes": [
+    "The request body is the exact compact JSON produced from the listed synthetic fields. headerType MUST equal the outer NHP_KNK type (1).",
+    "A success ACK is usable only when both acTokens and resHost contain the requested resId with non-empty values.",
+    "errCode is a string. Empty string and \"0\" are success; every other value is an authenticated deny and MUST be handled before success-map validation.",
+    "agentAddr is corroborating server output, not the authorization signal. The per-resource acTokens entry is the authorization signal.",
+    "NHP_COK is retry-later. Every other wrong reply type, a non-echoed ACK counter, malformed maps, or maps for another resource fails closed."
+  ],
+  "request": {
+    "wire_type": 1,
+    "fields": {
+      "header_type": 1,
+      "user_id": "agent-conformance-01",
+      "device_id": "agent-conformance-01",
+      "auth_service_id": "agent",
+      "resource_id": "tunnel-conformance-01"
+    },
+    "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"tunnel-conformance-01\"}"
+  },
+  "reply_cases": [
+    {
+      "name": "ack_success",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "success"
+    },
+    {
+      "name": "ack_deny",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "cookie_challenge",
+      "reply_type": 7,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"trxId\":42,\"cookie\":\"synthetic-cookie\"}",
+      "outcome": "retry",
+      "reject_class": "server_busy"
+    },
+    {
+      "name": "reject_wrong_resource",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-other-01\":\"frps.other.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-other-01\":\"ac-token-other-01\"}}",
+      "outcome": "reject",
+      "reject_class": "wrong_resource"
+    },
+    {
+      "name": "reject_missing_ac_token",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{}}",
+      "outcome": "reject",
+      "reject_class": "missing_token"
+    },
+    {
+      "name": "reject_empty_ac_token",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"\"}}",
+      "outcome": "reject",
+      "reject_class": "missing_token"
+    },
+    {
+      "name": "reject_missing_resource_host",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "reject",
+      "reject_class": "missing_host"
+    },
+    {
+      "name": "reject_empty_resource_host",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "reject",
+      "reject_class": "missing_host"
+    },
+    {
+      "name": "reject_malformed_ac_tokens_map",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":[]}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_malformed_resource_host_map",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":[],\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_counter_mismatch",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "43",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "reject",
+      "reject_class": "counter"
+    },
+    {
+      "name": "reject_reply_type_mismatch",
+      "reply_type": 14,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "outcome": "reject",
+      "reject_class": "reply_type"
+    }
+  ]
+}

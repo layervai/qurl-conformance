@@ -25,3 +25,8 @@ def relay_knock_vectors():
 def agent_registration_vectors():
     """Return the parsed agent_registration_golden.json."""
     return _load("agent_registration_golden.json")
+
+
+def agent_knock_application_vectors():
+    """Return the parsed agent_knock_application_vectors.json."""
+    return _load("agent_knock_application_vectors.json")

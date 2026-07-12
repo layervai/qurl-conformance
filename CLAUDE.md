@@ -10,6 +10,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   only deliberately, and re-run `go test ./...` after any edit.
 - `qv2_conformance_vectors.json` is the conformance classes; it composes
   `issuer_signature_vectors.json` (the signature golden bytes) by reference.
+- `agent_knock_application_vectors.json` starts after Noise decryption. Keep it
+  consumer-neutral and do not add packet/key/ciphertext fields already covered
+  by `relay_knock_golden.json`.
 - `vectors/README_qv2_conformance_vectors.md` is the schema + `reject_class`
   vocabulary + class-to-entry-point map. Keep it in sync with any schema change.
 
