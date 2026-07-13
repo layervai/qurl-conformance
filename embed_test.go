@@ -206,8 +206,8 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 1 {
-		t.Errorf("schema_version = %d, want 1", af.SchemaVersion)
+	if af.SchemaVersion != 2 {
+		t.Errorf("schema_version = %d, want 2", af.SchemaVersion)
 	}
 
 	var body map[string]any
@@ -220,6 +220,7 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 		"devId":      false,
 		"aspId":      false,
 		"resId":      false,
+		"runId":      false,
 	}
 	if len(body) != len(wantRequestKeys) {
 		t.Fatalf("request body field count = %d, want %d: %v", len(body), len(wantRequestKeys), body)
@@ -236,6 +237,30 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 			t.Errorf("request body missing key %q", key)
 		}
 	}
+	if got := body["runId"]; got != af.Request.Fields.RunID {
+		t.Errorf("request body runId = %v, want semantic run_id %q", got, af.Request.Fields.RunID)
+	}
+
+	wantRequestCases := map[string]bool{
+		"canonical_run_id": false, "missing_run_id": false, "empty_run_id": false,
+		"reject_duplicate_run_id": false, "reject_alias_run_id": false,
+		"reject_alias_snake_case_run_id": false, "reject_whitespace_run_id": false,
+		"reject_internal_whitespace_run_id": false, "reject_uppercase_run_id": false, "reject_short_run_id": false,
+		"reject_long_run_id": false, "reject_nonhex_run_id": false,
+	}
+	for _, c := range af.RequestCases {
+		if _, ok := wantRequestCases[c.Name]; !ok {
+			t.Errorf("unexpected request case %q", c.Name)
+			continue
+		}
+		wantRequestCases[c.Name] = true
+	}
+	for name, present := range wantRequestCases {
+		if !present {
+			t.Errorf("missing request case %q", name)
+		}
+	}
+	assertAgentKnockRequestPolicies(t, af)
 
 	wantCases := map[string]bool{
 		"ack_success": false, "ack_deny": false, "cookie_challenge": false,
@@ -260,13 +285,106 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 	assertAgentKnockReplyBodySemantics(t, af)
 }
 
+func assertAgentKnockRequestPolicies(t *testing.T, af *AgentKnockApplicationFile) {
+	t.Helper()
+	byName := make(map[string]AgentKnockRequestCase, len(af.RequestCases))
+	for _, c := range af.RequestCases {
+		byName[c.Name] = c
+	}
+	assertAccept := func(caseName, entryPoint string, got AgentKnockRequestExpectation, runID string) {
+		t.Helper()
+		if got.Outcome != ExpectAccept || got.ParsedRunID == nil || *got.ParsedRunID != runID || got.RejectClass != "" {
+			t.Errorf("%s.%s = %+v, want accept run_id %q", caseName, entryPoint, got, runID)
+		}
+	}
+	assertReject := func(caseName, entryPoint string, got AgentKnockRequestExpectation, class string) {
+		t.Helper()
+		if got.Outcome != ExpectReject || got.ParsedRunID != nil || got.RejectClass != class {
+			t.Errorf("%s.%s = %+v, want reject class %q", caseName, entryPoint, got, class)
+		}
+	}
+
+	canonical := byName["canonical_run_id"]
+	assertAccept(canonical.Name, "generic_parser", canonical.GenericParser, af.Request.Fields.RunID)
+	assertAccept(canonical.Name, "native_connector", canonical.NativeConnector, af.Request.Fields.RunID)
+	if canonical.BodyJSON != af.Request.BodyJSON {
+		t.Errorf("canonical_run_id body differs from request golden")
+	}
+	for _, name := range []string{"missing_run_id", "empty_run_id"} {
+		c := byName[name]
+		assertAccept(name, "generic_parser", c.GenericParser, "")
+		assertReject(name, "native_connector", c.NativeConnector, AgentKnockRejectMissingRunID)
+	}
+	for _, name := range []string{"reject_duplicate_run_id", "reject_alias_run_id", "reject_alias_snake_case_run_id"} {
+		c := byName[name]
+		assertReject(name, "generic_parser", c.GenericParser, AgentKnockRejectBodyParse)
+		assertReject(name, "native_connector", c.NativeConnector, AgentKnockRejectBodyParse)
+	}
+	for _, name := range []string{
+		"reject_whitespace_run_id", "reject_internal_whitespace_run_id",
+		"reject_uppercase_run_id", "reject_short_run_id",
+		"reject_long_run_id", "reject_nonhex_run_id",
+	} {
+		c := byName[name]
+		assertReject(name, "generic_parser", c.GenericParser, AgentKnockRejectInvalidRunID)
+		assertReject(name, "native_connector", c.NativeConnector, AgentKnockRejectInvalidRunID)
+	}
+
+	if got := strings.Count(byName["reject_duplicate_run_id"].BodyJSON, `"runId"`); got != 2 {
+		t.Errorf("duplicate case has %d runId keys, want 2", got)
+	}
+	if body := byName["reject_alias_run_id"].BodyJSON; !strings.Contains(body, `"runID"`) || strings.Contains(body, `"runId"`) {
+		t.Errorf("runID alias case does not isolate the alias: %s", body)
+	}
+	if body := byName["reject_alias_snake_case_run_id"].BodyJSON; !strings.Contains(body, `"run_id"`) || strings.Contains(body, `"runId"`) {
+		t.Errorf("run_id alias case does not isolate the alias: %s", body)
+	}
+}
+
+func TestAgentKnockRequestExactKeyGateIsLoadBearing(t *testing.T) {
+	af, err := AgentKnockApplication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var alias AgentKnockRequestCase
+	for _, c := range af.RequestCases {
+		if c.Name == "reject_alias_run_id" {
+			alias = c
+			break
+		}
+	}
+	if alias.Name == "" {
+		t.Fatal("missing reject_alias_run_id fixture")
+	}
+
+	// This documents why rejectUnknownAgentKnockRequestKeys cannot be folded
+	// into strictDecodeArtifact: encoding/json treats runID as a case-insensitive
+	// match for the runId struct tag even when unknown fields are disallowed.
+	var wire agentKnockRequestWireBody
+	dec := json.NewDecoder(strings.NewReader(alias.BodyJSON))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&wire); err != nil {
+		t.Fatalf("stdlib alias decode = %v, want acceptance that the exact-key gate overrides", err)
+	}
+	if string(wire.RunID) != `"0123456789abcdef"` {
+		t.Fatalf("stdlib runID alias decoded as %s, want canonical value", wire.RunID)
+	}
+
+	generic, connector := deriveAgentKnockRequestExpectations(af.Request.Fields, []byte(alias.BodyJSON))
+	for name, got := range map[string]AgentKnockRequestExpectation{"generic": generic, "connector": connector} {
+		if got.Outcome != ExpectReject || got.RejectClass != AgentKnockRejectBodyParse || got.ParsedRunID != nil {
+			t.Errorf("%s exact-key outcome = %+v, want body_parse rejection", name, got)
+		}
+	}
+}
+
 func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationFile) {
 	t.Helper()
 	byName := make(map[string]AgentKnockReplyCase, len(af.ReplyCases))
 	for _, c := range af.ReplyCases {
 		byName[c.Name] = c
 	}
-	const resourceID = "tunnel-conformance-01"
+	const resourceID = "connector-conformance-01"
 
 	body := func(name string) map[string]json.RawMessage {
 		t.Helper()
@@ -365,6 +483,25 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 
 func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 	raw := AgentKnockApplicationVectors()
+	mutateRequestCase := func(t *testing.T, name string, mutate func(*AgentKnockRequestCase)) []byte {
+		t.Helper()
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for i := range doc.RequestCases {
+			if doc.RequestCases[i].Name == name {
+				mutate(&doc.RequestCases[i])
+				b, err := json.Marshal(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return b
+			}
+		}
+		t.Fatalf("missing fixture request case %q", name)
+		return nil
+	}
 	mutateCase := func(t *testing.T, name string, mutate func(*AgentKnockReplyCase)) []byte {
 		t.Helper()
 		var doc AgentKnockApplicationFile
@@ -409,12 +546,12 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			t.Fatal(err)
 		}
-		doc.SchemaVersion = 2
+		doc.SchemaVersion = 1
 		b, err := json.Marshal(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 1") {
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 2") {
 			t.Fatalf("error = %v, want schema version rejection", err)
 		}
 	})
@@ -424,13 +561,95 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			t.Fatal(err)
 		}
-		doc.Request.BodyJSON = `{"headerType":1,"usrId":"wrong","devId":"agent-conformance-01","aspId":"agent","resId":"tunnel-conformance-01"}`
+		doc.Request.BodyJSON = `{"headerType":1,"usrId":"wrong","devId":"agent-conformance-01","aspId":"agent","resId":"connector-conformance-01","runId":"0123456789abcdef"}`
 		b, err := json.Marshal(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "does not match fields") {
 			t.Fatalf("error = %v, want request body mismatch", err)
+		}
+	})
+
+	t.Run("noncanonical request semantic run id", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.Request.Fields.RunID = "0123456789ABCDEF"
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "lowercase hexadecimal") {
+			t.Fatalf("error = %v, want canonical run_id rejection", err)
+		}
+	})
+
+	t.Run("missing mandatory request case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.RequestCases = doc.RequestCases[1:]
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), `missing request case "canonical_run_id"`) {
+			t.Fatalf("error = %v, want missing canonical_run_id", err)
+		}
+	})
+
+	t.Run("duplicate request case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc.RequestCases = append(doc.RequestCases, doc.RequestCases[0])
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "duplicate agent-knock request case") {
+			t.Fatalf("error = %v, want duplicate request case", err)
+		}
+	})
+
+	t.Run("unknown request case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		extra := doc.RequestCases[0]
+		extra.Name = "unexpected_run_id_case"
+		doc.RequestCases = append(doc.RequestCases, extra)
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown agent-knock request case") {
+			t.Fatalf("error = %v, want unknown request case rejection", err)
+		}
+	})
+
+	t.Run("request policy label drift", func(t *testing.T) {
+		b := mutateRequestCase(t, "missing_run_id", func(c *AgentKnockRequestCase) {
+			c.NativeConnector = requestAcceptExpectation("")
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "native_connector expectation") {
+			t.Fatalf("error = %v, want derived expectation mismatch", err)
+		}
+	})
+
+	t.Run("request body and label drift together", func(t *testing.T) {
+		b := mutateRequestCase(t, "reject_uppercase_run_id", func(c *AgentKnockRequestCase) {
+			c.BodyJSON = `{"headerType":1,"usrId":"agent-conformance-01","devId":"agent-conformance-01","aspId":"agent","resId":"connector-conformance-01","runId":"0123456789abcdef"}`
+			c.GenericParser = requestAcceptExpectation("0123456789abcdef")
+			c.NativeConnector = requestAcceptExpectation("0123456789abcdef")
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "required exact vector") {
+			t.Fatalf("error = %v, want required case body rejection", err)
 		}
 	})
 

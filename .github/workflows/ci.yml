@@ -52,11 +52,77 @@ jobs:
         run: cd tools/verify-sdk && go test ./...
 
       - name: npm package smoke
-        run: node -e "const c=require('./npm');const r=c.relayKnockVectors();const a=c.agentRegistrationVectors();const k=c.agentKnockApplicationVectors();const m=Object.fromEntries(k.reply_cases.map(v=>[v.name,v]));if(!c.qv2Vectors().classes||!c.issuerSignatureVectors().issuer||!r.knock.packet_hex||!r.ack.packet_hex||!a.otp.packet_hex||!a.rak_success.packet_hex||k.reply_cases.length!==12||m.ack_success.outcome!=='success'||m.ack_deny.reject_class!=='server_deny'||m.reject_counter_mismatch.request_counter===m.reject_counter_mismatch.reply_counter||!Array.isArray(JSON.parse(m.reject_malformed_ac_tokens_map.body_json).acTokens)){process.exit(1)}console.log('npm ok')"
+        run: |
+          node <<'NODE'
+          const c = require('./npm');
+          const r = c.relayKnockVectors();
+          const a = c.agentRegistrationVectors();
+          const k = c.agentKnockApplicationVectors();
+          const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
+          const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
+          const canonical = '0123456789abcdef';
+          // Stock JSON parsing is intentionally insufficient for these cases:
+          // duplicate keys collapse last-wins and aliases remain unchecked.
+          const lossyDuplicate = JSON.parse(requests.reject_duplicate_run_id.body_json);
+          const uncheckedAlias = JSON.parse(requests.reject_alias_run_id.body_json);
+          if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
+              !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
+              k.schema_version !== 2 || k.request.fields.run_id !== canonical ||
+              JSON.parse(k.request.body_json).runId !== canonical || k.request_cases.length !== 12 ||
+              requests.canonical_run_id.native_connector.parsed_run_id !== canonical ||
+              requests.missing_run_id.generic_parser.parsed_run_id !== '' ||
+              requests.missing_run_id.native_connector.reject_class !== 'missing_run_id' ||
+              requests.reject_uppercase_run_id.generic_parser.reject_class !== 'invalid_run_id' ||
+              requests.reject_alias_run_id.native_connector.reject_class !== 'body_parse' ||
+              lossyDuplicate.runId !== 'fedcba9876543210' ||
+              uncheckedAlias.runID !== canonical || uncheckedAlias.runId !== undefined ||
+              k.reply_cases.length !== 12 || replies.ack_success.outcome !== 'success' ||
+              replies.ack_deny.reject_class !== 'server_deny' ||
+              replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
+              !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens)) {
+            process.exit(1);
+          }
+          console.log('npm ok');
+          NODE
 
       - name: python package smoke
         run: |
-          cd python && python3 -c "import json,sys;sys.path.insert(0,'.');import qurl_conformance as q;r=q.relay_knock_vectors();a=q.agent_registration_vectors();k=q.agent_knock_application_vectors();m={v['name']:v for v in k['reply_cases']};assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer'] and r['knock']['packet_hex'] and r['ack']['packet_hex'] and a['otp']['packet_hex'] and a['rak_success']['packet_hex'] and len(k['reply_cases'])==12 and m['ack_success']['outcome']=='success' and m['ack_deny']['reject_class']=='server_deny' and m['reject_counter_mismatch']['request_counter']!=m['reject_counter_mismatch']['reply_counter'] and isinstance(json.loads(m['reject_malformed_ac_tokens_map']['body_json'])['acTokens'],list);print('py ok')"
+          cd python
+          python3 <<'PY'
+          import json
+          import sys
+          sys.path.insert(0, '.')
+          import qurl_conformance as q
+
+          r = q.relay_knock_vectors()
+          a = q.agent_registration_vectors()
+          k = q.agent_knock_application_vectors()
+          replies = {v['name']: v for v in k['reply_cases']}
+          requests = {v['name']: v for v in k['request_cases']}
+          canonical = '0123456789abcdef'
+          # Stock JSON parsing is intentionally insufficient for these cases:
+          # duplicate keys collapse last-wins and aliases remain unchecked.
+          lossy_duplicate = json.loads(requests['reject_duplicate_run_id']['body_json'])
+          unchecked_alias = json.loads(requests['reject_alias_run_id']['body_json'])
+          assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
+          assert r['knock']['packet_hex'] and r['ack']['packet_hex']
+          assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
+          assert k['schema_version'] == 2 and k['request']['fields']['run_id'] == canonical
+          assert json.loads(k['request']['body_json'])['runId'] == canonical
+          assert len(k['request_cases']) == 12
+          assert requests['canonical_run_id']['native_connector']['parsed_run_id'] == canonical
+          assert requests['missing_run_id']['generic_parser']['parsed_run_id'] == ''
+          assert requests['missing_run_id']['native_connector']['reject_class'] == 'missing_run_id'
+          assert requests['reject_uppercase_run_id']['generic_parser']['reject_class'] == 'invalid_run_id'
+          assert requests['reject_alias_run_id']['native_connector']['reject_class'] == 'body_parse'
+          assert lossy_duplicate['runId'] == 'fedcba9876543210'
+          assert unchecked_alias['runID'] == canonical and 'runId' not in unchecked_alias
+          assert len(k['reply_cases']) == 12 and replies['ack_success']['outcome'] == 'success'
+          assert replies['ack_deny']['reject_class'] == 'server_deny'
+          assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
+          assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
+          print('py ok')
+          PY
 
   # Slack build-completion card. Thin shim over the fleet-shared reusable in
   # layervai/ops-routines-workflows (public mirror of private

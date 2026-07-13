@@ -21,7 +21,7 @@ trust.
 | `vectors/issuer_signature_vectors.json` | the issuer-signature golden vectors (P-256 raw r\|\|s low-S) the signature class composes by reference |
 | `vectors/relay_knock_golden.json` | the relay/NHP-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s): a deterministic knock packet plus a frozen, server-sealed ack reply (see Scope) |
 | `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
-| `vectors/agent_knock_application_vectors.json` | registered-agent KNK body plus already-decrypted ACK/COK disposition vectors; no Noise packet duplication |
+| `vectors/agent_knock_application_vectors.json` | registered-agent KNK body and RunID request-policy cases plus already-decrypted ACK/COK dispositions; no Noise packet duplication |
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
@@ -85,12 +85,16 @@ This module hosts four artifact families, each under its own `artifact` id:
   counter contract against a positive fixture. All keys/ids/secrets are synthetic.
 - **Registered-agent knock application contract**
   (`qurl-agent-knock-application-vectors`,
-  `agent_knock_application_vectors.json`) — the exact compact five-field KNK
-  body and synthetic, already-decrypted reply dispositions for ACK success,
+  `agent_knock_application_vectors.json`) — the exact compact six-field KNK
+  body, authenticated RunID request-policy cases, and synthetic,
+  already-decrypted reply dispositions for ACK success,
   authenticated deny, cookie challenge, wrong resource, malformed/missing maps,
-  and reply counter/type mismatch. It contains no Noise packets or key material;
-  consumers compose it with their real body serializer, reply parser, and
-  transport correlation gates. See
+  and reply counter/type mismatch. Generic protocol parsing keeps RunID optional,
+  while the native qURL Connector gate requires one canonical 16-character
+  lowercase-hex value. It contains no Noise packets or key material; consumers
+  compose it with their real body serializer, request-policy gates, reply parser,
+  and transport correlation gates. Its `resId` semantic is the placement-neutral
+  NHP `knock_resource_id`, not the public-key management `resource_id`. See
   `vectors/README_agent_knock_application_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that

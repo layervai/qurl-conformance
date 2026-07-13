@@ -13,6 +13,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - `agent_knock_application_vectors.json` starts after Noise decryption. Keep it
   consumer-neutral and do not add packet/key/ciphertext fields already covered
   by `relay_knock_golden.json`.
+- Keep its raw RunID request cases at the application-body layer. The generic
+  parser and native qURL Connector expectations are separate entry points; do
+  not turn either into a second full packet artifact.
 - `vectors/README_qv2_conformance_vectors.md` is the schema + `reject_class`
   vocabulary + class-to-entry-point map. Keep it in sync with any schema change.
 

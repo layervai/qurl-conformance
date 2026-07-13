@@ -235,8 +235,12 @@ requests and frozen server-sealed RAK replies — not folded into this one.
 reference. Verify-path classes: this file. Relay-knock handshake bytes:
 `relay_knock_golden.json`. Agent-registration handshake bytes:
 `agent_registration_golden.json`.
-Registered-agent knock application semantics:
+Registered-agent knock application semantics, including the authenticated
+RunID policy split between the generic parser and native qURL Connector:
 `agent_knock_application_vectors.json`.
+Its `missing_run_id` / `invalid_run_id` request classes are scoped to that
+separate artifact and intentionally remain outside this qURL-v2 reject vocabulary;
+see `README_agent_knock_application_vectors.md` for their closed definitions.
 
 ---
 
