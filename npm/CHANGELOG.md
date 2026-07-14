@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.1.3...npm-v0.2.0) (2026-07-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** agent knock application vectors now use schema version 2 with authenticated runId request policies.
+
+### Features
+
+* **vectors:** bind agent knocks to cycle run IDs ([#26](https://github.com/layervai/qurl-conformance/issues/26)) ([dce363b](https://github.com/layervai/qurl-conformance/commit/dce363b5c018639cd5cacdb321cde0daf37eb805))
+
 ## [0.1.3](https://github.com/layervai/qurl-conformance/compare/npm-v0.1.2...npm-v0.1.3) (2026-07-12)
 
 
