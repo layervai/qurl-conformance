@@ -17,8 +17,9 @@
 //     (agent_registration_golden.json): deterministic OTP/REG requests plus
 //     frozen RAK replies.
 //   - The registered-agent knock application contract
-//     (agent_knock_application_vectors.json): exact KNK JSON plus already-
-//     decrypted ACK/COK disposition vectors, with no duplicate packet bytes.
+//     (agent_knock_application_vectors.json): exact KNK JSON, RunID request
+//     policy, and already-decrypted ACK/COK disposition vectors, with no
+//     duplicate packet bytes.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject
@@ -36,10 +37,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
+	"strings"
 )
 
-// Expectation constants for a vector's Expect field, shared by both artifacts.
+// Expectation constants for accept/reject vector fields across artifacts.
 const (
 	ExpectAccept = "accept"
 	ExpectReject = "reject"
@@ -524,8 +527,22 @@ const (
 	AgentKnockRejectReplyType     = "reply_type"
 )
 
+// Agent-knock request reject classes distinguish strict JSON-shape failures
+// from RunID policy failures. MissingRunID is specific to the native Connector
+// entry point; the generic protocol parser intentionally accepts an omitted or
+// empty RunID while rejecting every malformed non-empty value.
+const (
+	AgentKnockRejectMissingRunID = "missing_run_id"
+	AgentKnockRejectInvalidRunID = "invalid_run_id"
+)
+
+// AgentKnockRunIDLength is the exact lowercase-hex length of a canonical
+// native-UDP-SDK-generated knock cycle identifier (8 random bytes).
+const AgentKnockRunIDLength = 16
+
 // AgentKnockApplicationFile is the versioned application-layer contract for a
 // registered-agent NHP knock. Request carries one deterministic body golden;
+// RequestCases pin generic-parser versus native-Connector RunID policy; and
 // ReplyCases cover success, authenticated deny, overload, and fail-closed
 // application/correlation negatives without duplicating Noise packet vectors.
 type AgentKnockApplicationFile struct {
@@ -535,6 +552,7 @@ type AgentKnockApplicationFile struct {
 	SourceOfTruth string                       `json:"source_of_truth"`
 	Notes         []string                     `json:"notes"`
 	Request       AgentKnockApplicationRequest `json:"request"`
+	RequestCases  []AgentKnockRequestCase      `json:"request_cases"`
 	ReplyCases    []AgentKnockReplyCase        `json:"reply_cases"`
 }
 
@@ -548,14 +566,34 @@ type AgentKnockApplicationRequest struct {
 	BodyJSON string                             `json:"body_json"`
 }
 
-// AgentKnockApplicationRequestFields names the five load-bearing registered-
+// AgentKnockApplicationRequestFields names the six load-bearing registered-
 // agent fields without importing any producer implementation type.
 type AgentKnockApplicationRequestFields struct {
-	HeaderType    int    `json:"header_type"`
-	UserID        string `json:"user_id"`
-	DeviceID      string `json:"device_id"`
-	AuthServiceID string `json:"auth_service_id"`
-	ResourceID    string `json:"resource_id"`
+	HeaderType      int    `json:"header_type"`
+	UserID          string `json:"user_id"`
+	DeviceID        string `json:"device_id"`
+	AuthServiceID   string `json:"auth_service_id"`
+	KnockResourceID string `json:"knock_resource_id"`
+	RunID           string `json:"run_id"`
+}
+
+// AgentKnockRequestCase is one authenticated KNK JSON-body input evaluated at
+// both protocol entry points. BodyJSON remains raw so duplicate keys and alias
+// spellings reach each consumer's real strict parser.
+type AgentKnockRequestCase struct {
+	Name            string                       `json:"name"`
+	BodyJSON        string                       `json:"body_json"`
+	GenericParser   AgentKnockRequestExpectation `json:"generic_parser"`
+	NativeConnector AgentKnockRequestExpectation `json:"native_connector"`
+}
+
+// AgentKnockRequestExpectation is the declared result at one request parser.
+// ParsedRunID is required on accept (including the accepted empty generic
+// value) and absent on reject; RejectClass follows the inverse rule.
+type AgentKnockRequestExpectation struct {
+	Outcome     string  `json:"outcome"`
+	ParsedRunID *string `json:"parsed_run_id,omitempty"`
+	RejectClass string  `json:"reject_class,omitempty"`
 }
 
 // AgentKnockReplyCase is one already-decrypted reply disposition. Counter
@@ -576,9 +614,10 @@ type AgentKnockReplyCase struct {
 // application-body artifact. It rejects duplicate/unknown/trailing outer
 // fields, stale schema versions, missing mandatory cases, invalid
 // enums/counters, duplicate case names, and a request golden that does not
-// exactly match its semantic fields. Reply body semantics remain the consumer's
-// job: those bodies include intentional wrong-map shapes that must reach the
-// production parser.
+// exactly match its semantic fields. It independently derives both declared
+// request-parser outcomes from each raw body so case labels cannot drift.
+// Reply body semantics remain the consumer's job: those bodies include
+// intentional wrong-map shapes that must reach the production parser.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
 	var af AgentKnockApplicationFile
 	if err := strictDecodeArtifact(data, &af); err != nil {
@@ -587,13 +626,16 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		return nil, fmt.Errorf("conformance: agent-knock application file has artifact %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 1 {
-		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 1", af.SchemaVersion)
+	if af.SchemaVersion != 2 {
+		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 2", af.SchemaVersion)
 	}
 	if af.Description == "" || af.SourceOfTruth == "" || len(af.Notes) == 0 {
 		return nil, errors.New("conformance: agent-knock application file missing description, source_of_truth, or notes")
 	}
 	if err := validateAgentKnockRequest(af.Request); err != nil {
+		return nil, err
+	}
+	if err := validateAgentKnockRequestCases(af.Request, af.RequestCases); err != nil {
 		return nil, err
 	}
 	if len(af.ReplyCases) == 0 {
@@ -646,8 +688,11 @@ func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
 	if r.Fields.HeaderType != r.WireType {
 		return fmt.Errorf("conformance: agent-knock request header_type %d does not match wire_type %d", r.Fields.HeaderType, r.WireType)
 	}
-	if r.Fields.UserID == "" || r.Fields.DeviceID == "" || r.Fields.AuthServiceID == "" || r.Fields.ResourceID == "" {
+	if r.Fields.UserID == "" || r.Fields.DeviceID == "" || r.Fields.AuthServiceID == "" || r.Fields.KnockResourceID == "" {
 		return errors.New("conformance: agent-knock request has an empty required identity field")
+	}
+	if !isCanonicalAgentKnockRunID(r.Fields.RunID) {
+		return fmt.Errorf("conformance: agent-knock request run_id %q is not %d lowercase hexadecimal characters", r.Fields.RunID, AgentKnockRunIDLength)
 	}
 	if !json.Valid([]byte(r.BodyJSON)) {
 		return errors.New("conformance: agent-knock request body_json is not valid JSON")
@@ -656,13 +701,16 @@ func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
 	// producer wire struct. Equality here intentionally pins exact compact bytes,
 	// including wire names and omission of optional fields; consumers rebuild
 	// the same bytes from Request.Fields.
+	// runId remains omitempty to mirror the generic producer wire struct; the
+	// canonical request golden above deliberately requires a non-empty value.
 	want, err := json.Marshal(struct {
 		HeaderType int    `json:"headerType"`
 		UserID     string `json:"usrId"`
 		DeviceID   string `json:"devId"`
 		AspID      string `json:"aspId"`
 		ResourceID string `json:"resId"`
-	}{r.Fields.HeaderType, r.Fields.UserID, r.Fields.DeviceID, r.Fields.AuthServiceID, r.Fields.ResourceID})
+		RunID      string `json:"runId,omitempty"`
+	}{r.Fields.HeaderType, r.Fields.UserID, r.Fields.DeviceID, r.Fields.AuthServiceID, r.Fields.KnockResourceID, r.Fields.RunID})
 	if err != nil {
 		return fmt.Errorf("conformance: marshal agent-knock request golden: %w", err)
 	}
@@ -670,6 +718,217 @@ func validateAgentKnockRequest(r AgentKnockApplicationRequest) error {
 		return fmt.Errorf("conformance: agent-knock request body_json does not match fields: got %s want %s", r.BodyJSON, want)
 	}
 	return nil
+}
+
+// validateAgentKnockRequestCases enforces a closed set: unlike the reply-case
+// loader (which only rejects duplicates and missing-required names), the RunID
+// request policy is exhaustive, so an unrecognized case name is a mismatch
+// against a derivable expectation rather than a benign addition and is rejected.
+func validateAgentKnockRequestCases(request AgentKnockApplicationRequest, cases []AgentKnockRequestCase) error {
+	if len(cases) == 0 {
+		return errors.New("conformance: agent-knock application file has no request_cases")
+	}
+	required := []string{
+		"canonical_run_id", "missing_run_id", "empty_run_id",
+		"reject_duplicate_run_id", "reject_alias_run_id",
+		"reject_alias_snake_case_run_id", "reject_whitespace_run_id",
+		"reject_internal_whitespace_run_id", "reject_uppercase_run_id", "reject_short_run_id",
+		"reject_long_run_id", "reject_nonhex_run_id",
+	}
+	requiredSet := make(map[string]struct{}, len(required))
+	for _, name := range required {
+		requiredSet[name] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(cases))
+	for _, c := range cases {
+		if _, ok := requiredSet[c.Name]; !ok {
+			return fmt.Errorf("conformance: unknown agent-knock request case %q", c.Name)
+		}
+		if _, ok := seen[c.Name]; ok {
+			return fmt.Errorf("conformance: duplicate agent-knock request case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+		if err := validateAgentKnockRequestCase(request, c); err != nil {
+			return err
+		}
+	}
+	for _, name := range required {
+		if _, present := seen[name]; !present {
+			return fmt.Errorf("conformance: agent-knock application file missing request case %q", name)
+		}
+	}
+	return nil
+}
+
+// agentKnockRequestWireBody mirrors the generic producer wire shape. orgId,
+// results, and usrData are tolerated-but-unexercised forward-compat fields: no
+// request_case carries them, so they are accepted (not required) and never
+// gate RunID policy — do not assume the parser is stricter than the vectors.
+type agentKnockRequestWireBody struct {
+	HeaderType      int                        `json:"headerType"`
+	UserID          string                     `json:"usrId"`
+	DeviceID        string                     `json:"devId"`
+	OrganizationID  string                     `json:"orgId,omitempty"`
+	AuthServiceID   string                     `json:"aspId"`
+	KnockResourceID string                     `json:"resId"`
+	RunID           json.RawMessage            `json:"runId"`
+	CheckResults    map[string]json.RawMessage `json:"results,omitempty"`
+	UserData        map[string]json.RawMessage `json:"usrData,omitempty"`
+}
+
+func validateAgentKnockRequestCase(request AgentKnockApplicationRequest, c AgentKnockRequestCase) error {
+	if c.Name == "" || c.BodyJSON == "" {
+		return errors.New("conformance: agent-knock request case missing name or body_json")
+	}
+	body := []byte(c.BodyJSON)
+	if !json.Valid(body) {
+		return fmt.Errorf("conformance: agent-knock request case %q body_json is not valid JSON", c.Name)
+	}
+	if want, required := expectedAgentKnockRequestCaseBody(request, c.Name); required && !bytes.Equal(body, want) {
+		return fmt.Errorf("conformance: agent-knock request case %q body_json does not match its required exact vector: got %s want %s", c.Name, c.BodyJSON, want)
+	}
+	generic, connector := deriveAgentKnockRequestExpectations(request.Fields, body)
+	if err := compareAgentKnockRequestExpectation(c.Name, "generic_parser", c.GenericParser, generic); err != nil {
+		return err
+	}
+	return compareAgentKnockRequestExpectation(c.Name, "native_connector", c.NativeConnector, connector)
+}
+
+func expectedAgentKnockRequestCaseBody(request AgentKnockApplicationRequest, name string) ([]byte, bool) {
+	canonical := request.BodyJSON
+	runIDSuffix := `,"runId":"` + request.Fields.RunID + `"}`
+	if !strings.HasSuffix(canonical, runIDSuffix) {
+		return nil, true
+	}
+	base := strings.TrimSuffix(canonical, runIDSuffix) + "}"
+	addField := func(body, key, value string) string {
+		return body[:len(body)-1] + `,"` + key + `":"` + value + `"}`
+	}
+	withRunID := func(runID string) string { return addField(base, "runId", runID) }
+
+	var body string
+	switch name {
+	case "canonical_run_id":
+		body = canonical
+	case "missing_run_id":
+		body = base
+	case "empty_run_id":
+		body = withRunID("")
+	case "reject_duplicate_run_id":
+		body = addField(withRunID(request.Fields.RunID), "runId", "fedcba9876543210")
+	case "reject_alias_run_id":
+		body = addField(base, "runID", request.Fields.RunID)
+	case "reject_alias_snake_case_run_id":
+		body = addField(base, "run_id", request.Fields.RunID)
+	case "reject_whitespace_run_id":
+		body = withRunID(" " + request.Fields.RunID + " ")
+	case "reject_internal_whitespace_run_id":
+		body = withRunID("01234567 89abcde")
+	case "reject_uppercase_run_id":
+		body = withRunID("0123456789ABCDEF")
+	case "reject_short_run_id":
+		body = withRunID("0123456789abcde")
+	case "reject_long_run_id":
+		body = withRunID("0123456789abcdef0")
+	case "reject_nonhex_run_id":
+		body = withRunID("0123456789abcdeg")
+	default:
+		return nil, false
+	}
+	return []byte(body), true
+}
+
+func deriveAgentKnockRequestExpectations(fields AgentKnockApplicationRequestFields, body []byte) (AgentKnockRequestExpectation, AgentKnockRequestExpectation) {
+	bodyParse := requestRejectExpectation(AgentKnockRejectBodyParse)
+	// DisallowUnknownFields still matches JSON names case-insensitively, so it
+	// accepts runID for the runId tag. The raw exact-key gate must run first.
+	if err := rejectUnknownAgentKnockRequestKeys(body); err != nil {
+		return bodyParse, bodyParse
+	}
+	var wire agentKnockRequestWireBody
+	if err := strictDecodeArtifact(body, &wire); err != nil {
+		return bodyParse, bodyParse
+	}
+	if wire.HeaderType != fields.HeaderType || wire.UserID != fields.UserID || wire.DeviceID != fields.DeviceID ||
+		wire.AuthServiceID != fields.AuthServiceID || wire.KnockResourceID != fields.KnockResourceID {
+		return bodyParse, bodyParse
+	}
+	if len(wire.RunID) == 0 {
+		return requestAcceptExpectation(""), requestRejectExpectation(AgentKnockRejectMissingRunID)
+	}
+	var runID string
+	if bytes.Equal(wire.RunID, []byte("null")) || json.Unmarshal(wire.RunID, &runID) != nil {
+		return bodyParse, bodyParse
+	}
+	if runID == "" {
+		return requestAcceptExpectation(""), requestRejectExpectation(AgentKnockRejectMissingRunID)
+	}
+	if !isCanonicalAgentKnockRunID(runID) {
+		invalid := requestRejectExpectation(AgentKnockRejectInvalidRunID)
+		return invalid, invalid
+	}
+	accepted := requestAcceptExpectation(runID)
+	return accepted, accepted
+}
+
+// agentKnockRequestWireKeys is the exact set of JSON keys the request body may
+// carry, derived once from agentKnockRequestWireBody's struct tags so the two
+// cannot drift: adding a forward-compat field to the struct extends the gate
+// automatically. The gate itself is load-bearing — encoding/json matches tags
+// case-insensitively, so DisallowUnknownFields alone would accept runID.
+var agentKnockRequestWireKeys = jsonTagKeySet(reflect.TypeOf(agentKnockRequestWireBody{}))
+
+// jsonTagKeySet returns the set of json field names declared on a struct type,
+// with any ",omitempty"/options suffix stripped.
+func jsonTagKeySet(t reflect.Type) map[string]struct{} {
+	keys := make(map[string]struct{}, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		if name != "" && name != "-" {
+			keys[name] = struct{}{}
+		}
+	}
+	return keys
+}
+
+func rejectUnknownAgentKnockRequestKeys(body []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return err
+	}
+	for key := range fields {
+		if _, ok := agentKnockRequestWireKeys[key]; !ok {
+			return fmt.Errorf("unknown agent-knock request field %q", key)
+		}
+	}
+	return nil
+}
+
+func requestAcceptExpectation(runID string) AgentKnockRequestExpectation {
+	return AgentKnockRequestExpectation{Outcome: ExpectAccept, ParsedRunID: &runID}
+}
+
+func requestRejectExpectation(class string) AgentKnockRequestExpectation {
+	return AgentKnockRequestExpectation{Outcome: ExpectReject, RejectClass: class}
+}
+
+func compareAgentKnockRequestExpectation(caseName, entryPoint string, got, want AgentKnockRequestExpectation) error {
+	if !reflect.DeepEqual(got, want) {
+		return fmt.Errorf("conformance: agent-knock request case %q %s expectation = %+v, want %+v", caseName, entryPoint, got, want)
+	}
+	return nil
+}
+
+func isCanonicalAgentKnockRunID(runID string) bool {
+	if len(runID) != AgentKnockRunIDLength {
+		return false
+	}
+	for i := range runID {
+		if (runID[i] < '0' || runID[i] > '9') && (runID[i] < 'a' || runID[i] > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {

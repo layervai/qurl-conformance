@@ -1,10 +1,15 @@
 {
   "artifact": "qurl-agent-knock-application-vectors",
-  "schema_version": 1,
-  "description": "Application-body and reply-disposition vectors for a registered agent NHP knock. These vectors begin after Noise decryption and do not duplicate packet bytes.",
+  "schema_version": 2,
+  "description": "Application-body request-policy and reply-disposition vectors for a registered agent NHP knock. These vectors begin after Noise decryption and do not duplicate packet bytes.",
   "source_of_truth": "github.com/layervai/qurl-conformance",
   "notes": [
     "The request body is the exact compact JSON produced from the listed synthetic fields. headerType MUST equal the outer NHP_KNK type (1).",
+    "runId is an AEAD-authenticated knock-cycle identifier generated and validated by the native UDP SDK before network I/O: exactly 16 lowercase hexadecimal characters encoding 8 random bytes.",
+    "qURL Connector owns only outer-cycle lifecycle and retry/reconnect reuse of the SDK-issued value; it MUST NOT create a competing identifier.",
+    "resId is the placement-neutral NHP knock_resource_id used for admission and ACK lookup, not the public-key management resource_id.",
+    "The generic protocol parser accepts an omitted or empty runId for non-Connector callers but rejects malformed non-empty values. The native qURL Connector entry point additionally rejects omitted and empty values.",
+    "Every request parser rejects duplicate keys and unknown alias spellings before applying RunID policy.",
     "A success ACK is usable only when both acTokens and resHost contain the requested resId with non-empty values.",
     "errCode is a string. Empty string and \"0\" are success; every other value is an authenticated deny and MUST be handled before success-map validation.",
     "agentAddr is corroborating server output, not the authorization signal. The per-resource acTokens entry is the authorization signal.",
@@ -17,17 +22,92 @@
       "user_id": "agent-conformance-01",
       "device_id": "agent-conformance-01",
       "auth_service_id": "agent",
-      "resource_id": "tunnel-conformance-01"
+      "knock_resource_id": "connector-conformance-01",
+      "run_id": "0123456789abcdef"
     },
-    "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"tunnel-conformance-01\"}"
+    "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}"
   },
+  "request_cases": [
+    {
+      "name": "canonical_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
+      "generic_parser": {"outcome": "accept", "parsed_run_id": "0123456789abcdef"},
+      "native_connector": {"outcome": "accept", "parsed_run_id": "0123456789abcdef"}
+    },
+    {
+      "name": "missing_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\"}",
+      "generic_parser": {"outcome": "accept", "parsed_run_id": ""},
+      "native_connector": {"outcome": "reject", "reject_class": "missing_run_id"}
+    },
+    {
+      "name": "empty_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"\"}",
+      "generic_parser": {"outcome": "accept", "parsed_run_id": ""},
+      "native_connector": {"outcome": "reject", "reject_class": "missing_run_id"}
+    },
+    {
+      "name": "reject_duplicate_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\",\"runId\":\"fedcba9876543210\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "body_parse"},
+      "native_connector": {"outcome": "reject", "reject_class": "body_parse"}
+    },
+    {
+      "name": "reject_alias_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runID\":\"0123456789abcdef\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "body_parse"},
+      "native_connector": {"outcome": "reject", "reject_class": "body_parse"}
+    },
+    {
+      "name": "reject_alias_snake_case_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"run_id\":\"0123456789abcdef\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "body_parse"},
+      "native_connector": {"outcome": "reject", "reject_class": "body_parse"}
+    },
+    {
+      "name": "reject_whitespace_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\" 0123456789abcdef \"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    },
+    {
+      "name": "reject_internal_whitespace_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"01234567 89abcde\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    },
+    {
+      "name": "reject_uppercase_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789ABCDEF\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    },
+    {
+      "name": "reject_short_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcde\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    },
+    {
+      "name": "reject_long_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef0\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    },
+    {
+      "name": "reject_nonhex_run_id",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdeg\"}",
+      "generic_parser": {"outcome": "reject", "reject_class": "invalid_run_id"},
+      "native_connector": {"outcome": "reject", "reject_class": "invalid_run_id"}
+    }
+  ],
   "reply_cases": [
     {
       "name": "ack_success",
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "success"
     },
     {
@@ -53,7 +133,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-other-01\":\"frps.other.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-other-01\":\"ac-token-other-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-other-01\":\"frps.other.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-other-01\":\"ac-token-other-01\"}}",
       "outcome": "reject",
       "reject_class": "wrong_resource"
     },
@@ -62,7 +142,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{}}",
       "outcome": "reject",
       "reject_class": "missing_token"
     },
@@ -71,7 +151,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"\"}}",
       "outcome": "reject",
       "reject_class": "missing_token"
     },
@@ -80,7 +160,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "reject",
       "reject_class": "missing_host"
     },
@@ -89,7 +169,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "reject",
       "reject_class": "missing_host"
     },
@@ -98,7 +178,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":[]}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":[]}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -107,7 +187,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":[],\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":[],\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -116,7 +196,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "43",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "reject",
       "reject_class": "counter"
     },
@@ -125,7 +205,7 @@
       "reply_type": 14,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"tunnel-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"tunnel-conformance-01\":\"ac-token-conformance-01\"}}",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"}}",
       "outcome": "reject",
       "reject_class": "reply_type"
     }
