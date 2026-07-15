@@ -885,6 +885,24 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("success expected token drift", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.ExpectedACToken = "wrong-token"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "expected_ac_token") {
+			t.Fatalf("error = %v, want expected token mismatch rejection", err)
+		}
+	})
+
+	t.Run("success expected resource host drift", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.ExpectedResourceHost = "wrong.example:7000"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "expected_resource_host") {
+			t.Fatalf("error = %v, want expected resource host mismatch rejection", err)
+		}
+	})
+
 	t.Run("reject with expected result", func(t *testing.T) {
 		b := mutateCase(t, "reject_wrong_resource", func(c *AgentKnockReplyCase) {
 			c.ExpectedACToken = "unexpected"

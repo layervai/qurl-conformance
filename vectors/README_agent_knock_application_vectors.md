@@ -197,8 +197,9 @@ Consumers must derive each declared outcome through their production paths:
 A missing vector is a hard failure, never a skipped test. The Go loader also
 rejects unknown/trailing artifact fields, unsupported schema versions, duplicate
 case names, missing mandatory cases, invalid counters, unknown outcome or reject
-labels, request-policy label drift, and mandatory request bodies that no longer
-match their exact named vectors.
+labels, request-policy label drift, success result labels that differ from the
+requested resource's body maps, and mandatory request bodies that no longer match
+their exact named vectors.
 
 The npm and Python packages intentionally expose the producer bytes through
 thin accessors, consistent with the other artifact families; they do not inherit

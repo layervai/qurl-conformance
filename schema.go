@@ -625,10 +625,11 @@ type AgentKnockReplyCase struct {
 // fields, stale schema versions, missing or unknown cases, invalid
 // enums/counters, duplicate case names, and a request golden that does not
 // exactly match its semantic fields. It independently derives both declared
-// request-parser outcomes from each raw body so case labels cannot drift.
-// Reply body semantics remain the consumer's job: those bodies include
-// intentional wrong-map shapes and trailing data that must reach the production
-// parser. Invalid raw JSON is allowed only for an explicit body_parse reject.
+// request-parser outcomes and cross-checks success result labels against the
+// requested resource's raw body maps so labels cannot drift. Remaining reply
+// semantics stay the consumer's job: those bodies include intentional wrong-map
+// shapes and trailing data that must reach the production parser. Invalid raw
+// JSON is allowed only for an explicit body_parse reject.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
 	var af AgentKnockApplicationFile
 	if err := strictDecodeArtifact(data, &af); err != nil {
@@ -680,6 +681,11 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		seen[c.Name] = struct{}{}
 		if err := validateAgentKnockReplyCase(c); err != nil {
 			return nil, err
+		}
+		if c.Outcome == AgentKnockOutcomeSuccess {
+			if err := validateAgentKnockExpectedResult(af.Request.Fields.KnockResourceID, c); err != nil {
+				return nil, err
+			}
 		}
 	}
 	for _, name := range required {
@@ -1016,6 +1022,23 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		default:
 			return fmt.Errorf("conformance: reject agent-knock reply case %q has unknown reject_class %q", c.Name, c.RejectClass)
 		}
+	}
+	return nil
+}
+
+func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) error {
+	var body struct {
+		ResourceHost map[string]string `json:"resHost"`
+		ACTokens     map[string]string `json:"acTokens"`
+	}
+	if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
+		return fmt.Errorf("conformance: success agent-knock reply case %q result body: %w", c.Name, err)
+	}
+	if got := body.ACTokens[resourceID]; c.ExpectedACToken != got {
+		return fmt.Errorf("conformance: success agent-knock reply case %q expected_ac_token %q does not match acTokens[%q] %q", c.Name, c.ExpectedACToken, resourceID, got)
+	}
+	if got := body.ResourceHost[resourceID]; c.ExpectedResourceHost != got {
+		return fmt.Errorf("conformance: success agent-knock reply case %q expected_resource_host %q does not match resHost[%q] %q", c.Name, c.ExpectedResourceHost, resourceID, got)
 	}
 	return nil
 }
