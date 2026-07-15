@@ -426,7 +426,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		err := json.Unmarshal(body(name)[field], &value)
 		return value, err
 	}
-	// producerACK mirrors OpenNHP ServerKnockAckMsg at main commit
+	// producerACK mirrors OpenNHP nhp/common/nhpmsg.go's ServerKnockAckMsg at main commit
 	// 1dbedcadee2018cd6a8684cc4b53b9e6a9048da4.
 	type producerACK struct {
 		ErrCode           string            `json:"errCode"`
