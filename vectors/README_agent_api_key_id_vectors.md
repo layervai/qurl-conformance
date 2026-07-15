@@ -18,6 +18,12 @@ The equivalent pattern is `^key_[A-Za-z0-9]{12}$`. Consumers must not trim,
 case-fold, normalize Unicode, accept `_` in the suffix, or infer a broader
 grammar from another credential field.
 
+Treat `pattern` as a language-neutral serialization of the grammar, not as a
+license to use a partial-match API. Consumers must require a whole-string
+match: for example, Python uses `re.fullmatch` rather than `re.match` because
+Python's `$` can match immediately before a final newline. The
+`reject_trailing_newline` fixture enforces this boundary across languages.
+
 `total_length` and `pattern` intentionally repeat facts derivable from the
 prefix, alphabet, and suffix length. That gives length-oriented and
 regex-oriented consumers native forms; strict loaders cross-check all fields so
@@ -55,8 +61,9 @@ these outcomes into its own typed errors while preserving fail-closed behavior.
 The dependency-free Go loader in this repository is the artifact's strict
 reference validator: it independently derives every expectation and preserves
 raw JSON long enough to reject duplicate keys and trailing values. The npm and
-Python packages are byte-identical data accessors, so their in-repository gates
-check package shape and copy parity rather than reimplementing that parser.
+Python packages carry byte-identical artifact copies and expose data accessors,
+so their in-repository gates check package shape and copy parity rather than
+reimplementing that parser.
 Downstream producers and consumers still run every applicable case through
 their real implementation, as required by the lockstep rule below.
 

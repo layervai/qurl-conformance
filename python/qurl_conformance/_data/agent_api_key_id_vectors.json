@@ -117,6 +117,12 @@
       "reject_class": "invalid_id"
     },
     {
+      "name": "reject_trailing_newline",
+      "value": "key_A1b2C3d4E5f6\n",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
       "name": "reject_embedded_whitespace",
       "value": "key_A1b2C3 d4E5f",
       "outcome": "reject",

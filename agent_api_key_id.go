@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -107,6 +108,7 @@ var agentAPIKeyIDValueFixtures = map[string]string{
 	"reject_non_ascii_same_bytes": "key_A1b2C3d4E5é",
 	"reject_leading_whitespace":   " key_A1b2C3d4E5f6",
 	"reject_trailing_whitespace":  "key_A1b2C3d4E5f6 ",
+	"reject_trailing_newline":     "key_A1b2C3d4E5f6\n",
 	"reject_embedded_whitespace":  "key_A1b2C3 d4E5f",
 }
 
@@ -215,6 +217,10 @@ func validateAgentAPIKeyIDValueCases(cases []AgentAPIKeyIDValueCase) error {
 	if len(cases) != len(agentAPIKeyIDValueFixtures) {
 		return fmt.Errorf("conformance: agent API-key ID consumer value case count = %d, want %d", len(cases), len(agentAPIKeyIDValueFixtures))
 	}
+	pattern, err := regexp.Compile(AgentAPIKeyIDPattern)
+	if err != nil {
+		return fmt.Errorf("conformance: compile agent API-key ID pattern: %w", err)
+	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, c := range cases {
 		value, ok := agentAPIKeyIDValueFixtures[c.Name]
@@ -228,8 +234,12 @@ func validateAgentAPIKeyIDValueCases(cases []AgentAPIKeyIDValueCase) error {
 		if c.Value != value {
 			return fmt.Errorf("conformance: agent API-key ID consumer value case %q value = %q, want %q", c.Name, c.Value, value)
 		}
+		canonical := isCanonicalAgentAPIKeyID(c.Value)
+		if pattern.MatchString(c.Value) != canonical {
+			return fmt.Errorf("conformance: agent API-key ID consumer value case %q exposes a pattern/reference disagreement", c.Name)
+		}
 		wantOutcome, wantRejectClass := ExpectReject, AgentAPIKeyIDRejectInvalidID
-		if isCanonicalAgentAPIKeyID(c.Value) {
+		if canonical {
 			wantOutcome, wantRejectClass = ExpectAccept, ""
 		}
 		if c.Outcome != wantOutcome || c.RejectClass != wantRejectClass {

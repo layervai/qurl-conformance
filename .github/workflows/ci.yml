@@ -62,6 +62,7 @@ jobs:
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
+          const idValues = Object.fromEntries(i.consumer_value_cases.map(v => [v.name, v]));
           const canonical = '0123456789abcdef';
           // Stock JSON parsing is intentionally insufficient for these cases:
           // duplicate keys collapse last-wins and aliases remain unchecked.
@@ -83,8 +84,10 @@ jobs:
               replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
-              i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 14 ||
+              i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 15 ||
               i.consumer_response_cases.length !== 24 ||
+              idValues.reject_trailing_newline.outcome !== 'reject' ||
+              new RegExp(i.contract.pattern).test(idValues.reject_trailing_newline.value) ||
               idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse') {
             process.exit(1);
@@ -97,6 +100,7 @@ jobs:
           cd python
           python3 <<'PY'
           import json
+          import re
           import sys
           sys.path.insert(0, '.')
           import qurl_conformance as q
@@ -108,6 +112,7 @@ jobs:
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
+          id_values = {v['name']: v for v in i['consumer_value_cases']}
           canonical = '0123456789abcdef'
           # Stock JSON parsing is intentionally insufficient for these cases:
           # duplicate keys collapse last-wins and aliases remain unchecked.
@@ -131,8 +136,10 @@ jobs:
           assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
-          assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 14
+          assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 15
           assert len(i['consumer_response_cases']) == 24
+          assert id_values['reject_trailing_newline']['outcome'] == 'reject'
+          assert re.fullmatch(i['contract']['pattern'], id_values['reject_trailing_newline']['value']) is None
           assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
           print('py ok')
