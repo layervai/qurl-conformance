@@ -348,6 +348,8 @@ func deriveAgentAPIKeyIDResponse(surface string, body []byte) (outcome, id, reje
 		return ExpectReject, "", AgentAPIKeyIDRejectBodyParse
 	}
 	raw, present := object[field]
+	// json.Unmarshal accepts null into a string as "", so verify the JSON token
+	// is a string before decoding it to preserve the body_parse classification.
 	if !present || len(raw) < 2 || raw[0] != '"' || raw[len(raw)-1] != '"' {
 		return ExpectReject, "", AgentAPIKeyIDRejectBodyParse
 	}
