@@ -448,6 +448,8 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		ACTokens:         map[string]string{resourceID: "ac-token-conformance-01"},
 		PreAccessActions: map[string]*struct{}{resourceID: nil},
 	}
+	// This shallow copy deliberately changes only scalar metadata; its shared
+	// routing, admission, and pre-access maps remain immutable below.
 	optionalMetadata := standard
 	optionalMetadata.AuthProviderToken = "asp-token-must-not-authorize"
 	optionalMetadata.RedirectURL = "https://redirect.example/conformance"
