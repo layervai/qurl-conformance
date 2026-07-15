@@ -20,8 +20,9 @@ grammar from another credential field.
 
 Treat `pattern` as a language-neutral serialization of the grammar, not as a
 license to use a partial-match API. Consumers must require a whole-string
-match: for example, Python uses `re.fullmatch` rather than `re.match` because
-Python's `$` can match immediately before a final newline. The
+match and must not enable multiline mode in any language. For example, Python
+uses `re.fullmatch` rather than `re.match` because Python's `$` can match
+immediately before a final newline. The
 `reject_trailing_newline` fixture enforces this boundary across languages.
 
 `total_length` and `pattern` intentionally repeat facts derivable from the

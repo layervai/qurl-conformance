@@ -99,3 +99,10 @@ func TestParseAgentAPIKeyIDFileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(af *AgentAPIKeyIDFile) { af.ConsumerResponseCases[0].Name = "future_case" }), "unknown")
 	})
 }
+
+func TestDeriveAgentAPIKeyIDResponseRejectsUnknownSurface(t *testing.T) {
+	outcome, id, rejectClass := deriveAgentAPIKeyIDResponse("future_surface", []byte(`{"key_id":"key_A1b2C3d4E5f6"}`))
+	if outcome != ExpectReject || id != "" || rejectClass != AgentAPIKeyIDRejectBodyParse {
+		t.Fatalf("unknown surface = %q/%q/%q, want reject/empty/%q", outcome, id, rejectClass, AgentAPIKeyIDRejectBodyParse)
+	}
+}
