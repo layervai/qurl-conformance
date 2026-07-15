@@ -274,6 +274,8 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 		"reject_malformed_pre_actions":            false,
 		"reject_malformed_asp_token":              false,
 		"reject_malformed_redirect_url":           false,
+		"reject_malformed_opn_time":               false,
+		"reject_malformed_agent_addr":             false,
 		"reject_unknown_ack_field":                false,
 		"reject_duplicate_ack_field":              false,
 		"reject_trailing_ack_data":                false,
@@ -565,11 +567,16 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	}{
 		{"reject_malformed_asp_token", "aspToken"},
 		{"reject_malformed_redirect_url", "redirectUrl"},
+		{"reject_malformed_agent_addr", "agentAddr"},
 	} {
 		var value string
 		if err := json.Unmarshal(body(tc.name)[tc.field], &value); err == nil {
 			t.Errorf("%s.%s decoded as string, want type error", tc.name, tc.field)
 		}
+	}
+	var openTime uint32
+	if err := json.Unmarshal(body("reject_malformed_opn_time")["opnTime"], &openTime); err == nil {
+		t.Error("reject_malformed_opn_time.opnTime decoded as uint32, want type error")
 	}
 	if fields := body("reject_unknown_ack_field"); len(fields["futureField"]) == 0 {
 		t.Error("reject_unknown_ack_field does not carry its unknown field")

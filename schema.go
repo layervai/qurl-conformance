@@ -518,7 +518,8 @@ const (
 
 // Agent-knock application reject classes form a closed, consumer-neutral
 // vocabulary. ServerDeny and ServerBusy are authenticated platform outcomes;
-// the other classes are fail-closed client validation failures.
+// the other classes are fail-closed client dispositions: validation failures
+// plus the unsupported pre-access feature gate.
 const (
 	AgentKnockRejectServerDeny           = "server_deny"
 	AgentKnockRejectServerBusy           = "server_busy"
@@ -665,6 +666,7 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		"reject_malformed_resource_host_map", "reject_pre_access_action_requested",
 		"reject_pre_access_action_other_resource", "reject_malformed_pre_actions",
 		"reject_malformed_asp_token", "reject_malformed_redirect_url",
+		"reject_malformed_opn_time", "reject_malformed_agent_addr",
 		"reject_unknown_ack_field", "reject_duplicate_ack_field",
 		"reject_trailing_ack_data", "reject_null_ack_body",
 		"reject_non_object_ack_body", "reject_counter_mismatch", "reject_reply_type_mismatch",
@@ -966,6 +968,8 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	if c.Name == "" || c.BodyJSON == "" {
 		return errors.New("conformance: agent-knock reply case missing name or body_json")
 	}
+	// body_parse is the sole disposition allowed to carry invalid JSON because
+	// trailing-data vectors must reach the consumer's strict production parser.
 	if !json.Valid([]byte(c.BodyJSON)) && !(c.Outcome == AgentKnockOutcomeReject && c.RejectClass == AgentKnockRejectBodyParse) {
 		return fmt.Errorf("conformance: agent-knock reply case %q body_json is not valid JSON", c.Name)
 	}

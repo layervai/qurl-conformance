@@ -251,6 +251,24 @@
       "reject_class": "body_parse"
     },
     {
+      "name": "reject_malformed_opn_time",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":\"900\",\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_malformed_agent_addr",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":7,\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
       "name": "reject_unknown_ack_field",
       "reply_type": 2,
       "request_counter": "42",

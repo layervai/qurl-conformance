@@ -181,8 +181,10 @@ Consumers must derive each declared outcome through their production paths:
    and an echoed request counter before trusting its body.
 4. Strictly decode one ACK object with the complete field vocabulary above.
    Reject duplicate/unknown fields, a second/trailing value, null/non-object
-   bodies, and wrong types. `aspToken` / `redirectUrl` are optional strings;
-   `preActions` is an optional object whose values preserve null-vs-non-null.
+   bodies, and wrong types. `opnTime` is an unsigned 32-bit JSON number;
+   `agentAddr`, `aspToken`, and `redirectUrl` are strings (the latter two are
+   optional); `preActions` is an optional object whose values preserve
+   null-vs-non-null.
 5. Evaluate `errCode` before map validation. Empty string and `"0"` mean
    success; any other string is an authenticated deny.
 6. On success, accept absent/empty/all-null `preActions`. Reject
