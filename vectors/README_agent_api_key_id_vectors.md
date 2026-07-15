@@ -58,6 +58,10 @@ rejected case has one of two stable classes:
 - `invalid_id`: the field is a JSON string but violates the public ID grammar.
 - `body_parse`: the response object or field type is structurally invalid.
 
+These classes are local to this artifact; they do not extend the qv2
+`reject_class` vocabulary documented in
+[`README_qv2_conformance_vectors.md`](README_qv2_conformance_vectors.md).
+
 Internal error names are not part of this artifact. Each implementation maps
 these outcomes into its own typed errors while preserving fail-closed behavior.
 
