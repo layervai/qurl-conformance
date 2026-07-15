@@ -25,6 +25,10 @@ jobs:
         uses: anthropics/claude-code-action@2fee15510437d71399d9139ed60433470484a8fb # v1.0.153
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # This is the default GITHUB_TOKEN actor; Release Please is currently
+          # its only PR author. Keep the allowlist exact; this workflow can
+          # read and comment but not push.
+          allowed_bots: 'github-actions[bot]'
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
