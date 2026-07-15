@@ -7,7 +7,7 @@ ciphertext. `relay_knock_golden.json` remains the only artifact for the KNK/ACK
 Noise packet format.
 
 All identifiers, addresses, hosts, cookies, and tokens are synthetic. The
-artifact id is `qurl-agent-knock-application-vectors`; `schema_version` is `2`.
+artifact id is `qurl-agent-knock-application-vectors`; `schema_version` is `3`.
 A breaking shape or semantic change requires a schema-version bump.
 
 ## Request golden
@@ -85,6 +85,14 @@ folding, truncating, or aliasing is non-conformant. Go's
 consumer must apply an exact-key gate rather than relying on struct decoding
 alone to reject `runID`.
 
+**Schema-v3 migration obligation:** reply parsing now covers the complete current
+ACK producer envelope. Consumers must accept the standard exact-resource
+`preActions: null` shape and typed optional `aspToken` / `redirectUrl`, while
+rejecting unknown or duplicate fields, trailing data, null/non-object bodies,
+wrong field types, and every non-null pre-access action on a successful ACK. A
+consumer must not repin to schema v3 until these reply cases run through its real
+production interpreter.
+
 Request reject classes are closed:
 
 | Class | Meaning |
@@ -106,15 +114,31 @@ correlation metadata that remains outside the application JSON:
   "reply_counter": "42",
   "body_json": "{...}",
   "outcome": "success",
-  "reject_class": "..."
+  "expected_ac_token": "...",
+  "expected_resource_host": "..."
 }
 ```
 
 Counters are decimal strings so uint64 precision survives JavaScript and other
 number-limited consumers. `reject_class` is absent on success and required on
-every other outcome. Despite its historical name, it classifies the reason for
-all non-success dispositions, including authenticated `deny` and `retry`
-outcomes as well as fail-closed client `reject` outcomes.
+every other outcome. `expected_ac_token` and `expected_resource_host` are
+required only on success and pin the values returned from the requested
+resource's `acTokens` / `resHost` entries. Despite its historical name,
+`reject_class` classifies the reason for all non-success dispositions, including
+authenticated `deny` and `retry` outcomes as well as fail-closed client `reject`
+outcomes.
+
+The success bodies reproduce the current ACK producer's serialization order and
+`omitempty` behavior:
+
+`errCode`, optional `errMsg`, `resHost`, `opnTime`, optional `aspToken`,
+`agentAddr`, `acTokens`, optional `preActions`, optional `redirectUrl`.
+
+The ordinary success golden initializes `preActions` and maps the requested
+resource to JSON `null`, which is the producer's no-NHP_ACC shape. The optional-
+metadata success adds typed `aspToken` and `redirectUrl`; its deliberately
+different `aspToken` proves that only `acTokens[requested_res_id]` can become the
+declared admission token.
 
 | Outcome | Required handling |
 | --- | --- |
@@ -132,7 +156,8 @@ Closed `reject_class` vocabulary:
 | `wrong_resource` | success maps contain entries, but not for the requested `resId` |
 | `missing_token` | requested `acTokens` entry is absent or empty |
 | `missing_host` | requested `resHost` entry is absent or empty |
-| `body_parse` | ACK JSON cannot populate the typed string/map fields |
+| `body_parse` | ACK is not one closed-schema object: unknown/duplicate fields, trailing data, null/non-object body, or wrong field type |
+| `unsupported_pre_access` | a successful ACK contains a non-null `preActions` value under any map key and therefore requires an unsupported NHP_ACC phase |
 | `counter` | ACK does not echo the request counter |
 | `reply_type` | a knock received neither `NHP_ACK` nor `NHP_COK` |
 
@@ -153,16 +178,20 @@ Consumers must derive each declared outcome through their production paths:
    relay treats a cookie challenge as an authenticated overload signal rather
    than a completed transaction. For every admission reply, require `NHP_ACK`
    and an echoed request counter before trusting its body.
-4. Decode the ACK body into typed fields: string `errCode`, string-to-string
-   `resHost`, string `agentAddr`, and string-to-string `acTokens`. A wrong map
-   type fails parsing; it must not become an empty success value silently.
+4. Strictly decode one ACK object with the complete field vocabulary above.
+   Reject duplicate/unknown fields, a second/trailing value, null/non-object
+   bodies, and wrong types. `aspToken` / `redirectUrl` are optional strings;
+   `preActions` is an optional object whose values preserve null-vs-non-null.
 5. Evaluate `errCode` before map validation. Empty string and `"0"` mean
    success; any other string is an authenticated deny.
-6. On success, require non-empty `acTokens[requested_knock_resource_id]` and
-   `resHost[requested_knock_resource_id]`. A value for a different knock
-   resource never authorizes the requested one.
-7. Treat `agentAddr` only as corroborating server output. It is not the access
-   token, placement target, or source-address trust input.
+6. On success, accept absent/empty/all-null `preActions`. Reject
+   `unsupported_pre_access` if any map value is non-null, regardless of its key;
+   ignoring it would falsely report admission before the required NHP_ACC phase.
+7. Require non-empty `acTokens[requested_knock_resource_id]` and
+   `resHost[requested_knock_resource_id]`, and return those exact values as the
+   declared expected result. A value for another resource never authorizes the
+   requested one. `aspToken`, `redirectUrl`, `agentAddr`, and `preActions` are
+   never alternate authorization or placement sources.
 
 A missing vector is a hard failure, never a skipped test. The Go loader also
 rejects unknown/trailing artifact fields, unsupported schema versions, duplicate
