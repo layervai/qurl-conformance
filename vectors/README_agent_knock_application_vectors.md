@@ -122,10 +122,11 @@ correlation metadata that remains outside the application JSON:
 ```
 
 Counters are decimal strings so uint64 precision survives JavaScript and other
-number-limited consumers. `reject_class` is absent on success and required on
-every other outcome. `expected_ac_token` and `expected_resource_host` are
-required only on success and pin the values returned from the requested
-resource's `acTokens` / `resHost` entries. Despite its historical name,
+number-limited consumers. Success entries carry `expected_ac_token` and
+`expected_resource_host` but no `reject_class`; every non-success entry carries
+`reject_class` and neither expected-result field. The expected-result fields pin
+the values returned from the requested resource's `acTokens` / `resHost`
+entries. Despite its historical name,
 `reject_class` classifies the reason for all non-success dispositions, including
 authenticated `deny` and `retry` outcomes as well as fail-closed client `reject`
 outcomes.

@@ -91,6 +91,7 @@ jobs:
               replies.reject_pre_access_action_requested.reject_class !== 'unsupported_pre_access' ||
               replies.reject_pre_access_action_other_resource.reject_class !== 'unsupported_pre_access' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_pre_actions.body_json).preActions) ||
+              replies.reject_malformed_pre_actions.reject_class !== 'body_parse' ||
               replies.ack_deny.reject_class !== 'server_deny' ||
               replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
               JSON.parse(replies.reject_malformed_opn_time.body_json).opnTime !== '900' ||
@@ -98,6 +99,7 @@ jobs:
               JSON.parse(replies.reject_malformed_agent_addr.body_json).agentAddr !== 7 ||
               replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
+              replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
               i.consumer_response_cases.length !== 26 ||
@@ -156,6 +158,7 @@ jobs:
           assert replies['reject_pre_access_action_requested']['reject_class'] == 'unsupported_pre_access'
           assert replies['reject_pre_access_action_other_resource']['reject_class'] == 'unsupported_pre_access'
           assert isinstance(json.loads(replies['reject_malformed_pre_actions']['body_json'])['preActions'], list)
+          assert replies['reject_malformed_pre_actions']['reject_class'] == 'body_parse'
           assert replies['ack_deny']['reject_class'] == 'server_deny'
           assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
           assert json.loads(replies['reject_malformed_opn_time']['body_json'])['opnTime'] == '900'
@@ -163,6 +166,7 @@ jobs:
           assert json.loads(replies['reject_malformed_agent_addr']['body_json'])['agentAddr'] == 7
           assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
+          assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
           assert len(i['consumer_response_cases']) == 26
