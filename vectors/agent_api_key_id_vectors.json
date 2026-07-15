@@ -99,7 +99,7 @@
       "reject_class": "invalid_id"
     },
     {
-      "name": "reject_non_ascii_same_bytes",
+      "name": "reject_non_ascii_same_byte_length",
       "value": "key_A1b2C3d4E5é",
       "outcome": "reject",
       "reject_class": "invalid_id"
