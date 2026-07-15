@@ -52,6 +52,14 @@ rejected case has one of two stable classes:
 Internal error names are not part of this artifact. Each implementation maps
 these outcomes into its own typed errors while preserving fail-closed behavior.
 
+The dependency-free Go loader in this repository is the artifact's strict
+reference validator: it independently derives every expectation and preserves
+raw JSON long enough to reject duplicate keys and trailing values. The npm and
+Python packages are byte-identical data accessors, so their in-repository gates
+check package shape and copy parity rather than reimplementing that parser.
+Downstream producers and consumers still run every applicable case through
+their real implementation, as required by the lockstep rule below.
+
 ## Lockstep rule
 
 This artifact is not satisfied merely by copying its pattern into two local

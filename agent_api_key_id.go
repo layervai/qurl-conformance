@@ -94,19 +94,20 @@ var agentAPIKeyIDProducerFixtures = map[string]string{
 }
 
 var agentAPIKeyIDValueFixtures = map[string]string{
-	"accept_canonical":           "key_A1b2C3d4E5f6",
-	"accept_lowercase_suffix":    "key_abcdefghijkl",
-	"accept_uppercase_suffix":    "key_ABCDEFGHIJKL",
-	"accept_numeric_suffix":      "key_012345678901",
-	"reject_wrong_prefix":        "api_A1b2C3d4E5f6",
-	"reject_short_suffix":        "key_A1b2C3d4E5f",
-	"reject_long_suffix":         "key_A1b2C3d4E5f6G",
-	"reject_underscore":          "key_A1b2C3d4E5_6",
-	"reject_punctuation":         "key_A1b2C3d4E5-6",
-	"reject_non_ascii_lookalike": "key_A1b2C3d4E5ｆ6",
-	"reject_leading_whitespace":  " key_A1b2C3d4E5f6",
-	"reject_trailing_whitespace": "key_A1b2C3d4E5f6 ",
-	"reject_embedded_whitespace": "key_A1b2C3 d4E5f",
+	"accept_canonical":            "key_A1b2C3d4E5f6",
+	"accept_lowercase_suffix":     "key_abcdefghijkl",
+	"accept_uppercase_suffix":     "key_ABCDEFGHIJKL",
+	"accept_numeric_suffix":       "key_012345678901",
+	"reject_wrong_prefix":         "api_A1b2C3d4E5f6",
+	"reject_short_suffix":         "key_A1b2C3d4E5f",
+	"reject_long_suffix":          "key_A1b2C3d4E5f6G",
+	"reject_underscore":           "key_A1b2C3d4E5_6",
+	"reject_punctuation":          "key_A1b2C3d4E5-6",
+	"reject_non_ascii_lookalike":  "key_A1b2C3d4E5ｆ6",
+	"reject_non_ascii_same_bytes": "key_A1b2C3d4E5é",
+	"reject_leading_whitespace":   " key_A1b2C3d4E5f6",
+	"reject_trailing_whitespace":  "key_A1b2C3d4E5f6 ",
+	"reject_embedded_whitespace":  "key_A1b2C3 d4E5f",
 }
 
 var agentAPIKeyIDResponseKinds = []string{
@@ -344,7 +345,7 @@ func isCanonicalAgentAPIKeyID(value string) bool {
 }
 
 func isASCIIAlphanumeric(value string) bool {
-	for i := range value {
+	for i := 0; i < len(value); i++ {
 		ch := value[i]
 		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') {
 			return false
