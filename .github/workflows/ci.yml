@@ -62,7 +62,10 @@ jobs:
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
-          const idValues = Object.fromEntries(i.consumer_value_cases.map(v => [v.name, v]));
+          const idValuePattern = new RegExp(i.contract.pattern);
+          const idValuesAgree = i.consumer_value_cases.every(
+            v => idValuePattern.test(v.value) === (v.outcome === 'accept')
+          );
           const canonical = '0123456789abcdef';
           // Stock JSON parsing is intentionally insufficient for these cases:
           // duplicate keys collapse last-wins and aliases remain unchecked.
@@ -86,8 +89,7 @@ jobs:
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
               i.consumer_response_cases.length !== 26 ||
-              idValues.reject_trailing_newline.outcome !== 'reject' ||
-              new RegExp(i.contract.pattern).test(idValues.reject_trailing_newline.value) ||
+              !idValuesAgree ||
               idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.registration_info_accept_with_companion_field.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse') {
@@ -113,7 +115,6 @@ jobs:
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
-          id_values = {v['name']: v for v in i['consumer_value_cases']}
           canonical = '0123456789abcdef'
           # Stock JSON parsing is intentionally insufficient for these cases:
           # duplicate keys collapse last-wins and aliases remain unchecked.
@@ -139,8 +140,10 @@ jobs:
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
           assert len(i['consumer_response_cases']) == 26
-          assert id_values['reject_trailing_newline']['outcome'] == 'reject'
-          assert re.fullmatch(i['contract']['pattern'], id_values['reject_trailing_newline']['value']) is None
+          assert all(
+              (re.fullmatch(i['contract']['pattern'], v['value']) is not None) == (v['outcome'] == 'accept')
+              for v in i['consumer_value_cases']
+          )
           assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['registration_info_accept_with_companion_field']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
