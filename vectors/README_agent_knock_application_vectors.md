@@ -70,12 +70,13 @@ string) and no `reject_class`. A rejecting expectation has `reject_class` and no
 | malformed non-empty `runId` | reject `invalid_run_id` | reject `invalid_run_id` |
 | duplicate key or unknown alias (`runID`, `run_id`) | reject `body_parse` | reject `body_parse` |
 
-**Still-standing request-layer obligation introduced by schema v2:** the exact-key and duplicate-key rules apply
-to the generic protocol parser as well as the native Connector profile. Generic
-implementers that previously relied on a case-insensitive or last-key-wins JSON
-decoder must add a raw-body strictness gate before typed decoding. The
-`generic_parser` and `native_connector` names are public policy profiles that any
-language implementation can exercise; they do not expose a private SDK parser.
+The exact-key and duplicate-key request-layer obligation introduced by schema v2
+remains in force for the generic protocol parser as well as the native Connector
+profile. Generic implementers that previously relied on a case-insensitive or
+last-key-wins JSON decoder must add a raw-body strictness gate before typed
+decoding. The `generic_parser` and `native_connector` names are public policy
+profiles that any language implementation can exercise; they do not expose a
+private SDK parser.
 
 The malformed vectors separately pin surrounding whitespace, 16-character
 internal whitespace, uppercase hex, 15-character, 17-character, and non-hex values.
