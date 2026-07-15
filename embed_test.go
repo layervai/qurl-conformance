@@ -910,6 +910,24 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("success with non-null pre-access action", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			var body map[string]any
+			if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
+				t.Fatal(err)
+			}
+			body["preActions"] = map[string]any{"foreign-resource": map[string]any{"acIp": "198.51.100.8"}}
+			encoded, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.BodyJSON = string(encoded)
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "non-null preActions") {
+			t.Fatalf("error = %v, want non-null success preActions rejection", err)
+		}
+	})
+
 	t.Run("reject with expected result", func(t *testing.T) {
 		b := mutateCase(t, "reject_wrong_resource", func(c *AgentKnockReplyCase) {
 			c.ExpectedACToken = "unexpected"

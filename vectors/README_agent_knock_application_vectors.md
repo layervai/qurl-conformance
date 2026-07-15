@@ -70,7 +70,7 @@ string) and no `reject_class`. A rejecting expectation has `reject_class` and no
 | malformed non-empty `runId` | reject `invalid_run_id` | reject `invalid_run_id` |
 | duplicate key or unknown alias (`runID`, `run_id`) | reject `body_parse` | reject `body_parse` |
 
-**Schema-v2 migration obligation:** the exact-key and duplicate-key rules apply
+**Still-standing request-layer obligation introduced by schema v2:** the exact-key and duplicate-key rules apply
 to the generic protocol parser as well as the native Connector profile. Generic
 implementers that previously relied on a case-insensitive or last-key-wins JSON
 decoder must add a raw-body strictness gate before typed decoding. The
@@ -200,8 +200,8 @@ A missing vector is a hard failure, never a skipped test. The Go loader also
 rejects unknown/trailing artifact fields, unsupported schema versions, duplicate
 case names, missing mandatory cases, invalid counters, unknown outcome or reject
 labels, request-policy label drift, success result labels that differ from the
-requested resource's body maps, and mandatory request bodies that no longer match
-their exact named vectors.
+requested resource's body maps, non-null success `preActions` values, and mandatory
+request bodies that no longer match their exact named vectors.
 
 The npm and Python packages intentionally expose the producer bytes through
 thin accessors, consistent with the other artifact families; they do not inherit

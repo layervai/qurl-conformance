@@ -627,13 +627,11 @@ type AgentKnockReplyCase struct {
 // enums/counters, duplicate case names, and a request golden that does not
 // exactly match its semantic fields. It independently derives both declared
 // request-parser outcomes and cross-checks success result labels against the
-// requested resource's raw body maps so labels cannot drift. Remaining reply
+// requested resource's raw body maps so labels cannot drift, and rejects a
+// declared success that carries any non-null preActions value. Remaining reply
 // semantics stay the consumer's job: those bodies include intentional wrong-map
 // shapes and trailing data that must reach the production parser. Invalid raw
-// JSON is allowed only for an explicit body_parse reject. The loader checks only
-// the explicit expected_* metadata against the body maps; success-body
-// dispositions such as all-null preActions are body-derived interpreter truth
-// left to the consumer's production path and deliberately not re-derived here.
+// JSON is allowed only for an explicit body_parse reject.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
 	var af AgentKnockApplicationFile
 	if err := strictDecodeArtifact(data, &af); err != nil {
@@ -1035,8 +1033,9 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 
 func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) error {
 	var body struct {
-		ResourceHost map[string]string `json:"resHost"`
-		ACTokens     map[string]string `json:"acTokens"`
+		ResourceHost     map[string]string           `json:"resHost"`
+		ACTokens         map[string]string           `json:"acTokens"`
+		PreAccessActions map[string]*json.RawMessage `json:"preActions"`
 	}
 	if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
 		return fmt.Errorf("conformance: success agent-knock reply case %q result body: %w", c.Name, err)
@@ -1046,6 +1045,11 @@ func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) 
 	}
 	if got := body.ResourceHost[resourceID]; c.ExpectedResourceHost != got {
 		return fmt.Errorf("conformance: success agent-knock reply case %q expected_resource_host %q does not match resHost[%q] %q", c.Name, c.ExpectedResourceHost, resourceID, got)
+	}
+	for key, action := range body.PreAccessActions {
+		if action != nil {
+			return fmt.Errorf("conformance: success agent-knock reply case %q has non-null preActions[%q]", c.Name, key)
+		}
 	}
 	return nil
 }
