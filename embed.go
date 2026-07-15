@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_knock_application_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -14,6 +14,7 @@ const (
 	relayKnockName            = "vectors/relay_knock_golden.json"
 	agentRegistrationName     = "vectors/agent_registration_golden.json"
 	agentKnockApplicationName = "vectors/agent_knock_application_vectors.json"
+	agentAPIKeyIDName         = "vectors/agent_api_key_id_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -78,6 +79,17 @@ func AgentKnockApplicationVectors() []byte {
 	return b
 }
 
+// AgentAPIKeyIDVectors returns the raw bytes of the control-plane API-key ID
+// producer and consumer vectors used by agent registration.
+func AgentAPIKeyIDVectors() []byte {
+	b, err := vectorsFS.ReadFile(agentAPIKeyIDName)
+	if err != nil {
+		// Unreachable: the file is embedded at build time.
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentAPIKeyIDName, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -93,6 +105,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(agentRegistrationName)
 	case agentKnockApplicationName, "agent_knock_application_vectors.json":
 		return vectorsFS.ReadFile(agentKnockApplicationName)
+	case agentAPIKeyIDName, "agent_api_key_id_vectors.json":
+		return vectorsFS.ReadFile(agentAPIKeyIDName)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -129,4 +143,9 @@ func AgentRegistrationGolden() (*AgentRegistrationFile, error) {
 // application-body artifact into a typed document.
 func AgentKnockApplication() (*AgentKnockApplicationFile, error) {
 	return ParseAgentKnockApplicationFile(AgentKnockApplicationVectors())
+}
+
+// AgentAPIKeyIDs strictly parses the embedded agent API-key ID artifact.
+func AgentAPIKeyIDs() (*AgentAPIKeyIDFile, error) {
+	return ParseAgentAPIKeyIDFile(AgentAPIKeyIDVectors())
 }

@@ -747,6 +747,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/agent_registration_golden.json",
 		"agent_knock_application_vectors.json",
 		"vectors/agent_knock_application_vectors.json",
+		"agent_api_key_id_vectors.json",
+		"vectors/agent_api_key_id_vectors.json",
 	} {
 		b, err := Open(name)
 		if err != nil {
