@@ -133,6 +133,13 @@
       "reject_class": "invalid_id"
     },
     {
+      "name": "registration_info_reject_surrounding_whitespace_id",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\" key_A1b2C3d4E5f6 \"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
       "name": "registration_info_reject_null",
       "surface": "registration_info",
       "body_json": "{\"key_id\":null}",
@@ -206,6 +213,13 @@
       "name": "completion_reject_invalid_id",
       "surface": "completion",
       "body_json": "{\"device_api_key_id\":\"api_A1b2C3d4E5f6\"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "completion_reject_surrounding_whitespace_id",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\" key_A1b2C3d4E5f6 \"}",
       "outcome": "reject",
       "reject_class": "invalid_id"
     },

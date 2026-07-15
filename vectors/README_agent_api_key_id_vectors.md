@@ -18,6 +18,11 @@ The equivalent pattern is `^key_[A-Za-z0-9]{12}$`. Consumers must not trim,
 case-fold, normalize Unicode, accept `_` in the suffix, or infer a broader
 grammar from another credential field.
 
+`total_length` and `pattern` intentionally repeat facts derivable from the
+prefix, alphabet, and suffix length. That gives length-oriented and
+regex-oriented consumers native forms; strict loaders cross-check all fields so
+the convenience cannot drift into a second contract.
+
 The same value contract applies to two response surfaces:
 
 | `surface` | Wire field |

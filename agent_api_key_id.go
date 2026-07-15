@@ -86,14 +86,11 @@ var agentAPIKeyIDSurfaceFields = map[string]string{
 	AgentAPIKeyIDSurfaceCompletion:       "device_api_key_id",
 }
 
-var agentAPIKeyIDProducerFixtures = map[string]struct {
-	suffix string
-	id     string
-}{
-	"lowercase_suffix": {"abcdefghijkl", "key_abcdefghijkl"},
-	"uppercase_suffix": {"ABCDEFGHIJKL", "key_ABCDEFGHIJKL"},
-	"numeric_suffix":   {"012345678901", "key_012345678901"},
-	"mixed_suffix":     {"A1b2C3d4E5f6", "key_A1b2C3d4E5f6"},
+var agentAPIKeyIDProducerFixtures = map[string]string{
+	"lowercase_suffix": "abcdefghijkl",
+	"uppercase_suffix": "ABCDEFGHIJKL",
+	"numeric_suffix":   "012345678901",
+	"mixed_suffix":     "A1b2C3d4E5f6",
 }
 
 var agentAPIKeyIDValueFixtures = map[string]string{
@@ -115,6 +112,7 @@ var agentAPIKeyIDValueFixtures = map[string]string{
 var agentAPIKeyIDResponseKinds = []string{
 	"accept_canonical",
 	"reject_invalid_id",
+	"reject_surrounding_whitespace_id",
 	"reject_null",
 	"reject_number",
 	"reject_boolean",
@@ -194,7 +192,7 @@ func validateAgentAPIKeyIDProducerCases(cases []AgentAPIKeyIDProducerCase) error
 	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, c := range cases {
-		fixture, ok := agentAPIKeyIDProducerFixtures[c.Name]
+		suffix, ok := agentAPIKeyIDProducerFixtures[c.Name]
 		if !ok {
 			return fmt.Errorf("conformance: unknown agent API-key ID producer case %q", c.Name)
 		}
@@ -202,10 +200,10 @@ func validateAgentAPIKeyIDProducerCases(cases []AgentAPIKeyIDProducerCase) error
 			return fmt.Errorf("conformance: duplicate agent API-key ID producer case %q", c.Name)
 		}
 		seen[c.Name] = struct{}{}
-		if c.Suffix != fixture.suffix || c.ExpectedID != fixture.id {
-			return fmt.Errorf("conformance: agent API-key ID producer case %q = %q/%q, want %q/%q", c.Name, c.Suffix, c.ExpectedID, fixture.suffix, fixture.id)
+		if c.Suffix != suffix {
+			return fmt.Errorf("conformance: agent API-key ID producer case %q suffix = %q, want %q", c.Name, c.Suffix, suffix)
 		}
-		if len(c.Suffix) != AgentAPIKeyIDSuffixLength || !isASCIIAlphanumeric(c.Suffix) || AgentAPIKeyIDPrefix+c.Suffix != c.ExpectedID || !isCanonicalAgentAPIKeyID(c.ExpectedID) {
+		if len(c.Suffix) != AgentAPIKeyIDSuffixLength || !isASCIIAlphanumeric(c.Suffix) || c.ExpectedID != AgentAPIKeyIDPrefix+c.Suffix || !isCanonicalAgentAPIKeyID(c.ExpectedID) {
 			return fmt.Errorf("conformance: agent API-key ID producer case %q does not satisfy the declared construction contract", c.Name)
 		}
 	}
@@ -268,47 +266,52 @@ func validateAgentAPIKeyIDResponseCases(cases []AgentAPIKeyIDResponseCase) error
 
 func expectedAgentAPIKeyIDResponseBody(name string) (body, surface string, ok bool) {
 	for candidate, field := range agentAPIKeyIDSurfaceFields {
-		prefix := candidate + "_"
-		if !strings.HasPrefix(name, prefix) {
-			continue
-		}
-		kind := strings.TrimPrefix(name, prefix)
-		if !containsString(agentAPIKeyIDResponseKinds, kind) {
-			return "", "", false
-		}
-		canonical := "key_A1b2C3d4E5f6"
-		quotedField := `"` + field + `"`
-		switch kind {
-		case "accept_canonical":
-			body = `{` + quotedField + `:"` + canonical + `"}`
-		case "reject_invalid_id":
-			body = `{` + quotedField + `:"api_A1b2C3d4E5f6"}`
-		case "reject_null":
-			body = `{` + quotedField + `:null}`
-		case "reject_number":
-			body = `{` + quotedField + `:7}`
-		case "reject_boolean":
-			body = `{` + quotedField + `:false}`
-		case "reject_object":
-			body = `{` + quotedField + `:{"nested":"value"}}`
-		case "reject_array":
-			body = `{` + quotedField + `:[]}`
-		case "reject_duplicate_field":
-			body = `{` + quotedField + `:"` + canonical + `",` + quotedField + `:"key_012345678901"}`
-		case "reject_trailing_json":
-			body = `{` + quotedField + `:"` + canonical + `"}{}`
-		case "reject_missing_field":
-			body = `{}`
-		case "reject_unknown_field":
-			unknown := "keyId"
-			if candidate == AgentAPIKeyIDSurfaceCompletion {
-				unknown = "deviceApiKeyId"
+		for _, kind := range agentAPIKeyIDResponseKinds {
+			if name != candidate+"_"+kind {
+				continue
 			}
-			body = `{"` + unknown + `":"` + canonical + `"}`
+			body, ok := agentAPIKeyIDResponseBody(candidate, field, kind)
+			return body, candidate, ok
 		}
-		return body, candidate, true
 	}
 	return "", "", false
+}
+
+func agentAPIKeyIDResponseBody(surface, field, kind string) (string, bool) {
+	canonical := "key_A1b2C3d4E5f6"
+	quotedField := `"` + field + `"`
+	switch kind {
+	case "accept_canonical":
+		return `{` + quotedField + `:"` + canonical + `"}`, true
+	case "reject_invalid_id":
+		return `{` + quotedField + `:"api_A1b2C3d4E5f6"}`, true
+	case "reject_surrounding_whitespace_id":
+		return `{` + quotedField + `:" ` + canonical + ` "}`, true
+	case "reject_null":
+		return `{` + quotedField + `:null}`, true
+	case "reject_number":
+		return `{` + quotedField + `:7}`, true
+	case "reject_boolean":
+		return `{` + quotedField + `:false}`, true
+	case "reject_object":
+		return `{` + quotedField + `:{"nested":"value"}}`, true
+	case "reject_array":
+		return `{` + quotedField + `:[]}`, true
+	case "reject_duplicate_field":
+		return `{` + quotedField + `:"` + canonical + `",` + quotedField + `:"key_012345678901"}`, true
+	case "reject_trailing_json":
+		return `{` + quotedField + `:"` + canonical + `"}{}`, true
+	case "reject_missing_field":
+		return `{}`, true
+	case "reject_unknown_field":
+		unknown := "keyId"
+		if surface == AgentAPIKeyIDSurfaceCompletion {
+			unknown = "deviceApiKeyId"
+		}
+		return `{"` + unknown + `":"` + canonical + `"}`, true
+	default:
+		return "", false
+	}
 }
 
 func deriveAgentAPIKeyIDResponse(surface string, body []byte) (outcome, id, rejectClass string) {
@@ -348,13 +351,4 @@ func isASCIIAlphanumeric(value string) bool {
 		}
 	}
 	return true
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }

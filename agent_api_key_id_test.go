@@ -17,7 +17,7 @@ func TestEmbeddedAgentAPIKeyIDsLoad(t *testing.T) {
 	if af.Contract.Pattern != AgentAPIKeyIDPattern || af.Contract.TotalLength != AgentAPIKeyIDTotalLength {
 		t.Fatalf("contract = %+v, want pattern %q and length %d", af.Contract, AgentAPIKeyIDPattern, AgentAPIKeyIDTotalLength)
 	}
-	if len(af.Surfaces) != 2 || len(af.ProducerCases) != 4 || len(af.ConsumerValueCases) != 13 || len(af.ConsumerResponseCases) != 22 {
+	if len(af.Surfaces) != 2 || len(af.ProducerCases) != 4 || len(af.ConsumerValueCases) != 13 || len(af.ConsumerResponseCases) != 24 {
 		t.Fatalf("fixture counts = surfaces:%d producer:%d values:%d responses:%d", len(af.Surfaces), len(af.ProducerCases), len(af.ConsumerValueCases), len(af.ConsumerResponseCases))
 	}
 
