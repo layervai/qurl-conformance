@@ -629,7 +629,10 @@ type AgentKnockReplyCase struct {
 // requested resource's raw body maps so labels cannot drift. Remaining reply
 // semantics stay the consumer's job: those bodies include intentional wrong-map
 // shapes and trailing data that must reach the production parser. Invalid raw
-// JSON is allowed only for an explicit body_parse reject.
+// JSON is allowed only for an explicit body_parse reject. The loader checks only
+// the explicit expected_* metadata against the body maps; success-body
+// dispositions such as all-null preActions are body-derived interpreter truth
+// left to the consumer's production path and deliberately not re-derived here.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
 	var af AgentKnockApplicationFile
 	if err := strictDecodeArtifact(data, &af); err != nil {

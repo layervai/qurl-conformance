@@ -424,23 +424,19 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		err := json.Unmarshal(body(name)[field], &value)
 		return value, err
 	}
-	type preAccessInfo struct {
-		AccessIP       string `json:"acIp"`
-		AccessPort     string `json:"acPort"`
-		ACPublicKey    string `json:"acPubKey"`
-		ACToken        string `json:"acToken"`
-		ACCipherScheme int    `json:"acCipherScheme"`
-	}
 	type producerACK struct {
-		ErrCode           string                    `json:"errCode"`
-		ErrMsg            string                    `json:"errMsg,omitempty"`
-		ResourceHost      map[string]string         `json:"resHost"`
-		OpenTime          uint32                    `json:"opnTime"`
-		AuthProviderToken string                    `json:"aspToken,omitempty"`
-		AgentAddr         string                    `json:"agentAddr"`
-		ACTokens          map[string]string         `json:"acTokens"`
-		PreAccessActions  map[string]*preAccessInfo `json:"preActions,omitempty"`
-		RedirectURL       string                    `json:"redirectUrl,omitempty"`
+		ErrCode           string            `json:"errCode"`
+		ErrMsg            string            `json:"errMsg,omitempty"`
+		ResourceHost      map[string]string `json:"resHost"`
+		OpenTime          uint32            `json:"opnTime"`
+		AuthProviderToken string            `json:"aspToken,omitempty"`
+		AgentAddr         string            `json:"agentAddr"`
+		ACTokens          map[string]string `json:"acTokens"`
+		// preActions maps the requested resource only to null in the producer's
+		// no-NHP_ACC success shape. Populated action fields live in the
+		// reject_pre_access_* vectors rather than this serialization fixture.
+		PreAccessActions map[string]*struct{} `json:"preActions,omitempty"`
+		RedirectURL      string               `json:"redirectUrl,omitempty"`
 	}
 	standard := producerACK{
 		ErrCode:          "0",
@@ -448,7 +444,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		OpenTime:         900,
 		AgentAddr:        "203.0.113.9:49152",
 		ACTokens:         map[string]string{resourceID: "ac-token-conformance-01"},
-		PreAccessActions: map[string]*preAccessInfo{resourceID: nil},
+		PreAccessActions: map[string]*struct{}{resourceID: nil},
 	}
 	optionalMetadata := standard
 	optionalMetadata.AuthProviderToken = "asp-token-must-not-authorize"
