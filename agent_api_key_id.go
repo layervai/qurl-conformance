@@ -280,14 +280,13 @@ func validateAgentAPIKeyIDResponseCases(cases []AgentAPIKeyIDResponseCase) error
 	return nil
 }
 
-func expectedAgentAPIKeyIDResponseBody(name string) (body, surface string, ok bool) {
+func expectedAgentAPIKeyIDResponseBody(name string) (string, string, bool) {
 	for candidate, field := range agentAPIKeyIDSurfaceFields {
 		for _, kind := range agentAPIKeyIDResponseKinds {
-			if name != candidate+"_"+kind {
-				continue
+			if name == candidate+"_"+kind {
+				body, ok := agentAPIKeyIDResponseBody(candidate, field, kind)
+				return body, candidate, ok
 			}
-			body, ok := agentAPIKeyIDResponseBody(candidate, field, kind)
-			return body, candidate, ok
 		}
 	}
 	return "", "", false
