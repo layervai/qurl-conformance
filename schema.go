@@ -965,13 +965,18 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		c.Outcome != AgentKnockOutcomeRetry && c.Outcome != AgentKnockOutcomeReject {
 		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
 	}
+	// Expected-result presence is a pure function of success-ness: required on
+	// success, forbidden on every other outcome.
+	if c.Outcome == AgentKnockOutcomeSuccess && (c.ExpectedACToken == "" || c.ExpectedResourceHost == "") {
+		return fmt.Errorf("conformance: success agent-knock reply case %q must carry a non-empty expected result", c.Name)
+	}
 	if c.Outcome != AgentKnockOutcomeSuccess && (c.ExpectedACToken != "" || c.ExpectedResourceHost != "") {
 		return fmt.Errorf("conformance: non-success agent-knock reply case %q must not carry an expected result", c.Name)
 	}
 	switch c.Outcome {
 	case AgentKnockOutcomeSuccess:
-		if c.RejectClass != "" || c.ReplyType != 2 || req != reply || c.ExpectedACToken == "" || c.ExpectedResourceHost == "" {
-			return fmt.Errorf("conformance: success agent-knock reply case %q must be matched NHP_ACK with no reject_class and non-empty expected result", c.Name)
+		if c.RejectClass != "" || c.ReplyType != 2 || req != reply {
+			return fmt.Errorf("conformance: success agent-knock reply case %q must be matched NHP_ACK with no reject_class", c.Name)
 		}
 	case AgentKnockOutcomeDeny:
 		if c.RejectClass != AgentKnockRejectServerDeny || c.ReplyType != 2 || req != reply {

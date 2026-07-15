@@ -454,12 +454,9 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	optionalMetadata.AuthProviderToken = "asp-token-must-not-authorize"
 	optionalMetadata.RedirectURL = "https://redirect.example/conformance"
 	denied := producerACK{
-		ErrCode:      "52004",
-		ErrMsg:       "failed to find resource",
-		OpenTime:     0,
-		AgentAddr:    "203.0.113.9:49152",
-		ResourceHost: nil,
-		ACTokens:     nil,
+		ErrCode:   "52004",
+		ErrMsg:    "failed to find resource",
+		AgentAddr: "203.0.113.9:49152",
 	}
 	for name, ack := range map[string]producerACK{
 		"ack_success":                   standard,
@@ -479,19 +476,19 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		if got := stringField(name, "errCode"); got != "0" {
 			t.Errorf("%s errCode = %q, want 0", name, got)
 		}
-		for _, field := range []string{"resHost", "acTokens"} {
-			values, err := stringMap(name, field)
-			if err != nil || values[resourceID] == "" {
-				t.Errorf("%s %s = %v, %v; want requested non-empty value", name, field, values, err)
-			}
+		acTokens, acErr := stringMap(name, "acTokens")
+		resourceHosts, hostErr := stringMap(name, "resHost")
+		if hostErr != nil || resourceHosts[resourceID] == "" {
+			t.Errorf("%s resHost = %v, %v; want requested non-empty value", name, resourceHosts, hostErr)
+		}
+		if acErr != nil || acTokens[resourceID] == "" {
+			t.Errorf("%s acTokens = %v, %v; want requested non-empty value", name, acTokens, acErr)
 		}
 		preActions, err := rawMap(name, "preActions")
 		if err != nil || string(preActions[resourceID]) != "null" {
 			t.Errorf("%s preActions = %v, %v; want exact-resource null", name, preActions, err)
 		}
 		c := byName[name]
-		acTokens, _ := stringMap(name, "acTokens")
-		resourceHosts, _ := stringMap(name, "resHost")
 		if c.ExpectedACToken != acTokens[resourceID] || c.ExpectedResourceHost != resourceHosts[resourceID] {
 			t.Errorf("%s expected result = %q/%q, want exact resource maps %q/%q", name,
 				c.ExpectedACToken, c.ExpectedResourceHost, acTokens[resourceID], resourceHosts[resourceID])
