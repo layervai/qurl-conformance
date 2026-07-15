@@ -89,9 +89,10 @@ alone to reject `runID`.
 ACK producer envelope. Consumers must accept the standard exact-resource
 `preActions: null` shape and typed optional `aspToken` / `redirectUrl`, while
 rejecting unknown or duplicate fields, trailing data, null/non-object bodies,
-wrong field types, and every non-null pre-access action on a successful ACK. A
-consumer must not repin to schema v3 until these reply cases run through its real
-production interpreter.
+wrong field types, and every non-null pre-access action on a successful ACK.
+Strict field decoding and wrong-type rejection must occur before pre-access
+evaluation. A consumer must not repin to schema v3 until these reply cases run
+through its real production interpreter.
 
 Request reject classes are closed:
 

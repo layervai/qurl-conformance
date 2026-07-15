@@ -802,6 +802,23 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown reply case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		extra := doc.ReplyCases[0]
+		extra.Name = "unexpected_reply_case"
+		doc.ReplyCases = append(doc.ReplyCases, extra)
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown agent-knock reply case") {
+			t.Fatalf("error = %v, want unknown reply case rejection", err)
+		}
+	})
+
 	t.Run("duplicate case", func(t *testing.T) {
 		var doc AgentKnockApplicationFile
 		if err := json.Unmarshal(raw, &doc); err != nil {

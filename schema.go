@@ -622,7 +622,7 @@ type AgentKnockReplyCase struct {
 
 // ParseAgentKnockApplicationFile strictly parses and validates the
 // application-body artifact. It rejects duplicate/unknown/trailing outer
-// fields, stale schema versions, missing mandatory cases, invalid
+// fields, stale schema versions, missing or unknown cases, invalid
 // enums/counters, duplicate case names, and a request golden that does not
 // exactly match its semantic fields. It independently derives both declared
 // request-parser outcomes from each raw body so case labels cannot drift.
@@ -665,8 +665,15 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		"reject_trailing_ack_data", "reject_null_ack_body",
 		"reject_non_object_ack_body", "reject_counter_mismatch", "reject_reply_type_mismatch",
 	}
+	allowed := make(map[string]struct{}, len(required))
+	for _, name := range required {
+		allowed[name] = struct{}{}
+	}
 	seen := make(map[string]struct{}, len(af.ReplyCases))
 	for _, c := range af.ReplyCases {
+		if _, ok := allowed[c.Name]; !ok {
+			return nil, fmt.Errorf("conformance: unknown agent-knock reply case %q", c.Name)
+		}
 		if _, ok := seen[c.Name]; ok {
 			return nil, fmt.Errorf("conformance: duplicate agent-knock reply case %q", c.Name)
 		}
