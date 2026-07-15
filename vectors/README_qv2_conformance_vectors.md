@@ -1,5 +1,9 @@
 # qURL v2 conformance vectors
 
+The reject classes in this document belong to the qv2 artifact. Independent
+artifacts define local vocabularies in their own guides; see, for example,
+[`README_agent_api_key_id_vectors.md`](README_agent_api_key_id_vectors.md).
+
 `qv2_conformance_vectors.json` is the **protocol-versioned, language-agnostic**
 wire-truth for the qURL v2 *verify* path. Every qURL v2 verifier implementation
 re-runs the **same bytes** against its **own** implementation, in whatever

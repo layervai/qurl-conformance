@@ -3,8 +3,8 @@
 The single public source of truth for the **qURL cross-language conformance
 vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
-path, Noise-handshake packets, agent registration, and registered-agent knock
-application bodies decoupled by layer.
+path, Noise-handshake packets, agent registration, registered-agent knock
+application bodies, and control-plane API-key IDs decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -23,6 +23,8 @@ trust.
 | `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
 | `vectors/agent_knock_application_vectors.json` | registered-agent KNK body and RunID request-policy cases plus already-decrypted ACK/COK dispositions; no Noise packet duplication |
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
+| `vectors/agent_api_key_id_vectors.json` | issuer and strict-consumer fixtures for agent registration `key_id` / `device_api_key_id` |
+| `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -36,6 +38,7 @@ vf, err := conformance.SignatureVectors()          // strict-parsed issuer-signa
 rk, err := conformance.RelayKnockGolden()          // strict-parsed relay-knock golden packets
 ar, err := conformance.AgentRegistrationGolden()   // strict-parsed agent-registration golden packets
 ka, err := conformance.AgentKnockApplication()      // strict-parsed agent KNK/ACK application vectors
+ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -53,7 +56,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts four artifact families, each under its own `artifact` id:
+This module hosts five artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -96,6 +99,13 @@ This module hosts four artifact families, each under its own `artifact` id:
   and transport correlation gates. Its `resId` semantic is the placement-neutral
   NHP `knock_resource_id`, not the public-key management `resource_id`. See
   `vectors/README_agent_knock_application_vectors.md`.
+- **Agent API-key ID contract** (`qurl-agent-api-key-id-vectors`,
+  `agent_api_key_id_vectors.json`) — deterministic issuer suffix fixtures,
+  direct string validation cases, and raw response-field cases for
+  `registration-info.key_id` and completion `device_api_key_id`. It freezes the
+  exact `key_` plus 12 ASCII-alphanumeric grammar without reinterpreting the
+  synthetic NHP registration packet `usrId`. See
+  `vectors/README_agent_api_key_id_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

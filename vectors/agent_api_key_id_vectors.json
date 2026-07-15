@@ -1,0 +1,334 @@
+{
+  "artifact": "qurl-agent-api-key-id-vectors",
+  "schema_version": 1,
+  "description": "Shared producer and consumer fixtures for control-plane API-key identifiers returned during agent registration.",
+  "contract": {
+    "prefix": "key_",
+    "suffix_length": 12,
+    "total_length": 16,
+    "suffix_alphabet": "ASCII_ALPHANUMERIC",
+    "pattern": "^key_[A-Za-z0-9]{12}$"
+  },
+  "surfaces": [
+    {
+      "name": "registration_info",
+      "wire_field": "key_id"
+    },
+    {
+      "name": "completion",
+      "wire_field": "device_api_key_id"
+    }
+  ],
+  "producer_cases": [
+    {
+      "name": "lowercase_suffix",
+      "suffix": "abcdefghijkl",
+      "expected_id": "key_abcdefghijkl"
+    },
+    {
+      "name": "uppercase_suffix",
+      "suffix": "ABCDEFGHIJKL",
+      "expected_id": "key_ABCDEFGHIJKL"
+    },
+    {
+      "name": "numeric_suffix",
+      "suffix": "012345678901",
+      "expected_id": "key_012345678901"
+    },
+    {
+      "name": "mixed_suffix",
+      "suffix": "A1b2C3d4E5f6",
+      "expected_id": "key_A1b2C3d4E5f6"
+    }
+  ],
+  "consumer_value_cases": [
+    {
+      "name": "accept_canonical",
+      "value": "key_A1b2C3d4E5f6",
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_lowercase_suffix",
+      "value": "key_abcdefghijkl",
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_uppercase_suffix",
+      "value": "key_ABCDEFGHIJKL",
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_numeric_suffix",
+      "value": "key_012345678901",
+      "outcome": "accept"
+    },
+    {
+      "name": "reject_empty",
+      "value": "",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_prefix_only",
+      "value": "key_",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_uppercase_prefix",
+      "value": "KEY_A1b2C3d4E5f6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_wrong_prefix",
+      "value": "api_A1b2C3d4E5f6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_short_suffix",
+      "value": "key_A1b2C3d4E5f",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_long_suffix",
+      "value": "key_A1b2C3d4E5f6G",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_underscore",
+      "value": "key_A1b2C3d4E5_6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_punctuation",
+      "value": "key_A1b2C3d4E5-6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_non_ascii_lookalike",
+      "value": "key_A1b2C3d4E5ｆ6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_non_ascii_same_byte_length",
+      "value": "key_A1b2C3d4E5é",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_leading_whitespace",
+      "value": " key_A1b2C3d4E5f6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_trailing_whitespace",
+      "value": "key_A1b2C3d4E5f6 ",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_trailing_newline",
+      "value": "key_A1b2C3d4E5f6\n",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_embedded_whitespace",
+      "value": "key_A1b2C3 d4E5f",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    }
+  ],
+  "consumer_response_cases": [
+    {
+      "name": "registration_info_accept_canonical",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "registration_info_accept_with_companion_field",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_kind\":\"bootstrap\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "registration_info_reject_invalid_id",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"api_A1b2C3d4E5f6\"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "registration_info_reject_surrounding_whitespace_id",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\" key_A1b2C3d4E5f6 \"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "registration_info_reject_null",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":null}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_number",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":7}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_boolean",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":false}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_object",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":{\"nested\":\"value\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_array",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":[]}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_duplicate_field",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_id\":\"key_012345678901\"}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_trailing_json",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\"}{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_missing_field",
+      "surface": "registration_info",
+      "body_json": "{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "registration_info_reject_unknown_field",
+      "surface": "registration_info",
+      "body_json": "{\"keyId\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_accept_canonical",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "completion_accept_with_companion_field",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\",\"agent_id\":\"agent_conform\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "completion_reject_invalid_id",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"api_A1b2C3d4E5f6\"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "completion_reject_surrounding_whitespace_id",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\" key_A1b2C3d4E5f6 \"}",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "completion_reject_null",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":null}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_number",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":7}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_boolean",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":false}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_object",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":{\"nested\":\"value\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_array",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":[]}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_duplicate_field",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\",\"device_api_key_id\":\"key_012345678901\"}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_trailing_json",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\"}{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_missing_field",
+      "surface": "completion",
+      "body_json": "{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "completion_reject_unknown_field",
+      "surface": "completion",
+      "body_json": "{\"deviceApiKeyId\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    }
+  ]
+}
