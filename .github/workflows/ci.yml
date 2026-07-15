@@ -84,11 +84,12 @@ jobs:
               replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
-              i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 15 ||
-              i.consumer_response_cases.length !== 24 ||
+              i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
+              i.consumer_response_cases.length !== 26 ||
               idValues.reject_trailing_newline.outcome !== 'reject' ||
               new RegExp(i.contract.pattern).test(idValues.reject_trailing_newline.value) ||
               idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
+              idResponses.registration_info_accept_with_companion_field.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse') {
             process.exit(1);
           }
@@ -136,11 +137,12 @@ jobs:
           assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
-          assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 15
-          assert len(i['consumer_response_cases']) == 24
+          assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
+          assert len(i['consumer_response_cases']) == 26
           assert id_values['reject_trailing_newline']['outcome'] == 'reject'
           assert re.fullmatch(i['contract']['pattern'], id_values['reject_trailing_newline']['value']) is None
           assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
+          assert id_responses['registration_info_accept_with_companion_field']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
           print('py ok')
           PY

@@ -43,11 +43,14 @@ The same value contract applies to two response surfaces:
   validate IDs minted from its real randomness source against `contract`.
 - `consumer_value_cases` feed the listed string directly through the same ID
   validator used by both response surfaces and assert `outcome`.
-- `consumer_response_cases` preserve raw one-field JSON objects. They exercise
-  null and non-string values, duplicate keys, trailing JSON, missing/unknown
-  fields, and the ID validator. Consumers must keep `body_json` raw until it
-  reaches their strict response boundary; parsing and re-serializing first
-  would erase the duplicate-key and trailing-value negatives.
+- `consumer_response_cases` preserve raw JSON objects. Minimal cases isolate the
+  ID field, while companion-field accepts prove consumers can extract it from
+  the larger registration-info and completion bodies used on the wire. The
+  remaining cases exercise null and non-string values, duplicate keys, trailing
+  JSON, missing/unknown fields, and the ID validator. Consumers must keep
+  `body_json` raw until it reaches their response boundary; parsing and
+  re-serializing first would erase the duplicate-key and trailing-value
+  negatives.
 
 For an accepted response case, `expected_id` is the exact parsed result. A
 rejected case has one of two stable classes:

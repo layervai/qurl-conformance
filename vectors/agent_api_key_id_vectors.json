@@ -63,6 +63,24 @@
       "outcome": "accept"
     },
     {
+      "name": "reject_empty",
+      "value": "",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_prefix_only",
+      "value": "key_",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
+      "name": "reject_uppercase_prefix",
+      "value": "KEY_A1b2C3d4E5f6",
+      "outcome": "reject",
+      "reject_class": "invalid_id"
+    },
+    {
       "name": "reject_wrong_prefix",
       "value": "api_A1b2C3d4E5f6",
       "outcome": "reject",
@@ -134,6 +152,13 @@
       "name": "registration_info_accept_canonical",
       "surface": "registration_info",
       "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "registration_info_accept_with_companion_field",
+      "surface": "registration_info",
+      "body_json": "{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_kind\":\"bootstrap\"}",
       "outcome": "accept",
       "expected_id": "key_A1b2C3d4E5f6"
     },
@@ -218,6 +243,13 @@
       "name": "completion_accept_canonical",
       "surface": "completion",
       "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\"}",
+      "outcome": "accept",
+      "expected_id": "key_A1b2C3d4E5f6"
+    },
+    {
+      "name": "completion_accept_with_companion_field",
+      "surface": "completion",
+      "body_json": "{\"device_api_key_id\":\"key_A1b2C3d4E5f6\",\"agent_id\":\"agent_conform\"}",
       "outcome": "accept",
       "expected_id": "key_A1b2C3d4E5f6"
     },

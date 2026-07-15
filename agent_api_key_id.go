@@ -71,8 +71,9 @@ type AgentAPIKeyIDValueCase struct {
 	RejectClass string `json:"reject_class,omitempty"`
 }
 
-// AgentAPIKeyIDResponseCase preserves raw JSON so duplicate keys, wrong scalar
-// types, and trailing values reach a consumer's strict response parser.
+// AgentAPIKeyIDResponseCase preserves raw JSON so companion fields, duplicate
+// keys, wrong scalar types, and trailing values reach a consumer's response
+// parser without lossy re-serialization.
 type AgentAPIKeyIDResponseCase struct {
 	Name        string `json:"name"`
 	Surface     string `json:"surface"`
@@ -99,6 +100,9 @@ var agentAPIKeyIDValueFixtures = map[string]string{
 	"accept_lowercase_suffix":           "key_abcdefghijkl",
 	"accept_uppercase_suffix":           "key_ABCDEFGHIJKL",
 	"accept_numeric_suffix":             "key_012345678901",
+	"reject_empty":                      "",
+	"reject_prefix_only":                "key_",
+	"reject_uppercase_prefix":           "KEY_A1b2C3d4E5f6",
 	"reject_wrong_prefix":               "api_A1b2C3d4E5f6",
 	"reject_short_suffix":               "key_A1b2C3d4E5f",
 	"reject_long_suffix":                "key_A1b2C3d4E5f6G",
@@ -114,6 +118,7 @@ var agentAPIKeyIDValueFixtures = map[string]string{
 
 var agentAPIKeyIDResponseKinds = []string{
 	"accept_canonical",
+	"accept_with_companion_field",
 	"reject_invalid_id",
 	"reject_surrounding_whitespace_id",
 	"reject_null",
@@ -294,6 +299,12 @@ func agentAPIKeyIDResponseBody(surface, field, kind string) (string, bool) {
 	switch kind {
 	case "accept_canonical":
 		return `{` + quotedField + `:"` + canonical + `"}`, true
+	case "accept_with_companion_field":
+		companion := `"key_kind":"bootstrap"`
+		if surface == AgentAPIKeyIDSurfaceCompletion {
+			companion = `"agent_id":"agent_conform"`
+		}
+		return `{` + quotedField + `:"` + canonical + `",` + companion + `}`, true
 	case "reject_invalid_id":
 		return `{` + quotedField + `:"api_A1b2C3d4E5f6"}`, true
 	case "reject_surrounding_whitespace_id":
@@ -334,7 +345,7 @@ func deriveAgentAPIKeyIDResponse(surface string, body []byte) (outcome, id, reje
 		return ExpectReject, "", AgentAPIKeyIDRejectBodyParse
 	}
 	var object map[string]json.RawMessage
-	if err := json.Unmarshal(body, &object); err != nil || len(object) != 1 {
+	if err := json.Unmarshal(body, &object); err != nil {
 		return ExpectReject, "", AgentAPIKeyIDRejectBodyParse
 	}
 	raw, present := object[field]
