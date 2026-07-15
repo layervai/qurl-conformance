@@ -58,7 +58,7 @@ jobs:
           const r = c.relayKnockVectors();
           const a = c.agentRegistrationVectors();
           const k = c.agentKnockApplicationVectors();
-          const i = c.agentAPIKeyIDVectors();
+          const i = c.agentApiKeyIdVectors();
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
