@@ -93,8 +93,10 @@ jobs:
               !Array.isArray(JSON.parse(replies.reject_malformed_pre_actions.body_json).preActions) ||
               replies.ack_deny.reject_class !== 'server_deny' ||
               replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
-              typeof JSON.parse(replies.reject_malformed_opn_time.body_json).opnTime !== 'string' ||
-              typeof JSON.parse(replies.reject_malformed_agent_addr.body_json).agentAddr !== 'number' ||
+              JSON.parse(replies.reject_malformed_opn_time.body_json).opnTime !== '900' ||
+              replies.reject_malformed_opn_time.reject_class !== 'body_parse' ||
+              JSON.parse(replies.reject_malformed_agent_addr.body_json).agentAddr !== 7 ||
+              replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
@@ -156,8 +158,10 @@ jobs:
           assert isinstance(json.loads(replies['reject_malformed_pre_actions']['body_json'])['preActions'], list)
           assert replies['ack_deny']['reject_class'] == 'server_deny'
           assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
-          assert isinstance(json.loads(replies['reject_malformed_opn_time']['body_json'])['opnTime'], str)
-          assert isinstance(json.loads(replies['reject_malformed_agent_addr']['body_json'])['agentAddr'], int)
+          assert json.loads(replies['reject_malformed_opn_time']['body_json'])['opnTime'] == '900'
+          assert replies['reject_malformed_opn_time']['reject_class'] == 'body_parse'
+          assert json.loads(replies['reject_malformed_agent_addr']['body_json'])['agentAddr'] == 7
+          assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
