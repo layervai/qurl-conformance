@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"os"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -379,7 +381,7 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 			t.Errorf("result case %q = %#v, want semantic reject", name, c)
 		}
 	}
-	if af.ErrorContract.Status != "ready" || af.ErrorContract.ProducerRevision != "9653fcb185c77629b787ad046c13c760baba88f4" {
+	if af.ErrorContract.Status != "ready" || af.ErrorContract.ProducerRevision != AgentAssignmentNHPProducerRevision {
 		t.Errorf("error taxonomy status/producer = %q/%q, want merged NHP producer pin", af.ErrorContract.Status, af.ErrorContract.ProducerRevision)
 	}
 	if got, want := len(af.ErrorContract.AssignmentCases), 6; got != want {
@@ -393,6 +395,40 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	}
 	if got, want := len(af.ErrorContract.RegistrationCases), 4; got != want {
 		t.Errorf("registration error case count = %d, want %d", got, want)
+	}
+}
+
+func TestAgentAssignmentProductionShapedFixturesAreExact(t *testing.T) {
+	allowed := map[string]bool{
+		AgentAssignmentBootstrapCredentialFixture: false,
+		AgentAssignmentDeviceAPIKeyFixture:        false,
+	}
+	for _, token := range regexp.MustCompile(`lv_live_[A-Za-z0-9_]+`).FindAllString(string(AgentAssignmentVectors()), -1) {
+		if _, ok := allowed[token]; !ok {
+			t.Errorf("unexpected production-shaped fixture %q; scanner exceptions must be exact", token)
+			continue
+		}
+		allowed[token] = true
+	}
+	for token, found := range allowed {
+		if !found {
+			t.Errorf("production-shaped fixture %q is not load-bearing", token)
+		}
+	}
+}
+
+func TestAgentAssignmentREADMERevisionPins(t *testing.T) {
+	readme, err := os.ReadFile("README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, revision := range map[string]string{
+		"qurl-go": AgentAssignmentQURLGoProducerRevision,
+		"NHP":     AgentAssignmentNHPProducerRevision,
+	} {
+		if !bytes.Contains(readme, []byte(revision)) {
+			t.Errorf("README is missing the %s producer revision %s", name, revision)
+		}
 	}
 }
 

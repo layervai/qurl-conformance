@@ -534,6 +534,20 @@ const (
 	AgentAssignmentRejectRetryAfterUnexpected = "retry_after_unexpected"
 	AgentAssignmentRejectSemantic             = "semantic"
 	AgentAssignmentRejectUnknownErrorCode     = "unknown_error_code"
+	// AgentAssignmentQURLGoProducerRevision is the merged qurl-go revision
+	// used to build and authenticate-open every assignment lifecycle packet.
+	AgentAssignmentQURLGoProducerRevision = "8a69642957030b9ce0a1b8b356246d265a9f577d"
+	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
+	// the closed assignment and registration error-code taxonomy.
+	AgentAssignmentNHPProducerRevision = "9653fcb185c77629b787ad046c13c760baba88f4"
+	// AgentAssignmentBootstrapCredentialFixture is the exact synthetic,
+	// production-shaped credential fixture. Secret scanners must allow only
+	// this value, never an lv_live_conformance_* wildcard.
+	AgentAssignmentBootstrapCredentialFixture = "lv_live_conformance_bootstrap_secret_0001"
+	// AgentAssignmentDeviceAPIKeyFixture is the exact synthetic,
+	// production-shaped device-key fixture. Secret scanners must allow only
+	// this value, never an lv_live_conformance_* wildcard.
+	AgentAssignmentDeviceAPIKeyFixture = "lv_live_conformance_device_secret_0001"
 )
 
 // AgentAssignmentFile pins four complete deterministic NHP exchanges: initial
@@ -1330,7 +1344,7 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if err := strictDecodeArtifact(initialRequest.UsrData, &initialData); err != nil || initialData == nil {
 		return fmt.Errorf("conformance: initial_assignment.request usrData is not strict v1 JSON: %v", err)
 	}
-	if initialRequest.UsrID != "" || initialRequest.DevID == "" || initialRequest.AspID != "agent" || initialData.Query != "cell_assignment" || initialData.Version != 1 || initialData.Mode != "enroll" || initialData.Credential == "" {
+	if initialRequest.UsrID != "" || initialRequest.DevID == "" || initialRequest.AspID != "agent" || initialData.Query != "cell_assignment" || initialData.Version != 1 || initialData.Mode != "enroll" || initialData.Credential != AgentAssignmentBootstrapCredentialFixture {
 		return errors.New("conformance: initial_assignment.request semantic fields drifted")
 	}
 
@@ -1407,7 +1421,7 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if err := strictDecodeArtifact(completionRequest.UsrData, &completionData); err != nil || completionData == nil {
 		return fmt.Errorf("conformance: registration_completion.request usrData is not strict v1 JSON: %v", err)
 	}
-	if completionRequest.UsrID != "" || completionRequest.DevID != initialRequest.DevID || completionRequest.AspID != "agent" || completionData.Query != "agent_registration_completion" || completionData.Version != 1 || completionData.DeviceAPIKey == "" {
+	if completionRequest.UsrID != "" || completionRequest.DevID != initialRequest.DevID || completionRequest.AspID != "agent" || completionData.Query != "agent_registration_completion" || completionData.Version != 1 || completionData.DeviceAPIKey != AgentAssignmentDeviceAPIKeyFixture {
 		return errors.New("conformance: registration_completion.request semantic fields drifted")
 	}
 	completionList, err := decodeAgentAssignmentListSuccess("registration_completion.result", af.RegistrationCompletion.Result.BodyJSON)
@@ -1511,7 +1525,7 @@ var (
 )
 
 func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract) error {
-	if contract.Status != "ready" || contract.ProducerRevision != "9653fcb185c77629b787ad046c13c760baba88f4" {
+	if contract.Status != "ready" || contract.ProducerRevision != AgentAssignmentNHPProducerRevision {
 		return errors.New("conformance: agent-assignment error taxonomy is not pinned to its merged production NHP producer")
 	}
 	rules := contract.Rules

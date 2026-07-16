@@ -3,13 +3,26 @@ package verifyassignment
 import (
 	"bytes"
 	"encoding/hex"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	conformance "github.com/layervai/qurl-conformance"
 	"github.com/layervai/qurl-go/relayknock"
 	"github.com/layervai/qurl-go/relayknock/relayknocktest"
 )
+
+func TestQURLGoProducerRevisionPin(t *testing.T) {
+	module, err := os.ReadFile("go.mod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "github.com/layervai/qurl-go v0.0.0-20260716040040-" + conformance.AgentAssignmentQURLGoProducerRevision[:12]
+	if !strings.Contains(string(module), want) {
+		t.Fatalf("go.mod is missing qurl-go producer pin %q", want)
+	}
+}
 
 func decodeHex(t *testing.T, value string) []byte {
 	t.Helper()
