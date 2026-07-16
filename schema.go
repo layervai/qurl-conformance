@@ -2310,7 +2310,7 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	}
 	// body_parse is the sole disposition allowed to carry invalid JSON because
 	// trailing-data vectors must reach the consumer's strict production parser.
-	if !json.Valid([]byte(c.BodyJSON)) && (c.Outcome != AgentKnockOutcomeReject || c.RejectClass != AgentKnockRejectBodyParse) {
+	if !json.Valid([]byte(c.BodyJSON)) && !(c.Outcome == AgentKnockOutcomeReject && c.RejectClass == AgentKnockRejectBodyParse) {
 		return fmt.Errorf("conformance: agent-knock reply case %q body_json is not valid JSON", c.Name)
 	}
 	req, err := strconv.ParseUint(c.RequestCounter, 10, 64)

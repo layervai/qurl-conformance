@@ -19,6 +19,11 @@ the transmitted `claims_b64url` string without decoding and reserializing it.
 The final optional `assignment_fence_b64` claim is omitted for the positive
 `placement_mode=new` vector.
 
+Inside the claims, `agent_public_key_b64` is the deliberate exception: it is
+canonical padded standard base64 (44 characters for the 32-byte key). The JTI
+payload, credential hash, and fence digests are canonical unpadded base64url;
+the JTI additionally carries the literal `atj_` prefix.
+
 The signing digest is:
 
 ```text
@@ -50,6 +55,9 @@ fixture stays below the frozen 3856-byte body and 4096-byte packet limits.
 `tools/verify-sdk`: qurl-go and NHP carry qat1 opaquely, while qurl-service is
 the ticket producer and verifier. The standalone verifier therefore exercises
 the qat1 cryptography without adding a ticket parser to the SDK or NHP layer.
+It deliberately remains in the root Go module so `go test ./...` runs its tests
+in the standard root-module CI gate; publishing the command is an accepted
+tradeoff for automatically guarding every committed cryptographic byte.
 
 ## Fences
 

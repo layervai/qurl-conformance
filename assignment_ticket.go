@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -292,9 +293,9 @@ func validateAssignmentTicketContract(c AssignmentTicketContract) error {
 		c.DigestCharacters != 43 || c.AgentPublicKeyCharacters != 44 ||
 		c.MaxLifetimeSeconds != 900 || c.NotBeforeOffsetSeconds != -30 ||
 		c.NHPBodyMaxBytes != 3856 || c.NHPPacketMaxBytes != 4096 ||
-		!equalStrings(c.ClaimOrder, assignmentTicketClaimOrder) ||
-		!equalStrings(c.CredentialKinds, assignmentTicketCredentialKinds) ||
-		!equalStrings(c.PlacementModes, assignmentTicketPlacementModes) {
+		!slices.Equal(c.ClaimOrder, assignmentTicketClaimOrder) ||
+		!slices.Equal(c.CredentialKinds, assignmentTicketCredentialKinds) ||
+		!slices.Equal(c.PlacementModes, assignmentTicketPlacementModes) {
 		return errors.New("conformance: assignment-ticket contract drift")
 	}
 	return nil
@@ -469,22 +470,10 @@ func validateAssignmentTicketRejectClass(name, rejectClass string) error {
 	return nil
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // ResolveToken returns the exact verifier input for a reject vector.
 func (c AssignmentTicketVerifyReject) ResolveToken(g AssignmentTicketGolden) (string, error) {
 	if c.Derivation != nil {
-		repeated, err := resolveAssignmentRepeat(c.Derivation, c.Derivation.Target)
+		repeated, err := resolveAssignmentRepeat(c.Derivation)
 		if err != nil {
 			return "", err
 		}
@@ -514,7 +503,10 @@ func (c AssignmentTicketVerifyReject) ResolveToken(g AssignmentTicketGolden) (st
 // ResolveClaims returns the exact strict-parser input for a claims reject.
 func (c AssignmentTicketClaimsReject) ResolveClaims() (string, error) {
 	if c.Derivation != nil {
-		return resolveAssignmentRepeat(c.Derivation, "claims_json")
+		if c.Derivation.Target != "claims_json" {
+			return "", errors.New("conformance: invalid claims repeat target")
+		}
+		return resolveAssignmentRepeat(c.Derivation)
 	}
 	if c.ClaimsJSON == "" {
 		return "", errors.New("conformance: claims reject has no input")
@@ -522,8 +514,8 @@ func (c AssignmentTicketClaimsReject) ResolveClaims() (string, error) {
 	return c.ClaimsJSON, nil
 }
 
-func resolveAssignmentRepeat(derivation *AssignmentTicketRepeatDerivation, target string) (string, error) {
-	if derivation == nil || derivation.Target != target || len(derivation.ASCIIChar) != 1 || derivation.ASCIIChar[0] > 0x7f || derivation.Count < 1 || derivation.Count > 4096 {
+func resolveAssignmentRepeat(derivation *AssignmentTicketRepeatDerivation) (string, error) {
+	if derivation == nil || len(derivation.ASCIIChar) != 1 || derivation.ASCIIChar[0] > 0x7f || derivation.Count < 1 || derivation.Count > 4096 {
 		return "", errors.New("conformance: invalid assignment-ticket repeat derivation")
 	}
 	return strings.Repeat(derivation.ASCIIChar, derivation.Count), nil

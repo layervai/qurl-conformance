@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -204,7 +205,7 @@ func referenceParseClaims(raw []byte, contract conformance.AssignmentTicketContr
 			return errors.New("digest mismatch")
 		}
 	}
-	if !contains(contract.CredentialKinds, claims.CredentialKind) || claims.AssignmentGeneration < 1 || claims.EndpointRevision < 1 || claims.CellID == "" {
+	if !slices.Contains(contract.CredentialKinds, claims.CredentialKind) || claims.AssignmentGeneration < 1 || claims.EndpointRevision < 1 || claims.CellID == "" {
 		return errors.New("credential or placement mismatch")
 	}
 	_, assignmentFencePresent := values["assignment_fence_b64"]
@@ -222,15 +223,6 @@ func referenceParseClaims(raw []byte, contract conformance.AssignmentTicketContr
 		return errors.New("unknown placement mode")
 	}
 	return nil
-}
-
-func contains(values []string, wanted string) bool {
-	for _, value := range values {
-		if value == wanted {
-			return true
-		}
-	}
-	return false
 }
 
 func verifySyntheticKey(key conformance.AssignmentTicketSyntheticKey) (*ecdsa.PublicKey, *big.Int, error) {
@@ -285,7 +277,7 @@ func verifyGolden(publicKey *ecdsa.PublicKey, privateScalar *big.Int, af *confor
 		return errors.New("golden claims bytes disagree")
 	}
 	keys, err := topLevelKeys(claims)
-	if err != nil || !sameStrings(keys, af.Contract.ClaimOrder[:len(af.Contract.ClaimOrder)-1]) {
+	if err != nil || !slices.Equal(keys, af.Contract.ClaimOrder[:len(af.Contract.ClaimOrder)-1]) {
 		return errors.New("golden claims field order disagrees with contract")
 	}
 	var claimValues map[string]any
@@ -395,18 +387,6 @@ func topLevelKeys(raw []byte) ([]string, error) {
 		return nil, errors.New("claims object is not closed")
 	}
 	return keys, nil
-}
-
-func sameStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for index := range a {
-		if a[index] != b[index] {
-			return false
-		}
-	}
-	return true
 }
 
 func verifyFence(vector conformance.AssignmentTicketFenceVector) error {
