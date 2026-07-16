@@ -73,6 +73,7 @@ func TestAgentAssignmentClass(t *testing.T) {
 		{"refresh_assignment/result", af.RefreshAssignment.Result, relayknock.TypeListResult, false},
 		{"assigned_cell_registration/request", af.AssignedCellRegistration.Request, relayknock.TypeRegister, true},
 		{"assigned_cell_registration/result", af.AssignedCellRegistration.Result, relayknock.TypeRegisterAck, false},
+		{"account_credential_otp/request", af.AccountCredentialOTP.Request, relayknock.TypeOTP, true},
 		{"registration_completion/request", af.RegistrationCompletion.Request, relayknock.TypeListRequest, true},
 		{"registration_completion/result", af.RegistrationCompletion.Result, relayknock.TypeListResult, false},
 	} {
@@ -126,5 +127,75 @@ func TestAgentAssignmentClass(t *testing.T) {
 				t.Fatalf("recovered body hex mismatch:\n got  %s\n want %s", got, tc.packet.BodyHex)
 			}
 		})
+	}
+}
+
+// TestAccountCredentialOTPPacketSizeBoundary drives the artifact's derived
+// maximum and max+1 bodies through the real qurl-go OTP packet producer. This
+// proves the contract counts the 240-byte header and 16-byte body tag exactly,
+// instead of merely restating the artifact's expected outcomes.
+func TestAccountCredentialOTPPacketSizeBoundary(t *testing.T) {
+	af, err := conformance.AgentAssignmentGolden()
+	if err != nil {
+		t.Fatal(err)
+	}
+	otp := af.AccountCredentialOTP
+	agent := af.Keys.Agent
+	cell := af.Keys.AssignedCell
+	fill := decodeHex(t, otp.PacketSizeContract.BodyFillByteHex)
+	if len(fill) != 1 {
+		t.Fatalf("body_fill_byte_hex decodes to %d bytes, want 1", len(fill))
+	}
+
+	for _, tc := range otp.PacketSizeContract.Cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			body := bytes.Repeat(fill, tc.BodyBytes)
+			packet, err := relayknock.BuildMessage(relayknock.TypeOTP, &relayknock.KnockInputs{
+				DeviceStaticPriv: decodeHex(t, agent.StaticPrivHex),
+				ServerStaticPub:  decodeHex(t, cell.StaticPubHex),
+				EphemeralPriv:    decodeHex(t, otp.Request.EphemeralPrivHex),
+				TimestampNanos:   parseUint(t, otp.Request.TimestampNanos, 10),
+				Counter:          parseUint(t, otp.Request.Counter, 10),
+				Preamble:         uint32(parseUint(t, otp.Request.PreambleHex, 16)),
+				Body:             body,
+			})
+			switch tc.Outcome {
+			case conformance.ExpectAccept:
+				if err != nil {
+					t.Fatalf("BuildMessage(TypeOTP): %v", err)
+				}
+				if len(packet) != tc.ExpectedPacketBytes {
+					t.Fatalf("packet bytes = %d, want %d", len(packet), tc.ExpectedPacketBytes)
+				}
+				opened, err := relayknocktest.OpenInitiatorMessage(decodeHex(t, cell.StaticPrivHex), decodeHex(t, agent.StaticPubHex), packet)
+				if err != nil {
+					t.Fatalf("OpenInitiatorMessage(TypeOTP): %v", err)
+				}
+				if opened.Type != relayknock.TypeOTP || !bytes.Equal(opened.Body, body) {
+					t.Fatalf("opened OTP = type %d body bytes %d, want type %d body bytes %d", opened.Type, len(opened.Body), relayknock.TypeOTP, len(body))
+				}
+			case conformance.ExpectReject:
+				if err == nil || packet != nil {
+					t.Fatalf("BuildMessage(TypeOTP) = %d-byte packet, %v; want size reject with nil packet", len(packet), err)
+				}
+			default:
+				t.Fatalf("unknown outcome %q", tc.Outcome)
+			}
+		})
+	}
+}
+
+func TestAccountCredentialOTPRejectsWrongAuthenticatedIdentity(t *testing.T) {
+	af, err := conformance.AgentAssignmentGolden()
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := decodeHex(t, af.AccountCredentialOTP.Request.PacketHex)
+	cellPriv := decodeHex(t, af.Keys.AssignedCell.StaticPrivHex)
+	if _, err := relayknocktest.OpenInitiatorMessage(cellPriv, decodeHex(t, af.Keys.Hub.StaticPubHex), packet); err == nil {
+		t.Fatal("OpenInitiatorMessage accepted OTP under the wrong expected agent public key")
+	}
+	if _, err := relayknocktest.OpenInitiatorMessage(decodeHex(t, af.Keys.Hub.StaticPrivHex), decodeHex(t, af.Keys.Agent.StaticPubHex), packet); err == nil {
+		t.Fatal("OpenInitiatorMessage accepted OTP under the wrong assigned-cell private key")
 	}
 }

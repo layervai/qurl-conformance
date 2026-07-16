@@ -212,8 +212,8 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 1 {
-		t.Errorf("schema_version = %d, want 1", af.SchemaVersion)
+	if af.SchemaVersion != 2 {
+		t.Errorf("schema_version = %d, want 2", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
 		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
@@ -243,6 +243,54 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	}
 	if registration.Request.Counter != registration.Result.Counter {
 		t.Errorf("assigned-cell registration result counter = %q, want request counter %q", registration.Result.Counter, registration.Request.Counter)
+	}
+	otp := af.AccountCredentialOTP
+	if otp.ProducerRevision != AgentAssignmentOTPProducerRevision || !otp.RawBodyRequired || !otp.AuthenticatedPeerPublicKeyRequired {
+		t.Errorf("account OTP producer/raw trust boundary drifted: %+v", otp)
+	}
+	if otp.Request.HeaderName != AgentAssignmentOTPRequestHeaderName || otp.Request.HeaderType != AgentAssignmentOTPRequestHeaderType || otp.Request.SenderKey != "agent" || otp.Request.ReceiverKey != "assigned_cell" {
+		t.Errorf("account OTP header/roles = %q/%d %q->%q, want NHP_OTP/12 agent->assigned_cell", otp.Request.HeaderName, otp.Request.HeaderType, otp.Request.SenderKey, otp.Request.ReceiverKey)
+	}
+	if !slices.Equal(otp.OTPRegistrationKeyKinds, []string{"account"}) || !slices.Equal(otp.OTPFreeRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "agent"}) {
+		t.Errorf("account OTP key-kind split drifted: OTP=%v OTP-free=%v", otp.OTPRegistrationKeyKinds, otp.OTPFreeRegistrationKeyKinds)
+	}
+	var otpRequest struct {
+		UsrID   string `json:"usrId"`
+		DevID   string `json:"devId"`
+		AspID   string `json:"aspId"`
+		Pass    string `json:"pass"`
+		UsrData struct {
+			Query            string `json:"query"`
+			Version          int    `json:"version"`
+			AssignmentTicket string `json:"assignment_ticket"`
+		} `json:"usrData"`
+	}
+	if err := json.Unmarshal([]byte(otp.Request.BodyJSON), &otpRequest); err != nil {
+		t.Fatalf("account OTP request body: %v", err)
+	}
+	if otpRequest.UsrID != otp.EnrollmentBinding.RequestRegistrationKeyID || otpRequest.DevID != otp.EnrollmentBinding.RequestAgentID || otpRequest.AspID != "agent" || otpRequest.Pass != AgentAssignmentAccountCredentialFixture || otpRequest.UsrData.Query != "agent_registration_otp" || otpRequest.UsrData.Version != 1 || otpRequest.UsrData.AssignmentTicket != otp.EnrollmentBinding.RequestAssignmentTicket {
+		t.Errorf("account OTP request/binding drifted: %+v / %+v", otpRequest, otp.EnrollmentBinding)
+	}
+	if otp.EnrollmentBinding.RecomputedCredentialFenceB64 != otp.EnrollmentBinding.TicketCredentialFenceB64 ||
+		otp.ChallengeBinding.TicketJTI != otp.EnrollmentBinding.TicketJTI ||
+		otp.ChallengeBinding.AuthenticatedPeerPublicKeyB64 != otp.EnrollmentBinding.AuthenticatedPeerPublicKeyB64 ||
+		otp.ChallengeBinding.DevID != otp.EnrollmentBinding.RequestAgentID ||
+		otp.ChallengeBinding.CredentialKeyID != otp.EnrollmentBinding.RequestRegistrationKeyID ||
+		otp.ChallengeBinding.EnvironmentID != otp.EnrollmentBinding.LocalEnvironmentID ||
+		otp.ChallengeBinding.CellID != otp.EnrollmentBinding.LocalCellID {
+		t.Errorf("account OTP fence/challenge binding drifted: %+v / %+v", otp.EnrollmentBinding, otp.ChallengeBinding)
+	}
+	if got, want := len(otp.RequestCases), 14; got != want {
+		t.Errorf("account OTP request case count = %d, want %d", got, want)
+	}
+	if got, want := len(otp.BindingCases), 13; got != want {
+		t.Errorf("account OTP binding case count = %d, want %d", got, want)
+	}
+	if got, want := len(otp.ChallengeBindingCases), 7; got != want {
+		t.Errorf("account OTP challenge-binding case count = %d, want %d", got, want)
+	}
+	if got, want := len(otp.PacketSizeContract.Cases), 2; got != want {
+		t.Errorf("account OTP packet-size case count = %d, want %d", got, want)
 	}
 
 	var initialRequest struct {
@@ -401,6 +449,7 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 func TestAgentAssignmentProductionShapedFixturesAreExact(t *testing.T) {
 	allowed := map[string]bool{
 		AgentAssignmentBootstrapCredentialFixture: false,
+		AgentAssignmentAccountCredentialFixture:   false,
 		AgentAssignmentDeviceAPIKeyFixture:        false,
 	}
 	for _, token := range regexp.MustCompile(`lv_live_[A-Za-z0-9_]+`).FindAllString(string(AgentAssignmentVectors()), -1) {
@@ -423,8 +472,9 @@ func TestAgentAssignmentREADMERevisionPins(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, revision := range map[string]string{
-		"qurl-go": AgentAssignmentQURLGoProducerRevision,
-		"NHP":     AgentAssignmentNHPProducerRevision,
+		"qurl-go":         AgentAssignmentQURLGoProducerRevision,
+		"NHP errors":      AgentAssignmentNHPProducerRevision,
+		"NHP OTP RawBody": AgentAssignmentOTPProducerRevision,
 	} {
 		if !bytes.Contains(readme, []byte(revision)) {
 			t.Errorf("README is missing the %s producer revision %s", name, revision)
@@ -491,6 +541,80 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		})
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "key roles") {
 			t.Fatalf("error = %v, want completion trust-boundary rejection", err)
+		}
+	})
+
+	t.Run("account OTP RawBody requirement disabled", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.RawBodyRequired = false
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "requires exact RawBody") {
+			t.Fatalf("error = %v, want account OTP RawBody rejection", err)
+		}
+	})
+
+	t.Run("account OTP key-kind policy drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.OTPFreeRegistrationKeyKinds[0] = "account"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "key-kind policy drifted") {
+			t.Fatalf("error = %v, want account OTP key-kind rejection", err)
+		}
+	})
+
+	t.Run("account OTP exact binding drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.AccountCredentialOTP.Request.BodyJSON, doc.AccountCredentialOTP.EnrollmentBinding.RequestAssignmentTicket, "different-ticket", 1)
+			doc.AccountCredentialOTP.Request.BodyJSON = body
+			doc.AccountCredentialOTP.Request.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "exact enrollment binding") {
+			t.Fatalf("error = %v, want account OTP binding rejection", err)
+		}
+	})
+
+	t.Run("account OTP binding-case classifier drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.BindingCases[1].RejectClass = AgentAssignmentRejectSemantic
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "fields drifted") {
+			t.Fatalf("error = %v, want account OTP binding-case rejection", err)
+		}
+	})
+
+	t.Run("account OTP credential-fence drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.EnrollmentBinding.TicketCredentialFenceB64 = "SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "credential fence does not match") {
+			t.Fatalf("error = %v, want account OTP credential-fence rejection", err)
+		}
+	})
+
+	t.Run("account OTP challenge binding drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.ChallengeBinding.CellID = "cell1"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "Redis challenge binding drifted") {
+			t.Fatalf("error = %v, want account OTP challenge-binding rejection", err)
+		}
+	})
+
+	t.Run("account OTP challenge binding-case drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.ChallengeBindingCases[1].MutationValue = doc.AccountCredentialOTP.EnrollmentBinding.TicketJTI
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "challenge-binding case") {
+			t.Fatalf("error = %v, want account OTP challenge-binding case rejection", err)
+		}
+	})
+
+	t.Run("account OTP packet-size drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.AccountCredentialOTP.PacketSizeContract.MaxPlaintextBodyBytes++
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "packet-size contract drifted") {
+			t.Fatalf("error = %v, want account OTP packet-size rejection", err)
 		}
 	})
 

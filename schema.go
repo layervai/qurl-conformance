@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Six families live here, each under its own artifact id so they stay decoupled
+// Seven families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -18,7 +18,8 @@
 //     frozen RAK replies.
 //   - The NHP agent-assignment golden packets
 //     (agent_assignment_golden.json): deterministic LST/LRT assignment and
-//     completion, assigned-cell REG/RAK activation, and strict error bodies.
+//     completion, account-only assigned-cell OTP, REG/RAK activation, and
+//     strict request/binding/size/error cases.
 //   - The registered-agent knock application contract
 //     (agent_knock_application_vectors.json): exact KNK JSON, RunID request
 //     policy, and already-decrypted ACK/COK disposition vectors, with no
@@ -42,6 +43,7 @@ package conformance
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -527,6 +529,11 @@ const (
 	AgentAssignmentRegistrationRequestHeaderType = 13
 	AgentAssignmentRegistrationResultHeaderName  = "NHP_RAK"
 	AgentAssignmentRegistrationResultHeaderType  = 14
+	// OTP is the one-way, account-credential-only assigned-cell step. It has no
+	// result header: the operator receives the code out of band and presents it
+	// in the subsequent REG request.
+	AgentAssignmentOTPRequestHeaderName = "NHP_OTP"
+	AgentAssignmentOTPRequestHeaderType = 12
 )
 
 // Agent-assignment reject outcome and class vocabulary.
@@ -542,6 +549,17 @@ const (
 	AgentAssignmentRejectRetryAfterUnexpected = "retry_after_unexpected"
 	AgentAssignmentRejectSemantic             = "semantic"
 	AgentAssignmentRejectUnknownErrorCode     = "unknown_error_code"
+	AgentAssignmentRejectWrongPhase           = "wrong_phase"
+	AgentAssignmentRejectTicketBinding        = "ticket_binding"
+	AgentAssignmentRejectTicketExpired        = "ticket_expired"
+	AgentAssignmentRejectTicketLifetime       = "ticket_lifetime"
+	AgentAssignmentRejectPeerBinding          = "peer_binding"
+	AgentAssignmentRejectAgentBinding         = "agent_binding"
+	AgentAssignmentRejectCredentialBinding    = "credential_binding"
+	AgentAssignmentRejectEnvironmentBinding   = "environment_binding"
+	AgentAssignmentRejectCellBinding          = "cell_binding"
+	AgentAssignmentRejectChallengeBinding     = "challenge_binding"
+	AgentAssignmentRejectPacketSize           = "packet_size"
 )
 
 // Producer revisions for the deterministic wire and error contracts.
@@ -552,6 +570,10 @@ const (
 	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
 	// the closed assignment and registration error-code taxonomy.
 	AgentAssignmentNHPProducerRevision = "9653fcb185c77629b787ad046c13c760baba88f4"
+	// AgentAssignmentOTPProducerRevision is the merged NHP revision that
+	// preserves the exact decrypted OTP RawBody alongside the independently
+	// authenticated initiator public key at the plugin boundary.
+	AgentAssignmentOTPProducerRevision = "2072546e1fc76eb76bd7e5c22d37856019ba33e7"
 )
 
 // Exact synthetic production-shaped fixture values.
@@ -564,6 +586,9 @@ const (
 	// production-shaped device-key fixture. Secret scanners must allow only
 	// this value, never an lv_live_conformance_* wildcard.
 	AgentAssignmentDeviceAPIKeyFixture = "lv_live_conformance_device_secret_0001"
+	// AgentAssignmentAccountCredentialFixture is the exact synthetic account
+	// credential carried only by the optional account OTP packet.
+	AgentAssignmentAccountCredentialFixture = "lv_live_conformance_account_secret_0001"
 )
 
 // NHP Curve packets use a 240-byte HeaderCurve and the transport reads into a
@@ -572,11 +597,15 @@ const (
 const (
 	agentAssignmentCurveHeaderBytes  = 240
 	agentAssignmentPacketBufferBytes = 4096
+	agentAssignmentBodyAEADTagBytes  = 16
+	agentAssignmentMaxBodyBytes      = agentAssignmentPacketBufferBytes - agentAssignmentCurveHeaderBytes - agentAssignmentBodyAEADTagBytes
+	agentAssignmentOTPMinRemaining   = 630
 )
 
-// AgentAssignmentFile pins four complete deterministic NHP exchanges: initial
-// assignment and refresh against the bootstrap hub, assigned-cell registration
-// with the assignment ticket, and registration completion against that cell.
+// AgentAssignmentFile pins four complete deterministic NHP exchanges plus the
+// one-way account-only OTP packet: initial assignment and refresh against the
+// bootstrap hub, optional assigned-cell OTP, assigned-cell registration with
+// the assignment ticket, and registration completion against that cell.
 // ErrorContract is application-layer behavioral data for the same lifecycle.
 type AgentAssignmentFile struct {
 	Artifact                   string                       `json:"artifact"`
@@ -590,9 +619,104 @@ type AgentAssignmentFile struct {
 	RefreshAssignment          AgentAssignmentExchange      `json:"refresh_assignment"`
 	AssignedCellRegistration   AgentAssignmentExchange      `json:"assigned_cell_registration"`
 	RegistrationCompletion     AgentAssignmentExchange      `json:"registration_completion"`
+	AccountCredentialOTP       AgentAssignmentOTPContract   `json:"account_credential_otp"`
 	RequestCases               []AgentAssignmentRequestCase `json:"request_cases"`
 	SuccessResultCases         []AgentAssignmentResultCase  `json:"success_result_cases"`
 	ErrorContract              AgentAssignmentErrorContract `json:"error_contract"`
+}
+
+// AgentAssignmentOTPContract is the optional assigned-cell OTP request for an
+// account credential. It is deliberately a contract artifact, not an SDK or
+// authority implementation: the deterministic packet freezes the authenticated
+// wire bytes, request cases freeze strict RawBody parsing, binding cases freeze
+// the inputs an authority must compare, and packet-size cases drive the real
+// producer codec from the verifier module.
+type AgentAssignmentOTPContract struct {
+	ProducerRevision                   string                               `json:"producer_revision"`
+	RawBodyRequired                    bool                                 `json:"raw_body_required"`
+	AuthenticatedPeerPublicKeyRequired bool                                 `json:"authenticated_peer_public_key_required"`
+	OTPRegistrationKeyKinds            []string                             `json:"otp_registration_key_kinds"`
+	OTPFreeRegistrationKeyKinds        []string                             `json:"otp_free_registration_key_kinds"`
+	EnrollmentBinding                  AgentAssignmentOTPEnrollmentBinding  `json:"enrollment_binding"`
+	ChallengeBinding                   AgentAssignmentOTPChallengeBinding   `json:"challenge_binding"`
+	Request                            AgentAssignmentPacket                `json:"request"`
+	RequestCases                       []AgentAssignmentRequestCase         `json:"request_cases"`
+	BindingCases                       []AgentAssignmentOTPBindingCase      `json:"binding_cases"`
+	ChallengeBindingCases              []AgentAssignmentOTPBindingCase      `json:"challenge_binding_cases"`
+	PacketSizeContract                 AgentAssignmentOTPPacketSizeContract `json:"packet_size_contract"`
+}
+
+// AgentAssignmentOTPEnrollmentBinding is the trusted baseline from which each
+// binding case starts. Request* values come from the authenticated RawBody;
+// Ticket* values come from verified ticket claims; AuthenticatedPeerPublicKeyB64
+// comes from the Noise transaction; Local* values come from server configuration.
+type AgentAssignmentOTPEnrollmentBinding struct {
+	RequestAssignmentTicket       string `json:"request_assignment_ticket"`
+	VerifiedAssignmentTicket      string `json:"verified_assignment_ticket"`
+	RequestAgentID                string `json:"request_agent_id"`
+	TicketAgentID                 string `json:"ticket_agent_id"`
+	AuthenticatedPeerPublicKeyB64 string `json:"authenticated_peer_public_key_b64"`
+	TicketAgentPublicKeyB64       string `json:"ticket_agent_public_key_b64"`
+	RequestRegistrationKeyID      string `json:"request_registration_key_id"`
+	TicketCredentialKeyID         string `json:"ticket_credential_key_id"`
+	TicketCredentialKind          string `json:"ticket_credential_kind"`
+	RequestCredential             string `json:"request_credential"`
+	RequestCredentialHashB64      string `json:"request_credential_hash_b64"`
+	TicketCredentialKeyHashB64    string `json:"ticket_credential_key_hash_b64"`
+	RecomputedCredentialFenceB64  string `json:"recomputed_credential_fence_b64"`
+	TicketCredentialFenceB64      string `json:"ticket_credential_fence_b64"`
+	TicketJTI                     string `json:"ticket_jti"`
+	LocalEnvironmentID            string `json:"local_environment_id"`
+	TicketEnvironmentID           string `json:"ticket_environment_id"`
+	LocalCellID                   string `json:"local_cell_id"`
+	TicketCellID                  string `json:"ticket_cell_id"`
+	EvaluatedAtUnix               int64  `json:"evaluated_at_unix"`
+	TicketExpiresAtUnix           int64  `json:"ticket_expires_at_unix"`
+	MinimumTicketRemainingSeconds int64  `json:"minimum_ticket_remaining_seconds"`
+}
+
+// AgentAssignmentOTPChallengeBinding freezes the exact Redis challenge tuple.
+// TicketJTI is both the lookup key and a required stored value; every other
+// field must match the authenticated OTP request and verified ticket before a
+// later REG code can be accepted. This is metadata, not a Redis implementation.
+type AgentAssignmentOTPChallengeBinding struct {
+	LookupKeyField                string   `json:"lookup_key_field"`
+	RequiredMatchFields           []string `json:"required_match_fields"`
+	TicketJTI                     string   `json:"ticket_jti"`
+	AuthenticatedPeerPublicKeyB64 string   `json:"authenticated_peer_public_key_b64"`
+	DevID                         string   `json:"dev_id"`
+	CredentialKeyID               string   `json:"credential_key_id"`
+	EnvironmentID                 string   `json:"environment_id"`
+	CellID                        string   `json:"cell_id"`
+}
+
+// AgentAssignmentOTPBindingCase applies one typed mutation to the exact
+// enrollment baseline. "none" is the positive boundary case; all other
+// mutations isolate one trust fence without duplicating the credential-bearing
+// baseline across the artifact.
+type AgentAssignmentOTPBindingCase struct {
+	Name          string `json:"name"`
+	MutationField string `json:"mutation_field"`
+	MutationValue string `json:"mutation_value"`
+	Outcome       string `json:"outcome"`
+	RejectClass   string `json:"reject_class,omitempty"`
+}
+
+type AgentAssignmentOTPPacketSizeContract struct {
+	HeaderBytes           int                                `json:"header_bytes"`
+	BodyAEADTagBytes      int                                `json:"body_aead_tag_bytes"`
+	MaxPlaintextBodyBytes int                                `json:"max_plaintext_body_bytes"`
+	MaxPacketBytes        int                                `json:"max_packet_bytes"`
+	BodyFillByteHex       string                             `json:"body_fill_byte_hex"`
+	Cases                 []AgentAssignmentOTPPacketSizeCase `json:"cases"`
+}
+
+type AgentAssignmentOTPPacketSizeCase struct {
+	Name                string `json:"name"`
+	BodyBytes           int    `json:"body_bytes"`
+	ExpectedPacketBytes int    `json:"expected_packet_bytes,omitempty"`
+	Outcome             string `json:"outcome"`
+	RejectClass         string `json:"reject_class,omitempty"`
 }
 
 // AgentAssignmentKeys names the three synthetic static X25519 identities used by
@@ -715,6 +839,20 @@ type agentAssignmentRegisterRequestData struct {
 	AssignmentTicket string `json:"assignment_ticket"`
 }
 
+type agentAssignmentOTPRequest struct {
+	UsrID   string                        `json:"usrId"`
+	DevID   string                        `json:"devId"`
+	AspID   string                        `json:"aspId"`
+	Pass    string                        `json:"pass"`
+	UsrData agentAssignmentOTPRequestData `json:"usrData"`
+}
+
+type agentAssignmentOTPRequestData struct {
+	Query            string `json:"query"`
+	Version          int    `json:"version"`
+	AssignmentTicket string `json:"assignment_ticket"`
+}
+
 type agentAssignmentRegisterResult struct {
 	ErrCode string `json:"errCode"`
 	AspID   string `json:"aspId"`
@@ -827,6 +965,7 @@ var (
 	agentAssignmentPublicRegistrationKeyKinds = []string{"bootstrap", "connector_bootstrap", "account", "agent"}
 	agentAssignmentListRequestKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentListRequest{}))
 	agentAssignmentRegisterKeys               = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequest{}))
+	agentAssignmentOTPKeys                    = jsonTagKeySet(reflect.TypeOf(agentAssignmentOTPRequest{}))
 	agentAssignmentListSuccessKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentListSuccess{}))
 	agentAssignmentRegisterAckKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterResult{}))
 	agentAssignmentRegistrationKeys           = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegistrationMetadata{}))
@@ -868,6 +1007,13 @@ var (
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequestData{})),
 			resultOuterKeys:   agentAssignmentRegisterAckKeys,
 		},
+		"assigned_cell_otp": {
+			requestHeaderName: AgentAssignmentOTPRequestHeaderName,
+			requestHeaderType: AgentAssignmentOTPRequestHeaderType,
+			target:            "assigned_cell",
+			requestOuterKeys:  agentAssignmentOTPKeys,
+			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentOTPRequestData{})),
+		},
 		"registration_completion": {
 			requestHeaderName: AgentAssignmentRequestHeaderName,
 			requestHeaderType: AgentAssignmentRequestHeaderType,
@@ -894,8 +1040,8 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		return nil, fmt.Errorf("conformance: agent-assignment file has artifact %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 1 {
-		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 1", af.SchemaVersion)
+	if af.SchemaVersion != 2 {
+		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 2", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
 		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
@@ -942,6 +1088,9 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if err := validateAgentAssignmentSuccessBodies(&af); err != nil {
 		return nil, err
 	}
+	if err := validateAgentAssignmentOTPContract(&af); err != nil {
+		return nil, err
+	}
 	if err := validateAgentAssignmentRequestCases(af.RequestCases); err != nil {
 		return nil, err
 	}
@@ -952,6 +1101,306 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 		return nil, err
 	}
 	return &af, nil
+}
+
+func validateAgentAssignmentOTPContract(af *AgentAssignmentFile) error {
+	otp := af.AccountCredentialOTP
+	if otp.ProducerRevision != AgentAssignmentOTPProducerRevision {
+		return fmt.Errorf("conformance: account OTP producer revision = %q, want %q", otp.ProducerRevision, AgentAssignmentOTPProducerRevision)
+	}
+	if !otp.RawBodyRequired || !otp.AuthenticatedPeerPublicKeyRequired {
+		return errors.New("conformance: account OTP requires exact RawBody and authenticated peer public key")
+	}
+	if !slices.Equal(otp.OTPRegistrationKeyKinds, []string{"account"}) ||
+		!slices.Equal(otp.OTPFreeRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "agent"}) {
+		return errors.New("conformance: account OTP key-kind policy drifted")
+	}
+
+	binding := otp.EnrollmentBinding
+	if binding.RequestAssignmentTicket == "" || binding.RequestAssignmentTicket != binding.VerifiedAssignmentTicket ||
+		binding.RequestAgentID == "" || binding.RequestAgentID != binding.TicketAgentID ||
+		binding.RequestRegistrationKeyID == "" || binding.RequestRegistrationKeyID != binding.TicketCredentialKeyID ||
+		binding.TicketCredentialKind != "account" || binding.RequestCredential != AgentAssignmentAccountCredentialFixture ||
+		binding.LocalEnvironmentID == "" || binding.LocalEnvironmentID != binding.TicketEnvironmentID ||
+		binding.LocalCellID == "" || binding.LocalCellID != binding.TicketCellID ||
+		binding.EvaluatedAtUnix < 1 || binding.TicketExpiresAtUnix-binding.EvaluatedAtUnix != agentAssignmentOTPMinRemaining ||
+		binding.MinimumTicketRemainingSeconds != agentAssignmentOTPMinRemaining {
+		return errors.New("conformance: account OTP enrollment binding is not the exact minimum-lifetime positive case")
+	}
+	credentialHash := sha256.Sum256([]byte(binding.RequestCredential))
+	wantCredentialHash := base64.RawURLEncoding.EncodeToString(credentialHash[:])
+	if binding.RequestCredentialHashB64 != wantCredentialHash || binding.TicketCredentialKeyHashB64 != wantCredentialHash {
+		return errors.New("conformance: account OTP credential hash does not bind the request credential to the ticket")
+	}
+	if err := validateAgentAssignmentOTPDigest(binding.RecomputedCredentialFenceB64); err != nil {
+		return fmt.Errorf("conformance: account OTP recomputed credential fence: %w", err)
+	}
+	if err := validateAgentAssignmentOTPDigest(binding.TicketCredentialFenceB64); err != nil {
+		return fmt.Errorf("conformance: account OTP ticket credential fence: %w", err)
+	}
+	if binding.RecomputedCredentialFenceB64 != binding.TicketCredentialFenceB64 {
+		return errors.New("conformance: account OTP recomputed credential fence does not match ticket credential_fence_b64")
+	}
+	if !strings.HasPrefix(binding.TicketJTI, "atj_") || len(binding.TicketJTI) != 26 {
+		return errors.New("conformance: account OTP ticket jti has the wrong shape")
+	}
+	jti, err := base64.RawURLEncoding.Strict().DecodeString(strings.TrimPrefix(binding.TicketJTI, "atj_"))
+	if err != nil || len(jti) != 16 {
+		return errors.New("conformance: account OTP ticket jti is not canonical 16-byte base64url")
+	}
+	for name, value := range map[string]string{
+		"authenticated_peer_public_key_b64": binding.AuthenticatedPeerPublicKeyB64,
+		"ticket_agent_public_key_b64":       binding.TicketAgentPublicKeyB64,
+	} {
+		decoded, err := base64.StdEncoding.DecodeString(value)
+		if err != nil || base64.StdEncoding.EncodeToString(decoded) != value || len(decoded) != 32 {
+			return fmt.Errorf("conformance: account OTP %s is not canonical padded standard base64 X25519 key", name)
+		}
+		want, err := hex.DecodeString(af.Keys.Agent.StaticPubHex)
+		if err != nil {
+			return fmt.Errorf("conformance: decode account OTP agent public key: %w", err)
+		}
+		if !bytes.Equal(decoded, want) {
+			return fmt.Errorf("conformance: account OTP %s is not the agent fixture key", name)
+		}
+	}
+
+	if err := validateAgentAssignmentPacket("account_credential_otp.request", otp.Request,
+		AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, "agent", "assigned_cell"); err != nil {
+		return err
+	}
+	if got := classifyAgentAssignmentOTPRequest(AgentAssignmentRequestCase{
+		Name:       "account_credential_otp.request",
+		Phase:      "assigned_cell_otp",
+		HeaderName: otp.Request.HeaderName,
+		HeaderType: otp.Request.HeaderType,
+		BodyJSON:   otp.Request.BodyJSON,
+	}); got != "" {
+		return fmt.Errorf("conformance: account OTP request classifies as %q, want accept", got)
+	}
+	var request *agentAssignmentOTPRequest
+	if err := strictDecodeArtifact([]byte(otp.Request.BodyJSON), &request); err != nil || request == nil {
+		return fmt.Errorf("conformance: account OTP request is not strict v1 JSON: %v", err)
+	}
+	if request.UsrID != binding.RequestRegistrationKeyID || request.DevID != binding.RequestAgentID ||
+		request.AspID != "agent" || request.Pass != binding.RequestCredential ||
+		request.UsrData.Query != "agent_registration_otp" || request.UsrData.Version != 1 ||
+		request.UsrData.AssignmentTicket != binding.RequestAssignmentTicket {
+		return errors.New("conformance: account OTP request does not carry the exact enrollment binding")
+	}
+	if err := validateAgentAssignmentOTPRequestCases(otp.RequestCases); err != nil {
+		return err
+	}
+	if err := validateAgentAssignmentOTPBindingCases(binding, otp.BindingCases); err != nil {
+		return err
+	}
+	if err := validateAgentAssignmentOTPChallengeBinding(binding, otp.ChallengeBinding, otp.ChallengeBindingCases); err != nil {
+		return err
+	}
+	return validateAgentAssignmentOTPPacketSizeContract(otp.PacketSizeContract)
+}
+
+func validateAgentAssignmentOTPDigest(value string) error {
+	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
+	if err != nil || len(decoded) != sha256.Size || len(value) != 43 || base64.RawURLEncoding.EncodeToString(decoded) != value {
+		return errors.New("not a canonical 43-character SHA-256 base64url digest")
+	}
+	return nil
+}
+
+func classifyAgentAssignmentOTPRequest(c AgentAssignmentRequestCase) string {
+	if c.Phase != "assigned_cell_otp" || c.HeaderName != AgentAssignmentOTPRequestHeaderName || c.HeaderType != AgentAssignmentOTPRequestHeaderType {
+		return AgentAssignmentRejectWrongPhase
+	}
+	if err := validateAgentAssignmentRequestKeys(c.Phase, []byte(c.BodyJSON)); err != nil {
+		return classifyAgentAssignmentStrictError(err)
+	}
+	var body *agentAssignmentOTPRequest
+	if err := strictDecodeArtifact([]byte(c.BodyJSON), &body); err != nil || body == nil {
+		return classifyAgentAssignmentStrictError(err)
+	}
+	if body.UsrID == "" || body.DevID == "" || body.AspID != "agent" || body.Pass == "" ||
+		body.UsrData.Query != "agent_registration_otp" || body.UsrData.Version != 1 || body.UsrData.AssignmentTicket == "" {
+		return AgentAssignmentRejectSemantic
+	}
+	return ""
+}
+
+func validateAgentAssignmentOTPRequestCases(cases []AgentAssignmentRequestCase) error {
+	type expectation struct {
+		headerName  string
+		headerType  int
+		rejectClass string
+	}
+	expected := map[string]expectation{
+		"reject_duplicate_otp_usr_id":            {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectBodyParse},
+		"reject_duplicate_otp_assignment_ticket": {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectBodyParse},
+		"reject_alias_otp_usr_id":                {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
+		"reject_unknown_otp_outer_field":         {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
+		"reject_unknown_otp_user_data_field":     {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
+		"reject_missing_otp_assignment_ticket":   {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectMissingField},
+		"reject_null_otp_body":                   {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectWrongType},
+		"reject_null_otp_user_data":              {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectWrongType},
+		"reject_trailing_otp_value":              {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectBodyParse},
+		"reject_wrong_otp_header_phase":          {AgentAssignmentRegistrationRequestHeaderName, AgentAssignmentRegistrationRequestHeaderType, AgentAssignmentRejectWrongPhase},
+		"reject_wrong_otp_query":                 {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
+		"reject_wrong_otp_version":               {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
+		"reject_empty_otp_assignment_ticket":     {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
+		"reject_empty_otp_pass":                  {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
+	}
+	if len(cases) != len(expected) {
+		return fmt.Errorf("conformance: account OTP request cases has %d entries, want %d", len(cases), len(expected))
+	}
+	seen := make(map[string]struct{}, len(cases))
+	for _, c := range cases {
+		want, ok := expected[c.Name]
+		if !ok {
+			return fmt.Errorf("conformance: account OTP has unknown request case %q", c.Name)
+		}
+		if _, duplicate := seen[c.Name]; duplicate {
+			return fmt.Errorf("conformance: account OTP repeats request case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+		if c.Phase != "assigned_cell_otp" || c.HeaderName != want.headerName || c.HeaderType != want.headerType ||
+			c.BodyJSON == "" || c.Outcome != AgentAssignmentErrorOutcomeReject || c.RejectClass != want.rejectClass {
+			return fmt.Errorf("conformance: account OTP request case %q fields drifted", c.Name)
+		}
+		if got := classifyAgentAssignmentOTPRequest(c); got != c.RejectClass {
+			return fmt.Errorf("conformance: account OTP request case %q classifies as %q, want %q", c.Name, got, c.RejectClass)
+		}
+	}
+	return nil
+}
+
+func validateAgentAssignmentOTPBindingCases(binding AgentAssignmentOTPEnrollmentBinding, cases []AgentAssignmentOTPBindingCase) error {
+	type expectation struct{ mutation, value, rejectClass string }
+	expected := map[string]expectation{
+		"accept_exact_minimum_lifetime":              {"none", "", ""},
+		"reject_different_request_ticket":            {"request_assignment_ticket", "conformance-account-assignment-ticket-other", AgentAssignmentRejectTicketBinding},
+		"reject_peer_public_key_mismatch":            {"authenticated_peer_public_key_b64", "TSe87jE1xJRLKNJ92Amwe+EMNRYNIBMcqn6FV1SY0Hw=", AgentAssignmentRejectPeerBinding},
+		"reject_ticket_agent_id_mismatch":            {"ticket_agent_id", "agent-other", AgentAssignmentRejectAgentBinding},
+		"reject_ticket_agent_public_key_mismatch":    {"ticket_agent_public_key_b64", "Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=", AgentAssignmentRejectPeerBinding},
+		"reject_ticket_credential_key_id_mismatch":   {"ticket_credential_key_id", "key_Z9y8X7w6V5u4", AgentAssignmentRejectCredentialBinding},
+		"reject_ticket_credential_key_hash_mismatch": {"ticket_credential_key_hash_b64", "dOBWJRmGOcbsFdxvDCWi8M-nzZkJLJ2F5LknIx4oJcE", AgentAssignmentRejectCredentialBinding},
+		"reject_ticket_credential_fence_mismatch":    {"ticket_credential_fence_b64", "SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE", AgentAssignmentRejectCredentialBinding},
+		"reject_ticket_credential_kind_non_account":  {"ticket_credential_kind", "connector_bootstrap", AgentAssignmentRejectCredentialBinding},
+		"reject_ticket_environment_mismatch":         {"ticket_environment_id", "production", AgentAssignmentRejectEnvironmentBinding},
+		"reject_ticket_cell_mismatch":                {"ticket_cell_id", "cell1", AgentAssignmentRejectCellBinding},
+		"reject_ticket_expired":                      {"ticket_expires_at_unix", strconv.FormatInt(binding.EvaluatedAtUnix, 10), AgentAssignmentRejectTicketExpired},
+		"reject_ticket_remaining_lifetime_629":       {"ticket_expires_at_unix", strconv.FormatInt(binding.EvaluatedAtUnix+binding.MinimumTicketRemainingSeconds-1, 10), AgentAssignmentRejectTicketLifetime},
+	}
+	if len(cases) != len(expected) {
+		return fmt.Errorf("conformance: account OTP binding cases has %d entries, want %d", len(cases), len(expected))
+	}
+	seen := make(map[string]struct{}, len(cases))
+	for _, c := range cases {
+		want, ok := expected[c.Name]
+		if !ok {
+			return fmt.Errorf("conformance: account OTP has unknown binding case %q", c.Name)
+		}
+		if _, duplicate := seen[c.Name]; duplicate {
+			return fmt.Errorf("conformance: account OTP repeats binding case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+		if c.MutationField != want.mutation || c.MutationValue != want.value || c.RejectClass != want.rejectClass {
+			return fmt.Errorf("conformance: account OTP binding case %q fields drifted", c.Name)
+		}
+		wantOutcome := ExpectReject
+		if want.rejectClass == "" {
+			wantOutcome = ExpectAccept
+		}
+		if c.Outcome != wantOutcome {
+			return fmt.Errorf("conformance: account OTP binding case %q outcome = %q, want %q", c.Name, c.Outcome, wantOutcome)
+		}
+	}
+	return nil
+}
+
+func validateAgentAssignmentOTPChallengeBinding(
+	binding AgentAssignmentOTPEnrollmentBinding,
+	challenge AgentAssignmentOTPChallengeBinding,
+	cases []AgentAssignmentOTPBindingCase,
+) error {
+	wantFields := []string{
+		"ticket_jti", "authenticated_peer_public_key_b64", "dev_id",
+		"credential_key_id", "environment_id", "cell_id",
+	}
+	if challenge.LookupKeyField != "ticket_jti" || !slices.Equal(challenge.RequiredMatchFields, wantFields) ||
+		challenge.TicketJTI != binding.TicketJTI ||
+		challenge.AuthenticatedPeerPublicKeyB64 != binding.AuthenticatedPeerPublicKeyB64 ||
+		challenge.DevID != binding.RequestAgentID ||
+		challenge.CredentialKeyID != binding.RequestRegistrationKeyID ||
+		challenge.EnvironmentID != binding.LocalEnvironmentID || challenge.CellID != binding.LocalCellID {
+		return errors.New("conformance: account OTP Redis challenge binding drifted")
+	}
+	type expectation struct{ mutation, value string }
+	expected := map[string]expectation{
+		"accept_exact_challenge_binding":              {"none", ""},
+		"reject_challenge_ticket_jti_mismatch":        {"ticket_jti", "atj_AQECAwQFBgcICQoLDA0ODw"},
+		"reject_challenge_peer_public_key_mismatch":   {"authenticated_peer_public_key_b64", "TSe87jE1xJRLKNJ92Amwe+EMNRYNIBMcqn6FV1SY0Hw="},
+		"reject_challenge_dev_id_mismatch":            {"dev_id", "agent-other"},
+		"reject_challenge_credential_key_id_mismatch": {"credential_key_id", "key_Z9y8X7w6V5u4"},
+		"reject_challenge_environment_mismatch":       {"environment_id", "production"},
+		"reject_challenge_cell_mismatch":              {"cell_id", "cell1"},
+	}
+	if len(cases) != len(expected) {
+		return fmt.Errorf("conformance: account OTP challenge-binding cases has %d entries, want %d", len(cases), len(expected))
+	}
+	seen := make(map[string]struct{}, len(cases))
+	for _, c := range cases {
+		want, ok := expected[c.Name]
+		if !ok {
+			return fmt.Errorf("conformance: account OTP has unknown challenge-binding case %q", c.Name)
+		}
+		if _, duplicate := seen[c.Name]; duplicate {
+			return fmt.Errorf("conformance: account OTP repeats challenge-binding case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+		if c.MutationField != want.mutation || c.MutationValue != want.value {
+			return fmt.Errorf("conformance: account OTP challenge-binding case %q fields drifted", c.Name)
+		}
+		wantOutcome, wantRejectClass := ExpectReject, AgentAssignmentRejectChallengeBinding
+		if c.Name == "accept_exact_challenge_binding" {
+			wantOutcome, wantRejectClass = ExpectAccept, ""
+		}
+		if c.Outcome != wantOutcome || c.RejectClass != wantRejectClass {
+			return fmt.Errorf("conformance: account OTP challenge-binding case %q disposition drifted", c.Name)
+		}
+	}
+	return nil
+}
+
+func validateAgentAssignmentOTPPacketSizeContract(contract AgentAssignmentOTPPacketSizeContract) error {
+	if contract.HeaderBytes != agentAssignmentCurveHeaderBytes || contract.BodyAEADTagBytes != agentAssignmentBodyAEADTagBytes ||
+		contract.MaxPlaintextBodyBytes != agentAssignmentMaxBodyBytes || contract.MaxPacketBytes != agentAssignmentPacketBufferBytes ||
+		contract.BodyFillByteHex != "78" || contract.HeaderBytes+contract.BodyAEADTagBytes+contract.MaxPlaintextBodyBytes != contract.MaxPacketBytes {
+		return errors.New("conformance: account OTP packet-size contract drifted")
+	}
+	expected := map[string]AgentAssignmentOTPPacketSizeCase{
+		"accept_max_plaintext_body": {
+			Name: "accept_max_plaintext_body", BodyBytes: agentAssignmentMaxBodyBytes,
+			ExpectedPacketBytes: agentAssignmentPacketBufferBytes, Outcome: ExpectAccept,
+		},
+		"reject_plaintext_body_over_max": {
+			Name: "reject_plaintext_body_over_max", BodyBytes: agentAssignmentMaxBodyBytes + 1,
+			Outcome: ExpectReject, RejectClass: AgentAssignmentRejectPacketSize,
+		},
+	}
+	if len(contract.Cases) != len(expected) {
+		return fmt.Errorf("conformance: account OTP packet-size cases has %d entries, want %d", len(contract.Cases), len(expected))
+	}
+	seen := make(map[string]struct{}, len(contract.Cases))
+	for _, c := range contract.Cases {
+		want, ok := expected[c.Name]
+		if !ok || c != want {
+			return fmt.Errorf("conformance: account OTP packet-size case %q drifted", c.Name)
+		}
+		if _, duplicate := seen[c.Name]; duplicate {
+			return fmt.Errorf("conformance: account OTP repeats packet-size case %q", c.Name)
+		}
+		seen[c.Name] = struct{}{}
+	}
+	return nil
 }
 
 func validateAgentAssignmentRequestCases(cases []AgentAssignmentRequestCase) error {

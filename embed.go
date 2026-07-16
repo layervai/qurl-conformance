@@ -70,7 +70,8 @@ func AgentRegistrationVectors() []byte {
 }
 
 // AgentAssignmentVectors returns the raw bytes of the deterministic NHP LST/LRT
-// assignment and registration-completion packets.
+// assignment and registration-completion packets plus the account-only OTP
+// request contract.
 func AgentAssignmentVectors() []byte {
 	b, err := vectorsFS.ReadFile(agentAssignmentName)
 	if err != nil {
@@ -167,7 +168,7 @@ func AgentRegistrationGolden() (*AgentRegistrationFile, error) {
 }
 
 // AgentAssignmentGolden strictly parses the embedded deterministic NHP LST/LRT
-// assignment and registration-completion artifact.
+// assignment and registration-completion artifact plus account-only OTP.
 func AgentAssignmentGolden() (*AgentAssignmentFile, error) {
 	return ParseAgentAssignmentFile(AgentAssignmentVectors())
 }
