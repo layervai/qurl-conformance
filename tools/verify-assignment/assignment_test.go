@@ -18,10 +18,17 @@ func TestQURLGoProducerRevisionPin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "github.com/layervai/qurl-go v0.0.0-20260716040040-" + conformance.AgentAssignmentQURLGoProducerRevision[:12]
-	if !strings.Contains(string(module), want) {
-		t.Fatalf("go.mod is missing qurl-go producer pin %q", want)
+	wantRevisionSuffix := "-" + conformance.AgentAssignmentQURLGoProducerRevision[:12]
+	for _, line := range strings.Split(string(module), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "github.com/layervai/qurl-go" {
+			if !strings.HasSuffix(fields[1], wantRevisionSuffix) {
+				t.Fatalf("qurl-go version = %q, want producer revision suffix %q", fields[1], wantRevisionSuffix)
+			}
+			return
+		}
 	}
+	t.Fatal("go.mod is missing the qurl-go dependency")
 }
 
 func decodeHex(t *testing.T, value string) []byte {

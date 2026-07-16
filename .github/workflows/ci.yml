@@ -29,6 +29,8 @@ jobs:
 
       - name: Root module — test/vet/fmt
         run: |
+          # go.mod names an exact patch floor; this equality proves setup-go did
+          # not float the consumer-compatibility lane to a newer 1.26.x patch.
           test "$(go env GOVERSION)" = "go1.26.4"
           go test ./...
           go vet ./...
