@@ -564,6 +564,14 @@ const (
 	AgentAssignmentDeviceAPIKeyFixture = "lv_live_conformance_device_secret_0001"
 )
 
+// NHP Curve packets use a 240-byte HeaderCurve and the transport reads into a
+// fixed 4096-byte PacketBufferSize. These inclusive framing bounds reject
+// impossible fixtures before the producer verifier authenticates their bodies.
+const (
+	agentAssignmentCurveHeaderBytes  = 240
+	agentAssignmentPacketBufferBytes = 4096
+)
+
 // AgentAssignmentFile pins four complete deterministic NHP exchanges: initial
 // assignment and refresh against the bootstrap hub, assigned-cell registration
 // with the assignment ticket, and registration completion against that cell.
@@ -906,46 +914,35 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	for _, exchange := range []struct {
 		name                         string
 		exchange                     AgentAssignmentExchange
-		requestName                  string
-		requestType                  int
 		requestSender, requestTarget string
-		resultName                   string
-		resultType                   int
 		resultSender, resultTarget   string
 	}{
 		{
 			name: "initial_assignment", exchange: af.InitialAssignment,
-			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
 			requestSender: "agent", requestTarget: "hub",
-			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
 			resultSender: "hub", resultTarget: "agent",
 		},
 		{
 			name: "refresh_assignment", exchange: af.RefreshAssignment,
-			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
 			requestSender: "agent", requestTarget: "hub",
-			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
 			resultSender: "hub", resultTarget: "agent",
 		},
 		{
 			name: "assigned_cell_registration", exchange: af.AssignedCellRegistration,
-			requestName: AgentRegistrationRequestHeaderName, requestType: AgentRegistrationRequestHeaderType,
 			requestSender: "agent", requestTarget: "assigned_cell",
-			resultName: AgentRegistrationResultHeaderName, resultType: AgentRegistrationResultHeaderType,
 			resultSender: "assigned_cell", resultTarget: "agent",
 		},
 		{
 			name: "registration_completion", exchange: af.RegistrationCompletion,
-			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
 			requestSender: "agent", requestTarget: "assigned_cell",
-			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
 			resultSender: "assigned_cell", resultTarget: "agent",
 		},
 	} {
-		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, exchange.requestName, exchange.requestType, exchange.requestSender, exchange.requestTarget); err != nil {
+		phase := agentAssignmentPhases[exchange.name]
+		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, phase.requestHeaderName, phase.requestHeaderType, exchange.requestSender, exchange.requestTarget); err != nil {
 			return nil, err
 		}
-		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, exchange.resultName, exchange.resultType, exchange.resultSender, exchange.resultTarget); err != nil {
+		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, phase.resultHeaderName, phase.resultHeaderType, exchange.resultSender, exchange.resultTarget); err != nil {
 			return nil, err
 		}
 		if exchange.exchange.Result.Counter != exchange.exchange.Request.Counter {
@@ -1334,8 +1331,8 @@ func validateAgentAssignmentPacket(name string, packet AgentAssignmentPacket, wa
 	if err != nil {
 		return fmt.Errorf("conformance: %s.packet_hex is not hex: %w", name, err)
 	}
-	if len(wire) < 240 || len(wire) > 4096 {
-		return fmt.Errorf("conformance: %s.packet_hex decodes to %d bytes, want 240..4096", name, len(wire))
+	if len(wire) < agentAssignmentCurveHeaderBytes || len(wire) > agentAssignmentPacketBufferBytes {
+		return fmt.Errorf("conformance: %s.packet_hex decodes to %d bytes, want %d..%d", name, len(wire), agentAssignmentCurveHeaderBytes, agentAssignmentPacketBufferBytes)
 	}
 	preamble, err := hex.DecodeString(packet.PreambleHex)
 	if err != nil {
