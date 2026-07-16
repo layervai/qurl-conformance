@@ -25,13 +25,13 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
-          check-latest: true
 
       - name: Root module — test/vet/fmt
         run: |
-          # go.mod names an exact patch floor; this equality proves setup-go did
-          # not float the consumer-compatibility lane to a newer 1.26.x patch.
-          test "$(go env GOVERSION)" = "go1.26.4"
+          # go.mod is the root compatibility source of truth. This equality
+          # proves setup-go selected its exact patch rather than floating 1.26.x.
+          expected_go="go$(awk '$1 == "go" { print $2 }' go.mod)"
+          test "$(go env GOVERSION)" = "$expected_go"
           go test ./...
           go vet ./...
           if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi

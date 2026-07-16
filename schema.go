@@ -515,14 +515,20 @@ const AgentAssignmentArtifactID = "qurl-agent-assignment-golden-vectors"
 // The exact NHP header values used for list request/result exchanges. Results
 // echo their request's counter and never use the overload-cookie reply type.
 const (
-	AgentAssignmentRequestHeaderName          = "NHP_LST"
-	AgentAssignmentRequestHeaderType          = 5
-	AgentAssignmentResultHeaderName           = "NHP_LRT"
-	AgentAssignmentResultHeaderType           = 6
-	AgentRegistrationRequestHeaderName        = "NHP_REG"
-	AgentRegistrationRequestHeaderType        = 13
-	AgentRegistrationResultHeaderName         = "NHP_RAK"
-	AgentRegistrationResultHeaderType         = 14
+	AgentAssignmentRequestHeaderName = "NHP_LST"
+	AgentAssignmentRequestHeaderType = 5
+	AgentAssignmentResultHeaderName  = "NHP_LRT"
+	AgentAssignmentResultHeaderType  = 6
+	// REG/RAK are shared NHP wire identities; these constants describe the
+	// assigned-cell activation step, not a second registration wire format.
+	AgentRegistrationRequestHeaderName = "NHP_REG"
+	AgentRegistrationRequestHeaderType = 13
+	AgentRegistrationResultHeaderName  = "NHP_RAK"
+	AgentRegistrationResultHeaderType  = 14
+)
+
+// Agent-assignment reject outcome and class vocabulary.
+const (
 	AgentAssignmentErrorOutcomeReject         = "reject"
 	AgentAssignmentRejectBodyParse            = "body_parse"
 	AgentAssignmentRejectUnknownField         = "unknown_field"
@@ -534,12 +540,20 @@ const (
 	AgentAssignmentRejectRetryAfterUnexpected = "retry_after_unexpected"
 	AgentAssignmentRejectSemantic             = "semantic"
 	AgentAssignmentRejectUnknownErrorCode     = "unknown_error_code"
+)
+
+// Producer revisions for the deterministic wire and error contracts.
+const (
 	// AgentAssignmentQURLGoProducerRevision is the merged qurl-go revision
 	// used to build and authenticate-open every assignment lifecycle packet.
 	AgentAssignmentQURLGoProducerRevision = "8a69642957030b9ce0a1b8b356246d265a9f577d"
 	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
 	// the closed assignment and registration error-code taxonomy.
 	AgentAssignmentNHPProducerRevision = "9653fcb185c77629b787ad046c13c760baba88f4"
+)
+
+// Exact synthetic production-shaped fixture values.
+const (
 	// AgentAssignmentBootstrapCredentialFixture is the exact synthetic,
 	// production-shaped credential fixture. Secret scanners must allow only
 	// this value, never an lv_live_conformance_* wildcard.
@@ -871,18 +885,21 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
 		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
 	}
-	for name, key := range map[string]AgentAssignmentKey{
-		"hub":           af.Keys.Hub,
-		"assigned_cell": af.Keys.AssignedCell,
-		"agent":         af.Keys.Agent,
+	for _, fixture := range []struct {
+		name string
+		key  AgentAssignmentKey
+	}{
+		{name: "hub", key: af.Keys.Hub},
+		{name: "assigned_cell", key: af.Keys.AssignedCell},
+		{name: "agent", key: af.Keys.Agent},
 	} {
-		if err := validateAgentAssignmentHex(name+".static_priv_hex", key.StaticPrivHex, 32); err != nil {
+		if err := validateAgentAssignmentHex(fixture.name+".static_priv_hex", fixture.key.StaticPrivHex, 32); err != nil {
 			return nil, err
 		}
-		if err := validateAgentAssignmentHex(name+".static_pub_hex", key.StaticPubHex, 32); err != nil {
+		if err := validateAgentAssignmentHex(fixture.name+".static_pub_hex", fixture.key.StaticPubHex, 32); err != nil {
 			return nil, err
 		}
-		if err := validateAgentAssignmentKeyPair(name, key); err != nil {
+		if err := validateAgentAssignmentKeyPair(fixture.name, fixture.key); err != nil {
 			return nil, err
 		}
 	}
@@ -1512,31 +1529,31 @@ type agentAssignmentExpectedError struct {
 
 var (
 	agentAssignmentAssignmentErrors = map[string]agentAssignmentExpectedError{
-		"52200": {"retry", true, false},
-		"52201": {"identity_rejected", false, false},
-		"52202": {"reassignment_required", false, false},
-		"52203": {"quota_exceeded", false, false},
-		"52204": {"rate_limited", true, true},
-		"52205": {"invalid_request", false, false},
+		"52200": {outcome: "retry", retryPermitted: true},
+		"52201": {outcome: "identity_rejected"},
+		"52202": {outcome: "reassignment_required"},
+		"52203": {outcome: "quota_exceeded"},
+		"52204": {outcome: "rate_limited", retryPermitted: true, retryRequired: true},
+		"52205": {outcome: "invalid_request"},
 	}
 	agentAssignmentInitialCredentialErrors = map[string]agentAssignmentExpectedError{
-		"52106": {"key_rejected", false, false},
-		"52107": {"registration_disabled", false, false},
-		"52108": {"bootstrap_consumed", false, false},
-		"52109": {"invalid_request", false, false},
+		"52106": {outcome: "key_rejected"},
+		"52107": {outcome: "registration_disabled"},
+		"52108": {outcome: "bootstrap_consumed"},
+		"52109": {outcome: "invalid_request"},
 	}
 	agentAssignmentCompletionErrors = map[string]agentAssignmentExpectedError{
-		"52300": {"retry", true, false},
-		"52301": {"identity_rejected", false, false},
-		"52302": {"quota_exceeded", false, false},
-		"52303": {"credential_conflict", false, false},
-		"52304": {"invalid_request", false, false},
+		"52300": {outcome: "retry", retryPermitted: true},
+		"52301": {outcome: "identity_rejected"},
+		"52302": {outcome: "quota_exceeded"},
+		"52303": {outcome: "credential_conflict"},
+		"52304": {outcome: "invalid_request"},
 	}
 	agentAssignmentRegistrationErrors = map[string]agentAssignmentExpectedError{
-		"52103": {"identity_conflict", false, false},
-		"52110": {"ticket_invalid", false, false},
-		"52111": {"ticket_expired", false, false},
-		"52112": {"quota_exceeded", false, false},
+		"52103": {outcome: "identity_conflict"},
+		"52110": {outcome: "ticket_invalid"},
+		"52111": {outcome: "ticket_expired"},
+		"52112": {outcome: "quota_exceeded"},
 	}
 )
 
@@ -1545,11 +1562,12 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 		return errors.New("conformance: agent-assignment error taxonomy is not pinned to its merged production NHP producer")
 	}
 	rules := contract.Rules
+	retryPermitted, retryRequired := agentAssignmentRetryAfterCodes()
 	if rules.ListErrorHeaderName != AgentAssignmentResultHeaderName || rules.ListErrorHeaderType != AgentAssignmentResultHeaderType ||
 		rules.RegistrationErrorHeaderName != AgentRegistrationResultHeaderName || rules.RegistrationErrorHeaderType != AgentRegistrationResultHeaderType ||
 		!rules.ListOmittedOnError || rules.CookieChallengeAllowed || !rules.RetryAfterSecondsPositiveInteger || rules.ErrMsgControlsPolicy ||
-		!reflect.DeepEqual(rules.RetryAfterSecondsPermittedCodes, []string{"52200", "52204", "52300"}) ||
-		!reflect.DeepEqual(rules.RetryAfterSecondsRequiredCodes, []string{"52204"}) {
+		!slices.Equal(rules.RetryAfterSecondsPermittedCodes, retryPermitted) ||
+		!slices.Equal(rules.RetryAfterSecondsRequiredCodes, retryRequired) {
 		return errors.New("conformance: agent-assignment error rules drifted from the closed v1 contract")
 	}
 
@@ -1573,9 +1591,7 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 	if len(contract.MalformedCases) == 0 {
 		return errors.New("conformance: agent-assignment error contract has no malformed cases")
 	}
-	expectedMalformed := map[string]struct {
-		phase, rejectClass string
-	}{
+	expectedMalformed := map[string]agentAssignmentCaseExpectation{
 		"reject_duplicate_err_code":               {"cell_assignment", AgentAssignmentRejectBodyParse},
 		"reject_unknown_list_error_field":         {"cell_assignment", AgentAssignmentRejectUnknownField},
 		"reject_trailing_list_error_value":        {"cell_assignment", AgentAssignmentRejectBodyParse},
@@ -1762,8 +1778,8 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 	if len(body.List) != 0 {
 		return AgentAssignmentRejectListOnError
 	}
-	permitted := body.ErrCode == "52200" || body.ErrCode == "52204" || body.ErrCode == "52300"
-	if body.ErrCode == "52204" && body.RetryAfterSeconds == nil {
+	permitted, required := agentAssignmentRetryAfterPolicy(body.ErrCode)
+	if required && body.RetryAfterSeconds == nil {
 		return AgentAssignmentRejectRetryAfterMissing
 	}
 	if body.RetryAfterSeconds != nil && *body.RetryAfterSeconds <= 0 {
@@ -1773,6 +1789,39 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 		return AgentAssignmentRejectRetryAfterUnexpected
 	}
 	return ""
+}
+
+func agentAssignmentRetryAfterPolicy(code string) (permitted, required bool) {
+	for _, group := range []map[string]agentAssignmentExpectedError{
+		agentAssignmentAssignmentErrors,
+		agentAssignmentInitialCredentialErrors,
+		agentAssignmentCompletionErrors,
+	} {
+		if expected, ok := group[code]; ok {
+			return expected.retryPermitted, expected.retryRequired
+		}
+	}
+	return false, false
+}
+
+func agentAssignmentRetryAfterCodes() (permitted, required []string) {
+	for _, group := range []map[string]agentAssignmentExpectedError{
+		agentAssignmentAssignmentErrors,
+		agentAssignmentInitialCredentialErrors,
+		agentAssignmentCompletionErrors,
+	} {
+		for code, expected := range group {
+			if expected.retryPermitted {
+				permitted = append(permitted, code)
+			}
+			if expected.retryRequired {
+				required = append(required, code)
+			}
+		}
+	}
+	slices.Sort(permitted)
+	slices.Sort(required)
+	return permitted, required
 }
 
 func isKnownAgentAssignmentListErrorCode(code string) bool {
