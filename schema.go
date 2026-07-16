@@ -1148,20 +1148,20 @@ func validateAgentAssignmentOTPContract(af *AgentAssignmentFile) error {
 	if err != nil || len(jti) != 16 {
 		return errors.New("conformance: account OTP ticket jti is not canonical 16-byte base64url")
 	}
-	for name, value := range map[string]string{
-		"authenticated_peer_public_key_b64": binding.AuthenticatedPeerPublicKeyB64,
-		"ticket_agent_public_key_b64":       binding.TicketAgentPublicKeyB64,
+	wantAgentPub, err := hex.DecodeString(af.Keys.Agent.StaticPubHex)
+	if err != nil {
+		return fmt.Errorf("conformance: decode account OTP agent public key: %w", err)
+	}
+	for _, key := range []struct{ name, value string }{
+		{"authenticated_peer_public_key_b64", binding.AuthenticatedPeerPublicKeyB64},
+		{"ticket_agent_public_key_b64", binding.TicketAgentPublicKeyB64},
 	} {
-		decoded, err := base64.StdEncoding.DecodeString(value)
-		if err != nil || base64.StdEncoding.EncodeToString(decoded) != value || len(decoded) != 32 {
-			return fmt.Errorf("conformance: account OTP %s is not canonical padded standard base64 X25519 key", name)
+		decoded, err := base64.StdEncoding.DecodeString(key.value)
+		if err != nil || base64.StdEncoding.EncodeToString(decoded) != key.value || len(decoded) != 32 {
+			return fmt.Errorf("conformance: account OTP %s is not canonical padded standard base64 X25519 key", key.name)
 		}
-		want, err := hex.DecodeString(af.Keys.Agent.StaticPubHex)
-		if err != nil {
-			return fmt.Errorf("conformance: decode account OTP agent public key: %w", err)
-		}
-		if !bytes.Equal(decoded, want) {
-			return fmt.Errorf("conformance: account OTP %s is not the agent fixture key", name)
+		if !bytes.Equal(decoded, wantAgentPub) {
+			return fmt.Errorf("conformance: account OTP %s is not the agent fixture key", key.name)
 		}
 	}
 
@@ -1234,8 +1234,11 @@ func validateAgentAssignmentOTPRequestCases(cases []AgentAssignmentRequestCase) 
 	}
 	expected := map[string]expectation{
 		"reject_duplicate_otp_usr_id":            {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectBodyParse},
+		"reject_empty_otp_usr_id":                {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
 		"reject_duplicate_otp_assignment_ticket": {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectBodyParse},
 		"reject_alias_otp_usr_id":                {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
+		"reject_empty_otp_dev_id":                {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
+		"reject_wrong_otp_asp_id":                {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectSemantic},
 		"reject_unknown_otp_outer_field":         {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
 		"reject_unknown_otp_user_data_field":     {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectUnknownField},
 		"reject_missing_otp_assignment_ticket":   {AgentAssignmentOTPRequestHeaderName, AgentAssignmentOTPRequestHeaderType, AgentAssignmentRejectMissingField},

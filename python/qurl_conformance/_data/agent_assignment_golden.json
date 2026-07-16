@@ -205,6 +205,15 @@
         "reject_class": "body_parse"
       },
       {
+        "name": "reject_empty_otp_usr_id",
+        "phase": "assigned_cell_otp",
+        "header_name": "NHP_OTP",
+        "header_type": 12,
+        "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"pass\":\"lv_live_conformance_account_secret_0001\",\"usrData\":{\"query\":\"agent_registration_otp\",\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\"}}",
+        "outcome": "reject",
+        "reject_class": "semantic"
+      },
+      {
         "name": "reject_duplicate_otp_assignment_ticket",
         "phase": "assigned_cell_otp",
         "header_name": "NHP_OTP",
@@ -221,6 +230,24 @@
         "body_json": "{\"usrID\":\"key_A1b2C3d4E5f6\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"pass\":\"lv_live_conformance_account_secret_0001\",\"usrData\":{\"query\":\"agent_registration_otp\",\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\"}}",
         "outcome": "reject",
         "reject_class": "unknown_field"
+      },
+      {
+        "name": "reject_empty_otp_dev_id",
+        "phase": "assigned_cell_otp",
+        "header_name": "NHP_OTP",
+        "header_type": 12,
+        "body_json": "{\"usrId\":\"key_A1b2C3d4E5f6\",\"devId\":\"\",\"aspId\":\"agent\",\"pass\":\"lv_live_conformance_account_secret_0001\",\"usrData\":{\"query\":\"agent_registration_otp\",\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\"}}",
+        "outcome": "reject",
+        "reject_class": "semantic"
+      },
+      {
+        "name": "reject_wrong_otp_asp_id",
+        "phase": "assigned_cell_otp",
+        "header_name": "NHP_OTP",
+        "header_type": 12,
+        "body_json": "{\"usrId\":\"key_A1b2C3d4E5f6\",\"devId\":\"agent-conform\",\"aspId\":\"wrong\",\"pass\":\"lv_live_conformance_account_secret_0001\",\"usrData\":{\"query\":\"agent_registration_otp\",\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\"}}",
+        "outcome": "reject",
+        "reject_class": "semantic"
       },
       {
         "name": "reject_unknown_otp_outer_field",

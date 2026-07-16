@@ -119,7 +119,12 @@ This module hosts seven artifact families, each under its own `artifact` id:
   cell, expiry, inclusive 630-second lifetime boundary, and 629-second reject.
   The Redis challenge metadata freezes `ticket_jti` as its lookup key and binds
   that ticket to the authenticated peer key, devId, credential id, environment,
-  and cell, with an exact one-field mismatch suite. Packet-size
+  and cell, with an exact one-field mismatch suite.
+  `recomputed_credential_fence_b64` is the frozen expected result of the
+  qat1/authority-owned strong-row derivation; this artifact freezes its compare
+  inputs and mismatch outcome rather than locally reimplementing that derivation.
+  Binding and challenge cases are declarative mutation recipes that authority
+  consumers must execute against their own implementation. Packet-size
   cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet
   limit and max+1. This remains contract data: it does not implement ticket
   verification, OTP state, rate limiting, email delivery, SDK callbacks, or a

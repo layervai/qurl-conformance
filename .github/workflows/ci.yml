@@ -100,6 +100,14 @@ jobs:
           const assignmentOtpRequests = Object.fromEntries(s.account_credential_otp.request_cases.map(v => [v.name, v]));
           const assignmentOtpBindings = Object.fromEntries(s.account_credential_otp.binding_cases.map(v => [v.name, v]));
           const assignmentOtpChallengeBindings = Object.fromEntries(s.account_credential_otp.challenge_binding_cases.map(v => [v.name, v]));
+          const assignmentOtpChallengesAgree = [
+            'reject_challenge_ticket_jti_mismatch',
+            'reject_challenge_peer_public_key_mismatch',
+            'reject_challenge_dev_id_mismatch',
+            'reject_challenge_credential_key_id_mismatch',
+            'reject_challenge_environment_mismatch',
+            'reject_challenge_cell_mismatch',
+          ].every(name => assignmentOtpChallengeBindings[name].reject_class === 'challenge_binding');
           const assignmentOtpSizes = Object.fromEntries(s.account_credential_otp.packet_size_contract.cases.map(v => [v.name, v]));
           const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
           const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
@@ -140,8 +148,11 @@ jobs:
               assignmentOtp.pubKey !== undefined ||
               assignmentOtpBinding.ticket_expires_at_unix - assignmentOtpBinding.evaluated_at_unix !== 630 ||
               assignmentOtpBinding.minimum_ticket_remaining_seconds !== 630 ||
-              s.account_credential_otp.request_cases.length !== 14 ||
+              s.account_credential_otp.request_cases.length !== 17 ||
               assignmentOtpRequests.reject_duplicate_otp_assignment_ticket.reject_class !== 'body_parse' ||
+              assignmentOtpRequests.reject_empty_otp_usr_id.reject_class !== 'semantic' ||
+              assignmentOtpRequests.reject_empty_otp_dev_id.reject_class !== 'semantic' ||
+              assignmentOtpRequests.reject_wrong_otp_asp_id.reject_class !== 'semantic' ||
               assignmentOtpRequests.reject_unknown_otp_outer_field.reject_class !== 'unknown_field' ||
               assignmentOtpRequests.reject_null_otp_body.reject_class !== 'wrong_type' ||
               assignmentOtpRequests.reject_trailing_otp_value.reject_class !== 'body_parse' ||
@@ -155,12 +166,7 @@ jobs:
               assignmentOtpBindings.reject_ticket_remaining_lifetime_629.reject_class !== 'ticket_lifetime' ||
               s.account_credential_otp.challenge_binding_cases.length !== 7 ||
               assignmentOtpChallengeBindings.accept_exact_challenge_binding.outcome !== 'accept' ||
-              assignmentOtpChallengeBindings.reject_challenge_ticket_jti_mismatch.reject_class !== 'challenge_binding' ||
-              assignmentOtpChallengeBindings.reject_challenge_peer_public_key_mismatch.reject_class !== 'challenge_binding' ||
-              assignmentOtpChallengeBindings.reject_challenge_dev_id_mismatch.reject_class !== 'challenge_binding' ||
-              assignmentOtpChallengeBindings.reject_challenge_credential_key_id_mismatch.reject_class !== 'challenge_binding' ||
-              assignmentOtpChallengeBindings.reject_challenge_environment_mismatch.reject_class !== 'challenge_binding' ||
-              assignmentOtpChallengeBindings.reject_challenge_cell_mismatch.reject_class !== 'challenge_binding' ||
+              !assignmentOtpChallengesAgree ||
               s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3840 ||
               s.account_credential_otp.packet_size_contract.max_packet_bytes !== 4096 ||
               assignmentOtpSizes.accept_max_plaintext_body.expected_packet_bytes !== 4096 ||
@@ -316,8 +322,11 @@ jobs:
           assert 'pubKey' not in account_otp_request
           assert account_otp_binding['ticket_expires_at_unix'] - account_otp_binding['evaluated_at_unix'] == 630
           assert account_otp_binding['minimum_ticket_remaining_seconds'] == 630
-          assert len(account_otp['request_cases']) == 14
+          assert len(account_otp['request_cases']) == 17
           assert account_otp_requests['reject_duplicate_otp_assignment_ticket']['reject_class'] == 'body_parse'
+          assert account_otp_requests['reject_empty_otp_usr_id']['reject_class'] == 'semantic'
+          assert account_otp_requests['reject_empty_otp_dev_id']['reject_class'] == 'semantic'
+          assert account_otp_requests['reject_wrong_otp_asp_id']['reject_class'] == 'semantic'
           assert account_otp_requests['reject_unknown_otp_outer_field']['reject_class'] == 'unknown_field'
           assert account_otp_requests['reject_null_otp_body']['reject_class'] == 'wrong_type'
           assert account_otp_requests['reject_trailing_otp_value']['reject_class'] == 'body_parse'

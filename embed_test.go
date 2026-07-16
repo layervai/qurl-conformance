@@ -280,7 +280,7 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 		otp.ChallengeBinding.CellID != otp.EnrollmentBinding.LocalCellID {
 		t.Errorf("account OTP fence/challenge binding drifted: %+v / %+v", otp.EnrollmentBinding, otp.ChallengeBinding)
 	}
-	if got, want := len(otp.RequestCases), 14; got != want {
+	if got, want := len(otp.RequestCases), 17; got != want {
 		t.Errorf("account OTP request case count = %d, want %d", got, want)
 	}
 	if got, want := len(otp.BindingCases), 13; got != want {
