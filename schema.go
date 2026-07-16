@@ -814,6 +814,7 @@ type agentAssignmentPhaseSchema struct {
 	requestHeaderType int
 	resultHeaderName  string
 	resultHeaderType  int
+	target            string
 	requestOuterKeys  map[string]struct{}
 	requestDataKeys   map[string]struct{}
 	resultOuterKeys   map[string]struct{}
@@ -838,6 +839,7 @@ var (
 			requestHeaderType: AgentAssignmentRequestHeaderType,
 			resultHeaderName:  AgentAssignmentResultHeaderName,
 			resultHeaderType:  AgentAssignmentResultHeaderType,
+			target:            "hub",
 			requestOuterKeys:  agentAssignmentListRequestKeys,
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentInitialRequestData{})),
 			resultOuterKeys:   agentAssignmentListSuccessKeys,
@@ -848,6 +850,7 @@ var (
 			requestHeaderType: AgentAssignmentRequestHeaderType,
 			resultHeaderName:  AgentAssignmentResultHeaderName,
 			resultHeaderType:  AgentAssignmentResultHeaderType,
+			target:            "hub",
 			requestOuterKeys:  agentAssignmentListRequestKeys,
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshRequestData{})),
 			resultOuterKeys:   agentAssignmentListSuccessKeys,
@@ -858,6 +861,7 @@ var (
 			requestHeaderType: AgentAssignmentRegistrationRequestHeaderType,
 			resultHeaderName:  AgentAssignmentRegistrationResultHeaderName,
 			resultHeaderType:  AgentAssignmentRegistrationResultHeaderType,
+			target:            "assigned_cell",
 			requestOuterKeys:  agentAssignmentRegisterKeys,
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequestData{})),
 			resultOuterKeys:   agentAssignmentRegisterAckKeys,
@@ -867,6 +871,7 @@ var (
 			requestHeaderType: AgentAssignmentRequestHeaderType,
 			resultHeaderName:  AgentAssignmentResultHeaderName,
 			resultHeaderType:  AgentAssignmentResultHeaderType,
+			target:            "assigned_cell",
 			requestOuterKeys:  agentAssignmentListRequestKeys,
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentCompletionRequestData{})),
 			resultOuterKeys:   agentAssignmentListSuccessKeys,
@@ -914,19 +919,18 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	for _, exchange := range []struct {
 		name     string
 		exchange AgentAssignmentExchange
-		target   string
 	}{
-		{name: "initial_assignment", exchange: af.InitialAssignment, target: "hub"},
-		{name: "refresh_assignment", exchange: af.RefreshAssignment, target: "hub"},
-		{name: "assigned_cell_registration", exchange: af.AssignedCellRegistration, target: "assigned_cell"},
-		{name: "registration_completion", exchange: af.RegistrationCompletion, target: "assigned_cell"},
+		{name: "initial_assignment", exchange: af.InitialAssignment},
+		{name: "refresh_assignment", exchange: af.RefreshAssignment},
+		{name: "assigned_cell_registration", exchange: af.AssignedCellRegistration},
+		{name: "registration_completion", exchange: af.RegistrationCompletion},
 	} {
 		phase := agentAssignmentPhases[exchange.name]
 		// Every lifecycle exchange is agent -> target -> agent.
-		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, phase.requestHeaderName, phase.requestHeaderType, "agent", exchange.target); err != nil {
+		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, phase.requestHeaderName, phase.requestHeaderType, "agent", phase.target); err != nil {
 			return nil, err
 		}
-		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, phase.resultHeaderName, phase.resultHeaderType, exchange.target, "agent"); err != nil {
+		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, phase.resultHeaderName, phase.resultHeaderType, phase.target, "agent"); err != nil {
 			return nil, err
 		}
 		if exchange.exchange.Result.Counter != exchange.exchange.Request.Counter {
@@ -1232,9 +1236,6 @@ func decodeAgentAssignmentExactObject(body []byte, allowed map[string]struct{}) 
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, err
-	}
-	if fields == nil {
-		return nil, newAgentAssignmentRejectError(AgentAssignmentRejectWrongType, "value is not an object")
 	}
 	for key := range fields {
 		if _, ok := allowed[key]; !ok {
