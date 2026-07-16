@@ -1356,10 +1356,10 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 		request string
 		result  string
 	}{
-		{"initial_assignment", af.InitialAssignment.Request.BodyJSON, af.InitialAssignment.Result.BodyJSON},
-		{"refresh_assignment", af.RefreshAssignment.Request.BodyJSON, af.RefreshAssignment.Result.BodyJSON},
-		{"assigned_cell_registration", af.AssignedCellRegistration.Request.BodyJSON, af.AssignedCellRegistration.Result.BodyJSON},
-		{"registration_completion", af.RegistrationCompletion.Request.BodyJSON, af.RegistrationCompletion.Result.BodyJSON},
+		{phase: "initial_assignment", request: af.InitialAssignment.Request.BodyJSON, result: af.InitialAssignment.Result.BodyJSON},
+		{phase: "refresh_assignment", request: af.RefreshAssignment.Request.BodyJSON, result: af.RefreshAssignment.Result.BodyJSON},
+		{phase: "assigned_cell_registration", request: af.AssignedCellRegistration.Request.BodyJSON, result: af.AssignedCellRegistration.Result.BodyJSON},
+		{phase: "registration_completion", request: af.RegistrationCompletion.Request.BodyJSON, result: af.RegistrationCompletion.Result.BodyJSON},
 	} {
 		if err := validateAgentAssignmentRequestKeys(c.phase, []byte(c.request)); err != nil {
 			return fmt.Errorf("conformance: %s.request exact-key validation: %w", c.phase, err)
@@ -1584,10 +1584,10 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 		expected     map[string]agentAssignmentExpectedError
 		registration bool
 	}{
-		{"assignment_cases", "cell_assignment", contract.AssignmentCases, agentAssignmentAssignmentErrors, false},
-		{"initial_credential_cases", "initial_assignment", contract.InitialCredentialCases, agentAssignmentInitialCredentialErrors, false},
-		{"completion_cases", "registration_completion", contract.CompletionCases, agentAssignmentCompletionErrors, false},
-		{"registration_cases", "assigned_cell_registration", contract.RegistrationCases, agentAssignmentRegistrationErrors, true},
+		{name: "assignment_cases", phase: "cell_assignment", cases: contract.AssignmentCases, expected: agentAssignmentAssignmentErrors},
+		{name: "initial_credential_cases", phase: "initial_assignment", cases: contract.InitialCredentialCases, expected: agentAssignmentInitialCredentialErrors},
+		{name: "completion_cases", phase: "registration_completion", cases: contract.CompletionCases, expected: agentAssignmentCompletionErrors},
+		{name: "registration_cases", phase: "assigned_cell_registration", cases: contract.RegistrationCases, expected: agentAssignmentRegistrationErrors, registration: true},
 	} {
 		if err := validateAgentAssignmentErrorCases(group.name, group.phase, group.cases, group.expected, group.registration, errorNames); err != nil {
 			return err
