@@ -25,6 +25,10 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   `make gen-vectors` ONCE per issuer-key rotation. It is NEVER run in CI (the
   accept signature uses a random nonce, so it is not reproducible). The committed
   JSON is the artifact.
+- `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts. It
+  does not rewrite the frozen NHP packet families: agent-registration packets
+  are checked by `tools/verify-sdk`, and agent-assignment packets are checked by
+  `tools/verify-assignment` against their pinned producers.
 - Do not regenerate keys or signatures here; the committed key/signature bytes are
   the contract.
 - Keep the module dependency-free (stdlib only): no `require` lines in `go.mod`.
