@@ -1108,24 +1108,35 @@ func validateAgentAssignmentSuccessKeys(phase string, body []byte) error {
 	return nil
 }
 
+type agentAssignmentRejectError struct {
+	class string
+	err   error
+}
+
+func (e *agentAssignmentRejectError) Error() string { return e.err.Error() }
+
+func newAgentAssignmentRejectError(class, format string, args ...any) error {
+	return &agentAssignmentRejectError{class: class, err: fmt.Errorf(format, args...)}
+}
+
 func decodeAgentAssignmentExactObject(body []byte, allowed map[string]struct{}) (map[string]json.RawMessage, error) {
 	if err := rejectDuplicateJSONKeys(body); err != nil {
 		return nil, err
 	}
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return nil, errors.New("value is not an object")
+		return nil, newAgentAssignmentRejectError(AgentAssignmentRejectWrongType, "value is not an object")
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, err
 	}
 	if fields == nil {
-		return nil, errors.New("value is not an object")
+		return nil, newAgentAssignmentRejectError(AgentAssignmentRejectWrongType, "value is not an object")
 	}
 	for key := range fields {
 		if _, ok := allowed[key]; !ok {
-			return nil, fmt.Errorf("unknown field %q", key)
+			return nil, newAgentAssignmentRejectError(AgentAssignmentRejectUnknownField, "unknown field %q", key)
 		}
 	}
 	return fields, nil
@@ -1134,21 +1145,16 @@ func decodeAgentAssignmentExactObject(body []byte, allowed map[string]struct{}) 
 func requireAgentAssignmentExactKeys(fields map[string]json.RawMessage, required map[string]struct{}) error {
 	for key := range required {
 		if _, ok := fields[key]; !ok {
-			return fmt.Errorf("missing field %q", key)
+			return newAgentAssignmentRejectError(AgentAssignmentRejectMissingField, "missing field %q", key)
 		}
 	}
 	return nil
 }
 
 func classifyAgentAssignmentStrictError(err error) string {
-	if err != nil && strings.Contains(err.Error(), "unknown field") {
-		return AgentAssignmentRejectUnknownField
-	}
-	if err != nil && strings.Contains(err.Error(), "missing field") {
-		return AgentAssignmentRejectMissingField
-	}
-	if err != nil && strings.Contains(err.Error(), "not an object") {
-		return AgentAssignmentRejectWrongType
+	var rejectErr *agentAssignmentRejectError
+	if errors.As(err, &rejectErr) {
+		return rejectErr.class
 	}
 	return AgentAssignmentRejectBodyParse
 }
@@ -1583,9 +1589,6 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 		}
 		var body *agentAssignmentRegistrationErrorBody
 		if err := strictDecodeArtifact([]byte(c.BodyJSON), &body); err != nil {
-			if strings.Contains(err.Error(), "unknown field") {
-				return AgentAssignmentRejectUnknownField
-			}
 			return AgentAssignmentRejectBodyParse
 		}
 		if body == nil || body.ErrCode == "" || body.AspID != "agent" {
@@ -1604,10 +1607,8 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 	}
 	var body *agentAssignmentListErrorBody
 	if err := strictDecodeArtifact([]byte(c.BodyJSON), &body); err != nil {
-		if strings.Contains(err.Error(), "unknown field") {
-			return AgentAssignmentRejectUnknownField
-		}
-		if strings.Contains(err.Error(), "retryAfterSeconds") {
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &typeErr) && typeErr.Field == "retryAfterSeconds" {
 			return AgentAssignmentRejectRetryAfterInvalid
 		}
 		return AgentAssignmentRejectBodyParse

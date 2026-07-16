@@ -660,18 +660,18 @@
         "phase": "cell_assignment",
         "header_name": "NHP_LRT",
         "header_type": 6,
-      "body_json": "null",
-      "outcome": "reject",
-      "reject_class": "wrong_type"
+        "body_json": "null",
+        "outcome": "reject",
+        "reject_class": "wrong_type"
       },
       {
         "name": "reject_non_object_list_error",
         "phase": "cell_assignment",
         "header_name": "NHP_LRT",
         "header_type": 6,
-      "body_json": "[]",
-      "outcome": "reject",
-      "reject_class": "wrong_type"
+        "body_json": "[]",
+        "outcome": "reject",
+        "reject_class": "wrong_type"
       },
       {
         "name": "reject_list_present_on_error",
@@ -741,28 +741,28 @@
         "phase": "assigned_cell_registration",
         "header_name": "NHP_RAK",
         "header_type": 14,
-      "body_json": "{\"errCode\":\"52110\",\"errMsg\":\"invalid\",\"aspId\":\"agent\",\"list\":{}}",
-      "outcome": "reject",
-      "reject_class": "unknown_field"
-    },
-    {
-      "name": "reject_unknown_list_error_code",
-      "phase": "cell_assignment",
-      "header_name": "NHP_LRT",
-      "header_type": 6,
-      "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\"}",
-      "outcome": "reject",
-      "reject_class": "unknown_error_code"
-    },
-    {
-      "name": "reject_unknown_registration_error_code",
-      "phase": "assigned_cell_registration",
-      "header_name": "NHP_RAK",
-      "header_type": 14,
-      "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\",\"aspId\":\"agent\"}",
-      "outcome": "reject",
-      "reject_class": "unknown_error_code"
-    }
+        "body_json": "{\"errCode\":\"52110\",\"errMsg\":\"invalid\",\"aspId\":\"agent\",\"list\":{}}",
+        "outcome": "reject",
+        "reject_class": "unknown_field"
+      },
+      {
+        "name": "reject_unknown_list_error_code",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\"}",
+        "outcome": "reject",
+        "reject_class": "unknown_error_code"
+      },
+      {
+        "name": "reject_unknown_registration_error_code",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\",\"aspId\":\"agent\"}",
+        "outcome": "reject",
+        "reject_class": "unknown_error_code"
+      }
     ]
   }
 }
