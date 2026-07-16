@@ -238,7 +238,7 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 		}
 	}
 	registration := af.AssignedCellRegistration
-	if registration.Request.HeaderName != AgentRegistrationRequestHeaderName || registration.Request.HeaderType != AgentRegistrationRequestHeaderType || registration.Result.HeaderName != AgentRegistrationResultHeaderName || registration.Result.HeaderType != AgentRegistrationResultHeaderType {
+	if registration.Request.HeaderName != AgentAssignmentRegistrationRequestHeaderName || registration.Request.HeaderType != AgentAssignmentRegistrationRequestHeaderType || registration.Result.HeaderName != AgentAssignmentRegistrationResultHeaderName || registration.Result.HeaderType != AgentAssignmentRegistrationResultHeaderType {
 		t.Errorf("assigned-cell registration headers = %q/%d -> %q/%d, want NHP_REG/13 -> NHP_RAK/14", registration.Request.HeaderName, registration.Request.HeaderType, registration.Result.HeaderName, registration.Result.HeaderType)
 	}
 	if registration.Request.Counter != registration.Result.Counter {

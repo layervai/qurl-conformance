@@ -521,10 +521,10 @@ const (
 	AgentAssignmentResultHeaderType  = 6
 	// REG/RAK are shared NHP wire identities; these constants describe the
 	// assigned-cell activation step, not a second registration wire format.
-	AgentRegistrationRequestHeaderName = "NHP_REG"
-	AgentRegistrationRequestHeaderType = 13
-	AgentRegistrationResultHeaderName  = "NHP_RAK"
-	AgentRegistrationResultHeaderType  = 14
+	AgentAssignmentRegistrationRequestHeaderName = "NHP_REG"
+	AgentAssignmentRegistrationRequestHeaderType = 13
+	AgentAssignmentRegistrationResultHeaderName  = "NHP_RAK"
+	AgentAssignmentRegistrationResultHeaderType  = 14
 )
 
 // Agent-assignment reject outcome and class vocabulary.
@@ -854,10 +854,10 @@ var (
 			resultListKeys:    jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshResult{})),
 		},
 		"assigned_cell_registration": {
-			requestHeaderName: AgentRegistrationRequestHeaderName,
-			requestHeaderType: AgentRegistrationRequestHeaderType,
-			resultHeaderName:  AgentRegistrationResultHeaderName,
-			resultHeaderType:  AgentRegistrationResultHeaderType,
+			requestHeaderName: AgentAssignmentRegistrationRequestHeaderName,
+			requestHeaderType: AgentAssignmentRegistrationRequestHeaderType,
+			resultHeaderName:  AgentAssignmentRegistrationResultHeaderName,
+			resultHeaderType:  AgentAssignmentRegistrationResultHeaderType,
 			requestOuterKeys:  agentAssignmentRegisterKeys,
 			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequestData{})),
 			resultOuterKeys:   agentAssignmentRegisterAckKeys,
@@ -1530,7 +1530,7 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 	rules := contract.Rules
 	retryPermitted, retryRequired := agentAssignmentRetryAfterCodes()
 	if rules.ListErrorHeaderName != AgentAssignmentResultHeaderName || rules.ListErrorHeaderType != AgentAssignmentResultHeaderType ||
-		rules.RegistrationErrorHeaderName != AgentRegistrationResultHeaderName || rules.RegistrationErrorHeaderType != AgentRegistrationResultHeaderType ||
+		rules.RegistrationErrorHeaderName != AgentAssignmentRegistrationResultHeaderName || rules.RegistrationErrorHeaderType != AgentAssignmentRegistrationResultHeaderType ||
 		!rules.ListOmittedOnError || rules.CookieChallengeAllowed || !rules.RetryAfterSecondsPositiveInteger || rules.ErrMsgControlsPolicy ||
 		!slices.Equal(rules.RetryAfterSecondsPermittedCodes, retryPermitted) ||
 		!slices.Equal(rules.RetryAfterSecondsRequiredCodes, retryRequired) {
@@ -1597,8 +1597,8 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 		if c.Phase != want.phase || c.RejectClass != want.rejectClass {
 			return fmt.Errorf("conformance: malformed case %q phase/class = %q/%q, want %q/%q", c.Name, c.Phase, c.RejectClass, want.phase, want.rejectClass)
 		}
-		if c.HeaderName == AgentRegistrationResultHeaderName {
-			if c.Phase != "assigned_cell_registration" || c.HeaderType != AgentRegistrationResultHeaderType {
+		if c.HeaderName == AgentAssignmentRegistrationResultHeaderName {
+			if c.Phase != "assigned_cell_registration" || c.HeaderType != AgentAssignmentRegistrationResultHeaderType {
 				return fmt.Errorf("conformance: malformed registration case %q has wrong phase/header", c.Name)
 			}
 		} else if c.HeaderName != AgentAssignmentResultHeaderName || c.HeaderType != AgentAssignmentResultHeaderType ||
@@ -1641,7 +1641,7 @@ func validateAgentAssignmentErrorCases(group, phase string, cases []AgentAssignm
 			return fmt.Errorf("conformance: agent-assignment %s case for %s has invalid name/phase/body/outcome", group, c.ErrCode)
 		}
 		if registration {
-			if c.HeaderName != AgentRegistrationResultHeaderName || c.HeaderType != AgentRegistrationResultHeaderType {
+			if c.HeaderName != AgentAssignmentRegistrationResultHeaderName || c.HeaderType != AgentAssignmentRegistrationResultHeaderType {
 				return fmt.Errorf("conformance: agent-assignment %s case %q has wrong RAK header", group, c.Name)
 			}
 			if _, err := decodeAgentAssignmentExactObject([]byte(c.BodyJSON), agentAssignmentRAKErrorKeys); err != nil {
@@ -1705,7 +1705,7 @@ func equalOptionalInt(a, b *int) bool {
 }
 
 func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
-	if c.HeaderName == AgentRegistrationResultHeaderName && c.HeaderType == AgentRegistrationResultHeaderType {
+	if c.HeaderName == AgentAssignmentRegistrationResultHeaderName && c.HeaderType == AgentAssignmentRegistrationResultHeaderType {
 		if _, err := decodeAgentAssignmentExactObject([]byte(c.BodyJSON), agentAssignmentRAKErrorKeys); err != nil {
 			return classifyAgentAssignmentStrictError(err)
 		}
@@ -1830,6 +1830,8 @@ func validateAgentAssignmentKeyPair(name string, key AgentAssignmentKey) error {
 }
 
 func validateAgentAssignmentUint64(name, value string) error {
+	// Positive values are a deterministic fixture invariant, not a general
+	// statement that the NHP wire protocol forbids zero-valued counters.
 	parsed, err := strconv.ParseUint(value, 10, 64)
 	if err != nil || parsed == 0 || strconv.FormatUint(parsed, 10) != value {
 		return fmt.Errorf("conformance: %s %q is not canonical positive uint64 decimal", name, value)
