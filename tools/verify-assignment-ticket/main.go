@@ -390,7 +390,7 @@ func topLevelKeys(raw []byte) ([]string, error) {
 }
 
 func verifyFence(vector conformance.AssignmentTicketFenceVector) error {
-	preimage := append(append([]byte{}, []byte(vector.Domain)...), 0)
+	preimage := append([]byte(vector.Domain), 0)
 	for _, part := range vector.Parts {
 		semantic, err := fencePartBytes(part)
 		if err != nil {
@@ -495,7 +495,7 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			}
 			digest, _ := hex.DecodeString(af.Golden.SigningDigestHex)
 			s := new(big.Int).SetBytes(raw[32:])
-			if s.Cmp(new(big.Int).Rsh(new(big.Int).Set(elliptic.P256().Params().N), 1)) <= 0 || !verifyRawSignature(publicKey, digest, raw) {
+			if s.Cmp(new(big.Int).Rsh(elliptic.P256().Params().N, 1)) <= 0 || !verifyRawSignature(publicKey, digest, raw) {
 				return errors.New("high-S reject is not mathematically valid high-S")
 			}
 		case "claims_noncanonical_base64url":
@@ -613,7 +613,7 @@ func derToRawLowS(der []byte) ([]byte, error) {
 		return nil, errors.New("invalid P-256 DER signature")
 	}
 	s := new(big.Int).Set(signature.S)
-	if s.Cmp(new(big.Int).Rsh(new(big.Int).Set(n), 1)) > 0 {
+	if s.Cmp(new(big.Int).Rsh(n, 1)) > 0 {
 		s.Sub(n, s)
 	}
 	raw := make([]byte, 64)
