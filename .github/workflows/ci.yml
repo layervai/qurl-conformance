@@ -67,13 +67,14 @@ jobs:
             v => idValuePattern.test(v.value) === (v.outcome === 'accept')
           );
           const canonical = '0123456789abcdef';
+          const resource = 'connector-conformance-01';
           // Stock JSON parsing is intentionally insufficient for these cases:
           // duplicate keys collapse last-wins and aliases remain unchecked.
           const lossyDuplicate = JSON.parse(requests.reject_duplicate_run_id.body_json);
           const uncheckedAlias = JSON.parse(requests.reject_alias_run_id.body_json);
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
-              k.schema_version !== 2 || k.request.fields.run_id !== canonical ||
+              k.schema_version !== 3 || k.request.fields.run_id !== canonical ||
               JSON.parse(k.request.body_json).runId !== canonical || k.request_cases.length !== 12 ||
               requests.canonical_run_id.native_connector.parsed_run_id !== canonical ||
               requests.missing_run_id.generic_parser.parsed_run_id !== '' ||
@@ -82,10 +83,23 @@ jobs:
               requests.reject_alias_run_id.native_connector.reject_class !== 'body_parse' ||
               lossyDuplicate.runId !== 'fedcba9876543210' ||
               uncheckedAlias.runID !== canonical || uncheckedAlias.runId !== undefined ||
-              k.reply_cases.length !== 12 || replies.ack_success.outcome !== 'success' ||
+              k.reply_cases.length !== 25 || replies.ack_success.outcome !== 'success' ||
+              JSON.parse(replies.ack_success.body_json).preActions[resource] !== null ||
+              replies.ack_success.expected_ac_token !== JSON.parse(replies.ack_success.body_json).acTokens[resource] ||
+              replies.ack_success.expected_resource_host !== JSON.parse(replies.ack_success.body_json).resHost[resource] ||
+              JSON.parse(replies.ack_success_optional_metadata.body_json).aspToken === replies.ack_success_optional_metadata.expected_ac_token ||
+              replies.reject_pre_access_action_requested.reject_class !== 'unsupported_pre_access' ||
+              replies.reject_pre_access_action_other_resource.reject_class !== 'unsupported_pre_access' ||
+              !Array.isArray(JSON.parse(replies.reject_malformed_pre_actions.body_json).preActions) ||
+              replies.reject_malformed_pre_actions.reject_class !== 'body_parse' ||
               replies.ack_deny.reject_class !== 'server_deny' ||
               replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
+              JSON.parse(replies.reject_malformed_opn_time.body_json).opnTime !== '900' ||
+              replies.reject_malformed_opn_time.reject_class !== 'body_parse' ||
+              JSON.parse(replies.reject_malformed_agent_addr.body_json).agentAddr !== 7 ||
+              replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
+              replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
               i.consumer_response_cases.length !== 26 ||
@@ -116,6 +130,7 @@ jobs:
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
           canonical = '0123456789abcdef'
+          resource = 'connector-conformance-01'
           # Stock JSON parsing is intentionally insufficient for these cases:
           # duplicate keys collapse last-wins and aliases remain unchecked.
           lossy_duplicate = json.loads(requests['reject_duplicate_run_id']['body_json'])
@@ -123,7 +138,7 @@ jobs:
           assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
-          assert k['schema_version'] == 2 and k['request']['fields']['run_id'] == canonical
+          assert k['schema_version'] == 3 and k['request']['fields']['run_id'] == canonical
           assert json.loads(k['request']['body_json'])['runId'] == canonical
           assert len(k['request_cases']) == 12
           assert requests['canonical_run_id']['native_connector']['parsed_run_id'] == canonical
@@ -133,10 +148,25 @@ jobs:
           assert requests['reject_alias_run_id']['native_connector']['reject_class'] == 'body_parse'
           assert lossy_duplicate['runId'] == 'fedcba9876543210'
           assert unchecked_alias['runID'] == canonical and 'runId' not in unchecked_alias
-          assert len(k['reply_cases']) == 12 and replies['ack_success']['outcome'] == 'success'
+          assert len(k['reply_cases']) == 25 and replies['ack_success']['outcome'] == 'success'
+          success = json.loads(replies['ack_success']['body_json'])
+          optional = json.loads(replies['ack_success_optional_metadata']['body_json'])
+          assert success['preActions'][resource] is None
+          assert replies['ack_success']['expected_ac_token'] == success['acTokens'][resource]
+          assert replies['ack_success']['expected_resource_host'] == success['resHost'][resource]
+          assert optional['aspToken'] != replies['ack_success_optional_metadata']['expected_ac_token']
+          assert replies['reject_pre_access_action_requested']['reject_class'] == 'unsupported_pre_access'
+          assert replies['reject_pre_access_action_other_resource']['reject_class'] == 'unsupported_pre_access'
+          assert isinstance(json.loads(replies['reject_malformed_pre_actions']['body_json'])['preActions'], list)
+          assert replies['reject_malformed_pre_actions']['reject_class'] == 'body_parse'
           assert replies['ack_deny']['reject_class'] == 'server_deny'
           assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
+          assert json.loads(replies['reject_malformed_opn_time']['body_json'])['opnTime'] == '900'
+          assert replies['reject_malformed_opn_time']['reject_class'] == 'body_parse'
+          assert json.loads(replies['reject_malformed_agent_addr']['body_json'])['agentAddr'] == 7
+          assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
+          assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
           assert len(i['consumer_response_cases']) == 26

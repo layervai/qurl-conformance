@@ -518,16 +518,18 @@ const (
 
 // Agent-knock application reject classes form a closed, consumer-neutral
 // vocabulary. ServerDeny and ServerBusy are authenticated platform outcomes;
-// the other classes are fail-closed client validation failures.
+// the other classes are fail-closed client dispositions: validation failures
+// plus the unsupported pre-access feature gate.
 const (
-	AgentKnockRejectServerDeny    = "server_deny"
-	AgentKnockRejectServerBusy    = "server_busy"
-	AgentKnockRejectWrongResource = "wrong_resource"
-	AgentKnockRejectMissingToken  = "missing_token"
-	AgentKnockRejectMissingHost   = "missing_host"
-	AgentKnockRejectBodyParse     = "body_parse"
-	AgentKnockRejectCounter       = "counter"
-	AgentKnockRejectReplyType     = "reply_type"
+	AgentKnockRejectServerDeny           = "server_deny"
+	AgentKnockRejectServerBusy           = "server_busy"
+	AgentKnockRejectWrongResource        = "wrong_resource"
+	AgentKnockRejectMissingToken         = "missing_token"
+	AgentKnockRejectMissingHost          = "missing_host"
+	AgentKnockRejectBodyParse            = "body_parse"
+	AgentKnockRejectUnsupportedPreAccess = "unsupported_pre_access"
+	AgentKnockRejectCounter              = "counter"
+	AgentKnockRejectReplyType            = "reply_type"
 )
 
 // Agent-knock request reject classes distinguish strict JSON-shape failures
@@ -546,7 +548,8 @@ const AgentKnockRunIDLength = 16
 // AgentKnockApplicationFile is the versioned application-layer contract for a
 // registered-agent NHP knock. Request carries one deterministic body golden;
 // RequestCases pin generic-parser versus native-Connector RunID policy; and
-// ReplyCases cover success, authenticated deny, overload, and fail-closed
+// ReplyCases cover the complete current ACK producer envelope, success result
+// values, authenticated deny, overload, unsupported pre-access, and fail-closed
 // application/correlation negatives without duplicating Noise packet vectors.
 type AgentKnockApplicationFile struct {
 	Artifact      string                       `json:"artifact"`
@@ -601,26 +604,34 @@ type AgentKnockRequestExpectation struct {
 
 // AgentKnockReplyCase is one already-decrypted reply disposition. Counter
 // values are decimal strings so JavaScript consumers never lose uint64
-// precision. BodyJSON stays raw so malformed application shapes survive the
-// artifact and reach the consumer's real parser.
+// precision. BodyJSON stays raw so malformed application shapes, including
+// deliberate trailing data, survive the artifact and reach the consumer's real
+// parser. ExpectedACToken and ExpectedResourceHost are present only on success
+// and pin the exact requested-resource map values a conforming interpreter must
+// return; optional ACK metadata cannot substitute for either.
 type AgentKnockReplyCase struct {
-	Name           string `json:"name"`
-	ReplyType      int    `json:"reply_type"`
-	RequestCounter string `json:"request_counter"`
-	ReplyCounter   string `json:"reply_counter"`
-	BodyJSON       string `json:"body_json"`
-	Outcome        string `json:"outcome"`
-	RejectClass    string `json:"reject_class,omitempty"`
+	Name                 string `json:"name"`
+	ReplyType            int    `json:"reply_type"`
+	RequestCounter       string `json:"request_counter"`
+	ReplyCounter         string `json:"reply_counter"`
+	BodyJSON             string `json:"body_json"`
+	Outcome              string `json:"outcome"`
+	RejectClass          string `json:"reject_class,omitempty"`
+	ExpectedACToken      string `json:"expected_ac_token,omitempty"`
+	ExpectedResourceHost string `json:"expected_resource_host,omitempty"`
 }
 
 // ParseAgentKnockApplicationFile strictly parses and validates the
 // application-body artifact. It rejects duplicate/unknown/trailing outer
-// fields, stale schema versions, missing mandatory cases, invalid
+// fields, stale schema versions, missing or unknown cases, invalid
 // enums/counters, duplicate case names, and a request golden that does not
 // exactly match its semantic fields. It independently derives both declared
-// request-parser outcomes from each raw body so case labels cannot drift.
-// Reply body semantics remain the consumer's job: those bodies include
-// intentional wrong-map shapes that must reach the production parser.
+// request-parser outcomes and cross-checks success result labels against the
+// requested resource's raw body maps so labels cannot drift, and rejects a
+// declared success that carries any non-null preActions value. Remaining reply
+// semantics stay the consumer's job: those bodies include intentional wrong-map
+// shapes and trailing data that must reach the production parser. Invalid raw
+// JSON is allowed only for an explicit body_parse reject.
 func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, error) {
 	var af AgentKnockApplicationFile
 	if err := strictDecodeArtifact(data, &af); err != nil {
@@ -629,8 +640,8 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		return nil, fmt.Errorf("conformance: agent-knock application file has artifact %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 2 {
-		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 2", af.SchemaVersion)
+	if af.SchemaVersion != 3 {
+		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 3", af.SchemaVersion)
 	}
 	if af.Description == "" || af.SourceOfTruth == "" || len(af.Notes) == 0 {
 		return nil, errors.New("conformance: agent-knock application file missing description, source_of_truth, or notes")
@@ -646,21 +657,38 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	}
 
 	required := []string{
-		"ack_success", "ack_deny", "cookie_challenge",
+		"ack_success", "ack_success_optional_metadata", "ack_deny", "cookie_challenge",
 		"reject_wrong_resource", "reject_missing_ac_token",
 		"reject_empty_ac_token", "reject_missing_resource_host",
 		"reject_empty_resource_host", "reject_malformed_ac_tokens_map",
-		"reject_malformed_resource_host_map", "reject_counter_mismatch",
-		"reject_reply_type_mismatch",
+		"reject_malformed_resource_host_map", "reject_pre_access_action_requested",
+		"reject_pre_access_action_other_resource", "reject_malformed_pre_actions",
+		"reject_malformed_asp_token", "reject_malformed_redirect_url",
+		"reject_malformed_opn_time", "reject_malformed_agent_addr",
+		"reject_unknown_ack_field", "reject_duplicate_ack_field",
+		"reject_trailing_ack_data", "reject_null_ack_body",
+		"reject_non_object_ack_body", "reject_counter_mismatch", "reject_reply_type_mismatch",
+	}
+	allowed := make(map[string]struct{}, len(required))
+	for _, name := range required {
+		allowed[name] = struct{}{}
 	}
 	seen := make(map[string]struct{}, len(af.ReplyCases))
 	for _, c := range af.ReplyCases {
+		if _, ok := allowed[c.Name]; !ok {
+			return nil, fmt.Errorf("conformance: unknown agent-knock reply case %q", c.Name)
+		}
 		if _, ok := seen[c.Name]; ok {
 			return nil, fmt.Errorf("conformance: duplicate agent-knock reply case %q", c.Name)
 		}
 		seen[c.Name] = struct{}{}
 		if err := validateAgentKnockReplyCase(c); err != nil {
 			return nil, err
+		}
+		if c.Outcome == AgentKnockOutcomeSuccess {
+			if err := validateAgentKnockExpectedResult(af.Request.Fields.KnockResourceID, c); err != nil {
+				return nil, err
+			}
 		}
 	}
 	for _, name := range required {
@@ -938,7 +966,9 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	if c.Name == "" || c.BodyJSON == "" {
 		return errors.New("conformance: agent-knock reply case missing name or body_json")
 	}
-	if !json.Valid([]byte(c.BodyJSON)) {
+	// body_parse is the sole disposition allowed to carry invalid JSON because
+	// trailing-data vectors must reach the consumer's strict production parser.
+	if !json.Valid([]byte(c.BodyJSON)) && !(c.Outcome == AgentKnockOutcomeReject && c.RejectClass == AgentKnockRejectBodyParse) {
 		return fmt.Errorf("conformance: agent-knock reply case %q body_json is not valid JSON", c.Name)
 	}
 	req, err := strconv.ParseUint(c.RequestCounter, 10, 64)
@@ -948,6 +978,18 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	reply, err := strconv.ParseUint(c.ReplyCounter, 10, 64)
 	if err != nil {
 		return fmt.Errorf("conformance: agent-knock reply case %q reply_counter: %w", c.Name, err)
+	}
+	if c.Outcome != AgentKnockOutcomeSuccess && c.Outcome != AgentKnockOutcomeDeny &&
+		c.Outcome != AgentKnockOutcomeRetry && c.Outcome != AgentKnockOutcomeReject {
+		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
+	}
+	// Expected-result presence is a pure function of success-ness: required on
+	// success, forbidden on every other outcome.
+	if c.Outcome == AgentKnockOutcomeSuccess && (c.ExpectedACToken == "" || c.ExpectedResourceHost == "") {
+		return fmt.Errorf("conformance: success agent-knock reply case %q must carry a non-empty expected result", c.Name)
+	}
+	if c.Outcome != AgentKnockOutcomeSuccess && (c.ExpectedACToken != "" || c.ExpectedResourceHost != "") {
+		return fmt.Errorf("conformance: non-success agent-knock reply case %q must not carry an expected result", c.Name)
 	}
 	switch c.Outcome {
 	case AgentKnockOutcomeSuccess:
@@ -969,7 +1011,8 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	case AgentKnockOutcomeReject:
 		switch c.RejectClass {
 		case AgentKnockRejectWrongResource, AgentKnockRejectMissingToken,
-			AgentKnockRejectMissingHost, AgentKnockRejectBodyParse:
+			AgentKnockRejectMissingHost, AgentKnockRejectBodyParse,
+			AgentKnockRejectUnsupportedPreAccess:
 			if c.ReplyType != 2 || req != reply {
 				return fmt.Errorf("conformance: application reject case %q must be a matched NHP_ACK", c.Name)
 			}
@@ -984,8 +1027,29 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		default:
 			return fmt.Errorf("conformance: reject agent-knock reply case %q has unknown reject_class %q", c.Name, c.RejectClass)
 		}
-	default:
-		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
+	}
+	return nil
+}
+
+func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) error {
+	var body struct {
+		ResourceHost     map[string]string           `json:"resHost"`
+		ACTokens         map[string]string           `json:"acTokens"`
+		PreAccessActions map[string]*json.RawMessage `json:"preActions"`
+	}
+	if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
+		return fmt.Errorf("conformance: success agent-knock reply case %q result body: %w", c.Name, err)
+	}
+	if got := body.ACTokens[resourceID]; c.ExpectedACToken != got {
+		return fmt.Errorf("conformance: success agent-knock reply case %q expected_ac_token %q does not match acTokens[%q] %q", c.Name, c.ExpectedACToken, resourceID, got)
+	}
+	if got := body.ResourceHost[resourceID]; c.ExpectedResourceHost != got {
+		return fmt.Errorf("conformance: success agent-knock reply case %q expected_resource_host %q does not match resHost[%q] %q", c.Name, c.ExpectedResourceHost, resourceID, got)
+	}
+	for key, action := range body.PreAccessActions {
+		if action != nil {
+			return fmt.Errorf("conformance: success agent-knock reply case %q has non-null preActions[%q]", c.Name, key)
+		}
 	}
 	return nil
 }

@@ -206,8 +206,8 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 2 {
-		t.Errorf("schema_version = %d, want 2", af.SchemaVersion)
+	if af.SchemaVersion != 3 {
+		t.Errorf("schema_version = %d, want 3", af.SchemaVersion)
 	}
 
 	var body map[string]any
@@ -263,12 +263,26 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 	assertAgentKnockRequestPolicies(t, af)
 
 	wantCases := map[string]bool{
-		"ack_success": false, "ack_deny": false, "cookie_challenge": false,
+		"ack_success": false, "ack_success_optional_metadata": false,
+		"ack_deny": false, "cookie_challenge": false,
 		"reject_wrong_resource": false, "reject_missing_ac_token": false,
 		"reject_empty_ac_token": false, "reject_missing_resource_host": false,
 		"reject_empty_resource_host": false, "reject_malformed_ac_tokens_map": false,
-		"reject_malformed_resource_host_map": false, "reject_counter_mismatch": false,
-		"reject_reply_type_mismatch": false,
+		"reject_malformed_resource_host_map":      false,
+		"reject_pre_access_action_requested":      false,
+		"reject_pre_access_action_other_resource": false,
+		"reject_malformed_pre_actions":            false,
+		"reject_malformed_asp_token":              false,
+		"reject_malformed_redirect_url":           false,
+		"reject_malformed_opn_time":               false,
+		"reject_malformed_agent_addr":             false,
+		"reject_unknown_ack_field":                false,
+		"reject_duplicate_ack_field":              false,
+		"reject_trailing_ack_data":                false,
+		"reject_null_ack_body":                    false,
+		"reject_non_object_ack_body":              false,
+		"reject_counter_mismatch":                 false,
+		"reject_reply_type_mismatch":              false,
 	}
 	for _, c := range af.ReplyCases {
 		if _, ok := wantCases[c.Name]; !ok {
@@ -407,15 +421,91 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		err := json.Unmarshal(body(name)[field], &value)
 		return value, err
 	}
-
-	if got := stringField("ack_success", "errCode"); got != "0" {
-		t.Errorf("ack_success errCode = %q, want 0", got)
+	rawMap := func(name, field string) (map[string]json.RawMessage, error) {
+		var value map[string]json.RawMessage
+		err := json.Unmarshal(body(name)[field], &value)
+		return value, err
 	}
-	for _, field := range []string{"resHost", "acTokens"} {
-		values, err := stringMap("ack_success", field)
-		if err != nil || values[resourceID] == "" {
-			t.Errorf("ack_success %s = %v, %v; want requested non-empty value", field, values, err)
+	// producerACK mirrors OpenNHP nhp/common/nhpmsg.go's ServerKnockAckMsg at main commit
+	// 1dbedcadee2018cd6a8684cc4b53b9e6a9048da4.
+	type producerACK struct {
+		ErrCode           string            `json:"errCode"`
+		ErrMsg            string            `json:"errMsg,omitempty"`
+		ResourceHost      map[string]string `json:"resHost"`
+		OpenTime          uint32            `json:"opnTime"`
+		AuthProviderToken string            `json:"aspToken,omitempty"`
+		AgentAddr         string            `json:"agentAddr"`
+		ACTokens          map[string]string `json:"acTokens"`
+		// preActions maps the requested resource only to null in the producer's
+		// no-NHP_ACC success shape. Populated action fields live in the
+		// reject_pre_access_* vectors rather than this serialization fixture.
+		PreAccessActions map[string]*struct{} `json:"preActions,omitempty"`
+		RedirectURL      string               `json:"redirectUrl,omitempty"`
+	}
+	standard := producerACK{
+		ErrCode:          "0",
+		ResourceHost:     map[string]string{resourceID: "frps.sandbox.example:7000"},
+		OpenTime:         900,
+		AgentAddr:        "203.0.113.9:49152",
+		ACTokens:         map[string]string{resourceID: "ac-token-conformance-01"},
+		PreAccessActions: map[string]*struct{}{resourceID: nil},
+	}
+	// This shallow copy deliberately changes only scalar metadata; its shared
+	// routing, admission, and pre-access maps remain immutable below.
+	optionalMetadata := standard
+	optionalMetadata.AuthProviderToken = "asp-token-must-not-authorize"
+	optionalMetadata.RedirectURL = "https://redirect.example/conformance"
+	denied := producerACK{
+		ErrCode:   "52004",
+		ErrMsg:    "failed to find resource",
+		AgentAddr: "203.0.113.9:49152",
+	}
+	for name, ack := range map[string]producerACK{
+		"ack_success":                   standard,
+		"ack_success_optional_metadata": optionalMetadata,
+		"ack_deny":                      denied,
+	} {
+		golden, err := json.Marshal(ack)
+		if err != nil {
+			t.Fatalf("marshal %s producer ACK: %v", name, err)
 		}
+		if byName[name].BodyJSON != string(golden) {
+			t.Errorf("%s body_json drifted from producer serialization:\n got %s\nwant %s", name, byName[name].BodyJSON, golden)
+		}
+	}
+
+	for _, name := range []string{"ack_success", "ack_success_optional_metadata"} {
+		if got := stringField(name, "errCode"); got != "0" {
+			t.Errorf("%s errCode = %q, want 0", name, got)
+		}
+		acTokens, acErr := stringMap(name, "acTokens")
+		resourceHosts, hostErr := stringMap(name, "resHost")
+		if hostErr != nil || resourceHosts[resourceID] == "" {
+			t.Errorf("%s resHost = %v, %v; want requested non-empty value", name, resourceHosts, hostErr)
+		}
+		if acErr != nil || acTokens[resourceID] == "" {
+			t.Errorf("%s acTokens = %v, %v; want requested non-empty value", name, acTokens, acErr)
+		}
+		preActions, err := rawMap(name, "preActions")
+		if err != nil || string(preActions[resourceID]) != "null" {
+			t.Errorf("%s preActions = %v, %v; want exact-resource null", name, preActions, err)
+		}
+		c := byName[name]
+		if c.ExpectedACToken != acTokens[resourceID] || c.ExpectedResourceHost != resourceHosts[resourceID] {
+			t.Errorf("%s expected result = %q/%q, want exact resource maps %q/%q", name,
+				c.ExpectedACToken, c.ExpectedResourceHost, acTokens[resourceID], resourceHosts[resourceID])
+		}
+	}
+	optional := body("ack_success_optional_metadata")
+	var aspToken, redirectURL string
+	if err := json.Unmarshal(optional["aspToken"], &aspToken); err != nil || aspToken != "asp-token-must-not-authorize" {
+		t.Errorf("optional aspToken = %q, %v; want typed non-authorizing metadata", aspToken, err)
+	}
+	if err := json.Unmarshal(optional["redirectUrl"], &redirectURL); err != nil || redirectURL != "https://redirect.example/conformance" {
+		t.Errorf("optional redirectUrl = %q, %v; want typed metadata", redirectURL, err)
+	}
+	if aspToken == byName["ack_success_optional_metadata"].ExpectedACToken {
+		t.Error("optional aspToken aliases expected_ac_token; vector would not catch alternate authorization")
 	}
 	if got := stringField("ack_deny", "errCode"); got == "" || got == "0" {
 		t.Errorf("ack_deny errCode = %q, want non-success code", got)
@@ -440,6 +530,24 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		}
 	}
 	for _, tc := range []struct {
+		name string
+		key  string
+	}{
+		{"reject_pre_access_action_requested", resourceID},
+		{"reject_pre_access_action_other_resource", "connector-other-01"},
+	} {
+		preActions, err := rawMap(tc.name, "preActions")
+		if err != nil || len(preActions[tc.key]) == 0 || string(preActions[tc.key]) == "null" {
+			t.Errorf("%s preActions = %v, %v; want non-null action under %q", tc.name, preActions, err, tc.key)
+		}
+		if byName[tc.name].RejectClass != AgentKnockRejectUnsupportedPreAccess {
+			t.Errorf("%s reject_class = %q, want %q", tc.name, byName[tc.name].RejectClass, AgentKnockRejectUnsupportedPreAccess)
+		}
+	}
+	if preActions, err := rawMap("reject_pre_access_action_other_resource", "preActions"); err != nil || string(preActions[resourceID]) != "null" {
+		t.Errorf("other-resource preActions = %v, %v; want requested-resource null plus foreign non-null action", preActions, err)
+	}
+	for _, tc := range []struct {
 		name  string
 		field string
 	}{
@@ -449,6 +557,38 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		if _, err := stringMap(tc.name, tc.field); err == nil {
 			t.Errorf("%s.%s decoded as map[string]string, want type error", tc.name, tc.field)
 		}
+	}
+	if _, err := rawMap("reject_malformed_pre_actions", "preActions"); err == nil {
+		t.Error("reject_malformed_pre_actions.preActions decoded as object, want type error")
+	}
+	for _, tc := range []struct {
+		name  string
+		field string
+	}{
+		{"reject_malformed_asp_token", "aspToken"},
+		{"reject_malformed_redirect_url", "redirectUrl"},
+		{"reject_malformed_agent_addr", "agentAddr"},
+	} {
+		var value string
+		if err := json.Unmarshal(body(tc.name)[tc.field], &value); err == nil {
+			t.Errorf("%s.%s decoded as string, want type error", tc.name, tc.field)
+		}
+	}
+	var openTime uint32
+	if err := json.Unmarshal(body("reject_malformed_opn_time")["opnTime"], &openTime); err == nil {
+		t.Error("reject_malformed_opn_time.opnTime decoded as uint32, want type error")
+	}
+	if fields := body("reject_unknown_ack_field"); len(fields["futureField"]) == 0 {
+		t.Error("reject_unknown_ack_field does not carry its unknown field")
+	}
+	if got := strings.Count(byName["reject_duplicate_ack_field"].BodyJSON, `"errCode"`); got != 2 {
+		t.Errorf("duplicate ACK case has %d errCode keys, want 2", got)
+	}
+	if json.Valid([]byte(byName["reject_trailing_ack_data"].BodyJSON)) {
+		t.Error("trailing ACK case unexpectedly contains one valid JSON value")
+	}
+	if byName["reject_null_ack_body"].BodyJSON != "null" || byName["reject_non_object_ack_body"].BodyJSON != "[]" {
+		t.Errorf("null/non-object ACK bodies drifted: %q / %q", byName["reject_null_ack_body"].BodyJSON, byName["reject_non_object_ack_body"].BodyJSON)
 	}
 }
 
@@ -547,12 +687,12 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			t.Fatal(err)
 		}
-		doc.SchemaVersion = 1
+		doc.SchemaVersion = 2
 		b, err := json.Marshal(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 2") {
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 3") {
 			t.Fatalf("error = %v, want schema version rejection", err)
 		}
 	})
@@ -669,6 +809,23 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown reply case", func(t *testing.T) {
+		var doc AgentKnockApplicationFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		extra := doc.ReplyCases[0]
+		extra.Name = "unexpected_reply_case"
+		doc.ReplyCases = append(doc.ReplyCases, extra)
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "unknown agent-knock reply case") {
+			t.Fatalf("error = %v, want unknown reply case rejection", err)
+		}
+	})
+
 	t.Run("duplicate case", func(t *testing.T) {
 		var doc AgentKnockApplicationFile
 		if err := json.Unmarshal(raw, &doc); err != nil {
@@ -723,6 +880,69 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		})
 		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "no reject_class") {
 			t.Fatalf("error = %v, want outcome/reject inconsistency rejection", err)
+		}
+	})
+
+	t.Run("success without expected result", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.ExpectedACToken = ""
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "non-empty expected result") {
+			t.Fatalf("error = %v, want missing expected result rejection", err)
+		}
+	})
+
+	t.Run("success expected token drift", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.ExpectedACToken = "wrong-token"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "expected_ac_token") {
+			t.Fatalf("error = %v, want expected token mismatch rejection", err)
+		}
+	})
+
+	t.Run("success expected resource host drift", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.ExpectedResourceHost = "wrong.example:7000"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "expected_resource_host") {
+			t.Fatalf("error = %v, want expected resource host mismatch rejection", err)
+		}
+	})
+
+	t.Run("success with non-null pre-access action", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			var body map[string]any
+			if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
+				t.Fatal(err)
+			}
+			body["preActions"] = map[string]any{"foreign-resource": map[string]any{"acIp": "198.51.100.8"}}
+			encoded, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.BodyJSON = string(encoded)
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "non-null preActions") {
+			t.Fatalf("error = %v, want non-null success preActions rejection", err)
+		}
+	})
+
+	t.Run("reject with expected result", func(t *testing.T) {
+		b := mutateCase(t, "reject_wrong_resource", func(c *AgentKnockReplyCase) {
+			c.ExpectedACToken = "unexpected"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "must not carry an expected result") {
+			t.Fatalf("error = %v, want non-success expected result rejection", err)
+		}
+	})
+
+	t.Run("invalid JSON requires body_parse disposition", func(t *testing.T) {
+		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
+			c.BodyJSON += "{}"
+		})
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "body_json is not valid JSON") {
+			t.Fatalf("error = %v, want invalid success body rejection", err)
 		}
 	})
 

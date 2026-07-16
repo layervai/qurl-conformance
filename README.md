@@ -92,12 +92,17 @@ This module hosts five artifact families, each under its own `artifact` id:
   body, authenticated RunID request-policy cases, and synthetic,
   already-decrypted reply dispositions for ACK success,
   authenticated deny, cookie challenge, wrong resource, malformed/missing maps,
-  and reply counter/type mismatch. Generic protocol parsing keeps RunID optional,
+  the complete current ACK producer envelope, required pre-access actions, and
+  reply counter/type mismatch. Generic protocol parsing keeps RunID optional,
   while the native qURL Connector gate requires one canonical 16-character
-  lowercase-hex value. It contains no Noise packets or key material; consumers
-  compose it with their real body serializer, request-policy gates, reply parser,
-  and transport correlation gates. Its `resId` semantic is the placement-neutral
-  NHP `knock_resource_id`, not the public-key management `resource_id`. See
+  lowercase-hex value. Standard success includes exact-resource
+  `preActions: null`; any non-null action requires NHP_ACC and fails closed until
+  that phase is implemented. Optional `aspToken` / `redirectUrl` metadata never
+  replaces the requested resource's `acTokens` / `resHost` authorization result.
+  It contains no Noise packets or key material; consumers compose it with their
+  real body serializer, request-policy gates, reply parser, and transport
+  correlation gates. Its `resId` semantic is the placement-neutral NHP
+  `knock_resource_id`, not the public-key management `resource_id`. See
   `vectors/README_agent_knock_application_vectors.md`.
 - **Agent API-key ID contract** (`qurl-agent-api-key-id-vectors`,
   `agent_api_key_id_vectors.json`) — deterministic issuer suffix fixtures,
