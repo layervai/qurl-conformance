@@ -765,10 +765,14 @@ type AgentAssignmentCase struct {
 }
 
 // AgentAssignmentRequestCase is an authenticated application request reject.
-type AgentAssignmentRequestCase = AgentAssignmentCase
+// It is intentionally distinct from AgentAssignmentResultCase so callers
+// cannot interchange request and result cases at compile time.
+type AgentAssignmentRequestCase AgentAssignmentCase
 
 // AgentAssignmentResultCase is an authenticated success-envelope reject.
-type AgentAssignmentResultCase = AgentAssignmentCase
+// It is intentionally distinct from AgentAssignmentRequestCase so callers
+// cannot interchange request and result cases at compile time.
+type AgentAssignmentResultCase AgentAssignmentCase
 
 type agentAssignmentListErrorBody struct {
 	ErrCode           string          `json:"errCode"`
@@ -970,7 +974,13 @@ func validateAgentAssignmentRequestCases(cases []AgentAssignmentRequestCase) err
 		"reject_wrong_version":                       {"refresh_assignment", AgentAssignmentRejectSemantic},
 		"reject_wrong_mode":                          {"refresh_assignment", AgentAssignmentRejectSemantic},
 	}
-	return validateAgentAssignmentCases("request", cases, expected, false, classifyAgentAssignmentRequest)
+	baseCases := make([]AgentAssignmentCase, len(cases))
+	for i, c := range cases {
+		baseCases[i] = AgentAssignmentCase(c)
+	}
+	return validateAgentAssignmentCases("request", baseCases, expected, false, func(c AgentAssignmentCase) string {
+		return classifyAgentAssignmentRequest(AgentAssignmentRequestCase(c))
+	})
 }
 
 func validateAgentAssignmentResultCases(cases []AgentAssignmentResultCase) error {
@@ -988,7 +998,13 @@ func validateAgentAssignmentResultCases(cases []AgentAssignmentResultCase) error
 		"reject_completion_device_key_commitment": {"registration_completion", AgentAssignmentRejectUnknownField},
 		"reject_trailing_registration_result":     {"assigned_cell_registration", AgentAssignmentRejectBodyParse},
 	}
-	if err := validateAgentAssignmentCases("success-result", cases, expected, true, classifyAgentAssignmentResult); err != nil {
+	baseCases := make([]AgentAssignmentCase, len(cases))
+	for i, c := range cases {
+		baseCases[i] = AgentAssignmentCase(c)
+	}
+	if err := validateAgentAssignmentCases("success-result", baseCases, expected, true, func(c AgentAssignmentCase) string {
+		return classifyAgentAssignmentResult(AgentAssignmentResultCase(c))
+	}); err != nil {
 		return err
 	}
 	expectedRejectedKeyKinds := map[string]string{
