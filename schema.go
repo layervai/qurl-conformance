@@ -912,37 +912,21 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 		}
 	}
 	for _, exchange := range []struct {
-		name                         string
-		exchange                     AgentAssignmentExchange
-		requestSender, requestTarget string
-		resultSender, resultTarget   string
+		name     string
+		exchange AgentAssignmentExchange
+		target   string
 	}{
-		{
-			name: "initial_assignment", exchange: af.InitialAssignment,
-			requestSender: "agent", requestTarget: "hub",
-			resultSender: "hub", resultTarget: "agent",
-		},
-		{
-			name: "refresh_assignment", exchange: af.RefreshAssignment,
-			requestSender: "agent", requestTarget: "hub",
-			resultSender: "hub", resultTarget: "agent",
-		},
-		{
-			name: "assigned_cell_registration", exchange: af.AssignedCellRegistration,
-			requestSender: "agent", requestTarget: "assigned_cell",
-			resultSender: "assigned_cell", resultTarget: "agent",
-		},
-		{
-			name: "registration_completion", exchange: af.RegistrationCompletion,
-			requestSender: "agent", requestTarget: "assigned_cell",
-			resultSender: "assigned_cell", resultTarget: "agent",
-		},
+		{name: "initial_assignment", exchange: af.InitialAssignment, target: "hub"},
+		{name: "refresh_assignment", exchange: af.RefreshAssignment, target: "hub"},
+		{name: "assigned_cell_registration", exchange: af.AssignedCellRegistration, target: "assigned_cell"},
+		{name: "registration_completion", exchange: af.RegistrationCompletion, target: "assigned_cell"},
 	} {
 		phase := agentAssignmentPhases[exchange.name]
-		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, phase.requestHeaderName, phase.requestHeaderType, exchange.requestSender, exchange.requestTarget); err != nil {
+		// Every lifecycle exchange is agent -> target -> agent.
+		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, phase.requestHeaderName, phase.requestHeaderType, "agent", exchange.target); err != nil {
 			return nil, err
 		}
-		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, phase.resultHeaderName, phase.resultHeaderType, exchange.resultSender, exchange.resultTarget); err != nil {
+		if err := validateAgentAssignmentPacket(exchange.name+".result", exchange.exchange.Result, phase.resultHeaderName, phase.resultHeaderType, exchange.target, "agent"); err != nil {
 			return nil, err
 		}
 		if exchange.exchange.Result.Counter != exchange.exchange.Request.Counter {
@@ -1172,20 +1156,12 @@ func validateAgentAssignmentRequestKeys(phase string, body []byte) error {
 	if !ok {
 		return fmt.Errorf("unknown phase %q", phase)
 	}
-	outer, err := decodeAgentAssignmentExactObject(body, schema.requestOuterKeys)
+	outer, err := checkAgentAssignmentExactObject("", body, schema.requestOuterKeys)
 	if err != nil {
 		return err
 	}
-	if err := requireAgentAssignmentExactKeys(outer, schema.requestOuterKeys); err != nil {
+	if _, err := checkAgentAssignmentExactObject("usrData", outer["usrData"], schema.requestDataKeys); err != nil {
 		return err
-	}
-	usrData := outer["usrData"]
-	inner, err := decodeAgentAssignmentExactObject(usrData, schema.requestDataKeys)
-	if err != nil {
-		return fmt.Errorf("usrData: %w", err)
-	}
-	if err := requireAgentAssignmentExactKeys(inner, schema.requestDataKeys); err != nil {
-		return fmt.Errorf("usrData: %w", err)
 	}
 	return nil
 }
@@ -1195,53 +1171,43 @@ func validateAgentAssignmentSuccessKeys(phase string, body []byte) error {
 	if !ok {
 		return fmt.Errorf("unknown phase %q", phase)
 	}
-	outer, err := decodeAgentAssignmentExactObject(body, schema.resultOuterKeys)
+	outer, err := checkAgentAssignmentExactObject("", body, schema.resultOuterKeys)
 	if err != nil {
-		return err
-	}
-	if err := requireAgentAssignmentExactKeys(outer, schema.resultOuterKeys); err != nil {
 		return err
 	}
 	if schema.resultListKeys == nil {
 		return nil
 	}
-	listRaw := outer["list"]
-	list, err := decodeAgentAssignmentExactObject(listRaw, schema.resultListKeys)
+	list, err := checkAgentAssignmentExactObject("list", outer["list"], schema.resultListKeys)
 	if err != nil {
-		return fmt.Errorf("list: %w", err)
-	}
-	if err := requireAgentAssignmentExactKeys(list, schema.resultListKeys); err != nil {
-		return fmt.Errorf("list: %w", err)
+		return err
 	}
 	if phase == "initial_assignment" {
-		registrationRaw := list["registration"]
-		registration, err := decodeAgentAssignmentExactObject(registrationRaw, agentAssignmentRegistrationKeys)
-		if err != nil {
-			return fmt.Errorf("registration: %w", err)
-		}
-		if err := requireAgentAssignmentExactKeys(registration, agentAssignmentRegistrationKeys); err != nil {
-			return fmt.Errorf("registration: %w", err)
+		if _, err := checkAgentAssignmentExactObject("registration", list["registration"], agentAssignmentRegistrationKeys); err != nil {
+			return err
 		}
 	}
 	if phase == "initial_assignment" || phase == "refresh_assignment" {
-		assignmentRaw := list["assignment"]
-		assignment, err := decodeAgentAssignmentExactObject(assignmentRaw, agentAssignmentAssignmentKeys)
+		assignment, err := checkAgentAssignmentExactObject("assignment", list["assignment"], agentAssignmentAssignmentKeys)
 		if err != nil {
-			return fmt.Errorf("assignment: %w", err)
+			return err
 		}
-		if err := requireAgentAssignmentExactKeys(assignment, agentAssignmentAssignmentKeys); err != nil {
-			return fmt.Errorf("assignment: %w", err)
-		}
-		endpointRaw := assignment["nhp_udp_endpoint"]
-		endpoint, err := decodeAgentAssignmentExactObject(endpointRaw, agentAssignmentEndpointKeys)
-		if err != nil {
-			return fmt.Errorf("nhp_udp_endpoint: %w", err)
-		}
-		if err := requireAgentAssignmentExactKeys(endpoint, agentAssignmentEndpointKeys); err != nil {
-			return fmt.Errorf("nhp_udp_endpoint: %w", err)
+		if _, err := checkAgentAssignmentExactObject("nhp_udp_endpoint", assignment["nhp_udp_endpoint"], agentAssignmentEndpointKeys); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func checkAgentAssignmentExactObject(prefix string, body []byte, keys map[string]struct{}) (map[string]json.RawMessage, error) {
+	fields, err := decodeAgentAssignmentExactObject(body, keys)
+	if err == nil {
+		err = requireAgentAssignmentExactKeys(fields, keys)
+	}
+	if err != nil && prefix != "" {
+		return nil, fmt.Errorf("%s: %w", prefix, err)
+	}
+	return fields, err
 }
 
 type agentAssignmentRejectError struct {
