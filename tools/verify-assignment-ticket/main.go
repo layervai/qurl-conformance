@@ -481,6 +481,8 @@ func verifyDERCases(cases []conformance.AssignmentTicketDERCase) error {
 			if err != nil || hex.EncodeToString(raw) != c.ExpectedRawHex {
 				return fmt.Errorf("DER accept case %s = %x/%v", c.Name, raw, err)
 			}
+		} else if c.RejectClass != "der" {
+			return fmt.Errorf("DER reject case %s class = %q, want der", c.Name, c.RejectClass)
 		} else if err == nil {
 			return fmt.Errorf("DER reject case %s unexpectedly normalized", c.Name)
 		}
