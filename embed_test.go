@@ -1,6 +1,9 @@
 package conformance
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"sort"
 	"strconv"
@@ -196,6 +199,362 @@ func TestEmbeddedAgentRegistrationLoads(t *testing.T) {
 			t.Errorf("%s.counter_hex = %d, want %d (must echo reg_emailed.counter)", c.name, rakCounter, regCounter)
 		}
 	}
+}
+
+func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
+	af, err := AgentAssignmentGolden()
+	if err != nil {
+		t.Fatalf("AgentAssignmentGolden(): %v", err)
+	}
+	if af.Artifact != AgentAssignmentArtifactID {
+		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
+	}
+	if af.SchemaVersion != 1 {
+		t.Errorf("schema_version = %d, want 1", af.SchemaVersion)
+	}
+
+	for _, exchange := range []struct {
+		name     string
+		exchange AgentAssignmentExchange
+	}{
+		{"initial_assignment", af.InitialAssignment},
+		{"refresh_assignment", af.RefreshAssignment},
+		{"registration_completion", af.RegistrationCompletion},
+	} {
+		if exchange.exchange.Request.HeaderType != AgentAssignmentRequestHeaderType || exchange.exchange.Request.HeaderName != AgentAssignmentRequestHeaderName {
+			t.Errorf("%s request header = %q/%d, want %q/%d", exchange.name, exchange.exchange.Request.HeaderName, exchange.exchange.Request.HeaderType, AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType)
+		}
+		if exchange.exchange.Result.HeaderType != AgentAssignmentResultHeaderType || exchange.exchange.Result.HeaderName != AgentAssignmentResultHeaderName {
+			t.Errorf("%s result header = %q/%d, want %q/%d", exchange.name, exchange.exchange.Result.HeaderName, exchange.exchange.Result.HeaderType, AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType)
+		}
+		if exchange.exchange.Result.Counter != exchange.exchange.Request.Counter {
+			t.Errorf("%s result counter = %q, want request counter %q", exchange.name, exchange.exchange.Result.Counter, exchange.exchange.Request.Counter)
+		}
+	}
+	registration := af.AssignedCellRegistration
+	if registration.Request.HeaderName != AgentRegistrationRequestHeaderName || registration.Request.HeaderType != AgentRegistrationRequestHeaderType || registration.Result.HeaderName != AgentRegistrationResultHeaderName || registration.Result.HeaderType != AgentRegistrationResultHeaderType {
+		t.Errorf("assigned-cell registration headers = %q/%d -> %q/%d, want NHP_REG/13 -> NHP_RAK/14", registration.Request.HeaderName, registration.Request.HeaderType, registration.Result.HeaderName, registration.Result.HeaderType)
+	}
+	if registration.Request.Counter != registration.Result.Counter {
+		t.Errorf("assigned-cell registration result counter = %q, want request counter %q", registration.Result.Counter, registration.Request.Counter)
+	}
+
+	var initialRequest struct {
+		UsrID   string `json:"usrId"`
+		DevID   string `json:"devId"`
+		UsrData struct {
+			Query      string `json:"query"`
+			Mode       string `json:"mode"`
+			Credential string `json:"credential"`
+		} `json:"usrData"`
+	}
+	if err := json.Unmarshal([]byte(af.InitialAssignment.Request.BodyJSON), &initialRequest); err != nil {
+		t.Fatalf("initial request body: %v", err)
+	}
+	if initialRequest.UsrID != "" || initialRequest.DevID != "agent-conform" || initialRequest.UsrData.Query != "cell_assignment" || initialRequest.UsrData.Mode != "enroll" || initialRequest.UsrData.Credential == "" {
+		t.Errorf("initial request identity/query fields drifted: %+v", initialRequest)
+	}
+	if strings.Contains(af.InitialAssignment.Result.BodyJSON, initialRequest.UsrData.Credential) {
+		t.Error("initial assignment result echoes enrollment credential")
+	}
+
+	var initialResult struct {
+		List struct {
+			Assignment struct {
+				Endpoint struct {
+					ServerPublicKeyB64 string `json:"server_public_key_b64"`
+				} `json:"nhp_udp_endpoint"`
+			} `json:"assignment"`
+			AssignmentTicket string `json:"assignment_ticket"`
+		} `json:"list"`
+	}
+	if err := json.Unmarshal([]byte(af.InitialAssignment.Result.BodyJSON), &initialResult); err != nil {
+		t.Fatalf("initial result body: %v", err)
+	}
+	endpointKey, err := base64.StdEncoding.DecodeString(initialResult.List.Assignment.Endpoint.ServerPublicKeyB64)
+	if err != nil {
+		t.Fatalf("decode assigned endpoint key: %v", err)
+	}
+	wantCellKey, err := hex.DecodeString(af.Keys.AssignedCell.StaticPubHex)
+	if err != nil {
+		t.Fatalf("decode assigned-cell fixture key: %v", err)
+	}
+	if !bytes.Equal(endpointKey, wantCellKey) {
+		t.Errorf("assignment endpoint key = %x, want assigned-cell key %x", endpointKey, wantCellKey)
+	}
+	if initialResult.List.AssignmentTicket == "" {
+		t.Error("initial assignment result is missing assignment_ticket")
+	}
+	var refreshResultFields map[string]any
+	if err := json.Unmarshal([]byte(af.RefreshAssignment.Result.BodyJSON), &refreshResultFields); err != nil {
+		t.Fatalf("refresh result fields: %v", err)
+	}
+	refreshList := refreshResultFields["list"].(map[string]any)
+	if _, ok := refreshList["assignment_ticket"]; ok {
+		t.Error("ordinary refresh result issues assignment_ticket")
+	}
+	if _, ok := refreshList["assignment_ticket_expires_at"]; ok {
+		t.Error("ordinary refresh result issues assignment_ticket_expires_at")
+	}
+	var initialResultFields map[string]any
+	if err := json.Unmarshal([]byte(af.InitialAssignment.Result.BodyJSON), &initialResultFields); err != nil {
+		t.Fatalf("initial result fields: %v", err)
+	}
+	initialList := initialResultFields["list"].(map[string]any)
+	registrationMetadata := initialList["registration"].(map[string]any)
+	if _, ok := registrationMetadata["masked_email"]; ok {
+		t.Error("initial assignment registration metadata commits to masked_email")
+	}
+	var registrationRequest struct {
+		OTP     string `json:"otp"`
+		UsrData struct {
+			AssignmentTicket string `json:"assignment_ticket"`
+		} `json:"usrData"`
+	}
+	if err := json.Unmarshal([]byte(af.AssignedCellRegistration.Request.BodyJSON), &registrationRequest); err != nil {
+		t.Fatalf("registration request body: %v", err)
+	}
+	if registrationRequest.OTP != initialRequest.UsrData.Credential || registrationRequest.UsrData.AssignmentTicket != initialResult.List.AssignmentTicket {
+		t.Errorf("assigned-cell REG did not carry exact credential/ticket handoff: %+v", registrationRequest)
+	}
+
+	var completionRequest map[string]any
+	if err := json.Unmarshal([]byte(af.RegistrationCompletion.Request.BodyJSON), &completionRequest); err != nil {
+		t.Fatalf("completion request body: %v", err)
+	}
+	completionUserData, ok := completionRequest["usrData"].(map[string]any)
+	if !ok {
+		t.Fatalf("completion request usrData = %#v, want object", completionRequest["usrData"])
+	}
+	if _, ok := completionUserData["assignment_ticket"]; ok {
+		t.Error("completion request reuses the REG-consumed assignment_ticket")
+	}
+	deviceSecret, ok := completionUserData["device_api_key"].(string)
+	if !ok || deviceSecret == "" {
+		t.Fatalf("completion request device_api_key = %#v, want non-empty synthetic secret", completionUserData["device_api_key"])
+	}
+	if strings.Contains(af.RegistrationCompletion.Result.BodyJSON, deviceSecret) {
+		t.Error("completion result echoes device_api_key secret")
+	}
+	if af.RegistrationCompletion.Request.ReceiverKey != "assigned_cell" || af.RegistrationCompletion.Result.SenderKey != "assigned_cell" {
+		t.Errorf("completion trust boundary = %q/%q, want assigned_cell/assigned_cell", af.RegistrationCompletion.Request.ReceiverKey, af.RegistrationCompletion.Result.SenderKey)
+	}
+	if got, want := len(af.RequestCases), 21; got != want {
+		t.Errorf("request case count = %d, want %d", got, want)
+	}
+	requestCases := make(map[string]AgentAssignmentRequestCase, len(af.RequestCases))
+	for _, c := range af.RequestCases {
+		requestCases[c.Name] = c
+	}
+	for name, wantClass := range map[string]string{
+		"reject_duplicate_outer_dev_id":        AgentAssignmentRejectBodyParse,
+		"reject_alias_outer_dev_id":            AgentAssignmentRejectUnknownField,
+		"reject_client_public_key":             AgentAssignmentRejectUnknownField,
+		"reject_refresh_assignment_ticket":     AgentAssignmentRejectUnknownField,
+		"reject_duplicate_registration_ticket": AgentAssignmentRejectBodyParse,
+		"reject_wrong_mode":                    AgentAssignmentRejectSemantic,
+	} {
+		c, ok := requestCases[name]
+		if !ok {
+			t.Errorf("request cases missing %q", name)
+			continue
+		}
+		if c.RejectClass != wantClass {
+			t.Errorf("request case %q reject_class = %q, want %q", name, c.RejectClass, wantClass)
+		}
+	}
+	if got, want := len(af.SuccessResultCases), 10; got != want {
+		t.Errorf("success result case count = %d, want %d", got, want)
+	}
+	if af.ErrorContract.Status != "ready" || af.ErrorContract.ProducerRevision != "9653fcb185c77629b787ad046c13c760baba88f4" {
+		t.Errorf("error taxonomy status/producer = %q/%q, want merged NHP producer pin", af.ErrorContract.Status, af.ErrorContract.ProducerRevision)
+	}
+	if got, want := len(af.ErrorContract.AssignmentCases), 6; got != want {
+		t.Errorf("assignment error case count = %d, want %d", got, want)
+	}
+	if got, want := len(af.ErrorContract.InitialCredentialCases), 4; got != want {
+		t.Errorf("initial credential error case count = %d, want %d", got, want)
+	}
+	if got, want := len(af.ErrorContract.CompletionCases), 5; got != want {
+		t.Errorf("completion error case count = %d, want %d", got, want)
+	}
+	if got, want := len(af.ErrorContract.RegistrationCases), 4; got != want {
+		t.Errorf("registration error case count = %d, want %d", got, want)
+	}
+}
+
+func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
+	raw := AgentAssignmentVectors()
+	mutate := func(t *testing.T, change func(*AgentAssignmentFile)) []byte {
+		t.Helper()
+		var doc AgentAssignmentFile
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		change(&doc)
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	t.Run("counter mismatch", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.InitialAssignment.Result.Counter = "99"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "does not echo") {
+			t.Fatalf("error = %v, want counter-echo rejection", err)
+		}
+	})
+
+	t.Run("completion routed to hub", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.RegistrationCompletion.Request.ReceiverKey = "hub"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "key roles") {
+			t.Fatalf("error = %v, want completion trust-boundary rejection", err)
+		}
+	})
+
+	t.Run("body bytes drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.RefreshAssignment.Request.BodyHex = "7b7d"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "does not encode body_json") {
+			t.Fatalf("error = %v, want body-byte rejection", err)
+		}
+	})
+
+	t.Run("wrong header type", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.RegistrationCompletion.Result.HeaderType = 2
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "header") {
+			t.Fatalf("error = %v, want header-type rejection", err)
+		}
+	})
+
+	t.Run("duplicate nested case name", func(t *testing.T) {
+		needle := []byte(`"name": "completion_unavailable",`)
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("completion_unavailable name count = %d, want 1", got)
+		}
+		replacement := []byte(`"name": "completion_unavailable", "name": "duplicate",`)
+		b := bytes.Replace(raw, needle, replacement, 1)
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `duplicate object key "name"`) {
+			t.Fatalf("error = %v, want nested duplicate-name rejection", err)
+		}
+	})
+
+	t.Run("REG ticket handoff mismatch", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.AssignedCellRegistration.Request.BodyJSON, "conformance-assignment-ticket-0001", "different-assignment-ticket", 1)
+			doc.AssignedCellRegistration.Request.BodyJSON = body
+			doc.AssignedCellRegistration.Request.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "exact hub registration metadata") {
+			t.Fatalf("error = %v, want exact REG ticket-handoff rejection", err)
+		}
+	})
+
+	t.Run("completion ticket reuse", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.RegistrationCompletion.Request.BodyJSON, `"device_api_key":`, `"assignment_ticket":"reused","device_api_key":`, 1)
+			doc.RegistrationCompletion.Request.BodyJSON = body
+			doc.RegistrationCompletion.Request.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "unknown field") {
+			t.Fatalf("error = %v, want completion assignment_ticket rejection", err)
+		}
+	})
+
+	t.Run("request case classifier drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.RequestCases[0].RejectClass = AgentAssignmentRejectSemantic
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "fields drifted") {
+			t.Fatalf("error = %v, want request-classifier rejection", err)
+		}
+	})
+
+	t.Run("success result case classifier drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.SuccessResultCases[0].RejectClass = AgentAssignmentRejectSemantic
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "fields drifted") {
+			t.Fatalf("error = %v, want success-result classifier rejection", err)
+		}
+	})
+
+	t.Run("case-insensitive request alias", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.InitialAssignment.Request.BodyJSON, `"devId":`, `"devID":`, 1)
+			doc.InitialAssignment.Request.BodyJSON = body
+			doc.InitialAssignment.Request.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "devID"`) {
+			t.Fatalf("error = %v, want exact-key request rejection", err)
+		}
+	})
+
+	t.Run("case-insensitive result alias", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.InitialAssignment.Result.BodyJSON, `"errCode":`, `"ErrCode":`, 1)
+			doc.InitialAssignment.Result.BodyJSON = body
+			doc.InitialAssignment.Result.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "ErrCode"`) {
+			t.Fatalf("error = %v, want exact-key result rejection", err)
+		}
+	})
+
+	t.Run("static keypair mismatch", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.Keys.Hub.StaticPubHex = doc.Keys.AssignedCell.StaticPubHex
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "do not form an X25519 pair") {
+			t.Fatalf("error = %v, want X25519 keypair rejection", err)
+		}
+	})
+
+	t.Run("uppercase hex", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.InitialAssignment.Request.EphemeralPrivHex = strings.ToUpper(doc.InitialAssignment.Request.EphemeralPrivHex)
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "canonical lowercase hex") {
+			t.Fatalf("error = %v, want canonical-hex rejection", err)
+		}
+	})
+
+	t.Run("leading-zero counter", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.InitialAssignment.Request.Counter = "021"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "canonical positive uint64 decimal") {
+			t.Fatalf("error = %v, want canonical-decimal rejection", err)
+		}
+	})
+
+	t.Run("preamble packet mismatch", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.InitialAssignment.Request.PreambleHex = "01020304"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "does not start with preamble_hex") {
+			t.Fatalf("error = %v, want packet-preamble rejection", err)
+		}
+	})
+
+	t.Run("noncanonical endpoint base64", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			body := strings.Replace(doc.InitialAssignment.Result.BodyJSON, `Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=`, `Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w1=`, 1)
+			doc.InitialAssignment.Result.BodyJSON = body
+			doc.InitialAssignment.Result.BodyHex = hex.EncodeToString([]byte(body))
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "canonical padded standard base64") {
+			t.Fatalf("error = %v, want canonical-base64 rejection", err)
+		}
+	})
 }
 
 func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
@@ -604,6 +963,7 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 		{"issuer signature", IssuerSignatureVectors(), `{"description":"duplicate",`, func(b []byte) error { _, err := ParseVectorFile(b); return err }},
 		{"relay knock", RelayKnockVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseRelayKnockFile(b); return err }},
 		{"agent registration", AgentRegistrationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err }},
+		{"agent assignment", AgentAssignmentVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err }},
 		{"agent knock application", AgentKnockApplicationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentKnockApplicationFile(b); return err }},
 		{"agent API-key ID", AgentAPIKeyIDVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAPIKeyIDFile(b); return err }},
 	}
@@ -966,6 +1326,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/relay_knock_golden.json",
 		"agent_registration_golden.json",
 		"vectors/agent_registration_golden.json",
+		"agent_assignment_golden.json",
+		"vectors/agent_assignment_golden.json",
 		"agent_knock_application_vectors.json",
 		"vectors/agent_knock_application_vectors.json",
 		"agent_api_key_id_vectors.json",

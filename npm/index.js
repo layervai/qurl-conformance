@@ -9,6 +9,7 @@ module.exports = {
   issuerSignatureVectors: () => load("issuer_signature_vectors.json"),
   relayKnockVectors: () => load("relay_knock_golden.json"),
   agentRegistrationVectors: () => load("agent_registration_golden.json"),
+  agentAssignmentVectors: () => load("agent_assignment_golden.json"),
   agentKnockApplicationVectors: () => load("agent_knock_application_vectors.json"),
   agentApiKeyIdVectors: () => load("agent_api_key_id_vectors.json"),
 };

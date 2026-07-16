@@ -1,6 +1,6 @@
 module github.com/layervai/qurl-conformance/tools/verify-sdk
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/layervai/qurl-conformance v0.0.0
