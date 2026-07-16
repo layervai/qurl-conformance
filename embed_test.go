@@ -452,7 +452,7 @@ func TestAgentAssignmentProductionShapedFixturesAreExact(t *testing.T) {
 		AgentAssignmentAccountCredentialFixture:   false,
 		AgentAssignmentDeviceAPIKeyFixture:        false,
 	}
-	for _, token := range regexp.MustCompile(`lv_live_[A-Za-z0-9_]+`).FindAllString(string(AgentAssignmentVectors()), -1) {
+	for _, token := range regexp.MustCompile(`lv_live_[A-Za-z0-9_-]+`).FindAllString(string(AgentAssignmentVectors()), -1) {
 		if _, ok := allowed[token]; !ok {
 			t.Errorf("unexpected production-shaped fixture %q; scanner exceptions must be exact", token)
 			continue
@@ -462,6 +462,27 @@ func TestAgentAssignmentProductionShapedFixturesAreExact(t *testing.T) {
 	for token, found := range allowed {
 		if !found {
 			t.Errorf("production-shaped fixture %q is not load-bearing", token)
+		}
+	}
+}
+
+func TestAgentAssignmentDeviceAPIKeyFixtureIsCanonical(t *testing.T) {
+	const prefix = "lv_live_"
+	if len(AgentAssignmentDeviceAPIKeyFixture) != len(prefix)+base64.RawURLEncoding.EncodedLen(agentAssignmentDeviceKeySecretBytes) ||
+		!strings.HasPrefix(AgentAssignmentDeviceAPIKeyFixture, prefix) {
+		t.Fatalf("device API-key fixture has noncanonical length or prefix: %q", AgentAssignmentDeviceAPIKeyFixture)
+	}
+	body := strings.TrimPrefix(AgentAssignmentDeviceAPIKeyFixture, prefix)
+	raw, err := base64.RawURLEncoding.Strict().DecodeString(body)
+	if err != nil {
+		t.Fatalf("decode device API-key fixture: %v", err)
+	}
+	if len(raw) != agentAssignmentDeviceKeySecretBytes || base64.RawURLEncoding.EncodeToString(raw) != body {
+		t.Fatalf("device API-key fixture body is not canonical unpadded base64url for 32 bytes")
+	}
+	for i, value := range raw {
+		if value != byte(i) {
+			t.Fatalf("device API-key fixture byte %d = 0x%02x, want 0x%02x", i, value, byte(i))
 		}
 	}
 }

@@ -69,6 +69,11 @@ jobs:
       - name: Assignment wire rebuild (merged qurl-go producer)
         run: cd tools/verify-assignment && go test ./...
 
+      - name: Set up Node for npm package smoke
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+
       - name: npm package smoke
         run: |
           node <<'NODE'
@@ -109,6 +114,16 @@ jobs:
             'reject_challenge_cell_mismatch',
           ].every(name => assignmentOtpChallengeBindings[name].reject_class === 'challenge_binding');
           const assignmentOtpSizes = Object.fromEntries(s.account_credential_otp.packet_size_contract.cases.map(v => [v.name, v]));
+          const assignmentCompletionRequest = JSON.parse(s.registration_completion.request.body_json);
+          const deviceApiKey = assignmentCompletionRequest.usrData.device_api_key;
+          const deviceApiKeyPrefix = 'lv_live_';
+          const deviceApiKeySecretBytes = 32;
+          const deviceApiKeyBody = deviceApiKey.slice(deviceApiKeyPrefix.length);
+          const deviceApiKeyBytes = Buffer.from(deviceApiKeyBody, 'base64url');
+          const deviceApiKeyCanonical = deviceApiKey.startsWith(deviceApiKeyPrefix) &&
+            deviceApiKeyBytes.length === deviceApiKeySecretBytes &&
+            deviceApiKeyBytes.every((value, index) => value === index) &&
+            deviceApiKeyBytes.toString('base64url') === deviceApiKeyBody;
           const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
           const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
           const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
@@ -178,7 +193,7 @@ jobs:
               assignmentRefresh.assignment_ticket !== undefined ||
               assignmentRefresh.assignment_ticket_expires_at !== undefined ||
               s.registration_completion.request.receiver_key !== 'assigned_cell' ||
-              JSON.parse(s.registration_completion.request.body_json).usrData.assignment_ticket !== undefined ||
+              assignmentCompletionRequest.usrData.assignment_ticket !== undefined ||
               JSON.stringify(Object.keys(assignmentCompletion).sort()) !== JSON.stringify(['device_api_key_id', 'query', 'version']) ||
               s.request_cases.length !== 21 ||
               assignmentRequests.reject_duplicate_outer_dev_id.reject_class !== 'body_parse' ||
@@ -241,16 +256,23 @@ jobs:
               t.golden.token.split('.').length !== 3 || t.golden.signature_b64url.length !== 86 ||
               t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
               t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
-              t.contract.credential_kinds.includes('tunnel_bootstrap')) {
+              t.contract.credential_kinds.includes('tunnel_bootstrap') ||
+              !deviceApiKeyCanonical) {
             process.exit(1);
           }
           console.log('npm ok');
           NODE
 
+      - name: Set up Python for package smoke
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
       - name: python package smoke
         run: |
           cd python
           python3 <<'PY'
+          import base64
           import json
           import re
           import sys
@@ -283,6 +305,17 @@ jobs:
           initial_assignment = json.loads(s['initial_assignment']['result']['body_json'])['list']
           refresh_assignment = json.loads(s['refresh_assignment']['result']['body_json'])['list']
           registration = json.loads(s['assigned_cell_registration']['request']['body_json'])
+          completion_request = json.loads(s['registration_completion']['request']['body_json'])
+          device_api_key = completion_request['usrData']['device_api_key']
+          device_api_key_prefix = 'lv_live_'
+          device_api_key_secret_bytes = 32
+          device_api_key_body = device_api_key.removeprefix(device_api_key_prefix)
+          device_api_key_bytes = base64.urlsafe_b64decode(
+              device_api_key_body + '=' * (-len(device_api_key_body) % 4)
+          )
+          assert device_api_key.startswith(device_api_key_prefix)
+          assert device_api_key_bytes == bytes(range(device_api_key_secret_bytes))
+          assert base64.urlsafe_b64encode(device_api_key_bytes).decode().rstrip('=') == device_api_key_body
           account_otp = s['account_credential_otp']
           account_otp_request = json.loads(account_otp['request']['body_json'])
           account_otp_binding = account_otp['enrollment_binding']
@@ -361,7 +394,7 @@ jobs:
           assert 'assignment_ticket' not in refresh_assignment
           assert 'assignment_ticket_expires_at' not in refresh_assignment
           assert s['registration_completion']['request']['receiver_key'] == 'assigned_cell'
-          assert 'assignment_ticket' not in json.loads(s['registration_completion']['request']['body_json'])['usrData']
+          assert 'assignment_ticket' not in completion_request['usrData']
           assert set(completion) == {'query', 'version', 'device_api_key_id'}
           assert len(s['request_cases']) == 21
           assert assignment_requests['reject_duplicate_outer_dev_id']['reject_class'] == 'body_parse'
