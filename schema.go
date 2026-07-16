@@ -1308,10 +1308,10 @@ func validateAgentAssignmentPacket(name string, packet AgentAssignmentPacket, wa
 	if err := validateAgentAssignmentHex(name+".ephemeral_priv_hex", packet.EphemeralPrivHex, 32); err != nil {
 		return err
 	}
-	if _, err := parseAgentAssignmentUint64(name+".timestamp_nanos", packet.TimestampNanos); err != nil {
+	if err := validateAgentAssignmentUint64(name+".timestamp_nanos", packet.TimestampNanos); err != nil {
 		return err
 	}
-	if _, err := parseAgentAssignmentUint64(name+".counter", packet.Counter); err != nil {
+	if err := validateAgentAssignmentUint64(name+".counter", packet.Counter); err != nil {
 		return err
 	}
 	if err := validateAgentAssignmentHex(name+".preamble_hex", packet.PreambleHex, 4); err != nil {
@@ -1555,6 +1555,11 @@ var (
 		"52111": {outcome: "ticket_expired"},
 		"52112": {outcome: "quota_exceeded"},
 	}
+	agentAssignmentListErrorGroups = []map[string]agentAssignmentExpectedError{
+		agentAssignmentAssignmentErrors,
+		agentAssignmentInitialCredentialErrors,
+		agentAssignmentCompletionErrors,
+	}
 )
 
 func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract) error {
@@ -1792,11 +1797,7 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 }
 
 func agentAssignmentRetryAfterPolicy(code string) (permitted, required bool) {
-	for _, group := range []map[string]agentAssignmentExpectedError{
-		agentAssignmentAssignmentErrors,
-		agentAssignmentInitialCredentialErrors,
-		agentAssignmentCompletionErrors,
-	} {
+	for _, group := range agentAssignmentListErrorGroups {
 		if expected, ok := group[code]; ok {
 			return expected.retryPermitted, expected.retryRequired
 		}
@@ -1805,11 +1806,7 @@ func agentAssignmentRetryAfterPolicy(code string) (permitted, required bool) {
 }
 
 func agentAssignmentRetryAfterCodes() (permitted, required []string) {
-	for _, group := range []map[string]agentAssignmentExpectedError{
-		agentAssignmentAssignmentErrors,
-		agentAssignmentInitialCredentialErrors,
-		agentAssignmentCompletionErrors,
-	} {
+	for _, group := range agentAssignmentListErrorGroups {
 		for code, expected := range group {
 			if expected.retryPermitted {
 				permitted = append(permitted, code)
@@ -1825,10 +1822,12 @@ func agentAssignmentRetryAfterCodes() (permitted, required []string) {
 }
 
 func isKnownAgentAssignmentListErrorCode(code string) bool {
-	_, assignment := agentAssignmentAssignmentErrors[code]
-	_, initialCredential := agentAssignmentInitialCredentialErrors[code]
-	_, completion := agentAssignmentCompletionErrors[code]
-	return assignment || initialCredential || completion
+	for _, group := range agentAssignmentListErrorGroups {
+		if _, ok := group[code]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func isKnownAgentAssignmentRegistrationErrorCode(code string) bool {
@@ -1869,12 +1868,12 @@ func validateAgentAssignmentKeyPair(name string, key AgentAssignmentKey) error {
 	return nil
 }
 
-func parseAgentAssignmentUint64(name, value string) (uint64, error) {
+func validateAgentAssignmentUint64(name, value string) error {
 	parsed, err := strconv.ParseUint(value, 10, 64)
 	if err != nil || parsed == 0 || strconv.FormatUint(parsed, 10) != value {
-		return 0, fmt.Errorf("conformance: %s %q is not canonical positive uint64 decimal", name, value)
+		return fmt.Errorf("conformance: %s %q is not canonical positive uint64 decimal", name, value)
 	}
-	return parsed, nil
+	return nil
 }
 
 // AgentKnockApplicationArtifactID is the fixed identity of the registered-agent
