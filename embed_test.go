@@ -595,7 +595,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		b := mutate(t, func(doc *AgentAssignmentFile) {
 			doc.AccountCredentialOTP.ChallengeBinding.CellID = "cell1"
 		})
-		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "Redis challenge binding drifted") {
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "challenge-store binding drifted") {
 			t.Fatalf("error = %v, want account OTP challenge-binding rejection", err)
 		}
 	})

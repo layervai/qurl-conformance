@@ -117,7 +117,7 @@ This module hosts seven artifact families, each under its own `artifact` id:
   OTP-free and proceed directly to one REG. Binding cases isolate the exact
   ticket token, peer key, devId, credential id/hash/fence/kind, environment,
   cell, expiry, inclusive 630-second lifetime boundary, and 629-second reject.
-  The Redis challenge metadata freezes `ticket_jti` as its lookup key and binds
+  The challenge-store metadata freezes `ticket_jti` as its lookup key and binds
   that ticket to the authenticated peer key, devId, credential id, environment,
   and cell, with an exact one-field mismatch suite.
   `recomputed_credential_fence_b64` is the frozen expected result of the

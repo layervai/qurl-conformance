@@ -675,10 +675,10 @@ type AgentAssignmentOTPEnrollmentBinding struct {
 	MinimumTicketRemainingSeconds int64  `json:"minimum_ticket_remaining_seconds"`
 }
 
-// AgentAssignmentOTPChallengeBinding freezes the exact Redis challenge tuple.
+// AgentAssignmentOTPChallengeBinding freezes the exact challenge-store tuple.
 // TicketJTI is both the lookup key and a required stored value; every other
 // field must match the authenticated OTP request and verified ticket before a
-// later REG code can be accepted. This is metadata, not a Redis implementation.
+// later REG code can be accepted. This is metadata, not a storage implementation.
 type AgentAssignmentOTPChallengeBinding struct {
 	LookupKeyField                string   `json:"lookup_key_field"`
 	RequiredMatchFields           []string `json:"required_match_fields"`
@@ -1334,7 +1334,7 @@ func validateAgentAssignmentOTPChallengeBinding(
 		challenge.DevID != binding.RequestAgentID ||
 		challenge.CredentialKeyID != binding.RequestRegistrationKeyID ||
 		challenge.EnvironmentID != binding.LocalEnvironmentID || challenge.CellID != binding.LocalCellID {
-		return errors.New("conformance: account OTP Redis challenge binding drifted")
+		return errors.New("conformance: account OTP challenge-store binding drifted")
 	}
 	type expectation struct{ mutation, value string }
 	expected := map[string]expectation{
