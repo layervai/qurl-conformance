@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/layervai/qurl-conformance/compare/v0.3.0...v0.4.0) (2026-07-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** add account OTP assignment vectors ([#40](https://github.com/layervai/qurl-conformance/issues/40))
+
+### Features
+
+* **vectors:** add account OTP assignment vectors ([#40](https://github.com/layervai/qurl-conformance/issues/40)) ([25298f6](https://github.com/layervai/qurl-conformance/commit/25298f6223b451b012f236a2004c4b5c5a872dd5))
+
 ## [0.3.0](https://github.com/layervai/qurl-conformance/compare/v0.2.0...v0.3.0) (2026-07-16)
 
 
