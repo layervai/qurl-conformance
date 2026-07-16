@@ -292,7 +292,7 @@ func verifyGolden(publicKey *ecdsa.PublicKey, privateScalar *big.Int, af *confor
 	if base64.RawURLEncoding.EncodeToString(credentialHash[:]) != claimValues["credential_key_hash_b64"] {
 		return errors.New("golden synthetic credential hash disagrees with claims")
 	}
-	preimage := append(append([]byte(af.Contract.SigningDomain), 0), []byte(golden.ClaimsB64URL)...)
+	preimage := signingPreimage(af.Contract.SigningDomain, golden.ClaimsB64URL)
 	if hex.EncodeToString(preimage) != golden.SigningPreimageHex {
 		return errors.New("golden signing preimage disagrees")
 	}
@@ -473,8 +473,7 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 		}
 		switch c.Name {
 		case "altered_claims", "reordered_claims_original_signature":
-			preimage := append(append([]byte(af.Contract.SigningDomain), 0), []byte(c.ClaimsB64URL)...)
-			digest := sha256.Sum256(preimage)
+			digest := sha256.Sum256(signingPreimage(af.Contract.SigningDomain, c.ClaimsB64URL))
 			if verifyRawSignature(publicKey, digest[:], acceptRaw) {
 				return fmt.Errorf("reject %s still verifies", c.Name)
 			}
@@ -483,8 +482,8 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			if err != nil {
 				return err
 			}
-			correct := sha256.Sum256(append(append([]byte(af.Contract.SigningDomain), 0), []byte(af.Golden.ClaimsB64URL)...))
-			wrong := sha256.Sum256(append(append([]byte("qurl-agent-assignment-ticket-v0"), 0), []byte(af.Golden.ClaimsB64URL)...))
+			correct := sha256.Sum256(signingPreimage(af.Contract.SigningDomain, af.Golden.ClaimsB64URL))
+			wrong := sha256.Sum256(signingPreimage("qurl-agent-assignment-ticket-v0", af.Golden.ClaimsB64URL))
 			if verifyRawSignature(publicKey, correct[:], raw) || !verifyRawSignature(publicKey, wrong[:], raw) {
 				return errors.New("wrong-domain reject does not isolate domain separation")
 			}
@@ -539,7 +538,7 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 				return errors.New("wrong-audience reject does not reach the claims boundary")
 			}
 			signature, err := strictRawURL(c.SignatureB64URL)
-			digest := sha256.Sum256(append(append([]byte(af.Contract.SigningDomain), 0), []byte(c.ClaimsB64URL)...))
+			digest := sha256.Sum256(signingPreimage(af.Contract.SigningDomain, c.ClaimsB64URL))
 			if err != nil || !verifyRawSignature(publicKey, digest[:], signature) {
 				return errors.New("wrong-audience reject does not isolate the claims boundary")
 			}
@@ -573,6 +572,10 @@ func verifyRawSignature(publicKey *ecdsa.PublicKey, digest, raw []byte) bool {
 	}
 	der, err := asn1.Marshal(ecdsaSignature{R: new(big.Int).SetBytes(raw[:32]), S: new(big.Int).SetBytes(raw[32:])})
 	return err == nil && ecdsa.VerifyASN1(publicKey, digest, der)
+}
+
+func signingPreimage(domain, claimsB64URL string) []byte {
+	return append(append([]byte(domain), 0), []byte(claimsB64URL)...)
 }
 
 func verifyTrustKeyRejects(cases []conformance.AssignmentTicketTrustReject) error {
