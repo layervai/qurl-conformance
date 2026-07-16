@@ -23,6 +23,7 @@
     "./issuer_signature_vectors.json": "./vectors/issuer_signature_vectors.json",
     "./relay_knock_golden.json": "./vectors/relay_knock_golden.json",
     "./agent_registration_golden.json": "./vectors/agent_registration_golden.json",
+    "./agent_assignment_golden.json": "./vectors/agent_assignment_golden.json",
     "./agent_knock_application_vectors.json": "./vectors/agent_knock_application_vectors.json",
     "./agent_api_key_id_vectors.json": "./vectors/agent_api_key_id_vectors.json"
   },

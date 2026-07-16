@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -13,6 +13,7 @@ const (
 	issuerSignatureName       = "vectors/issuer_signature_vectors.json"
 	relayKnockName            = "vectors/relay_knock_golden.json"
 	agentRegistrationName     = "vectors/agent_registration_golden.json"
+	agentAssignmentName       = "vectors/agent_assignment_golden.json"
 	agentKnockApplicationName = "vectors/agent_knock_application_vectors.json"
 	agentAPIKeyIDName         = "vectors/agent_api_key_id_vectors.json"
 )
@@ -67,6 +68,17 @@ func AgentRegistrationVectors() []byte {
 	return b
 }
 
+// AgentAssignmentVectors returns the raw bytes of the deterministic NHP LST/LRT
+// assignment and registration-completion packets.
+func AgentAssignmentVectors() []byte {
+	b, err := vectorsFS.ReadFile(agentAssignmentName)
+	if err != nil {
+		// Unreachable: the file is embedded at build time.
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentAssignmentName, err))
+	}
+	return b
+}
+
 // AgentKnockApplicationVectors returns the raw bytes of the registered-agent
 // knock application-body vectors. Unlike RelayKnockVectors, this artifact starts
 // after Noise decryption and contains no packet bytes.
@@ -103,6 +115,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(relayKnockName)
 	case agentRegistrationName, "agent_registration_golden.json":
 		return vectorsFS.ReadFile(agentRegistrationName)
+	case agentAssignmentName, "agent_assignment_golden.json":
+		return vectorsFS.ReadFile(agentAssignmentName)
 	case agentKnockApplicationName, "agent_knock_application_vectors.json":
 		return vectorsFS.ReadFile(agentKnockApplicationName)
 	case agentAPIKeyIDName, "agent_api_key_id_vectors.json":
@@ -137,6 +151,12 @@ func RelayKnockGolden() (*RelayKnockFile, error) {
 // is not the expected artifact.
 func AgentRegistrationGolden() (*AgentRegistrationFile, error) {
 	return ParseAgentRegistrationFile(AgentRegistrationVectors())
+}
+
+// AgentAssignmentGolden strictly parses the embedded deterministic NHP LST/LRT
+// assignment and registration-completion artifact.
+func AgentAssignmentGolden() (*AgentAssignmentFile, error) {
+	return ParseAgentAssignmentFile(AgentAssignmentVectors())
 }
 
 // AgentKnockApplication strictly parses the embedded registered-agent knock

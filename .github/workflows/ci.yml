@@ -25,10 +25,14 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
-          check-latest: true
 
       - name: Root module — test/vet/fmt
         run: |
+          # go.mod is the root compatibility source of truth. This equality
+          # proves setup-go selected its exact patch rather than floating 1.26.x.
+          # It deliberately assumes go.mod has no toolchain directive.
+          expected_go="go$(awk '$1 == "go" { print $2 }' go.mod)"
+          test "$(go env GOVERSION)" = "$expected_go"
           go test ./...
           go vet ./...
           if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi
@@ -48,8 +52,22 @@ jobs:
       - name: Vector byte-identity (root == npm == python)
         run: bash scripts/check-sync.sh
 
+      - name: Legacy SDK verifier shares the root Go floor
+        run: |
+          root_go="$(awk '$1 == "go" { print $2 }' go.mod)"
+          sdk_go="$(awk '$1 == "go" { print $2 }' tools/verify-sdk/go.mod)"
+          test "$sdk_go" = "$root_go"
+
       - name: Cross-language compat (verify-sdk via qurl-go exported API)
         run: cd tools/verify-sdk && go test ./...
+
+      - name: Set up Go for assignment verifier
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: tools/verify-assignment/go.mod
+
+      - name: Assignment wire rebuild (merged qurl-go producer)
+        run: cd tools/verify-assignment && go test ./...
 
       - name: npm package smoke
         run: |
@@ -57,6 +75,7 @@ jobs:
           const c = require('./npm');
           const r = c.relayKnockVectors();
           const a = c.agentRegistrationVectors();
+          const s = c.agentAssignmentVectors();
           const k = c.agentKnockApplicationVectors();
           const i = c.agentApiKeyIdVectors();
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
@@ -72,8 +91,54 @@ jobs:
           // duplicate keys collapse last-wins and aliases remain unchecked.
           const lossyDuplicate = JSON.parse(requests.reject_duplicate_run_id.body_json);
           const uncheckedAlias = JSON.parse(requests.reject_alias_run_id.body_json);
+          const assignmentInitial = JSON.parse(s.initial_assignment.result.body_json).list;
+          const assignmentRefresh = JSON.parse(s.refresh_assignment.result.body_json).list;
+          const assignmentRegister = JSON.parse(s.assigned_cell_registration.request.body_json);
+          const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
+          const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
+          const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
+          const assignmentMalformed = Object.fromEntries(s.error_contract.malformed_cases.map(v => [v.name, v]));
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
+              s.schema_version !== 1 || s.initial_assignment.request.header_type !== 5 ||
+              JSON.stringify(s.public_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'account', 'agent']) ||
+              s.initial_assignment.result.header_type !== 6 ||
+              s.initial_assignment.request.counter !== s.initial_assignment.result.counter ||
+              s.assigned_cell_registration.request.header_type !== 13 ||
+              s.assigned_cell_registration.result.header_type !== 14 ||
+              s.assigned_cell_registration.request.counter !== s.assigned_cell_registration.result.counter ||
+              assignmentRegister.usrData.assignment_ticket !== assignmentInitial.assignment_ticket ||
+              assignmentRegister.otp !== JSON.parse(s.initial_assignment.request.body_json).usrData.credential ||
+              assignmentInitial.registration.masked_email !== undefined ||
+              assignmentRefresh.assignment_ticket !== undefined ||
+              assignmentRefresh.assignment_ticket_expires_at !== undefined ||
+              s.registration_completion.request.receiver_key !== 'assigned_cell' ||
+              JSON.parse(s.registration_completion.request.body_json).usrData.assignment_ticket !== undefined ||
+              JSON.stringify(Object.keys(assignmentCompletion).sort()) !== JSON.stringify(['device_api_key_id', 'query', 'version']) ||
+              s.request_cases.length !== 21 ||
+              assignmentRequests.reject_duplicate_outer_dev_id.reject_class !== 'body_parse' ||
+              assignmentRequests.reject_alias_outer_dev_id.reject_class !== 'unknown_field' ||
+              assignmentRequests.reject_client_public_key.reject_class !== 'unknown_field' ||
+              assignmentRequests.reject_refresh_assignment_ticket.reject_class !== 'unknown_field' ||
+              assignmentRequests.reject_duplicate_registration_ticket.reject_class !== 'body_parse' ||
+              assignmentRequests.reject_wrong_mode.reject_class !== 'semantic' ||
+              s.success_result_cases.length !== 12 ||
+              assignmentResults.reject_initial_private_key_kind.reject_class !== 'semantic' ||
+              JSON.parse(assignmentResults.reject_initial_private_key_kind.body_json).list.registration.key_kind !== 'tunnel_bootstrap' ||
+              assignmentResults.reject_initial_unknown_key_kind.reject_class !== 'semantic' ||
+              JSON.parse(assignmentResults.reject_initial_unknown_key_kind.body_json).list.registration.key_kind !== 'future_kind' ||
+              assignmentResults.reject_refresh_result_assignment_ticket.reject_class !== 'unknown_field' ||
+              assignmentResults.reject_completion_device_api_key.reject_class !== 'unknown_field' ||
+              assignmentResults.reject_completion_device_api_key_hash.reject_class !== 'unknown_field' ||
+              assignmentResults.reject_completion_device_key_commitment.reject_class !== 'unknown_field' ||
+              s.error_contract.status !== 'ready' || s.error_contract.producer_revision !== '9653fcb185c77629b787ad046c13c760baba88f4' ||
+              assignmentMalformed.reject_unknown_list_error_code.reject_class !== 'unknown_error_code' ||
+              assignmentMalformed.reject_unknown_registration_error_code.reject_class !== 'unknown_error_code' ||
+              s.error_contract.assignment_cases.length !== 6 ||
+              s.error_contract.initial_credential_cases.length !== 4 ||
+              s.error_contract.completion_cases.length !== 5 ||
+              s.error_contract.registration_cases.length !== 4 ||
+              s.error_contract.rules.cookie_challenge_allowed !== false ||
               k.schema_version !== 3 || k.request.fields.run_id !== canonical ||
               JSON.parse(k.request.body_json).runId !== canonical || k.request_cases.length !== 12 ||
               requests.canonical_run_id.native_connector.parsed_run_id !== canonical ||
@@ -124,6 +189,7 @@ jobs:
 
           r = q.relay_knock_vectors()
           a = q.agent_registration_vectors()
+          s = q.agent_assignment_vectors()
           k = q.agent_knock_application_vectors()
           i = q.agent_api_key_id_vectors()
           replies = {v['name']: v for v in k['reply_cases']}
@@ -138,6 +204,54 @@ jobs:
           assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
+          assert s['schema_version'] == 1
+          assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
+          assert s['initial_assignment']['request']['header_type'] == 5
+          assert s['initial_assignment']['result']['header_type'] == 6
+          assert s['initial_assignment']['request']['counter'] == s['initial_assignment']['result']['counter']
+          initial_assignment = json.loads(s['initial_assignment']['result']['body_json'])['list']
+          refresh_assignment = json.loads(s['refresh_assignment']['result']['body_json'])['list']
+          registration = json.loads(s['assigned_cell_registration']['request']['body_json'])
+          completion = json.loads(s['registration_completion']['result']['body_json'])['list']
+          assignment_requests = {v['name']: v for v in s['request_cases']}
+          assignment_results = {v['name']: v for v in s['success_result_cases']}
+          assignment_malformed = {v['name']: v for v in s['error_contract']['malformed_cases']}
+          assert s['assigned_cell_registration']['request']['header_type'] == 13
+          assert s['assigned_cell_registration']['result']['header_type'] == 14
+          assert s['assigned_cell_registration']['request']['counter'] == s['assigned_cell_registration']['result']['counter']
+          assert registration['usrData']['assignment_ticket'] == initial_assignment['assignment_ticket']
+          assert registration['otp'] == json.loads(s['initial_assignment']['request']['body_json'])['usrData']['credential']
+          assert 'masked_email' not in initial_assignment['registration']
+          assert 'assignment_ticket' not in refresh_assignment
+          assert 'assignment_ticket_expires_at' not in refresh_assignment
+          assert s['registration_completion']['request']['receiver_key'] == 'assigned_cell'
+          assert 'assignment_ticket' not in json.loads(s['registration_completion']['request']['body_json'])['usrData']
+          assert set(completion) == {'query', 'version', 'device_api_key_id'}
+          assert len(s['request_cases']) == 21
+          assert assignment_requests['reject_duplicate_outer_dev_id']['reject_class'] == 'body_parse'
+          assert assignment_requests['reject_alias_outer_dev_id']['reject_class'] == 'unknown_field'
+          assert assignment_requests['reject_client_public_key']['reject_class'] == 'unknown_field'
+          assert assignment_requests['reject_refresh_assignment_ticket']['reject_class'] == 'unknown_field'
+          assert assignment_requests['reject_duplicate_registration_ticket']['reject_class'] == 'body_parse'
+          assert assignment_requests['reject_wrong_mode']['reject_class'] == 'semantic'
+          assert len(s['success_result_cases']) == 12
+          assert assignment_results['reject_initial_private_key_kind']['reject_class'] == 'semantic'
+          assert json.loads(assignment_results['reject_initial_private_key_kind']['body_json'])['list']['registration']['key_kind'] == 'tunnel_bootstrap'
+          assert assignment_results['reject_initial_unknown_key_kind']['reject_class'] == 'semantic'
+          assert json.loads(assignment_results['reject_initial_unknown_key_kind']['body_json'])['list']['registration']['key_kind'] == 'future_kind'
+          assert assignment_results['reject_refresh_result_assignment_ticket']['reject_class'] == 'unknown_field'
+          assert assignment_results['reject_completion_device_api_key']['reject_class'] == 'unknown_field'
+          assert assignment_results['reject_completion_device_api_key_hash']['reject_class'] == 'unknown_field'
+          assert assignment_results['reject_completion_device_key_commitment']['reject_class'] == 'unknown_field'
+          assert s['error_contract']['status'] == 'ready'
+          assert s['error_contract']['producer_revision'] == '9653fcb185c77629b787ad046c13c760baba88f4'
+          assert assignment_malformed['reject_unknown_list_error_code']['reject_class'] == 'unknown_error_code'
+          assert assignment_malformed['reject_unknown_registration_error_code']['reject_class'] == 'unknown_error_code'
+          assert len(s['error_contract']['assignment_cases']) == 6
+          assert len(s['error_contract']['initial_credential_cases']) == 4
+          assert len(s['error_contract']['completion_cases']) == 5
+          assert len(s['error_contract']['registration_cases']) == 4
+          assert s['error_contract']['rules']['cookie_challenge_allowed'] is False
           assert k['schema_version'] == 3 and k['request']['fields']['run_id'] == canonical
           assert json.loads(k['request']['body_json'])['runId'] == canonical
           assert len(k['request_cases']) == 12

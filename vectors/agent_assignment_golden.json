@@ -1,0 +1,796 @@
+{
+  "artifact": "qurl-agent-assignment-golden-vectors",
+  "schema_version": 1,
+  "description": "Deterministic NHP hub-to-cell enrollment packets for initial and refreshed assignment, assigned-cell REG activation with an opaque one-shot ticket, and assigned-cell registration completion with an SDK-generated persisted device API-key candidate; plus strict request-rejection cases and the closed v1 application-error taxonomy.",
+  "source_of_truth": "github.com/layervai/qurl-conformance",
+  "notes": [
+    "Every success-path request and result is DETERMINISTIC. A conformant implementation MUST reproduce packet_hex byte-for-byte from the named sender/receiver keys, fixed ephemeral_priv_hex, timestamp_nanos, counter, preamble_hex, and the exact UTF-8 bytes in body_json. body_hex is those same body_json bytes encoded as lowercase hex.",
+    "NHP_LST is header type 5, NHP_LRT is type 6, NHP_REG is type 13, and NHP_RAK is type 14. Every result counter exactly echoes its request counter. LST/LRT never uses NHP_COK; pre-handler overload shedding appears as a timeout governed only by the SDK's bounded transaction retry.",
+    "Packet timestamp_nanos values and the RFC3339 expiry deadlines are independent deterministic synthetic clocks: the packet timestamp need not align with either deadline, while assignment_ticket_expires_at MUST precede lease_expires_at. They pin their respective wire encodings and ordering rule, not a shared wall-clock narrative.",
+    "initial_assignment and refresh_assignment target the bootstrap hub. The initial hub request presents the unregistered agent public key at the Noise layer and a credential in usrData; the hub plugin hashes and validates that credential and derives owner identity rather than trusting usrId. Supporting that request requires the hub endpoint's deliberate unregistered-LST validation posture.",
+    "The initial assignment result alone supplies registration metadata and an opaque short-lived assignment_ticket. assigned_cell_registration carries that exact ticket in REG usrData and targets the public key returned by assignment. The server consumes the ticket one-shot in the atomic registration activation transaction. Ordinary refresh returns only the sticky assignment/binding and never issues a registration ticket.",
+    "The bootstrap/preissued success path registers directly with NHP_REG and does not send NHP_OTP. Optional account-enrollment OTP remains outside this artifact until the producer exposes the exact authenticated OTP request body; that optional path does not block the eight standard lifecycle packets.",
+    "registration_completion targets assigned_cell after the successful RAK. It authenticates the now-registered Noise public key, exact final devId, and current assignment/cell fence. The REG-consumed ticket is intentionally absent from completion.",
+    "The completion request carries an SDK-generated synthetic device_api_key candidate. The SDK MUST durably persist the candidate before its first send. The service atomically stores its hash plus an issued sentinel; retrying with the same candidate returns the same device_api_key_id, while a different candidate conflicts.",
+    "The completion result list contains exactly query, version, and device_api_key_id; it carries no agent metadata, device_api_key secret, secret-derived hash, or candidate commitment. Assignment results never echo the initial credential. Consumers must explicitly assert both non-echo properties.",
+    "The public initial-assignment registration.key_kind vocabulary is exactly bootstrap, connector_bootstrap, account, and agent. tunnel_bootstrap is a private control-plane key_type and MUST NOT cross the LRT wire.",
+    "request_cases and success_result_cases are authenticated application-body trust-boundary tests. success_result_cases means rejects against the success-envelope grammar, so every case in that array deliberately has outcome reject. Producers feed each exact body_json through the same duplicate-aware, exact-case-key, unknown-field-rejecting parser and typed semantic validator used in production; they must derive owner, agent public key, assigned cell, and endpoint only from authenticated server state, never client-supplied placement fields.",
+    "Reject classes are consumer-neutral: body_parse covers invalid, duplicate-key, or trailing JSON; unknown_field covers any non-contract or wrong-case key; missing_field covers an absent required key; wrong_type covers a non-object or typed-field mismatch; semantic covers a structurally valid but disallowed value; list_on_error forbids list on an error result; retry_after_missing, retry_after_invalid, and retry_after_unexpected enforce retryAfterSeconds policy; unknown_error_code rejects any unreserved code.",
+    "list_on_error applies to NHP_LRT, whose success grammar owns list but error results must omit it. NHP_RAK has no list field in either success or error grammar, so a RAK list is classified as unknown_field instead.",
+    "error_contract is application-layer behavioral data pinned to the merged production NHP common-wire revision that reserves these codes and emits retryAfterSeconds. Consumers feed every body_json through the same strict parser and typed classifier used in production, rather than trusting outcome. Errors omit list; unknown codes reject; errMsg is diagnostic only; retryAfterSeconds is optional only for 52200/52300, required for 52204, forbidden elsewhere, and positive when present.",
+    "Tickets, identifiers, credentials, keys, hosts, timestamps, and error messages in this artifact are synthetic conformance values. The two exact production-shaped values deliberately retain live credential grammar while the conformance infix makes them non-secret fixtures. The hosted scanner uses no fixture allowlist; downstream scanners that need an exception must allow only lv_live_conformance_bootstrap_secret_0001 and lv_live_conformance_device_secret_0001, never a prefix wildcard. Ticket strings are opaque test data and do not prescribe a ticket encoding."
+  ],
+  "public_registration_key_kinds": [
+    "bootstrap",
+    "connector_bootstrap",
+    "account",
+    "agent"
+  ],
+  "keys": {
+    "hub": {
+      "static_priv_hex": "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "static_pub_hex": "4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c"
+    },
+    "assigned_cell": {
+      "static_priv_hex": "3132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f50",
+      "static_pub_hex": "5f09b7f97a40b50220697064b43b27411b07a4aa1fe05370b27519826983d30d"
+    },
+    "agent": {
+      "static_priv_hex": "5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f70",
+      "static_pub_hex": "0233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614"
+    }
+  },
+  "initial_assignment": {
+    "request": {
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "sender_key": "agent",
+      "receiver_key": "hub",
+      "ephemeral_priv_hex": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+      "timestamp_nanos": "1700000000000000000",
+      "counter": "21",
+      "preamble_hex": "a1b2c3d4",
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "body_hex": "7b227573724964223a22222c226465764964223a226167656e742d636f6e666f726d222c226173704964223a226167656e74222c2275737244617461223a7b227175657279223a2263656c6c5f61737369676e6d656e74222c2276657273696f6e223a312c226d6f6465223a22656e726f6c6c222c2263726564656e7469616c223a226c765f6c6976655f636f6e666f726d616e63655f626f6f7473747261705f7365637265745f30303031227d7d",
+      "packet_hex": "a1b2c3d4a1b7c36b01000000000000000000000000000015ad438bfae31f6c093d61d4339255ea798092c9fadd07b97827f4b0ae9dee7c1c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076f7a0dd2a35124070b7059730d467b906444ad5231d52b1a137fe83f7a3542d020a27c99f584b5b7fefa911479da17a5549f7650dd1b3e070037832f2411b2fca29d71fb68614246d452a564d4fbddad6996497c8cfa39be73aba852011e8c27330c87405d89b5005bd280e20841db1fef17bcc862dcba0c8440946f9831382619f936679e30b45278960d5e1362cc24b3c68ca49c80d702a9b5cb5db808498dceca8cdd560cb570c977e3a315092f7aee63e04d81b35687051c14be6107ae2acdcb1f079e5b45cc195a3ea8c4facc31d7503aa697c95f209f443dfc79163d9de2576ca5a9ea015da27427d054afc56f41a2db55251350f2fc1e4f33c53318112250155c6fafc29a015b20108935b24a7ca9dcadc6d167bd88b23bfc46e03da8a44f91eb7ac93"
+    },
+    "result": {
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "sender_key": "hub",
+      "receiver_key": "agent",
+      "ephemeral_priv_hex": "b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0",
+      "timestamp_nanos": "1700000000000001000",
+      "counter": "21",
+      "preamble_hex": "b1c2d3e4",
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_BsT4rP8wXn6Q\",\"key_kind\":\"bootstrap\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}",
+      "body_hex": "7b22657272436f6465223a2230222c226c697374223a7b227175657279223a2263656c6c5f61737369676e6d656e74222c2276657273696f6e223a312c226d6f6465223a22656e726f6c6c222c226167656e745f6964223a226167656e742d636f6e666f726d222c22726567697374726174696f6e223a7b226b65795f6964223a226b65795f4273543472503877586e3651222c226b65795f6b696e64223a22626f6f747374726170227d2c2261737369676e6d656e74223a7b2263656c6c5f6964223a2263656c6c30222c2261737369676e6d656e745f67656e65726174696f6e223a312c22656e64706f696e745f7265766973696f6e223a312c226c656173655f657870697265735f6174223a22323032362d30372d31365431323a30303a30305a222c226e68705f7564705f656e64706f696e74223a7b22686f7374223a2263656c6c302e6e68702e6c61796572762e6169222c22706f7274223a36323230362c227365727665725f7075626c69635f6b65795f623634223a2258776d332b587041745149676158426b7444736e51527348704b6f6634464e77736e555a676d6d443077303d227d7d2c2261737369676e6d656e745f7469636b6574223a22636f6e666f726d616e63652d61737369676e6d656e742d7469636b65742d30303031222c2261737369676e6d656e745f7469636b65745f657870697265735f6174223a22323032362d30372d31355432333a31353a30305a227d7d",
+      "packet_hex": "b1c2d3e4b1c4d1c901000000000000000000000000000015cd700e88f9e99b19c1a8a8dcd58182fd101e5e032a69ce317fde23e8ee265c510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000055b960db8374a78b92e99dd7a783b6c323cf235923b4fa67967497c96b036396b3636032eb1358e174fa0ca2da5a2b56a04397d03151ee1f1d3210903f6690c4eac13073ab464a34614b6906cc64185ad46830d3ddbe6899ec74a997805eaacce7e8a24f341a47eeb80b2393cc0327f8685442fccf91e028a95898747144ea0b0f22268e81563cf7f691ae5549ca4ce1147396e0a8bbbdf685fa46f8982d07a78a6fd489da28ced673c60e7f0a2b5a42df7975b0eee793b4734318c986610ff377dd3a42205c9299fc59326f2a4ecbf04ba5286fa0bc4bc56a878962373fcaaf48257691971f806010df15cd98d65293cac4d19d332fdb199c44bb09436c7660c239a1345e864a39b8d9104dc497805aa559fae5faa6e7d29565514a3fd8a29c5e562f07df47d12133123f0c5ea9043a1358812d58f55d0d1b92e5a6d69cefab98e9e538e582bb4aac2b399e5429e8592fa69a7f7d9a202340201b296cb4a0ba7e606eba9f2124a5c84b620c809c22b2b6199d5b4ed83b27efc6fa28c882f9128df8a55d649c1fe9ef98581c1350b7902263c70f75b111ca9e355f2fc2abe11108254cd3280d717dcbe08cf161b3ebfc4cbcde032dc01152b6e068a206f7af49bc949aee2d07ec935087ed10ee617cf6f216dac277ec1f0582941d01fdf06c8f4edfbb4c9bc4b9408e60e1daf60e7b74afca2c15d5f2aa8b3b0b55b29868d3b536147891761ae5d7f57e0ea229f6f5f6ae6a3ec6766c1066392d5d590ae637dada5421e3a2222547bb2f9c8c0128e6c4df3d198208de826d044c172b04d9776badcb2dcd14e18bacd634ff238c0e2a8220370a49bd998bf582f1d0a230cf53d4e6ef777ebb901386bfadc962b5cc6bd214322707754271dacfca66d7ca4ae08b8d82ae823eac8cc2c0921397e85d681a76424dccf"
+    }
+  },
+  "refresh_assignment": {
+    "request": {
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "sender_key": "agent",
+      "receiver_key": "hub",
+      "ephemeral_priv_hex": "c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0",
+      "timestamp_nanos": "1700000000000002000",
+      "counter": "22",
+      "preamble_hex": "c1d2e3f4",
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\"}}",
+      "body_hex": "7b227573724964223a22222c226465764964223a226167656e742d636f6e666f726d222c226173704964223a226167656e74222c2275737244617461223a7b227175657279223a2263656c6c5f61737369676e6d656e74222c2276657273696f6e223a312c226d6f6465223a2272656672657368227d7d",
+      "packet_hex": "c1d2e3f4c1d7e373010000000000000000000000000000163a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe240000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e51c96e754bba5426ed4b5d6cf38cb3c173568c29010c70049925f42dd10c0c1cecf72766c7475288fd5da54d18c2cf7f6656361fcaefc4c25c8f5069da44db732656a2e235c72127c6e30dd29dab6b765b072e3c4283160ec0045c5079873726e613a4f21f6375d7a4506763d3ca4903fad7d9ec9dc7d8867e757f4418de9f9e099a43feea07622ead680b01a69a3446b2f09ce44db6b01d33ac8cc014e90937150c979457b11ac6b7922121fc6ede1a9d232a7686f583a4d08e8b5c8e47da09583b5c121a90df28502b0bbd0341eb50433fd794136838c14ee52d66cb51d54b5b1686230d12002a5705e3bec8066"
+    },
+    "result": {
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "sender_key": "hub",
+      "receiver_key": "agent",
+      "ephemeral_priv_hex": "d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0",
+      "timestamp_nanos": "1700000000000003000",
+      "counter": "22",
+      "preamble_hex": "d1e2f304",
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"agent_id\":\"agent-conform\",\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}}}}",
+      "body_hex": "7b22657272436f6465223a2230222c226c697374223a7b227175657279223a2263656c6c5f61737369676e6d656e74222c2276657273696f6e223a312c226d6f6465223a2272656672657368222c226167656e745f6964223a226167656e742d636f6e666f726d222c2261737369676e6d656e74223a7b2263656c6c5f6964223a2263656c6c30222c2261737369676e6d656e745f67656e65726174696f6e223a312c22656e64706f696e745f7265766973696f6e223a312c226c656173655f657870697265735f6174223a22323032362d30372d31365431323a30303a30305a222c226e68705f7564705f656e64706f696e74223a7b22686f7374223a2263656c6c302e6e68702e6c61796572762e6169222c22706f7274223a36323230362c227365727665725f7075626c69635f6b65795f623634223a2258776d332b587041745149676158426b7444736e51527348704b6f6634464e77736e555a676d6d443077303d227d7d7d7d",
+      "packet_hex": "d1e2f304d1e4f27f0100000000000000000000000000001621c3332b61be6a7b6ab8461e155651b17501b6e07532ecf9ab6661bd5a2ca57500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008ef774a4046c4f64f6254f90d397ff6c137413f3864b18717c360f460e432ddad079e1d6be5d4f861dcbb8149c317a6386ac963ed8b2381dbfb60a59972b84b001295d93e6b6f7ed3e53f46a2fb3a63a3fc39b5d9d6a060e0275c7f20b6d2c50bf3225fad5ca2846437c41b82c43250e92e14aad327923b697be71a2776c6fe845ba5e79ff44dafdae7d8009c2462519f128fe0ff9c34a4209e03c9bea8e0c0a78b6fea2a556f7346308d5a3190067d5e857374f6f1d93ab6a757c6a3d8dfd040fc75c6c76e3ae8cdc3075a58a06112f8d1d5996140b86c5cb47b081165781f7dfa2cba52cbc00935e6b39511331571943fbf88681c7a07b4f3349b99e6548652c675d345b63f42d1a6d9dfa7ed0f11e32df80fb5c041e1817bd4380d519140f75bce888e247cb8223347454ba62756b911cc713da83863373aa109bd283457f9ecedbf76cf39b02f85222aab7465e53351da995d3f7e8c682cdda3f929f779ea014d9f6278aff43d2dd9ba8bdaf9ead915802659d5a0c83cb0e371f686f6552be6909e1709b0b8d18fc68bb3de49eb24aad450df2a57170615934c1f388be48aa053e939a022f459446f44fefd89634ab874322d6240b2f7e835e7d1a4190de8073906dc1933654852910f1571d8d290f06d202250e4e91af4eb4cadbc304e20f2d64"
+    }
+  },
+  "assigned_cell_registration": {
+    "request": {
+      "header_name": "NHP_REG",
+      "header_type": 13,
+      "sender_key": "agent",
+      "receiver_key": "assigned_cell",
+      "ephemeral_priv_hex": "9192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0",
+      "timestamp_nanos": "1700000000000004000",
+      "counter": "23",
+      "preamble_hex": "91a2b3c4",
+      "body_json": "{\"usrId\":\"key_BsT4rP8wXn6Q\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"otp\":\"lv_live_conformance_bootstrap_secret_0001\",\"usrData\":{\"hostname\":\"conformance-host\",\"version\":\"0.0.0-conformance\",\"assignment_ticket\":\"conformance-assignment-ticket-0001\"}}",
+      "body_hex": "7b227573724964223a226b65795f4273543472503877586e3651222c226465764964223a226167656e742d636f6e666f726d222c226173704964223a226167656e74222c226f7470223a226c765f6c6976655f636f6e666f726d616e63655f626f6f7473747261705f7365637265745f30303031222c2275737244617461223a7b22686f73746e616d65223a22636f6e666f726d616e63652d686f7374222c2276657273696f6e223a22302e302e302d636f6e666f726d616e6365222c2261737369676e6d656e745f7469636b6574223a22636f6e666f726d616e63652d61737369676e6d656e742d7469636b65742d30303031227d7d",
+      "packet_hex": "91a2b3c491afb2c3010000000000000000000000000000179cced751b301bbd16c4fb8deddd82f18925d71ed90c844fa0158f845b0fa7f4b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a483a9df2af0ef7658140aba15ab278a127cd15d4c86f57f58bd1cf6971f88243f829b394c1a7ef30809bbf921ebaf9e2206ee8299aa289725b49d2952c5461769b389b4a7879344e4c478966a909f7ba2602f07a78f65ed0784f7c819d7c836894593d0cf80aecfa97199ddbd2adba96c8575510489ee12816d60f5939675df8189fbf371b2b0115a496621a628cccbd28a696fd17bea6216d90d502ae2b62f739b84dd69b3ab580d56d1a1e98470f7ce7cefc7eced63cd633c331de3f5fe7a4cf35f9bc61e41119dd65376793b386717a709277f65673416e6b2d4b0cd5102e1d526763e8007953d12355b425e75032b10a550cb887ab497f8f7d7498bd9dad7a2deb4ec5739790d1eb81926b1554484d08f023d10646d574958930181893fb327b357ca293595510f8c6c38849a0d68ac80cf2fae5cf77bebbb4ba1dd1030a85bfa88bdd24a383f6b1486f60d1d0509485c66e64296720a1b843273e53d48db41a7a8eaf2fc800bed634dac2b8d"
+    },
+    "result": {
+      "header_name": "NHP_RAK",
+      "header_type": 14,
+      "sender_key": "assigned_cell",
+      "receiver_key": "agent",
+      "ephemeral_priv_hex": "8182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0",
+      "timestamp_nanos": "1700000000000005000",
+      "counter": "23",
+      "preamble_hex": "8192a3b4",
+      "body_json": "{\"errCode\":\"0\",\"aspId\":\"agent\"}",
+      "body_hex": "7b22657272436f6465223a2230222c226173704964223a226167656e74227d",
+      "packet_hex": "8192a3b4819ca39b01000000000000000000000000000017883186b800b41d5cf0429695da9b3cc4f328ebcd184a6e482fa578c103f06c7700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e7c4bfae383ace88404c724f88175cc02932db89c8d78f06476637aef56678be92b0e592dff106b5cd90588c0d8f8cca8efe3ed92b4bd6b819f38b8f4d95b47fb74a09ef950cc8e0c945c01eb7b56f2674ab7172646fc56aef7842f9942475fdff35bba2129c5c5c8ccb646bfbffcba31e1945c54c1c369d84394802f13080ca894f87a5f261b1b65c364771aa4cc282c72df4733072e"
+    }
+  },
+  "registration_completion": {
+    "request": {
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "sender_key": "agent",
+      "receiver_key": "assigned_cell",
+      "ephemeral_priv_hex": "e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff00",
+      "timestamp_nanos": "1700000000000006000",
+      "counter": "24",
+      "preamble_hex": "e1f20314",
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key\":\"lv_live_conformance_device_secret_0001\"}}",
+      "body_hex": "7b227573724964223a22222c226465764964223a226167656e742d636f6e666f726d222c226173704964223a226167656e74222c2275737244617461223a7b227175657279223a226167656e745f726567697374726174696f6e5f636f6d706c6574696f6e222c2276657273696f6e223a312c226465766963655f6170695f6b6579223a226c765f6c6976655f636f6e666f726d616e63655f6465766963655f7365637265745f30303031227d7d",
+      "packet_hex": "e1f20314e1f703aa01000000000000000000000000000018489cebba7a166c619835fe12eedc581dbfc1b36de10c830e4f0bc1c48734864b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000090484b126cbc7d2dc88724375b1e9ec14b0c972fa12ef2674babc6f4b2604711a325fdd05dd295291e6b8759a3196fbc21f86f675540a051c6930ccc629035ca8275e48589a8ca3cdea1c6f01fd32fa39ad2ac018ca3f78ea55b59877276b09564827c8b1c9ffef2ced2a262a1fe561a96f3de3131341e8f448801fc46358997effda48e740efa765da3730eb648ebf20784a21aa855927d7a03f2359600896ded9b082ccbfd36547f2779d499a02565d44b37245bde281b0f1fef1ad03917b1d663344e97442811c0e3e1caf9f5f264855203dcfbc93d833635f6790bd3d28a315285856c4e4774438063526e5a1a27685abb147e4b47469215eae355a516560068f56dd28951d2b6ad0d07fd1e4001164ea7737543f1f2773534aaf0bd6b24c08f53be00ff"
+    },
+    "result": {
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "sender_key": "assigned_cell",
+      "receiver_key": "agent",
+      "ephemeral_priv_hex": "f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f10",
+      "timestamp_nanos": "1700000000000007000",
+      "counter": "24",
+      "preamble_hex": "f1021324",
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key_id\":\"key_DvK9mN2pQr7S\"}}",
+      "body_hex": "7b22657272436f6465223a2230222c226c697374223a7b227175657279223a226167656e745f726567697374726174696f6e5f636f6d706c6574696f6e222c2276657273696f6e223a312c226465766963655f6170695f6b65795f6964223a226b65795f44764b396d4e327051723753227d7d",
+      "packet_hex": "f1021324f10413a70100000000000000000000000000001835fdea9e30d3a32c8c366dd18e1eee4c13266995fd5c1c04ea694206cea3087c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d3eb644f8e7ee3736c91cf55339b6c0478b894448f6b0b25fd451ae18a16e7ee2e6b096e424995ff7dc03231db0b77dbcc35f95775956b86bfe8eedcacef66eb99b15200f2b1a4cd208cf1ad56795ee8546034e224f2e4f90d3b90d7751e883dbd84341671262d150e86b2a57d7520df58cc2fd429e9cb1bd5fdfbc8e20d0c096a552380802bf509cbd4668d46138800f33cf861c82bd17e607d37335291a3a2c6b38dce96c3edb6d4918c05d5092fe6a482315fb574f677b53a1a3a328cf4eb916d8d71a520b3ac078cfa45434fd776614f2f51f2a3ed9031a65ac595abf385de4eedf7b19d6d545d865c"
+    }
+  },
+  "request_cases": [
+    {
+      "name": "reject_duplicate_outer_dev_id",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"devId\":\"attacker\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_duplicate_initial_credential",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\",\"credential\":\"attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_alias_outer_dev_id",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devID\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_alias_initial_query",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"Query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_missing_initial_credential",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\"}}",
+      "outcome": "reject",
+      "reject_class": "missing_field"
+    },
+    {
+      "name": "reject_client_owner_id",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\",\"owner_id\":\"owner-attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_client_public_key",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\",\"public_key\":\"attacker-key\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_client_cell_id",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\",\"cell_id\":\"cell-attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_client_endpoint",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\",\"nhp_udp_endpoint\":{\"host\":\"attacker.invalid\",\"port\":62206}}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_trailing_initial_value",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_null_usr_data",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":null}",
+      "outcome": "reject",
+      "reject_class": "wrong_type"
+    },
+    {
+      "name": "reject_non_object_usr_data",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":[]}",
+      "outcome": "reject",
+      "reject_class": "wrong_type"
+    },
+    {
+      "name": "reject_refresh_credential",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"credential\":\"replayed-secret\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_refresh_assignment_ticket",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"assignment_ticket\":\"replayed-ticket\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_completion_assignment_ticket",
+      "phase": "registration_completion",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key\":\"lv_live_conformance_device_secret_0001\",\"assignment_ticket\":\"replayed-ticket\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_duplicate_completion_device_api_key",
+      "phase": "registration_completion",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key\":\"lv_live_conformance_device_secret_0001\",\"device_api_key\":\"attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_duplicate_registration_ticket",
+      "phase": "assigned_cell_registration",
+      "header_name": "NHP_REG",
+      "header_type": 13,
+      "body_json": "{\"usrId\":\"key_BsT4rP8wXn6Q\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"otp\":\"lv_live_conformance_bootstrap_secret_0001\",\"usrData\":{\"hostname\":\"conformance-host\",\"version\":\"0.0.0-conformance\",\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket\":\"attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_registration_client_placement",
+      "phase": "assigned_cell_registration",
+      "header_name": "NHP_REG",
+      "header_type": 13,
+      "body_json": "{\"usrId\":\"key_BsT4rP8wXn6Q\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"otp\":\"lv_live_conformance_bootstrap_secret_0001\",\"usrData\":{\"hostname\":\"conformance-host\",\"version\":\"0.0.0-conformance\",\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"cell_id\":\"cell-attacker\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_wrong_query",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"attacker_query\",\"version\":1,\"mode\":\"enroll\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    },
+    {
+      "name": "reject_wrong_version",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":2,\"mode\":\"refresh\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    },
+    {
+      "name": "reject_wrong_mode",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LST",
+      "header_type": 5,
+      "body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"move\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    }
+  ],
+  "success_result_cases": [
+    {
+      "name": "reject_duplicate_initial_err_code",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"errCode\":\"0\",\"list\":{}}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_alias_initial_err_code",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"ErrCode\":\"0\",\"list\":{}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_missing_initial_list",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\"}",
+      "outcome": "reject",
+      "reject_class": "missing_field"
+    },
+    {
+      "name": "reject_initial_private_key_kind",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_BsT4rP8wXn6Q\",\"key_kind\":\"tunnel_bootstrap\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    },
+    {
+      "name": "reject_initial_unknown_key_kind",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_BsT4rP8wXn6Q\",\"key_kind\":\"future_kind\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    },
+    {
+      "name": "reject_null_refresh_list",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":null}",
+      "outcome": "reject",
+      "reject_class": "wrong_type"
+    },
+    {
+      "name": "reject_refresh_result_assignment_ticket",
+      "phase": "refresh_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"agent_id\":\"agent-conform\",\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"forbidden-ticket\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_completion_list_type",
+      "phase": "registration_completion",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":[]}",
+      "outcome": "reject",
+      "reject_class": "wrong_type"
+    },
+    {
+      "name": "reject_completion_device_api_key",
+      "phase": "registration_completion",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key_id\":\"key_DvK9mN2pQr7S\",\"device_api_key\":\"forbidden-secret\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_completion_device_api_key_hash",
+      "phase": "registration_completion",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key_id\":\"key_DvK9mN2pQr7S\",\"device_api_key_hash\":\"forbidden-hash\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_completion_device_key_commitment",
+      "phase": "registration_completion",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key_id\":\"key_DvK9mN2pQr7S\",\"device_api_key_commitment\":\"forbidden-commitment\"}}",
+      "outcome": "reject",
+      "reject_class": "unknown_field"
+    },
+    {
+      "name": "reject_trailing_registration_result",
+      "phase": "assigned_cell_registration",
+      "header_name": "NHP_RAK",
+      "header_type": 14,
+      "body_json": "{\"errCode\":\"0\",\"aspId\":\"agent\"}{}",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    }
+  ],
+  "error_contract": {
+    "status": "ready",
+    "producer_revision": "9653fcb185c77629b787ad046c13c760baba88f4",
+    "rules": {
+      "list_error_header_name": "NHP_LRT",
+      "list_error_header_type": 6,
+      "registration_error_header_name": "NHP_RAK",
+      "registration_error_header_type": 14,
+      "list_omitted_on_error": true,
+      "cookie_challenge_allowed": false,
+      "retry_after_seconds_permitted_codes": [
+        "52200",
+        "52204",
+        "52300"
+      ],
+      "retry_after_seconds_required_codes": [
+        "52204"
+      ],
+      "retry_after_seconds_positive_integer": true,
+      "err_msg_controls_policy": false
+    },
+    "assignment_cases": [
+      {
+        "name": "assignment_unavailable",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52200\",\"errMsg\":\"assignment temporarily unavailable\"}",
+        "err_code": "52200",
+        "outcome": "retry"
+      },
+      {
+        "name": "identity_rejected",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52201\",\"errMsg\":\"assignment identity rejected\"}",
+        "err_code": "52201",
+        "outcome": "identity_rejected"
+      },
+      {
+        "name": "reassignment_in_progress",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52202\",\"errMsg\":\"reassignment in progress\"}",
+        "err_code": "52202",
+        "outcome": "reassignment_required"
+      },
+      {
+        "name": "assignment_quota_exceeded",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52203\",\"errMsg\":\"assignment quota exceeded\"}",
+        "err_code": "52203",
+        "outcome": "quota_exceeded"
+      },
+      {
+        "name": "assignment_rate_limited",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52204\",\"errMsg\":\"assignment rate limited\",\"retryAfterSeconds\":60}",
+        "err_code": "52204",
+        "outcome": "rate_limited",
+        "retry_after_seconds": 60
+      },
+      {
+        "name": "invalid_assignment_request",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52205\",\"errMsg\":\"invalid assignment request\"}",
+        "err_code": "52205",
+        "outcome": "invalid_request"
+      }
+    ],
+    "initial_credential_cases": [
+      {
+        "name": "invalid_api_key",
+        "phase": "initial_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52106\",\"errMsg\":\"API key invalid\"}",
+        "err_code": "52106",
+        "outcome": "key_rejected"
+      },
+      {
+        "name": "registration_disabled",
+        "phase": "initial_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52107\",\"errMsg\":\"registration disabled\"}",
+        "err_code": "52107",
+        "outcome": "registration_disabled"
+      },
+      {
+        "name": "bootstrap_consumed",
+        "phase": "initial_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52108\",\"errMsg\":\"bootstrap key already consumed\"}",
+        "err_code": "52108",
+        "outcome": "bootstrap_consumed"
+      },
+      {
+        "name": "invalid_input",
+        "phase": "initial_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52109\",\"errMsg\":\"invalid enrollment input\"}",
+        "err_code": "52109",
+        "outcome": "invalid_request"
+      }
+    ],
+    "completion_cases": [
+      {
+        "name": "completion_unavailable",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52300\",\"errMsg\":\"completion temporarily unavailable\",\"retryAfterSeconds\":5}",
+        "err_code": "52300",
+        "outcome": "retry",
+        "retry_after_seconds": 5
+      },
+      {
+        "name": "completion_identity_rejected",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52301\",\"errMsg\":\"completion identity rejected\"}",
+        "err_code": "52301",
+        "outcome": "identity_rejected"
+      },
+      {
+        "name": "device_credential_quota_exceeded",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52302\",\"errMsg\":\"device credential quota exceeded\"}",
+        "err_code": "52302",
+        "outcome": "quota_exceeded"
+      },
+      {
+        "name": "device_credential_conflict",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52303\",\"errMsg\":\"different device credential candidate already recorded\"}",
+        "err_code": "52303",
+        "outcome": "credential_conflict"
+      },
+      {
+        "name": "invalid_completion_request",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52304\",\"errMsg\":\"invalid completion request\"}",
+        "err_code": "52304",
+        "outcome": "invalid_request"
+      }
+    ],
+    "registration_cases": [
+      {
+        "name": "registration_identity_conflict",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52103\",\"errMsg\":\"device identity already enrolled elsewhere\",\"aspId\":\"agent\"}",
+        "err_code": "52103",
+        "outcome": "identity_conflict"
+      },
+      {
+        "name": "assignment_ticket_invalid",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52110\",\"errMsg\":\"assignment ticket invalid\",\"aspId\":\"agent\"}",
+        "err_code": "52110",
+        "outcome": "ticket_invalid"
+      },
+      {
+        "name": "assignment_ticket_expired",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52111\",\"errMsg\":\"assignment ticket expired\",\"aspId\":\"agent\"}",
+        "err_code": "52111",
+        "outcome": "ticket_expired"
+      },
+      {
+        "name": "agent_registration_quota_exceeded",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52112\",\"errMsg\":\"agent registration quota exceeded\",\"aspId\":\"agent\"}",
+        "err_code": "52112",
+        "outcome": "quota_exceeded"
+      }
+    ],
+    "malformed_cases": [
+      {
+        "name": "reject_duplicate_err_code",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52200\",\"errCode\":\"52201\",\"errMsg\":\"duplicate\"}",
+        "outcome": "reject",
+        "reject_class": "body_parse"
+      },
+      {
+        "name": "reject_unknown_list_error_field",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52201\",\"errMsg\":\"denied\",\"futureField\":true}",
+        "outcome": "reject",
+        "reject_class": "unknown_field"
+      },
+      {
+        "name": "reject_trailing_list_error_value",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52201\",\"errMsg\":\"denied\"}{}",
+        "outcome": "reject",
+        "reject_class": "body_parse"
+      },
+      {
+        "name": "reject_null_list_error",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "null",
+        "outcome": "reject",
+        "reject_class": "wrong_type"
+      },
+      {
+        "name": "reject_non_object_list_error",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "[]",
+        "outcome": "reject",
+        "reject_class": "wrong_type"
+      },
+      {
+        "name": "reject_list_present_on_error",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52201\",\"errMsg\":\"denied\",\"list\":{}}",
+        "outcome": "reject",
+        "reject_class": "list_on_error"
+      },
+      {
+        "name": "reject_rate_limit_missing_retry_after",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52204\",\"errMsg\":\"rate limited\"}",
+        "outcome": "reject",
+        "reject_class": "retry_after_missing"
+      },
+      {
+        "name": "reject_zero_retry_after",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52200\",\"errMsg\":\"unavailable\",\"retryAfterSeconds\":0}",
+        "outcome": "reject",
+        "reject_class": "retry_after_invalid"
+      },
+      {
+        "name": "reject_string_retry_after",
+        "phase": "registration_completion",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52300\",\"errMsg\":\"unavailable\",\"retryAfterSeconds\":\"5\"}",
+        "outcome": "reject",
+        "reject_class": "retry_after_invalid"
+      },
+      {
+        "name": "reject_unexpected_retry_after",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52201\",\"errMsg\":\"denied\",\"retryAfterSeconds\":5}",
+        "outcome": "reject",
+        "reject_class": "retry_after_unexpected"
+      },
+      {
+        "name": "reject_duplicate_registration_err_code",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52110\",\"errCode\":\"52111\",\"aspId\":\"agent\"}",
+        "outcome": "reject",
+        "reject_class": "body_parse"
+      },
+      {
+        "name": "reject_unknown_registration_error_field",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52110\",\"errMsg\":\"invalid\",\"aspId\":\"agent\",\"futureField\":true}",
+        "outcome": "reject",
+        "reject_class": "unknown_field"
+      },
+      {
+        "name": "reject_registration_error_list",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52110\",\"errMsg\":\"invalid\",\"aspId\":\"agent\",\"list\":{}}",
+        "outcome": "reject",
+        "reject_class": "unknown_field"
+      },
+      {
+        "name": "reject_unknown_list_error_code",
+        "phase": "cell_assignment",
+        "header_name": "NHP_LRT",
+        "header_type": 6,
+        "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\"}",
+        "outcome": "reject",
+        "reject_class": "unknown_error_code"
+      },
+      {
+        "name": "reject_unknown_registration_error_code",
+        "phase": "assigned_cell_registration",
+        "header_name": "NHP_RAK",
+        "header_type": 14,
+        "body_json": "{\"errCode\":\"52999\",\"errMsg\":\"unreserved error\",\"aspId\":\"agent\"}",
+        "outcome": "reject",
+        "reject_class": "unknown_error_code"
+      }
+    ]
+  }
+}
