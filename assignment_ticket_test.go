@@ -80,6 +80,11 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 	t.Run("duplicate reject", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) { af.ClaimsRejects[1] = af.ClaimsRejects[0] }), "duplicate")
 	})
+	t.Run("unknown reject class", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) {
+			af.VerifyRejects[0].RejectClass = "signatuer"
+		}), "unknown reject class")
+	})
 	t.Run("ambiguous reject input", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) {
 			af.ClaimsRejects[0].Derivation = &AssignmentTicketRepeatDerivation{Target: "claims_json", ASCIIChar: " ", Count: 1}

@@ -193,6 +193,13 @@ var assignmentTicketClaimOrder = []string{
 var assignmentTicketCredentialKinds = []string{"bootstrap", "connector_bootstrap", "account", "agent"}
 var assignmentTicketPlacementModes = []string{"new", "existing"}
 
+var assignmentTicketRejectClasses = map[string]struct{}{
+	"claims": {}, "time": {}, "size": {}, "encoding": {},
+	"signature": {}, "high_s": {}, "wrong_length": {},
+	"unknown_kid": {}, "environment": {}, "key_length": {},
+	"der": {}, "fence_input": {},
+}
+
 var assignmentTicketFenceProfiles = map[string]string{
 	"credential": "qurl-agent-assignment-credential-fence-v1",
 	"cell":       "qurl-agent-assignment-cell-fence-v1",
@@ -403,6 +410,9 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 		if c.RejectClass == "" || c.Reason == "" || c.ExpectedEnvironmentID == "" || c.TrustedKID == "" || c.VerifyAtUnix < 1 {
 			return fmt.Errorf("conformance: assignment-ticket verify reject %q is incomplete", c.Name)
 		}
+		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
+			return err
+		}
 		hasParts := c.ClaimsB64URL != "" || c.SignatureB64URL != ""
 		if (c.Derivation != nil && (c.Token != "" || hasParts)) || (c.Token != "" && hasParts) {
 			return fmt.Errorf("conformance: assignment-ticket verify reject %q has ambiguous input sources", c.Name)
@@ -415,6 +425,9 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 		if c.RejectClass == "" || c.Reason == "" || (c.ClaimsJSON == "") == (c.Derivation == nil) {
 			return fmt.Errorf("conformance: assignment-ticket claims reject %q is incomplete or ambiguous", c.Name)
 		}
+		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
+			return err
+		}
 		if _, err := c.ResolveClaims(); err != nil {
 			return fmt.Errorf("conformance: assignment-ticket claims reject %q: %w", c.Name, err)
 		}
@@ -424,16 +437,34 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 			(c.Outcome == ExpectAccept) != (c.ExpectedRawHex != "") || (c.Outcome == ExpectReject) != (c.RejectClass != "") {
 			return fmt.Errorf("conformance: assignment-ticket KMS DER case %q is incomplete", c.Name)
 		}
+		if c.RejectClass != "" {
+			if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
+				return err
+			}
+		}
 	}
 	for _, c := range af.FenceRejects {
 		if c.FenceKind == "" || c.RejectClass == "" || c.Reason == "" || c.Mutation == "" {
 			return fmt.Errorf("conformance: assignment-ticket fence reject %q is incomplete", c.Name)
+		}
+		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
+			return err
 		}
 	}
 	for _, c := range af.TrustKeyRejects {
 		if c.RejectClass == "" || c.Reason == "" {
 			return fmt.Errorf("conformance: assignment-ticket trust-key reject %q is incomplete", c.Name)
 		}
+		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateAssignmentTicketRejectClass(name, rejectClass string) error {
+	if _, ok := assignmentTicketRejectClasses[rejectClass]; !ok {
+		return fmt.Errorf("conformance: assignment-ticket case %q has unknown reject class %q", name, rejectClass)
 	}
 	return nil
 }

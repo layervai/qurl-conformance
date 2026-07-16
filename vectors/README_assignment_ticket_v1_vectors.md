@@ -46,6 +46,11 @@ OTP with the ticket in the single REG call.
 JSON shape. The derived body and complete encrypted NHP packet sizes prove the
 fixture stays below the frozen 3856-byte body and 4096-byte packet limits.
 
+`tools/verify-assignment-ticket` is deliberately separate from
+`tools/verify-sdk`: qurl-go and NHP carry qat1 opaquely, while qurl-service is
+the ticket producer and verifier. The standalone verifier therefore exercises
+the qat1 cryptography without adding a ticket parser to the SDK or NHP layer.
+
 ## Fences
 
 Every fence is:

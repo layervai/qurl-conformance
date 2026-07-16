@@ -653,13 +653,13 @@
     },
     {
       "name": "malformed_spki",
-      "reject_class": "key_length",
+      "reject_class": "der",
       "reason": "Malformed DER cannot enter the trust store.",
       "public_key_spki_der_b64url": "AA"
     },
     {
       "name": "empty_spki",
-      "reject_class": "key_length",
+      "reject_class": "der",
       "reason": "An empty key cannot enter the trust store.",
       "public_key_spki_der_b64url": ""
     }
