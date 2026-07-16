@@ -100,7 +100,10 @@ This module hosts six artifact families, each under its own `artifact` id:
   ticket returned by initial assignment appears byte-for-byte in REG `usrData`
   and is consumed there. Ordinary refresh returns only the current assignment
   binding and never issues a registration ticket, while completion deliberately
-  carries no ticket. The
+  carries no ticket. Public initial-assignment `registration.key_kind` is closed
+  to `bootstrap`, `connector_bootstrap`, `account`, or `agent`;
+  `tunnel_bootstrap` remains a private control-plane `key_type` and is rejected
+  if it crosses the LRT wire. The
   completion request carries the synthetic SDK-generated device-key candidate
   that must be persisted before send; its result `list` contains exactly
   `query`, `version`, and `device_api_key_id`—no agent metadata, secret,

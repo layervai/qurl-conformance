@@ -12,9 +12,16 @@
     "registration_completion targets assigned_cell after the successful RAK. It authenticates the now-registered Noise public key, exact final devId, and current assignment/cell fence. The REG-consumed ticket is intentionally absent from completion.",
     "The completion request carries an SDK-generated synthetic device_api_key candidate. The SDK MUST durably persist the candidate before its first send. The service atomically stores its hash plus an issued sentinel; retrying with the same candidate returns the same device_api_key_id, while a different candidate conflicts.",
     "The completion result list contains exactly query, version, and device_api_key_id; it carries no agent metadata, device_api_key secret, secret-derived hash, or candidate commitment. Assignment results never echo the initial credential. Consumers must explicitly assert both non-echo properties.",
+    "The public initial-assignment registration.key_kind vocabulary is exactly bootstrap, connector_bootstrap, account, and agent. tunnel_bootstrap is a private control-plane key_type and MUST NOT cross the LRT wire.",
     "request_cases and success_result_cases are authenticated application-body trust-boundary tests. Producers feed each exact body_json through the same duplicate-aware, exact-case-key, unknown-field-rejecting parser and typed semantic validator used in production; they must derive owner, agent public key, assigned cell, and endpoint only from authenticated server state, never client-supplied placement fields.",
     "error_contract is application-layer behavioral data pinned to the merged production NHP common-wire revision that reserves these codes and emits retryAfterSeconds. Consumers feed every body_json through the same strict parser and typed classifier used in production, rather than trusting outcome. Errors omit list; unknown codes reject; errMsg is diagnostic only; retryAfterSeconds is optional only for 52200/52300, required for 52204, forbidden elsewhere, and positive when present.",
     "Tickets, identifiers, credentials, keys, hosts, timestamps, and error messages in this artifact are synthetic conformance values. Ticket strings are opaque test data and do not prescribe a ticket encoding."
+  ],
+  "public_registration_key_kinds": [
+    "bootstrap",
+    "connector_bootstrap",
+    "account",
+    "agent"
   ],
   "keys": {
     "hub": {
@@ -360,6 +367,24 @@
       "body_json": "{\"errCode\":\"0\"}",
       "outcome": "reject",
       "reject_class": "missing_field"
+    },
+    {
+      "name": "reject_initial_private_key_kind",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_BsT4rP8wXn6Q\",\"key_kind\":\"tunnel_bootstrap\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
+    },
+    {
+      "name": "reject_initial_unknown_key_kind",
+      "phase": "initial_assignment",
+      "header_name": "NHP_LRT",
+      "header_type": 6,
+      "body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_BsT4rP8wXn6Q\",\"key_kind\":\"future_kind\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}",
+      "outcome": "reject",
+      "reject_class": "semantic"
     },
     {
       "name": "reject_null_refresh_list",

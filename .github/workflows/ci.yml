@@ -86,6 +86,7 @@ jobs:
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
               s.schema_version !== 1 || s.initial_assignment.request.header_type !== 5 ||
+              JSON.stringify(s.public_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'account', 'agent']) ||
               s.initial_assignment.result.header_type !== 6 ||
               s.initial_assignment.request.counter !== s.initial_assignment.result.counter ||
               s.assigned_cell_registration.request.header_type !== 13 ||
@@ -106,7 +107,11 @@ jobs:
               assignmentRequests.reject_refresh_assignment_ticket.reject_class !== 'unknown_field' ||
               assignmentRequests.reject_duplicate_registration_ticket.reject_class !== 'body_parse' ||
               assignmentRequests.reject_wrong_mode.reject_class !== 'semantic' ||
-              s.success_result_cases.length !== 10 ||
+              s.success_result_cases.length !== 12 ||
+              assignmentResults.reject_initial_private_key_kind.reject_class !== 'semantic' ||
+              JSON.parse(assignmentResults.reject_initial_private_key_kind.body_json).list.registration.key_kind !== 'tunnel_bootstrap' ||
+              assignmentResults.reject_initial_unknown_key_kind.reject_class !== 'semantic' ||
+              JSON.parse(assignmentResults.reject_initial_unknown_key_kind.body_json).list.registration.key_kind !== 'future_kind' ||
               assignmentResults.reject_refresh_assignment_ticket.reject_class !== 'unknown_field' ||
               assignmentResults.reject_completion_device_api_key.reject_class !== 'unknown_field' ||
               assignmentResults.reject_completion_device_api_key_hash.reject_class !== 'unknown_field' ||
@@ -185,6 +190,7 @@ jobs:
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
           assert s['schema_version'] == 1
+          assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
           assert s['initial_assignment']['request']['header_type'] == 5
           assert s['initial_assignment']['result']['header_type'] == 6
           assert s['initial_assignment']['request']['counter'] == s['initial_assignment']['result']['counter']
@@ -213,7 +219,11 @@ jobs:
           assert assignment_requests['reject_refresh_assignment_ticket']['reject_class'] == 'unknown_field'
           assert assignment_requests['reject_duplicate_registration_ticket']['reject_class'] == 'body_parse'
           assert assignment_requests['reject_wrong_mode']['reject_class'] == 'semantic'
-          assert len(s['success_result_cases']) == 10
+          assert len(s['success_result_cases']) == 12
+          assert assignment_results['reject_initial_private_key_kind']['reject_class'] == 'semantic'
+          assert json.loads(assignment_results['reject_initial_private_key_kind']['body_json'])['list']['registration']['key_kind'] == 'tunnel_bootstrap'
+          assert assignment_results['reject_initial_unknown_key_kind']['reject_class'] == 'semantic'
+          assert json.loads(assignment_results['reject_initial_unknown_key_kind']['body_json'])['list']['registration']['key_kind'] == 'future_kind'
           assert assignment_results['reject_refresh_assignment_ticket']['reject_class'] == 'unknown_field'
           assert assignment_results['reject_completion_device_api_key']['reject_class'] == 'unknown_field'
           assert assignment_results['reject_completion_device_api_key_hash']['reject_class'] == 'unknown_field'

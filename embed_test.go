@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -212,6 +213,9 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.SchemaVersion != 1 {
 		t.Errorf("schema_version = %d, want 1", af.SchemaVersion)
 	}
+	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
+		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
+	}
 
 	for _, exchange := range []struct {
 		name     string
@@ -363,8 +367,17 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 			t.Errorf("request case %q reject_class = %q, want %q", name, c.RejectClass, wantClass)
 		}
 	}
-	if got, want := len(af.SuccessResultCases), 10; got != want {
+	if got, want := len(af.SuccessResultCases), 12; got != want {
 		t.Errorf("success result case count = %d, want %d", got, want)
+	}
+	resultCases := make(map[string]AgentAssignmentResultCase, len(af.SuccessResultCases))
+	for _, c := range af.SuccessResultCases {
+		resultCases[c.Name] = c
+	}
+	for _, name := range []string{"reject_initial_private_key_kind", "reject_initial_unknown_key_kind"} {
+		if c, ok := resultCases[name]; !ok || c.RejectClass != AgentAssignmentRejectSemantic {
+			t.Errorf("result case %q = %#v, want semantic reject", name, c)
+		}
 	}
 	if af.ErrorContract.Status != "ready" || af.ErrorContract.ProducerRevision != "9653fcb185c77629b787ad046c13c760baba88f4" {
 		t.Errorf("error taxonomy status/producer = %q/%q, want merged NHP producer pin", af.ErrorContract.Status, af.ErrorContract.ProducerRevision)
@@ -380,6 +393,25 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	}
 	if got, want := len(af.ErrorContract.RegistrationCases), 4; got != want {
 		t.Errorf("registration error case count = %d, want %d", got, want)
+	}
+}
+
+func TestAgentAssignmentPublicRegistrationKeyKindVocabulary(t *testing.T) {
+	af, err := AgentAssignmentGolden()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, keyKind := range af.PublicRegistrationKeyKinds {
+		body := strings.Replace(af.InitialAssignment.Result.BodyJSON, `"key_kind":"bootstrap"`, `"key_kind":"`+keyKind+`"`, 1)
+		got := classifyAgentAssignmentResult(AgentAssignmentResultCase{
+			Phase:      "initial_assignment",
+			HeaderName: AgentAssignmentResultHeaderName,
+			HeaderType: AgentAssignmentResultHeaderType,
+			BodyJSON:   body,
+		})
+		if got != "" {
+			t.Errorf("key_kind %q classified as %q, want accept", keyKind, got)
+		}
 	}
 }
 
@@ -405,6 +437,15 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		})
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "does not echo") {
 			t.Fatalf("error = %v, want counter-echo rejection", err)
+		}
+	})
+
+	t.Run("public registration key kind drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			doc.PublicRegistrationKeyKinds[0] = "tunnel_bootstrap"
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "key_kind vocabulary drifted") {
+			t.Fatalf("error = %v, want public key_kind vocabulary rejection", err)
 		}
 	})
 

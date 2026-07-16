@@ -47,6 +47,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -540,19 +541,20 @@ const (
 // with the assignment ticket, and registration completion against that cell.
 // ErrorContract is application-layer behavioral data for the same lifecycle.
 type AgentAssignmentFile struct {
-	Artifact                 string                       `json:"artifact"`
-	SchemaVersion            int                          `json:"schema_version"`
-	Description              string                       `json:"description"`
-	SourceOfTruth            string                       `json:"source_of_truth"`
-	Notes                    []string                     `json:"notes"`
-	Keys                     AgentAssignmentKeys          `json:"keys"`
-	InitialAssignment        AgentAssignmentExchange      `json:"initial_assignment"`
-	RefreshAssignment        AgentAssignmentExchange      `json:"refresh_assignment"`
-	AssignedCellRegistration AgentAssignmentExchange      `json:"assigned_cell_registration"`
-	RegistrationCompletion   AgentAssignmentExchange      `json:"registration_completion"`
-	RequestCases             []AgentAssignmentRequestCase `json:"request_cases"`
-	SuccessResultCases       []AgentAssignmentResultCase  `json:"success_result_cases"`
-	ErrorContract            AgentAssignmentErrorContract `json:"error_contract"`
+	Artifact                   string                       `json:"artifact"`
+	SchemaVersion              int                          `json:"schema_version"`
+	Description                string                       `json:"description"`
+	SourceOfTruth              string                       `json:"source_of_truth"`
+	Notes                      []string                     `json:"notes"`
+	PublicRegistrationKeyKinds []string                     `json:"public_registration_key_kinds"`
+	Keys                       AgentAssignmentKeys          `json:"keys"`
+	InitialAssignment          AgentAssignmentExchange      `json:"initial_assignment"`
+	RefreshAssignment          AgentAssignmentExchange      `json:"refresh_assignment"`
+	AssignedCellRegistration   AgentAssignmentExchange      `json:"assigned_cell_registration"`
+	RegistrationCompletion     AgentAssignmentExchange      `json:"registration_completion"`
+	RequestCases               []AgentAssignmentRequestCase `json:"request_cases"`
+	SuccessResultCases         []AgentAssignmentResultCase  `json:"success_result_cases"`
+	ErrorContract              AgentAssignmentErrorContract `json:"error_contract"`
 }
 
 // AgentAssignmentKeys names the three synthetic static X25519 identities used by
@@ -779,40 +781,56 @@ type agentAssignmentPhaseSchema struct {
 }
 
 var (
-	agentAssignmentListRequestKeys  = jsonTagKeySet(reflect.TypeOf(agentAssignmentListRequest{}))
-	agentAssignmentRegisterKeys     = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequest{}))
-	agentAssignmentListSuccessKeys  = jsonTagKeySet(reflect.TypeOf(agentAssignmentListSuccess{}))
-	agentAssignmentRegisterAckKeys  = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterResult{}))
-	agentAssignmentRegistrationKeys = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegistrationMetadata{}))
-	agentAssignmentAssignmentKeys   = jsonTagKeySet(reflect.TypeOf(agentAssignmentWireAssignment{}))
-	agentAssignmentEndpointKeys     = jsonTagKeySet(reflect.TypeOf(agentAssignmentWireEndpoint{}))
-	agentAssignmentListErrorKeys    = jsonTagKeySet(reflect.TypeOf(agentAssignmentListErrorBody{}))
-	agentAssignmentRAKErrorKeys     = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegistrationErrorBody{}))
+	agentAssignmentPublicRegistrationKeyKinds = []string{"bootstrap", "connector_bootstrap", "account", "agent"}
+	agentAssignmentListRequestKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentListRequest{}))
+	agentAssignmentRegisterKeys               = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequest{}))
+	agentAssignmentListSuccessKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentListSuccess{}))
+	agentAssignmentRegisterAckKeys            = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterResult{}))
+	agentAssignmentRegistrationKeys           = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegistrationMetadata{}))
+	agentAssignmentAssignmentKeys             = jsonTagKeySet(reflect.TypeOf(agentAssignmentWireAssignment{}))
+	agentAssignmentEndpointKeys               = jsonTagKeySet(reflect.TypeOf(agentAssignmentWireEndpoint{}))
+	agentAssignmentListErrorKeys              = jsonTagKeySet(reflect.TypeOf(agentAssignmentListErrorBody{}))
+	agentAssignmentRAKErrorKeys               = jsonTagKeySet(reflect.TypeOf(agentAssignmentRegistrationErrorBody{}))
 
 	agentAssignmentPhases = map[string]agentAssignmentPhaseSchema{
 		"initial_assignment": {
-			AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType,
-			AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType,
-			agentAssignmentListRequestKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentInitialRequestData{})),
-			agentAssignmentListSuccessKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentInitialResult{})),
+			requestHeaderName: AgentAssignmentRequestHeaderName,
+			requestHeaderType: AgentAssignmentRequestHeaderType,
+			resultHeaderName:  AgentAssignmentResultHeaderName,
+			resultHeaderType:  AgentAssignmentResultHeaderType,
+			requestOuterKeys:  agentAssignmentListRequestKeys,
+			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentInitialRequestData{})),
+			resultOuterKeys:   agentAssignmentListSuccessKeys,
+			resultListKeys:    jsonTagKeySet(reflect.TypeOf(agentAssignmentInitialResult{})),
 		},
 		"refresh_assignment": {
-			AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType,
-			AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType,
-			agentAssignmentListRequestKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshRequestData{})),
-			agentAssignmentListSuccessKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshResult{})),
+			requestHeaderName: AgentAssignmentRequestHeaderName,
+			requestHeaderType: AgentAssignmentRequestHeaderType,
+			resultHeaderName:  AgentAssignmentResultHeaderName,
+			resultHeaderType:  AgentAssignmentResultHeaderType,
+			requestOuterKeys:  agentAssignmentListRequestKeys,
+			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshRequestData{})),
+			resultOuterKeys:   agentAssignmentListSuccessKeys,
+			resultListKeys:    jsonTagKeySet(reflect.TypeOf(agentAssignmentRefreshResult{})),
 		},
 		"assigned_cell_registration": {
-			AgentRegistrationRequestHeaderName, AgentRegistrationRequestHeaderType,
-			AgentRegistrationResultHeaderName, AgentRegistrationResultHeaderType,
-			agentAssignmentRegisterKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequestData{})),
-			agentAssignmentRegisterAckKeys, nil,
+			requestHeaderName: AgentRegistrationRequestHeaderName,
+			requestHeaderType: AgentRegistrationRequestHeaderType,
+			resultHeaderName:  AgentRegistrationResultHeaderName,
+			resultHeaderType:  AgentRegistrationResultHeaderType,
+			requestOuterKeys:  agentAssignmentRegisterKeys,
+			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentRegisterRequestData{})),
+			resultOuterKeys:   agentAssignmentRegisterAckKeys,
 		},
 		"registration_completion": {
-			AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType,
-			AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType,
-			agentAssignmentListRequestKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentCompletionRequestData{})),
-			agentAssignmentListSuccessKeys, jsonTagKeySet(reflect.TypeOf(agentAssignmentCompletionResult{})),
+			requestHeaderName: AgentAssignmentRequestHeaderName,
+			requestHeaderType: AgentAssignmentRequestHeaderType,
+			resultHeaderName:  AgentAssignmentResultHeaderName,
+			resultHeaderType:  AgentAssignmentResultHeaderType,
+			requestOuterKeys:  agentAssignmentListRequestKeys,
+			requestDataKeys:   jsonTagKeySet(reflect.TypeOf(agentAssignmentCompletionRequestData{})),
+			resultOuterKeys:   agentAssignmentListSuccessKeys,
+			resultListKeys:    jsonTagKeySet(reflect.TypeOf(agentAssignmentCompletionResult{})),
 		},
 	}
 )
@@ -831,6 +849,9 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	}
 	if af.SchemaVersion != 1 {
 		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 1", af.SchemaVersion)
+	}
+	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
+		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
 	}
 	for name, key := range map[string]AgentAssignmentKey{
 		"hub":           af.Keys.Hub,
@@ -857,10 +878,34 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 		resultType                   int
 		resultSender, resultTarget   string
 	}{
-		{"initial_assignment", af.InitialAssignment, AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType, "agent", "hub", AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType, "hub", "agent"},
-		{"refresh_assignment", af.RefreshAssignment, AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType, "agent", "hub", AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType, "hub", "agent"},
-		{"assigned_cell_registration", af.AssignedCellRegistration, AgentRegistrationRequestHeaderName, AgentRegistrationRequestHeaderType, "agent", "assigned_cell", AgentRegistrationResultHeaderName, AgentRegistrationResultHeaderType, "assigned_cell", "agent"},
-		{"registration_completion", af.RegistrationCompletion, AgentAssignmentRequestHeaderName, AgentAssignmentRequestHeaderType, "agent", "assigned_cell", AgentAssignmentResultHeaderName, AgentAssignmentResultHeaderType, "assigned_cell", "agent"},
+		{
+			name: "initial_assignment", exchange: af.InitialAssignment,
+			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
+			requestSender: "agent", requestTarget: "hub",
+			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
+			resultSender: "hub", resultTarget: "agent",
+		},
+		{
+			name: "refresh_assignment", exchange: af.RefreshAssignment,
+			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
+			requestSender: "agent", requestTarget: "hub",
+			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
+			resultSender: "hub", resultTarget: "agent",
+		},
+		{
+			name: "assigned_cell_registration", exchange: af.AssignedCellRegistration,
+			requestName: AgentRegistrationRequestHeaderName, requestType: AgentRegistrationRequestHeaderType,
+			requestSender: "agent", requestTarget: "assigned_cell",
+			resultName: AgentRegistrationResultHeaderName, resultType: AgentRegistrationResultHeaderType,
+			resultSender: "assigned_cell", resultTarget: "agent",
+		},
+		{
+			name: "registration_completion", exchange: af.RegistrationCompletion,
+			requestName: AgentAssignmentRequestHeaderName, requestType: AgentAssignmentRequestHeaderType,
+			requestSender: "agent", requestTarget: "assigned_cell",
+			resultName: AgentAssignmentResultHeaderName, resultType: AgentAssignmentResultHeaderType,
+			resultSender: "assigned_cell", resultTarget: "agent",
+		},
 	} {
 		if err := validateAgentAssignmentPacket(exchange.name+".request", exchange.exchange.Request, exchange.requestName, exchange.requestType, exchange.requestSender, exchange.requestTarget); err != nil {
 			return nil, err
@@ -919,6 +964,8 @@ func validateAgentAssignmentResultCases(cases []AgentAssignmentResultCase) error
 		"reject_duplicate_initial_err_code":       {"initial_assignment", AgentAssignmentRejectBodyParse},
 		"reject_alias_initial_err_code":           {"initial_assignment", AgentAssignmentRejectUnknownField},
 		"reject_missing_initial_list":             {"initial_assignment", AgentAssignmentRejectMissingField},
+		"reject_initial_private_key_kind":         {"initial_assignment", AgentAssignmentRejectSemantic},
+		"reject_initial_unknown_key_kind":         {"initial_assignment", AgentAssignmentRejectSemantic},
 		"reject_null_refresh_list":                {"refresh_assignment", AgentAssignmentRejectWrongType},
 		"reject_refresh_assignment_ticket":        {"refresh_assignment", AgentAssignmentRejectUnknownField},
 		"reject_completion_list_type":             {"registration_completion", AgentAssignmentRejectWrongType},
@@ -927,7 +974,24 @@ func validateAgentAssignmentResultCases(cases []AgentAssignmentResultCase) error
 		"reject_completion_device_key_commitment": {"registration_completion", AgentAssignmentRejectUnknownField},
 		"reject_trailing_registration_result":     {"assigned_cell_registration", AgentAssignmentRejectBodyParse},
 	}
-	return validateAgentAssignmentCases("success-result", cases, expected, true, classifyAgentAssignmentResult)
+	if err := validateAgentAssignmentCases("success-result", cases, expected, true, classifyAgentAssignmentResult); err != nil {
+		return err
+	}
+	expectedRejectedKeyKinds := map[string]string{
+		"reject_initial_private_key_kind": "tunnel_bootstrap",
+		"reject_initial_unknown_key_kind": "future_kind",
+	}
+	for _, c := range cases {
+		want, ok := expectedRejectedKeyKinds[c.Name]
+		if !ok {
+			continue
+		}
+		result, err := decodeAgentAssignmentInitialResultCase(c.BodyJSON)
+		if err != nil || result.Registration.KeyKind != want {
+			return fmt.Errorf("conformance: agent-assignment success-result case %q key_kind drifted", c.Name)
+		}
+	}
+	return nil
 }
 
 type agentAssignmentCaseExpectation struct {
@@ -970,7 +1034,35 @@ func classifyAgentAssignmentResult(c AgentAssignmentResultCase) string {
 	if err := validateAgentAssignmentSuccessKeys(c.Phase, []byte(c.BodyJSON)); err != nil {
 		return classifyAgentAssignmentStrictError(err)
 	}
+	if c.Phase == "initial_assignment" {
+		result, err := decodeAgentAssignmentInitialResultCase(c.BodyJSON)
+		if err != nil {
+			return AgentAssignmentRejectBodyParse
+		}
+		if !isAgentAssignmentPublicRegistrationKeyKind(result.Registration.KeyKind) {
+			return AgentAssignmentRejectSemantic
+		}
+	}
 	return ""
+}
+
+func decodeAgentAssignmentInitialResultCase(bodyJSON string) (*agentAssignmentInitialResult, error) {
+	list, err := decodeAgentAssignmentListSuccess("initial_assignment result case", bodyJSON)
+	if err != nil {
+		return nil, err
+	}
+	var result *agentAssignmentInitialResult
+	if err := strictDecodeArtifact(list, &result); err != nil {
+		return nil, fmt.Errorf("initial assignment result body: %w", err)
+	}
+	if result == nil {
+		return nil, errors.New("initial assignment result body is null")
+	}
+	return result, nil
+}
+
+func isAgentAssignmentPublicRegistrationKeyKind(value string) bool {
+	return slices.Contains(agentAssignmentPublicRegistrationKeyKinds, value)
 }
 
 func classifyAgentAssignmentRequest(c AgentAssignmentRequestCase) string {
@@ -1388,6 +1480,36 @@ type agentAssignmentExpectedError struct {
 	retryRequired  bool
 }
 
+var (
+	agentAssignmentAssignmentErrors = map[string]agentAssignmentExpectedError{
+		"52200": {"retry", true, false},
+		"52201": {"identity_rejected", false, false},
+		"52202": {"reassignment_required", false, false},
+		"52203": {"quota_exceeded", false, false},
+		"52204": {"rate_limited", true, true},
+		"52205": {"invalid_request", false, false},
+	}
+	agentAssignmentInitialCredentialErrors = map[string]agentAssignmentExpectedError{
+		"52106": {"key_rejected", false, false},
+		"52107": {"registration_disabled", false, false},
+		"52108": {"bootstrap_consumed", false, false},
+		"52109": {"invalid_request", false, false},
+	}
+	agentAssignmentCompletionErrors = map[string]agentAssignmentExpectedError{
+		"52300": {"retry", true, false},
+		"52301": {"identity_rejected", false, false},
+		"52302": {"quota_exceeded", false, false},
+		"52303": {"credential_conflict", false, false},
+		"52304": {"invalid_request", false, false},
+	}
+	agentAssignmentRegistrationErrors = map[string]agentAssignmentExpectedError{
+		"52103": {"identity_conflict", false, false},
+		"52110": {"ticket_invalid", false, false},
+		"52111": {"ticket_expired", false, false},
+		"52112": {"quota_exceeded", false, false},
+	}
+)
+
 func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract) error {
 	if contract.Status != "ready" || contract.ProducerRevision != "9653fcb185c77629b787ad046c13c760baba88f4" {
 		return errors.New("conformance: agent-assignment error taxonomy is not pinned to its merged production NHP producer")
@@ -1401,33 +1523,6 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 		return errors.New("conformance: agent-assignment error rules drifted from the closed v1 contract")
 	}
 
-	assignment := map[string]agentAssignmentExpectedError{
-		"52200": {"retry", true, false},
-		"52201": {"identity_rejected", false, false},
-		"52202": {"reassignment_required", false, false},
-		"52203": {"quota_exceeded", false, false},
-		"52204": {"rate_limited", true, true},
-		"52205": {"invalid_request", false, false},
-	}
-	initialCredential := map[string]agentAssignmentExpectedError{
-		"52106": {"key_rejected", false, false},
-		"52107": {"registration_disabled", false, false},
-		"52108": {"bootstrap_consumed", false, false},
-		"52109": {"invalid_request", false, false},
-	}
-	completion := map[string]agentAssignmentExpectedError{
-		"52300": {"retry", true, false},
-		"52301": {"identity_rejected", false, false},
-		"52302": {"quota_exceeded", false, false},
-		"52303": {"credential_conflict", false, false},
-		"52304": {"invalid_request", false, false},
-	}
-	registration := map[string]agentAssignmentExpectedError{
-		"52103": {"identity_conflict", false, false},
-		"52110": {"ticket_invalid", false, false},
-		"52111": {"ticket_expired", false, false},
-		"52112": {"quota_exceeded", false, false},
-	}
 	errorNames := make(map[string]struct{})
 	for _, group := range []struct {
 		name         string
@@ -1436,10 +1531,10 @@ func validateAgentAssignmentErrorContract(contract AgentAssignmentErrorContract)
 		expected     map[string]agentAssignmentExpectedError
 		registration bool
 	}{
-		{"assignment_cases", "cell_assignment", contract.AssignmentCases, assignment, false},
-		{"initial_credential_cases", "initial_assignment", contract.InitialCredentialCases, initialCredential, false},
-		{"completion_cases", "registration_completion", contract.CompletionCases, completion, false},
-		{"registration_cases", "assigned_cell_registration", contract.RegistrationCases, registration, true},
+		{"assignment_cases", "cell_assignment", contract.AssignmentCases, agentAssignmentAssignmentErrors, false},
+		{"initial_credential_cases", "initial_assignment", contract.InitialCredentialCases, agentAssignmentInitialCredentialErrors, false},
+		{"completion_cases", "registration_completion", contract.CompletionCases, agentAssignmentCompletionErrors, false},
+		{"registration_cases", "assigned_cell_registration", contract.RegistrationCases, agentAssignmentRegistrationErrors, true},
 	} {
 		if err := validateAgentAssignmentErrorCases(group.name, group.phase, group.cases, group.expected, group.registration, errorNames); err != nil {
 			return err
@@ -1636,23 +1731,15 @@ func classifyAgentAssignmentMalformed(c AgentAssignmentMalformedCase) string {
 }
 
 func isKnownAgentAssignmentListErrorCode(code string) bool {
-	switch code {
-	case "52106", "52107", "52108", "52109",
-		"52200", "52201", "52202", "52203", "52204", "52205",
-		"52300", "52301", "52302", "52303", "52304":
-		return true
-	default:
-		return false
-	}
+	_, assignment := agentAssignmentAssignmentErrors[code]
+	_, initialCredential := agentAssignmentInitialCredentialErrors[code]
+	_, completion := agentAssignmentCompletionErrors[code]
+	return assignment || initialCredential || completion
 }
 
 func isKnownAgentAssignmentRegistrationErrorCode(code string) bool {
-	switch code {
-	case "52103", "52110", "52111", "52112":
-		return true
-	default:
-		return false
-	}
+	_, ok := agentAssignmentRegistrationErrors[code]
+	return ok
 }
 
 func validateAgentAssignmentHex(name string, value string, wantBytes int) error {
