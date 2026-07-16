@@ -167,6 +167,7 @@ jobs:
               s.account_credential_otp.challenge_binding_cases.length !== 7 ||
               assignmentOtpChallengeBindings.accept_exact_challenge_binding.outcome !== 'accept' ||
               !assignmentOtpChallengesAgree ||
+              s.account_credential_otp.packet_size_contract.cases.length !== 2 ||
               s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3840 ||
               s.account_credential_otp.packet_size_contract.max_packet_bytes !== 4096 ||
               assignmentOtpSizes.accept_max_plaintext_body.expected_packet_bytes !== 4096 ||
@@ -349,6 +350,7 @@ jobs:
               'reject_challenge_cell_mismatch',
           ):
               assert account_otp_challenge_bindings[challenge_case]['reject_class'] == 'challenge_binding'
+          assert len(account_otp['packet_size_contract']['cases']) == 2
           assert account_otp['packet_size_contract']['max_plaintext_body_bytes'] == 3840
           assert account_otp['packet_size_contract']['max_packet_bytes'] == 4096
           assert account_otp_sizes['accept_max_plaintext_body']['expected_packet_bytes'] == 4096
