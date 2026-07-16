@@ -95,19 +95,83 @@ jobs:
           const assignmentInitial = JSON.parse(s.initial_assignment.result.body_json).list;
           const assignmentRefresh = JSON.parse(s.refresh_assignment.result.body_json).list;
           const assignmentRegister = JSON.parse(s.assigned_cell_registration.request.body_json);
+          const assignmentOtp = JSON.parse(s.account_credential_otp.request.body_json);
+          const assignmentOtpBinding = s.account_credential_otp.enrollment_binding;
+          const assignmentOtpRequests = Object.fromEntries(s.account_credential_otp.request_cases.map(v => [v.name, v]));
+          const assignmentOtpBindings = Object.fromEntries(s.account_credential_otp.binding_cases.map(v => [v.name, v]));
+          const assignmentOtpChallengeBindings = Object.fromEntries(s.account_credential_otp.challenge_binding_cases.map(v => [v.name, v]));
+          const assignmentOtpChallengesAgree = [
+            'reject_challenge_ticket_jti_mismatch',
+            'reject_challenge_peer_public_key_mismatch',
+            'reject_challenge_dev_id_mismatch',
+            'reject_challenge_credential_key_id_mismatch',
+            'reject_challenge_environment_mismatch',
+            'reject_challenge_cell_mismatch',
+          ].every(name => assignmentOtpChallengeBindings[name].reject_class === 'challenge_binding');
+          const assignmentOtpSizes = Object.fromEntries(s.account_credential_otp.packet_size_contract.cases.map(v => [v.name, v]));
           const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
           const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
           const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
           const assignmentMalformed = Object.fromEntries(s.error_contract.malformed_cases.map(v => [v.name, v]));
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
-              s.schema_version !== 1 || s.initial_assignment.request.header_type !== 5 ||
+              s.schema_version !== 2 || s.initial_assignment.request.header_type !== 5 ||
               JSON.stringify(s.public_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'account', 'agent']) ||
               s.initial_assignment.result.header_type !== 6 ||
               s.initial_assignment.request.counter !== s.initial_assignment.result.counter ||
               s.assigned_cell_registration.request.header_type !== 13 ||
               s.assigned_cell_registration.result.header_type !== 14 ||
               s.assigned_cell_registration.request.counter !== s.assigned_cell_registration.result.counter ||
+              s.account_credential_otp.producer_revision !== '2072546e1fc76eb76bd7e5c22d37856019ba33e7' ||
+              s.account_credential_otp.raw_body_required !== true ||
+              s.account_credential_otp.authenticated_peer_public_key_required !== true ||
+              JSON.stringify(s.account_credential_otp.otp_registration_key_kinds) !== JSON.stringify(['account']) ||
+              JSON.stringify(s.account_credential_otp.otp_free_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'agent']) ||
+              s.account_credential_otp.request.header_type !== 12 ||
+              s.account_credential_otp.request.receiver_key !== 'assigned_cell' ||
+              assignmentOtp.usrId !== assignmentOtpBinding.request_registration_key_id ||
+              assignmentOtp.devId !== assignmentOtpBinding.request_agent_id ||
+              assignmentOtp.pass !== assignmentOtpBinding.request_credential ||
+              assignmentOtp.usrData.query !== 'agent_registration_otp' ||
+              assignmentOtp.usrData.version !== 1 ||
+              assignmentOtp.usrData.assignment_ticket !== assignmentOtpBinding.request_assignment_ticket ||
+              assignmentOtpBinding.request_credential_hash_b64 !== assignmentOtpBinding.ticket_credential_key_hash_b64 ||
+              assignmentOtpBinding.recomputed_credential_fence_b64 !== assignmentOtpBinding.ticket_credential_fence_b64 ||
+              s.account_credential_otp.challenge_binding.lookup_key_field !== 'ticket_jti' ||
+              JSON.stringify(s.account_credential_otp.challenge_binding.required_match_fields) !== JSON.stringify(['ticket_jti', 'authenticated_peer_public_key_b64', 'dev_id', 'credential_key_id', 'environment_id', 'cell_id']) ||
+              s.account_credential_otp.challenge_binding.ticket_jti !== assignmentOtpBinding.ticket_jti ||
+              s.account_credential_otp.challenge_binding.authenticated_peer_public_key_b64 !== assignmentOtpBinding.authenticated_peer_public_key_b64 ||
+              s.account_credential_otp.challenge_binding.dev_id !== assignmentOtpBinding.request_agent_id ||
+              s.account_credential_otp.challenge_binding.credential_key_id !== assignmentOtpBinding.request_registration_key_id ||
+              s.account_credential_otp.challenge_binding.environment_id !== assignmentOtpBinding.local_environment_id ||
+              s.account_credential_otp.challenge_binding.cell_id !== assignmentOtpBinding.local_cell_id ||
+              assignmentOtp.pubKey !== undefined ||
+              assignmentOtpBinding.ticket_expires_at_unix - assignmentOtpBinding.evaluated_at_unix !== 630 ||
+              assignmentOtpBinding.minimum_ticket_remaining_seconds !== 630 ||
+              s.account_credential_otp.request_cases.length !== 17 ||
+              assignmentOtpRequests.reject_duplicate_otp_assignment_ticket.reject_class !== 'body_parse' ||
+              assignmentOtpRequests.reject_empty_otp_usr_id.reject_class !== 'semantic' ||
+              assignmentOtpRequests.reject_empty_otp_dev_id.reject_class !== 'semantic' ||
+              assignmentOtpRequests.reject_wrong_otp_asp_id.reject_class !== 'semantic' ||
+              assignmentOtpRequests.reject_unknown_otp_outer_field.reject_class !== 'unknown_field' ||
+              assignmentOtpRequests.reject_null_otp_body.reject_class !== 'wrong_type' ||
+              assignmentOtpRequests.reject_trailing_otp_value.reject_class !== 'body_parse' ||
+              assignmentOtpRequests.reject_wrong_otp_header_phase.reject_class !== 'wrong_phase' ||
+              s.account_credential_otp.binding_cases.length !== 13 ||
+              assignmentOtpBindings.accept_exact_minimum_lifetime.outcome !== 'accept' ||
+              assignmentOtpBindings.reject_different_request_ticket.reject_class !== 'ticket_binding' ||
+              assignmentOtpBindings.reject_peer_public_key_mismatch.reject_class !== 'peer_binding' ||
+              assignmentOtpBindings.reject_ticket_credential_key_hash_mismatch.reject_class !== 'credential_binding' ||
+              assignmentOtpBindings.reject_ticket_credential_fence_mismatch.reject_class !== 'credential_binding' ||
+              assignmentOtpBindings.reject_ticket_remaining_lifetime_629.reject_class !== 'ticket_lifetime' ||
+              s.account_credential_otp.challenge_binding_cases.length !== 7 ||
+              assignmentOtpChallengeBindings.accept_exact_challenge_binding.outcome !== 'accept' ||
+              !assignmentOtpChallengesAgree ||
+              s.account_credential_otp.packet_size_contract.cases.length !== 2 ||
+              s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3840 ||
+              s.account_credential_otp.packet_size_contract.max_packet_bytes !== 4096 ||
+              assignmentOtpSizes.accept_max_plaintext_body.expected_packet_bytes !== 4096 ||
+              assignmentOtpSizes.reject_plaintext_body_over_max.reject_class !== 'packet_size' ||
               assignmentRegister.usrData.assignment_ticket !== assignmentInitial.assignment_ticket ||
               assignmentRegister.otp !== JSON.parse(s.initial_assignment.request.body_json).usrData.credential ||
               assignmentInitial.registration.masked_email !== undefined ||
@@ -211,7 +275,7 @@ jobs:
           assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
-          assert s['schema_version'] == 1
+          assert s['schema_version'] == 2
           assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
           assert s['initial_assignment']['request']['header_type'] == 5
           assert s['initial_assignment']['result']['header_type'] == 6
@@ -219,6 +283,13 @@ jobs:
           initial_assignment = json.loads(s['initial_assignment']['result']['body_json'])['list']
           refresh_assignment = json.loads(s['refresh_assignment']['result']['body_json'])['list']
           registration = json.loads(s['assigned_cell_registration']['request']['body_json'])
+          account_otp = s['account_credential_otp']
+          account_otp_request = json.loads(account_otp['request']['body_json'])
+          account_otp_binding = account_otp['enrollment_binding']
+          account_otp_requests = {v['name']: v for v in account_otp['request_cases']}
+          account_otp_bindings = {v['name']: v for v in account_otp['binding_cases']}
+          account_otp_challenge_bindings = {v['name']: v for v in account_otp['challenge_binding_cases']}
+          account_otp_sizes = {v['name']: v for v in account_otp['packet_size_contract']['cases']}
           completion = json.loads(s['registration_completion']['result']['body_json'])['list']
           assignment_requests = {v['name']: v for v in s['request_cases']}
           assignment_results = {v['name']: v for v in s['success_result_cases']}
@@ -226,6 +297,64 @@ jobs:
           assert s['assigned_cell_registration']['request']['header_type'] == 13
           assert s['assigned_cell_registration']['result']['header_type'] == 14
           assert s['assigned_cell_registration']['request']['counter'] == s['assigned_cell_registration']['result']['counter']
+          assert account_otp['producer_revision'] == '2072546e1fc76eb76bd7e5c22d37856019ba33e7'
+          assert account_otp['raw_body_required'] is True
+          assert account_otp['authenticated_peer_public_key_required'] is True
+          assert account_otp['otp_registration_key_kinds'] == ['account']
+          assert account_otp['otp_free_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'agent']
+          assert account_otp['request']['header_type'] == 12
+          assert account_otp['request']['receiver_key'] == 'assigned_cell'
+          assert account_otp_request['usrId'] == account_otp_binding['request_registration_key_id']
+          assert account_otp_request['devId'] == account_otp_binding['request_agent_id']
+          assert account_otp_request['pass'] == account_otp_binding['request_credential']
+          assert account_otp_request['usrData']['query'] == 'agent_registration_otp'
+          assert account_otp_request['usrData']['version'] == 1
+          assert account_otp_request['usrData']['assignment_ticket'] == account_otp_binding['request_assignment_ticket']
+          assert account_otp_binding['request_credential_hash_b64'] == account_otp_binding['ticket_credential_key_hash_b64']
+          assert account_otp_binding['recomputed_credential_fence_b64'] == account_otp_binding['ticket_credential_fence_b64']
+          assert account_otp['challenge_binding']['lookup_key_field'] == 'ticket_jti'
+          assert account_otp['challenge_binding']['required_match_fields'] == ['ticket_jti', 'authenticated_peer_public_key_b64', 'dev_id', 'credential_key_id', 'environment_id', 'cell_id']
+          assert account_otp['challenge_binding']['ticket_jti'] == account_otp_binding['ticket_jti']
+          assert account_otp['challenge_binding']['authenticated_peer_public_key_b64'] == account_otp_binding['authenticated_peer_public_key_b64']
+          assert account_otp['challenge_binding']['dev_id'] == account_otp_binding['request_agent_id']
+          assert account_otp['challenge_binding']['credential_key_id'] == account_otp_binding['request_registration_key_id']
+          assert account_otp['challenge_binding']['environment_id'] == account_otp_binding['local_environment_id']
+          assert account_otp['challenge_binding']['cell_id'] == account_otp_binding['local_cell_id']
+          assert 'pubKey' not in account_otp_request
+          assert account_otp_binding['ticket_expires_at_unix'] - account_otp_binding['evaluated_at_unix'] == 630
+          assert account_otp_binding['minimum_ticket_remaining_seconds'] == 630
+          assert len(account_otp['request_cases']) == 17
+          assert account_otp_requests['reject_duplicate_otp_assignment_ticket']['reject_class'] == 'body_parse'
+          assert account_otp_requests['reject_empty_otp_usr_id']['reject_class'] == 'semantic'
+          assert account_otp_requests['reject_empty_otp_dev_id']['reject_class'] == 'semantic'
+          assert account_otp_requests['reject_wrong_otp_asp_id']['reject_class'] == 'semantic'
+          assert account_otp_requests['reject_unknown_otp_outer_field']['reject_class'] == 'unknown_field'
+          assert account_otp_requests['reject_null_otp_body']['reject_class'] == 'wrong_type'
+          assert account_otp_requests['reject_trailing_otp_value']['reject_class'] == 'body_parse'
+          assert account_otp_requests['reject_wrong_otp_header_phase']['reject_class'] == 'wrong_phase'
+          assert len(account_otp['binding_cases']) == 13
+          assert account_otp_bindings['accept_exact_minimum_lifetime']['outcome'] == 'accept'
+          assert account_otp_bindings['reject_different_request_ticket']['reject_class'] == 'ticket_binding'
+          assert account_otp_bindings['reject_peer_public_key_mismatch']['reject_class'] == 'peer_binding'
+          assert account_otp_bindings['reject_ticket_credential_key_hash_mismatch']['reject_class'] == 'credential_binding'
+          assert account_otp_bindings['reject_ticket_credential_fence_mismatch']['reject_class'] == 'credential_binding'
+          assert account_otp_bindings['reject_ticket_remaining_lifetime_629']['reject_class'] == 'ticket_lifetime'
+          assert len(account_otp['challenge_binding_cases']) == 7
+          assert account_otp_challenge_bindings['accept_exact_challenge_binding']['outcome'] == 'accept'
+          for challenge_case in (
+              'reject_challenge_ticket_jti_mismatch',
+              'reject_challenge_peer_public_key_mismatch',
+              'reject_challenge_dev_id_mismatch',
+              'reject_challenge_credential_key_id_mismatch',
+              'reject_challenge_environment_mismatch',
+              'reject_challenge_cell_mismatch',
+          ):
+              assert account_otp_challenge_bindings[challenge_case]['reject_class'] == 'challenge_binding'
+          assert len(account_otp['packet_size_contract']['cases']) == 2
+          assert account_otp['packet_size_contract']['max_plaintext_body_bytes'] == 3840
+          assert account_otp['packet_size_contract']['max_packet_bytes'] == 4096
+          assert account_otp_sizes['accept_max_plaintext_body']['expected_packet_bytes'] == 4096
+          assert account_otp_sizes['reject_plaintext_body_over_max']['reject_class'] == 'packet_size'
           assert registration['usrData']['assignment_ticket'] == initial_assignment['assignment_ticket']
           assert registration['otp'] == json.loads(s['initial_assignment']['request']['body_json'])['usrData']['credential']
           assert 'masked_email' not in initial_assignment['registration']

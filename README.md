@@ -22,7 +22,7 @@ trust.
 | `vectors/issuer_signature_vectors.json` | the issuer-signature golden vectors (P-256 raw r\|\|s low-S) the signature class composes by reference |
 | `vectors/relay_knock_golden.json` | the relay/NHP-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s): a deterministic knock packet plus a frozen, server-sealed ack reply (see Scope) |
 | `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
-| `vectors/agent_assignment_golden.json` | deterministic hub LST/LRT assignment, assigned-cell REG/RAK activation, completion LST/LRT packets, strict request/result rejects, and the producer-pinned closed error-body taxonomy (see Scope) |
+| `vectors/agent_assignment_golden.json` | deterministic hub LST/LRT assignment, account-only assigned-cell OTP, REG/RAK activation, completion LST/LRT packets, strict request/binding/size/result rejects, and the producer-pinned closed error-body taxonomy (see Scope) |
 | `vectors/agent_knock_application_vectors.json` | registered-agent KNK body and RunID request-policy cases plus already-decrypted ACK/COK dispositions; no Noise packet duplication |
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
 | `vectors/agent_api_key_id_vectors.json` | issuer and strict-consumer fixtures for agent registration `key_id` / `device_api_key_id` |
@@ -63,7 +63,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts six artifact families, each under its own `artifact` id:
+This module hosts seven artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -107,15 +107,35 @@ This module hosts six artifact families, each under its own `artifact` id:
   carries no ticket. Public initial-assignment `registration.key_kind` is closed
   to `bootstrap`, `connector_bootstrap`, `account`, or `agent`;
   `tunnel_bootstrap` remains a private control-plane `key_type` and is rejected
-  if it crosses the LRT wire. The
-  completion request carries the synthetic SDK-generated device-key candidate
+  if it crosses the LRT wire. The schema-v2 `account_credential_otp` section
+  freezes the exact one-way NHP_OTP (type 12) request bytes sent to the assigned
+  cell: `{usrId,devId,aspId,pass,usrData:{query,version,assignment_ticket}}`.
+  Its secret-bearing decrypted body must be consumed from the exact RawBody;
+  the Noise-authenticated peer key is a separate trusted input, and no public
+  key or placement field is allowed in the body. Only `key_kind=account` uses
+  OTP. The `bootstrap`, `connector_bootstrap`, and `agent` paths are explicitly
+  OTP-free and proceed directly to one REG. Binding cases isolate the exact
+  ticket token, peer key, devId, credential id/hash/fence/kind, environment,
+  cell, expiry, inclusive 630-second lifetime boundary, and 629-second reject.
+  The challenge-store metadata freezes `ticket_jti` as its lookup key and binds
+  that ticket to the authenticated peer key, devId, credential id, environment,
+  and cell, with an exact one-field mismatch suite.
+  `recomputed_credential_fence_b64` is the frozen expected result of the
+  qat1/authority-owned strong-row derivation; this artifact freezes its compare
+  inputs and mismatch outcome rather than locally reimplementing that derivation.
+  Binding and challenge cases are declarative mutation recipes that authority
+  consumers must execute against their own implementation. Packet-size
+  cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet
+  limit and max+1. This remains contract data: it does not implement ticket
+  verification, OTP state, rate limiting, email delivery, SDK callbacks, or a
+  plugin. Schema v2 is a deliberate breaking shape for strict consumers: they
+  must update their typed loader before adopting the release that carries this
+  artifact. The completion request carries the synthetic SDK-generated
+  device-key candidate
   that must be persisted before send; its result `list` contains exactly
   `query`, `version`, and `device_api_key_id`—no agent metadata, secret,
-  secret-derived hash, or candidate commitment. The bootstrap/preissued path
-  registers directly with NHP_REG. Optional account-enrollment NHP_OTP is out of
-  this artifact until the producer exposes the exact authenticated OTP request
-  body, and does not block these eight standard lifecycle packets. The artifact
-  also carries the closed 522xx/523xx LRT
+  secret-derived hash, or candidate commitment. The artifact also carries the
+  closed 522xx/523xx LRT
   and ticket/quota 521xx RAK error taxonomy, including retry-delay rules and
   malformed-body rejects. Its compact authenticated request/result case sets
   separately pin duplicate-aware JSON parsing, exact case-sensitive keys,
@@ -126,11 +146,14 @@ This module hosts six artifact families, each under its own `artifact` id:
   verifies canonical lowercase hex, positive decimal transaction fields,
   canonical padded base64 endpoint keys, and each static X25519 keypair. The
   assignment wire verifier pins merged qurl-go revision
-  `8a69642957030b9ce0a1b8b356246d265a9f577d` and rebuilds and opens all eight
-  packets through its exported codec. The
+  `8a69642957030b9ce0a1b8b356246d265a9f577d` and rebuilds and opens all nine
+  deterministic packets through its exported codec. The
   error taxonomy is pinned to merged NHP revision
   `9653fcb185c77629b787ad046c13c760baba88f4`, which reserves 52110-52112 and
-  the 522xx/523xx ranges and adds list-result `retryAfterSeconds`. All packets,
+  the 522xx/523xx ranges and adds list-result `retryAfterSeconds`. Exact OTP
+  RawBody preservation and the authenticated-peer plugin boundary are pinned
+  separately to merged NHP revision
+  `2072546e1fc76eb76bd7e5c22d37856019ba33e7`. All packets,
   identities, credentials, tickets, hosts,
   timestamps, and error messages are synthetic conformance values.
 - **Registered-agent knock application contract**

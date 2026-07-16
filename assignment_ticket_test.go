@@ -15,7 +15,7 @@ func TestEmbeddedAssignmentTicketLoads(t *testing.T) {
 		t.Fatalf("identity = %q/v%d", af.Artifact, af.SchemaVersion)
 	}
 	if len(af.FenceVectors) != 3 || len(af.VerifyRejects) != 16 || len(af.ClaimsRejects) != 20 ||
-		len(af.KMSDERCases) != 5 || len(af.FenceRejects) != 6 || len(af.TrustKeyRejects) != 3 {
+		len(af.KMSDERCases) != 6 || len(af.FenceRejects) != 6 || len(af.TrustKeyRejects) != 3 {
 		t.Fatalf("fixture counts = fences:%d verify:%d claims:%d DER:%d fence rejects:%d trust rejects:%d",
 			len(af.FenceVectors), len(af.VerifyRejects), len(af.ClaimsRejects), len(af.KMSDERCases), len(af.FenceRejects), len(af.TrustKeyRejects))
 	}

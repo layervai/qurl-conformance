@@ -258,11 +258,12 @@ var assignmentTicketClaimsRejectClasses = map[string]string{
 }
 
 var assignmentTicketDERCaseClasses = map[string]string{
-	"kms_high_s_normalizes":   "",
-	"malformed_truncated":     "der",
-	"malformed_trailing_data": "der",
-	"invalid_zero_r":          "der",
-	"invalid_out_of_range_s":  "der",
+	"kms_high_s_normalizes":            "",
+	"malformed_truncated":              "der",
+	"malformed_trailing_data":          "der",
+	"malformed_extra_sequence_element": "der",
+	"invalid_zero_r":                   "der",
+	"invalid_out_of_range_s":           "der",
 }
 
 var assignmentTicketFenceRejectClasses = map[string]string{
