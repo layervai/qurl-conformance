@@ -403,6 +403,10 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 		if c.RejectClass == "" || c.Reason == "" || c.ExpectedEnvironmentID == "" || c.TrustedKID == "" || c.VerifyAtUnix < 1 {
 			return fmt.Errorf("conformance: assignment-ticket verify reject %q is incomplete", c.Name)
 		}
+		hasParts := c.ClaimsB64URL != "" || c.SignatureB64URL != ""
+		if (c.Derivation != nil && (c.Token != "" || hasParts)) || (c.Token != "" && hasParts) {
+			return fmt.Errorf("conformance: assignment-ticket verify reject %q has ambiguous input sources", c.Name)
+		}
 		if _, err := c.ResolveToken(af.Golden); err != nil {
 			return fmt.Errorf("conformance: assignment-ticket verify reject %q: %w", c.Name, err)
 		}

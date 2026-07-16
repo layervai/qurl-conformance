@@ -341,6 +341,9 @@ func verifyGolden(publicKey *ecdsa.PublicKey, privateScalar *big.Int, af *confor
 		golden.LRTBodyBytes > af.Contract.NHPBodyMaxBytes || golden.CompleteNHPPacketBytes > af.Contract.NHPPacketMaxBytes {
 		return errors.New("golden LRT exceeds or disagrees with NHP size budget")
 	}
+	if strings.Contains(strings.ToLower(lrtBody), `"otp`) {
+		return errors.New("assignment LRT must not carry an OTP")
+	}
 	return nil
 }
 
@@ -529,6 +532,40 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			if _, err := strictRawURL(c.SignatureB64URL); err == nil {
 				return errors.New("strict decoder accepted noncanonical signature")
 			}
+		case "claims_padding":
+			if _, err := strictRawURL(c.ClaimsB64URL); err == nil {
+				return errors.New("strict decoder accepted padded claims")
+			}
+		case "signature_padding":
+			if _, err := strictRawURL(c.SignatureB64URL); err == nil {
+				return errors.New("strict decoder accepted padded signature")
+			}
+		case "malformed_raw_signature":
+			raw, err := strictRawURL(c.SignatureB64URL)
+			if err != nil || len(raw) == af.Contract.RawSignatureBytes {
+				return errors.New("malformed raw signature does not isolate exact length")
+			}
+		case "wrong_kid":
+			if c.TrustedKID == af.SyntheticSigningKey.KID {
+				return errors.New("wrong-kid reject trusts the golden kid")
+			}
+		case "wrong_environment":
+			if c.ExpectedEnvironmentID == af.Golden.EnvironmentID {
+				return errors.New("wrong-environment reject uses the golden environment")
+			}
+		case "wrong_audience":
+			raw, err := strictRawURL(c.ClaimsB64URL)
+			if err != nil || referenceParseClaims(raw, af.Contract) == nil {
+				return errors.New("wrong-audience reject does not reach the claims boundary")
+			}
+		case "not_yet_valid":
+			if c.VerifyAtUnix != af.Golden.ClockUnix+int64(af.Contract.NotBeforeOffsetSeconds)-1 {
+				return errors.New("not-yet-valid reject is not exactly nbf-1")
+			}
+		case "expired":
+			if c.VerifyAtUnix != af.Golden.ClockUnix+int64(af.Contract.MaxLifetimeSeconds) {
+				return errors.New("expired reject is not exactly exp")
+			}
 		case "ticket_too_large":
 			if len(token) != af.Contract.MaxTicketASCIIBytes+1 {
 				return errors.New("ticket size reject is not exactly limit+1")
@@ -555,8 +592,11 @@ func verifyTrustKeyRejects(cases []conformance.AssignmentTicketTrustReject) erro
 	for _, c := range cases {
 		der, err := strictRawURL(c.PublicKeySPKIDERB64)
 		if c.Name == "empty_spki" {
-			if err == nil && len(der) != 0 {
+			if err != nil || len(der) != 0 {
 				return errors.New("empty SPKI case is not empty")
+			}
+			if _, parseErr := x509.ParsePKIXPublicKey(der); parseErr == nil {
+				return errors.New("empty SPKI unexpectedly parsed")
 			}
 			continue
 		}

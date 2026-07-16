@@ -85,6 +85,11 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 			af.ClaimsRejects[0].Derivation = &AssignmentTicketRepeatDerivation{Target: "claims_json", ASCIIChar: " ", Count: 1}
 		}), "ambiguous")
 	})
+	t.Run("ambiguous verifier input", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) {
+			af.VerifyRejects[0].Token = af.Golden.Token
+		}), "ambiguous")
+	})
 }
 
 func TestOpenAssignmentTicketArtifact(t *testing.T) {
