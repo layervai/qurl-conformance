@@ -71,6 +71,11 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 	t.Run("fence", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) { af.FenceVectors[0].Domain = "other" }), "fence")
 	})
+	t.Run("unknown fence encoding", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) {
+			af.FenceVectors[0].Parts[0].Encoding = "hex"
+		}), "unknown encoding")
+	})
 	t.Run("golden", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(af *AssignmentTicketFile) { af.Golden.SignatureB64URL = "AA" }), "signature")
 	})

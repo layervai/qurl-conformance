@@ -560,6 +560,8 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			if len(parts) != 3 || len(parts[1]) != af.Contract.MaxClaimsPartCharacters+1 || len(token) > af.Contract.MaxTicketASCIIBytes {
 				return errors.New("claims-part size reject does not isolate claims bound")
 			}
+		default:
+			return fmt.Errorf("unhandled verifier reject %q", c.Name)
 		}
 	}
 	return nil
@@ -599,6 +601,8 @@ func verifyTrustKeyRejects(cases []conformance.AssignmentTicketTrustReject) erro
 			if parseErr == nil {
 				return errors.New("malformed SPKI unexpectedly parsed")
 			}
+		default:
+			return fmt.Errorf("unhandled trust-key reject %q", c.Name)
 		}
 	}
 	return nil

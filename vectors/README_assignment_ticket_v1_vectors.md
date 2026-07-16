@@ -41,23 +41,24 @@ are all fixed so the independent verifier can reproduce the DER output and
 claims bytes exactly. Production KMS signatures remain nondeterministic.
 
 The positive ticket uses public `credential_kind=connector_bootstrap`. The
-private qurl-service row spelling `tunnel_bootstrap` appears only as the raw
-storage input to the credential fence and in the explicit public-wire reject.
-It is never an accepted ticket value. No assignment ticket contains an OTP:
-account registration obtains the user-entered OTP out of band and carries that
-OTP with the ticket in the single REG call.
+private storage discriminator `tunnel_bootstrap` appears only as the raw input
+to the credential fence and in the explicit public-wire reject. It is never an
+accepted ticket value. No assignment ticket contains an OTP: account
+registration obtains the user-entered OTP out of band and carries that OTP with
+the ticket in the single REG call.
 
 `lrt_body_template` composes the complete positive ticket into the exact LRT
 JSON shape. The derived body and complete encrypted NHP packet sizes prove the
 fixture stays below the frozen 3856-byte body and 4096-byte packet limits.
 
-`tools/verify-assignment-ticket` is deliberately separate from
-`tools/verify-sdk`: qurl-go and NHP carry qat1 opaquely, while qurl-service is
-the ticket producer and verifier. The standalone verifier therefore exercises
-the qat1 cryptography without adding a ticket parser to the SDK or NHP layer.
-It deliberately remains in the root Go module so `go test ./...` runs its tests
-in the standard root-module CI gate; publishing the command is an accepted
-tradeoff for automatically guarding every committed cryptographic byte.
+The independent assignment-ticket verifier is deliberately separate from
+exported-SDK coverage: SDK and NHP transport layers carry qat1 opaquely, while
+only the assignment authority produces and verifies it. The verifier therefore
+exercises qat1 cryptography without adding a ticket parser to either transport
+layer. It deliberately remains in the root Go module so `go test ./...` runs
+its tests in the standard root-module CI gate; publishing the command is an
+accepted tradeoff for automatically guarding every committed cryptographic
+byte.
 
 ## Fences
 
@@ -105,6 +106,8 @@ integer-encoding boundary rather than the name of a fourth fence. By contrast,
 `claims_rejects` carry executable parser inputs. The `wrong_audience` complete-
 verifier case includes a valid signature for its altered claims, so it isolates
 the claims boundary without depending on claims-before-signature check order.
+Trust-key rejects also carry concrete SPKI bytes: the independent verifier
+parses each input and proves the empty, malformed, and non-P256 cases reject.
 
 Reject classes are a closed, coarse consumer vocabulary:
 

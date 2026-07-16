@@ -207,6 +207,10 @@ var assignmentTicketFenceProfiles = map[string]string{
 	"existing":   "qurl-agent-assignment-existing-fence-v1",
 }
 
+var assignmentTicketFenceEncodings = map[string]struct{}{
+	"raw_bytes_b64url": {}, "utf8": {}, "uint64_be": {}, "bool_byte": {},
+}
+
 var assignmentTicketVerifyRejectNames = []string{
 	"altered_claims", "reordered_claims_original_signature", "claims_padding",
 	"claims_noncanonical_base64url", "signature_padding", "signature_noncanonical_base64url",
@@ -340,8 +344,11 @@ func validateAssignmentTicketFences(vectors []AssignmentTicketFenceVector) error
 			return fmt.Errorf("conformance: fence %q digest_b64url is invalid", vector.Name)
 		}
 		for _, part := range vector.Parts {
-			if part.Name == "" || part.Encoding == "" {
+			if part.Name == "" {
 				return fmt.Errorf("conformance: fence %q has incomplete part", vector.Name)
+			}
+			if _, ok := assignmentTicketFenceEncodings[part.Encoding]; !ok {
+				return fmt.Errorf("conformance: fence %q part %q has unknown encoding %q", vector.Name, part.Name, part.Encoding)
 			}
 			if _, err := hex.DecodeString(part.BytesHex); err != nil {
 				return fmt.Errorf("conformance: fence %q part %q bytes: %w", vector.Name, part.Name, err)
