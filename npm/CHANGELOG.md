@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.2.0...npm-v0.3.0) (2026-07-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** align ACK vectors with live producer ([#30](https://github.com/layervai/qurl-conformance/issues/30))
+
+### Features
+
+* add agent assignment wire vectors ([#34](https://github.com/layervai/qurl-conformance/issues/34)) ([1c008b9](https://github.com/layervai/qurl-conformance/commit/1c008b94b41c1ff0a5facd9c6caa5cccbaa050f1))
+* **vectors:** add agent API-key ID contract ([#31](https://github.com/layervai/qurl-conformance/issues/31)) ([faa4fb1](https://github.com/layervai/qurl-conformance/commit/faa4fb17939c144cd64afd04217cb91847820016))
+* **vectors:** add qat1 assignment ticket conformance ([#35](https://github.com/layervai/qurl-conformance/issues/35)) ([7d519ef](https://github.com/layervai/qurl-conformance/commit/7d519efd3e3216f0ea97f10b932bbf5d4fdc943d))
+* **vectors:** align ACK vectors with live producer ([#30](https://github.com/layervai/qurl-conformance/issues/30)) ([78bf85a](https://github.com/layervai/qurl-conformance/commit/78bf85a4408bd6c124f4d452b25c94919af52c1c))
+
 ## [0.2.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.1.3...npm-v0.2.0) (2026-07-14)
 
 
