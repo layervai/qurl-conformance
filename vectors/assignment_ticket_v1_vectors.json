@@ -1,0 +1,667 @@
+{
+  "artifact": "qurl-assignment-ticket-v1-vectors",
+  "schema_version": 1,
+  "description": "Synthetic qat1 assignment-ticket signing, strict-verification, and optimistic-fence vectors. Every credential, key, identifier, and signature is test-only.",
+  "contract": {
+    "token_prefix": "qat1",
+    "signing_algorithm": "ECDSA_P256_SHA256",
+    "signing_domain": "qurl-agent-assignment-ticket-v1",
+    "signing_separator_hex": "00",
+    "signature_encoding": "raw_r_s_low_s",
+    "kms_message_type": "DIGEST",
+    "kms_output_encoding": "ASN.1_DER",
+    "max_ticket_ascii_bytes": 2304,
+    "max_claims_part_characters": 2048,
+    "max_claims_json_bytes": 1536,
+    "raw_signature_bytes": 64,
+    "signature_part_characters": 86,
+    "max_kid_characters": 64,
+    "digest_characters": 43,
+    "agent_public_key_characters": 44,
+    "max_lifetime_seconds": 900,
+    "not_before_offset_seconds": -30,
+    "nhp_body_max_bytes": 3856,
+    "nhp_packet_max_bytes": 4096,
+    "claim_order": [
+      "v",
+      "iss",
+      "aud",
+      "environment_id",
+      "kid",
+      "iat",
+      "nbf",
+      "exp",
+      "jti",
+      "agent_id",
+      "agent_public_key_b64",
+      "credential_key_hash_b64",
+      "credential_key_id",
+      "credential_kind",
+      "credential_fence_b64",
+      "placement_mode",
+      "cell_id",
+      "assignment_generation",
+      "endpoint_revision",
+      "cell_fence_b64",
+      "assignment_fence_b64"
+    ],
+    "credential_kinds": [
+      "bootstrap",
+      "connector_bootstrap",
+      "account",
+      "agent"
+    ],
+    "placement_modes": [
+      "new",
+      "existing"
+    ]
+  },
+  "synthetic_signing_key": {
+    "kid": "assignment-2026-01",
+    "curve": "P-256",
+    "private_scalar_hex": "690265ef5f091a89b26cbaca28fc7226a6cda07d49d1c82a1dc6ab2b262ad753",
+    "public_key_spki_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELNZ6_o2LxLdpC2azrVC3V2cL5qsdusq6pq-ojxeR7FseZNDZBelGpUITFQDPB4ONmtbihGYCsq_aIfjJ2_n4rQ",
+    "jwk": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "LNZ6_o2LxLdpC2azrVC3V2cL5qsdusq6pq-ojxeR7Fs",
+      "y": "HmTQ2QXpRqVCExUAzweDjZrW4oRmArKv2iH4ydv5-K0"
+    }
+  },
+  "fence_vectors": [
+    {
+      "name": "connector_bootstrap_credential_snapshot",
+      "kind": "credential",
+      "domain": "qurl-agent-assignment-credential-fence-v1",
+      "parts": [
+        {
+          "name": "credential_key_hash",
+          "encoding": "raw_bytes_b64url",
+          "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+          "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+        },
+        {
+          "name": "credential_key_id",
+          "encoding": "utf8",
+          "value": "key_AbCdEf123456",
+          "bytes_hex": "6b65795f416243644566313233343536"
+        },
+        {
+          "name": "owner_id",
+          "encoding": "utf8",
+          "value": "owner-qat1-vector",
+          "bytes_hex": "6f776e65722d716174312d766563746f72"
+        },
+        {
+          "name": "status",
+          "encoding": "utf8",
+          "value": "active",
+          "bytes_hex": "616374697665"
+        },
+        {
+          "name": "raw_key_type",
+          "encoding": "utf8",
+          "value": "tunnel_bootstrap",
+          "bytes_hex": "74756e6e656c5f626f6f747374726170"
+        },
+        {
+          "name": "scope_count",
+          "encoding": "uint64_be",
+          "value": "2",
+          "bytes_hex": "0000000000000002"
+        },
+        {
+          "name": "scope_0",
+          "encoding": "utf8",
+          "value": "qurl:agent",
+          "bytes_hex": "7175726c3a6167656e74"
+        },
+        {
+          "name": "scope_1",
+          "encoding": "utf8",
+          "value": "qurl:write",
+          "bytes_hex": "7175726c3a7772697465"
+        },
+        {
+          "name": "expires_at",
+          "encoding": "utf8",
+          "value": "2026-07-16T00:30:00Z",
+          "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+        },
+        {
+          "name": "tunnel_slug",
+          "encoding": "utf8",
+          "value": "connector-qat1",
+          "bytes_hex": "636f6e6e6563746f722d71617431"
+        },
+        {
+          "name": "has_counter",
+          "encoding": "bool_byte",
+          "value": "false",
+          "bytes_hex": "00"
+        },
+        {
+          "name": "has_agent_counter",
+          "encoding": "bool_byte",
+          "value": "false",
+          "bytes_hex": "00"
+        },
+        {
+          "name": "consumed_at",
+          "encoding": "utf8",
+          "value": "",
+          "bytes_hex": ""
+        },
+        {
+          "name": "consumed_agent_id",
+          "encoding": "utf8",
+          "value": "",
+          "bytes_hex": ""
+        }
+      ],
+      "preimage_hex": "7175726c2d6167656e742d61737369676e6d656e742d63726564656e7469616c2d66656e63652d76310000000000000000203cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a700000000000000106b65795f41624364456631323334353600000000000000116f776e65722d716174312d766563746f720000000000000006616374697665000000000000001074756e6e656c5f626f6f74737472617000000000000000080000000000000002000000000000000a7175726c3a6167656e74000000000000000a7175726c3a77726974650000000000000014323032362d30372d31365430303a33303a30305a000000000000000e636f6e6e6563746f722d7161743100000000000000010000000000000000010000000000000000000000000000000000",
+      "digest_hex": "49097611fd040803696ea6f4cc79cd8324344366e0c48f8c7f94a094d7203061",
+      "digest_b64url": "SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE"
+    },
+    {
+      "name": "active_cell_snapshot",
+      "kind": "cell",
+      "domain": "qurl-agent-assignment-cell-fence-v1",
+      "parts": [
+        {
+          "name": "cell_id",
+          "encoding": "utf8",
+          "value": "cell0",
+          "bytes_hex": "63656c6c30"
+        },
+        {
+          "name": "status",
+          "encoding": "utf8",
+          "value": "active",
+          "bytes_hex": "616374697665"
+        },
+        {
+          "name": "endpoint_revision",
+          "encoding": "uint64_be",
+          "value": "7",
+          "bytes_hex": "0000000000000007"
+        },
+        {
+          "name": "nhp_host",
+          "encoding": "utf8",
+          "value": "cell0.nhp.layerv.ai",
+          "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+        },
+        {
+          "name": "nhp_port",
+          "encoding": "uint64_be",
+          "value": "62206",
+          "bytes_hex": "000000000000f2fe"
+        },
+        {
+          "name": "server_public_key_b64",
+          "encoding": "utf8",
+          "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+          "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+        },
+        {
+          "name": "selection_weight_storage",
+          "encoding": "utf8",
+          "value": "100",
+          "bytes_hex": "313030"
+        },
+        {
+          "name": "updated_at_storage",
+          "encoding": "utf8",
+          "value": "2026-07-15T23:55:00.123456789Z",
+          "bytes_hex": "323032362d30372d31355432333a35353a30302e3132333435363738395a"
+        }
+      ],
+      "preimage_hex": "7175726c2d6167656e742d61737369676e6d656e742d63656c6c2d66656e63652d763100000000000000000563656c6c30000000000000000661637469766500000000000000080000000000000007000000000000001363656c6c302e6e68702e6c61796572762e61690000000000000008000000000000f2fe000000000000002c494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d0000000000000003313030000000000000001e323032362d30372d31355432333a35353a30302e3132333435363738395a",
+      "digest_hex": "8ad299f895187cf48bbd5a50347be329eb260f74db0ff805ed3378ceea27838f",
+      "digest_b64url": "itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48"
+    },
+    {
+      "name": "existing_assignment_snapshot",
+      "kind": "existing",
+      "domain": "qurl-agent-assignment-existing-fence-v1",
+      "parts": [
+        {
+          "name": "agent_id",
+          "encoding": "utf8",
+          "value": "agent-final-id",
+          "bytes_hex": "6167656e742d66696e616c2d6964"
+        },
+        {
+          "name": "cell_id",
+          "encoding": "utf8",
+          "value": "cell0",
+          "bytes_hex": "63656c6c30"
+        },
+        {
+          "name": "assignment_generation",
+          "encoding": "uint64_be",
+          "value": "4",
+          "bytes_hex": "0000000000000004"
+        },
+        {
+          "name": "state",
+          "encoding": "utf8",
+          "value": "active",
+          "bytes_hex": "616374697665"
+        },
+        {
+          "name": "created_at_storage",
+          "encoding": "utf8",
+          "value": "2026-06-01T12:00:00Z",
+          "bytes_hex": "323032362d30362d30315431323a30303a30305a"
+        },
+        {
+          "name": "updated_at_storage",
+          "encoding": "utf8",
+          "value": "2026-07-15T23:50:00.000000000Z",
+          "bytes_hex": "323032362d30372d31355432333a35303a30302e3030303030303030305a"
+        }
+      ],
+      "preimage_hex": "7175726c2d6167656e742d61737369676e6d656e742d6578697374696e672d66656e63652d763100000000000000000e6167656e742d66696e616c2d6964000000000000000563656c6c300000000000000008000000000000000400000000000000066163746976650000000000000014323032362d30362d30315431323a30303a30305a000000000000001e323032362d30372d31355432333a35303a30302e3030303030303030305a",
+      "digest_hex": "d89488aab6d010fb64b23c636785ba50f51a7fe9dc8ca3b7f64d49e79e3721d6",
+      "digest_b64url": "2JSIqrbQEPtksjxjZ4W6UPUaf-ncjKO39k1J5543IdY"
+    }
+  ],
+  "golden": {
+    "environment_id": "sandbox",
+    "verify_at_unix": 1784160030,
+    "clock_unix": 1784160000,
+    "jti_random_hex": "000102030405060708090a0b0c0d0e0f",
+    "synthetic_ecdsa_nonce_hex": "9d6ea83f1246c4d65177acaa3feb7cec81ae1af4d252cd4b97f4dbc44fc1340f",
+    "synthetic_presented_credential": "lv_test_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789ABCDEFG",
+    "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}",
+    "claims_utf8_hex": "7b2276223a312c22697373223a227175726c2d61737369676e6d656e742d617574686f72697479222c22617564223a227175726c2d6167656e742d726567697374726174696f6e222c22656e7669726f6e6d656e745f6964223a2273616e64626f78222c226b6964223a2261737369676e6d656e742d323032362d3031222c22696174223a313738343136303030302c226e6266223a313738343135393937302c22657870223a313738343136303930302c226a7469223a2261746a5f41414543417751464267634943516f4c4441304f4477222c226167656e745f6964223a226167656e742d66696e616c2d6964222c226167656e745f7075626c69635f6b65795f623634223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b61477877644868383d222c2263726564656e7469616c5f6b65795f686173685f623634223a22504e73656e4346476f636e35352d57426a476f4e3367446a4c34596d455378763770306c672d6355786163222c2263726564656e7469616c5f6b65795f6964223a226b65795f416243644566313233343536222c2263726564656e7469616c5f6b696e64223a22636f6e6e6563746f725f626f6f747374726170222c2263726564656e7469616c5f66656e63655f623634223a2253516c324566304543414e70627162307a486e4e677951305132626778492d4d663553676c4e63674d4745222c22706c6163656d656e745f6d6f6465223a226e6577222c2263656c6c5f6964223a2263656c6c30222c2261737369676e6d656e745f67656e65726174696f6e223a312c22656e64706f696e745f7265766973696f6e223a372c2263656c6c5f66656e63655f623634223a2269744b5a2d4a55596650534c765670514e48766a4b65736d44335462445f674637544e347a756f6e673438227d",
+    "claims_b64url": "eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In0",
+    "signing_preimage_hex": "7175726c2d6167656e742d61737369676e6d656e742d7469636b65742d76310065794a32496a6f784c434a7063334d694f694a7864584a734c57467a63326c6e626d316c626e5174595856306147397961585235496977695958566b496a6f6963585679624331685a325675644331795a5764706333527959585270623234694c434a6c626e5a70636d397562575675644639705a434936496e4e68626d5269623367694c434a72615751694f694a6863334e705a3235745a5735304c5449774d6a59744d4445694c434a70595851694f6a45334f4451784e6a41774d444173496d35695a6949364d5463344e4445314f546b334d4377695a586877496a6f784e7a67304d5459774f5441774c434a7164476b694f694a6864477066515546465130463355555a435a324e4a51314676544552424d45394564794973496d466e5a57353058326c6b496a6f695957646c626e51745a6d6c7559577774615751694c434a685a3256756446397764574a7361574e6661325635583249324e434936496b464252554e4264314647516d646a53554e52623078455154425052486842556b566f54565647556c6c5952304a725955643464325249614467394969776959334a6c5a47567564476c68624639725a586c666147467a614639694e6a51694f694a51546e4e6c626b4e475232396a626a55314c566443616b6476546a4e6e5247704d4e466c7452564e34646a64774d47786e4c574e566547466a4969776959334a6c5a47567564476c68624639725a586c66615751694f694a725a586c6651574a445a45566d4d54497a4e4455324969776959334a6c5a47567564476c68624639726157356b496a6f6959323975626d566a6447397958324a766233527a64484a6863434973496d4e795a57526c626e5270595778665a6d567559325666596a5930496a6f69553146734d6b566d4d45564451553577596e46694d487049626b356e6556457755544a695a33684a4c55316d4e564e6e6245356a5a30314852534973496e427359574e6c62575675644639746232526c496a6f69626d56334969776959325673624639705a434936496d4e6c624777774969776959584e7a61576475625756756446396e5a57356c636d463061573975496a6f784c434a6c626d527762326c75644639795a585a7063326c76626949364e797769593256736246396d5a57356a5a5639694e6a51694f694a70644574614c55705657575a5155307832566e4252546b6832616b746c633231454d3152695246396e526a6455546a5236645739755a7a5134496e30",
+    "signing_digest_hex": "cdfd50f0fb6708def878efc7820128b463ea7ba06d9c0a07196b7699d5e5fb87",
+    "kms_signature_der_hex": "3046022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d7926c",
+    "kms_signature_der_b64": "MEYCIQD1pcgcn4UWtx1qBIog+3FGXyWn0FwqKbnPbn8x3rlHMgIhALy0CKGtrmjRO1ySlNXFvNfQHVJ5cUFmGPXZQmLw15Js",
+    "raw_low_s_signature_hex": "f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732434bf75d5251972fc4a36d6b2a3a4327ecc9a83435d6386bfde088600b8b92e5",
+    "signature_b64url": "9aXIHJ-FFrcdagSKIPtxRl8lp9BcKim5z25_Md65RzJDS_ddUlGXL8SjbWsqOkMn7MmoNDXWOGv94IhgC4uS5Q",
+    "token": "qat1.eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In0.9aXIHJ-FFrcdagSKIPtxRl8lp9BcKim5z25_Md65RzJDS_ddUlGXL8SjbWsqOkMn7MmoNDXWOGv94IhgC4uS5Q",
+    "lrt_body_template": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-final-id\",\"registration\":{\"key_id\":\"key_AbCdEf123456\",\"key_kind\":\"connector_bootstrap\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"lease_expires_at\":\"2026-07-16T00:30:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\"}},\"assignment_ticket\":\"${qat1_token}\",\"assignment_ticket_expires_at\":\"2026-07-16T00:15:00Z\"}}",
+    "ticket_marker": "${qat1_token}",
+    "nhp_packet_overhead_bytes": 256,
+    "lrt_body_bytes": 1521,
+    "complete_nhp_packet_bytes": 1777
+  },
+  "verify_rejects": [
+    {
+      "name": "altered_claims",
+      "reject_class": "signature",
+      "reason": "Changing endpoint_revision from 7 to 8 while retaining the original signature must fail.",
+      "claims_b64url": "eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6OCwiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In0",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "reordered_claims_original_signature",
+      "reject_class": "signature",
+      "reason": "Semantically equivalent claims reserialized in reverse key order are different signed bytes.",
+      "claims_b64url": "eyJjZWxsX2ZlbmNlX2I2NCI6Iml0S1otSlVZZlBTTHZWcFFOSHZqS2VzbUQzVGJEX2dGN1RONHp1b25nNDgiLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJjZWxsX2lkIjoiY2VsbDAiLCJwbGFjZW1lbnRfbW9kZSI6Im5ldyIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsImNyZWRlbnRpYWxfa2luZCI6ImNvbm5lY3Rvcl9ib290c3RyYXAiLCJjcmVkZW50aWFsX2tleV9pZCI6ImtleV9BYkNkRWYxMjM0NTYiLCJjcmVkZW50aWFsX2tleV9oYXNoX2I2NCI6IlBOc2VuQ0ZHb2NuNTUtV0JqR29OM2dEakw0WW1FU3h2N3AwbGctY1V4YWMiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiYWdlbnRfaWQiOiJhZ2VudC1maW5hbC1pZCIsImp0aSI6ImF0al9BQUVDQXdRRkJnY0lDUW9MREEwT0R3IiwiZXhwIjoxNzg0MTYwOTAwLCJuYmYiOjE3ODQxNTk5NzAsImlhdCI6MTc4NDE2MDAwMCwia2lkIjoiYXNzaWdubWVudC0yMDI2LTAxIiwiZW52aXJvbm1lbnRfaWQiOiJzYW5kYm94IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwidiI6MX0",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "claims_padding",
+      "reject_class": "encoding",
+      "reason": "qat1 claims use unpadded canonical base64url.",
+      "claims_b64url": "eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In0=",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "claims_noncanonical_base64url",
+      "reject_class": "encoding",
+      "reason": "Non-zero trailing pad bits decode to the same bytes but are not canonical.",
+      "claims_b64url": "eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1hZ2VudC1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In1",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "signature_padding",
+      "reject_class": "encoding",
+      "reason": "qat1 signatures use unpadded canonical base64url.",
+      "signature_b64url": "9aXIHJ-FFrcdagSKIPtxRl8lp9BcKim5z25_Md65RzJDS_ddUlGXL8SjbWsqOkMn7MmoNDXWOGv94IhgC4uS5Q=",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "signature_noncanonical_base64url",
+      "reject_class": "encoding",
+      "reason": "Non-zero trailing pad bits are rejected even when decoded bytes match.",
+      "signature_b64url": "9aXIHJ-FFrcdagSKIPtxRl8lp9BcKim5z25_Md65RzJDS_ddUlGXL8SjbWsqOkMn7MmoNDXWOGv94IhgC4uS5R",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "high_s_raw_signature",
+      "reject_class": "high_s",
+      "reason": "A mathematically valid high-S raw signature is noncanonical.",
+      "signature_b64url": "9aXIHJ-FFrcdagSKIPtxRl8lp9BcKim5z25_Md65RzK8tAihra5o0TtckpTVxbzX0B1SeXFBZhj12UJi8NeSbA",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "malformed_raw_signature",
+      "reject_class": "wrong_length",
+      "reason": "Raw r||s is exactly 64 bytes.",
+      "signature_b64url": "AA",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "wrong_kid",
+      "reject_class": "unknown_kid",
+      "reason": "The claims kid is absent from this environment-bound trust store.",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-02",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "wrong_environment",
+      "reject_class": "environment",
+      "reason": "A sandbox ticket cannot verify in production even under the same public key.",
+      "expected_environment_id": "production",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "wrong_signing_domain",
+      "reject_class": "signature",
+      "reason": "This signature is valid only for qurl-agent-assignment-ticket-v0.",
+      "signature_b64url": "Hx9Q_08A62nqHrIDNXhujjd0yNSehprV0dtHdjTZfrhAsCMH15JQxkHAMbtKqApvBauVBr5U46kKypiFPL6Jkg",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "wrong_audience",
+      "reject_class": "claims",
+      "reason": "The closed audience is qurl-agent-registration.",
+      "claims_b64url": "eyJ2IjoxLCJpc3MiOiJxdXJsLWFzc2lnbm1lbnQtYXV0aG9yaXR5IiwiYXVkIjoicXVybC1vdGhlci1yZWdpc3RyYXRpb24iLCJlbnZpcm9ubWVudF9pZCI6InNhbmRib3giLCJraWQiOiJhc3NpZ25tZW50LTIwMjYtMDEiLCJpYXQiOjE3ODQxNjAwMDAsIm5iZiI6MTc4NDE1OTk3MCwiZXhwIjoxNzg0MTYwOTAwLCJqdGkiOiJhdGpfQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImFnZW50X2lkIjoiYWdlbnQtZmluYWwtaWQiLCJhZ2VudF9wdWJsaWNfa2V5X2I2NCI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHhBUkVoTVVGUllYR0JrYUd4d2RIaDg9IiwiY3JlZGVudGlhbF9rZXlfaGFzaF9iNjQiOiJQTnNlbkNGR29jbjU1LVdCakdvTjNnRGpMNFltRVN4djdwMGxnLWNVeGFjIiwiY3JlZGVudGlhbF9rZXlfaWQiOiJrZXlfQWJDZEVmMTIzNDU2IiwiY3JlZGVudGlhbF9raW5kIjoiY29ubmVjdG9yX2Jvb3RzdHJhcCIsImNyZWRlbnRpYWxfZmVuY2VfYjY0IjoiU1FsMkVmMEVDQU5wYnFiMHpIbk5neVEwUTJiZ3hJLU1mNVNnbE5jZ01HRSIsInBsYWNlbWVudF9tb2RlIjoibmV3IiwiY2VsbF9pZCI6ImNlbGwwIiwiYXNzaWdubWVudF9nZW5lcmF0aW9uIjoxLCJlbmRwb2ludF9yZXZpc2lvbiI6NywiY2VsbF9mZW5jZV9iNjQiOiJpdEtaLUpVWWZQU0x2VnBRTkh2aktlc21EM1RiRF9nRjdUTjR6dW9uZzQ4In0",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    },
+    {
+      "name": "not_yet_valid",
+      "reject_class": "time",
+      "reason": "nbf is inclusive and this clock is one second earlier.",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784159969
+    },
+    {
+      "name": "expired",
+      "reject_class": "time",
+      "reason": "exp is exclusive.",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160900
+    },
+    {
+      "name": "ticket_too_large",
+      "reject_class": "size",
+      "reason": "The verifier rejects before parsing when the complete ASCII ticket exceeds 2304 bytes.",
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030,
+      "derivation": {
+        "target": "token",
+        "ascii_char": "A",
+        "count": 2305
+      }
+    },
+    {
+      "name": "claims_part_too_large",
+      "reject_class": "size",
+      "reason": "The claims segment cannot exceed 2048 characters.",
+      "derivation": {"target": "claims_part", "ascii_char": "A", "count": 2049},
+      "expected_environment_id": "sandbox",
+      "trusted_kid": "assignment-2026-01",
+      "verify_at_unix": 1784160030
+    }
+  ],
+  "claims_rejects": [
+    {
+      "name": "duplicate_claim",
+      "reject_class": "claims",
+      "reason": "Duplicate v is ambiguous and must fail before typed decode.",
+      "claims_json": "{\"v\":1,\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "unknown_claim",
+      "reject_class": "claims",
+      "reason": "The claims object is closed.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\",\"extra\":true}"
+    },
+    {
+      "name": "trailing_json",
+      "reject_class": "claims",
+      "reason": "A second JSON value after the claims object is forbidden.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"} {}"
+    },
+    {
+      "name": "null_claim",
+      "reject_class": "claims",
+      "reason": "Present null is not equivalent to a valid scalar.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":null,\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "invalid_nbf_relation",
+      "reject_class": "time",
+      "reason": "nbf must equal iat minus 30 exactly.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159971,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "exp_not_after_iat",
+      "reject_class": "time",
+      "reason": "exp must be strictly after iat.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160000,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "lifetime_too_long",
+      "reject_class": "time",
+      "reason": "The v1 lifetime cannot exceed 900 seconds.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160901,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "new_with_assignment_fence",
+      "reject_class": "claims",
+      "reason": "assignment_fence_b64 is forbidden for new placement.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\",\"assignment_fence_b64\":\"2JSIqrbQEPtksjxjZ4W6UPUaf-ncjKO39k1J5543IdY\"}"
+    },
+    {
+      "name": "existing_without_assignment_fence",
+      "reject_class": "claims",
+      "reason": "Existing placement requires assignment_fence_b64.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"existing\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "private_tunnel_bootstrap_kind",
+      "reject_class": "claims",
+      "reason": "tunnel_bootstrap is a private storage discriminator, not public qat1 vocabulary.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"tunnel_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "unknown_credential_kind",
+      "reject_class": "claims",
+      "reason": "Unknown credential kinds fail closed.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"future\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "credential_hash_wrong_length",
+      "reject_class": "key_length",
+      "reason": "Credential hashes are exactly 32 bytes / 43 base64url characters.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUx\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "credential_fence_wrong_length",
+      "reject_class": "key_length",
+      "reason": "Credential fences are exactly 32 bytes / 43 base64url characters.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMG\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "cell_fence_wrong_length",
+      "reject_class": "key_length",
+      "reason": "Cell fences are exactly 32 bytes / 43 base64url characters.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong4\"}"
+    },
+    {
+      "name": "assignment_fence_wrong_length",
+      "reject_class": "key_length",
+      "reason": "Existing-assignment fences are exactly 32 bytes / 43 base64url characters.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"existing\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\",\"assignment_fence_b64\":\"2JSIqrbQEPtksjxjZ4W6UPUaf-ncjKO39k1J5543Id\"}"
+    },
+    {
+      "name": "agent_public_key_wrong_length",
+      "reject_class": "key_length",
+      "reason": "The authenticated X25519 peer key is exactly 32 bytes in canonical padded base64.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHg==\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "kid_too_long",
+      "reject_class": "claims",
+      "reason": "kid is bounded to 64 characters.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "invalid_environment",
+      "reject_class": "claims",
+      "reason": "environment_id is lowercase canonical ASCII and environment-bound.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"Sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0ODw\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "jti_wrong_length",
+      "reject_class": "key_length",
+      "reason": "jti is atj_ plus exactly 22 unpadded base64url characters for 16 bytes.",
+      "claims_json": "{\"v\":1,\"iss\":\"qurl-assignment-authority\",\"aud\":\"qurl-agent-registration\",\"environment_id\":\"sandbox\",\"kid\":\"assignment-2026-01\",\"iat\":1784160000,\"nbf\":1784159970,\"exp\":1784160900,\"jti\":\"atj_AAECAwQFBgcICQoLDA0OD\",\"agent_id\":\"agent-final-id\",\"agent_public_key_b64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"credential_key_hash_b64\":\"PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac\",\"credential_key_id\":\"key_AbCdEf123456\",\"credential_kind\":\"connector_bootstrap\",\"credential_fence_b64\":\"SQl2Ef0ECANpbqb0zHnNgyQ0Q2bgxI-Mf5SglNcgMGE\",\"placement_mode\":\"new\",\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":7,\"cell_fence_b64\":\"itKZ-JUYfPSLvVpQNHvjKesmD3TbD_gF7TN4zuong48\"}"
+    },
+    {
+      "name": "claims_json_too_large",
+      "reject_class": "size",
+      "reason": "Decoded claims JSON cannot exceed 1536 bytes.",
+      "derivation": {
+        "target": "claims_json",
+        "ascii_char": " ",
+        "count": 1537
+      }
+    }
+  ],
+  "kms_der_cases": [
+    {
+      "name": "kms_high_s_normalizes",
+      "outcome": "accept",
+      "reason": "KMS may return high-S DER; the producer normalizes S before fixed-width raw encoding.",
+      "der_hex": "3046022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d7926c",
+      "expected_raw_low_s_hex": "f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732434bf75d5251972fc4a36d6b2a3a4327ecc9a83435d6386bfde088600b8b92e5"
+    },
+    {
+      "name": "malformed_truncated",
+      "outcome": "reject",
+      "reject_class": "der",
+      "reason": "Truncated ASN.1 must fail.",
+      "der_hex": "3046022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d792"
+    },
+    {
+      "name": "malformed_trailing_data",
+      "outcome": "reject",
+      "reject_class": "der",
+      "reason": "A second/trailing DER byte is forbidden.",
+      "der_hex": "3046022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d7926c00"
+    },
+    {
+      "name": "invalid_zero_r",
+      "outcome": "reject",
+      "reject_class": "der",
+      "reason": "ECDSA r must be in [1,N-1].",
+      "der_hex": "3006020100020101"
+    },
+    {
+      "name": "invalid_out_of_range_s",
+      "outcome": "reject",
+      "reject_class": "der",
+      "reason": "ECDSA s equal to curve order N is invalid.",
+      "der_hex": "3026020101022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"
+    }
+  ],
+  "fence_rejects": [
+    {
+      "name": "credential_hash_wrong_length",
+      "fence_kind": "credential",
+      "reject_class": "key_length",
+      "reason": "The raw credential hash part must be exactly 32 bytes.",
+      "mutation": "truncate credential_key_hash to 31 bytes"
+    },
+    {
+      "name": "credential_scopes_unsorted",
+      "fence_kind": "credential",
+      "reject_class": "fence_input",
+      "reason": "Scopes must be a canonical lexical byte-order set before framing.",
+      "mutation": "swap scope_0 and scope_1"
+    },
+    {
+      "name": "credential_scopes_duplicate",
+      "fence_kind": "credential",
+      "reject_class": "fence_input",
+      "reason": "Duplicate scopes are forbidden before framing.",
+      "mutation": "set scope_1 equal to scope_0"
+    },
+    {
+      "name": "uint64_negative_or_overflow",
+      "fence_kind": "all",
+      "reject_class": "fence_input",
+      "reason": "Integer parts are unsigned 64-bit big-endian.",
+      "mutation": "supply -1 or a value greater than 18446744073709551615"
+    },
+    {
+      "name": "bool_not_single_byte",
+      "fence_kind": "credential",
+      "reject_class": "fence_input",
+      "reason": "Boolean parts are exactly one byte 00 or 01.",
+      "mutation": "encode has_counter as UTF-8 false"
+    },
+    {
+      "name": "missing_required_cell_part",
+      "fence_kind": "cell",
+      "reject_class": "fence_input",
+      "reason": "A fence cannot silently omit a snapshot field.",
+      "mutation": "omit updated_at_storage"
+    }
+  ],
+  "trust_key_rejects": [
+    {
+      "name": "wrong_curve",
+      "reject_class": "key_length",
+      "reason": "The environment trust store accepts only P-256 public keys.",
+      "public_key_spki_der_b64url": "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEqofKIr6LBTeOscce8yCtdG4dO2KLp5uYWfdB4IJUKjhVAvJdv1UpbDpUXjhydgq3NhfeSpYmLG9dnpi_kpLcKfj0Hb0omhR86doxE7XwuMAKYLHOHX6BnXpDHXyQ6g5f"
+    },
+    {
+      "name": "malformed_spki",
+      "reject_class": "key_length",
+      "reason": "Malformed DER cannot enter the trust store.",
+      "public_key_spki_der_b64url": "AA"
+    },
+    {
+      "name": "empty_spki",
+      "reject_class": "key_length",
+      "reason": "An empty key cannot enter the trust store.",
+      "public_key_spki_der_b64url": ""
+    }
+  ]
+}

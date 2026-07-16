@@ -27,6 +27,8 @@ trust.
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
 | `vectors/agent_api_key_id_vectors.json` | issuer and strict-consumer fixtures for agent registration `key_id` / `device_api_key_id` |
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
+| `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
+| `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -42,6 +44,7 @@ ar, err := conformance.AgentRegistrationGolden()   // strict-parsed agent-regist
 aa, err := conformance.AgentAssignmentGolden()     // strict-parsed assignment/REG/completion packets + errors
 ka, err := conformance.AgentKnockApplication()      // strict-parsed agent KNK/ACK application vectors
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
+at, err := conformance.AssignmentTicket()            // strict-parsed qat1 cryptographic/fence artifact
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -50,7 +53,8 @@ artifact, so the contract can never silently drop out of a test suite.
 
 ## Using it from another language
 
-Copy `qv2_conformance_vectors.json` **and** `issuer_signature_vectors.json`
+Copy the artifact your implementation consumes (and, for qURL v2,
+`qv2_conformance_vectors.json` **and** `issuer_signature_vectors.json`)
 verbatim (same bytes, no reformatting), load them with a strict JSON reader that
 rejects duplicate keys and unknown fields, route each class's input to your real
 entry point, and assert the declared outcome. Treat a missing fixture as a hard
@@ -154,6 +158,12 @@ This module hosts six artifact families, each under its own `artifact` id:
   exact `key_` plus 12 ASCII-alphanumeric grammar without reinterpreting the
   synthetic NHP registration packet `usrId`. See
   `vectors/README_agent_api_key_id_vectors.md`.
+- **Assignment ticket v1** (`qurl-assignment-ticket-v1-vectors`,
+  `assignment_ticket_v1_vectors.json`) — exact qat1 claims bytes, signing digest,
+  synthetic KMS DER-to-raw-low-S conversion, complete ticket, credential/cell/
+  existing-assignment fences, NHP size budget, and closed reject suites. NHP
+  carries this ticket opaquely. See
+  `vectors/README_assignment_ticket_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

@@ -5,3 +5,4 @@ export declare function agentRegistrationVectors(): unknown;
 export declare function agentAssignmentVectors(): unknown;
 export declare function agentKnockApplicationVectors(): unknown;
 export declare function agentApiKeyIdVectors(): unknown;
+export declare function assignmentTicketVectors(): unknown;

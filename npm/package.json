@@ -1,7 +1,7 @@
 {
   "name": "@layervai/qurl-conformance",
   "version": "0.2.0",
-  "description": "qURL v2 cross-language conformance vectors",
+  "description": "qURL cross-language conformance vectors",
   "license": "MIT",
   "type": "commonjs",
   "main": "index.js",
@@ -25,7 +25,8 @@
     "./agent_registration_golden.json": "./vectors/agent_registration_golden.json",
     "./agent_assignment_golden.json": "./vectors/agent_assignment_golden.json",
     "./agent_knock_application_vectors.json": "./vectors/agent_knock_application_vectors.json",
-    "./agent_api_key_id_vectors.json": "./vectors/agent_api_key_id_vectors.json"
+    "./agent_api_key_id_vectors.json": "./vectors/agent_api_key_id_vectors.json",
+    "./assignment_ticket_v1_vectors.json": "./vectors/assignment_ticket_v1_vectors.json"
   },
   "repository": {
     "type": "git",

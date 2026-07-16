@@ -78,6 +78,7 @@ jobs:
           const s = c.agentAssignmentVectors();
           const k = c.agentKnockApplicationVectors();
           const i = c.agentApiKeyIdVectors();
+          const t = c.assignmentTicketVectors();
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
@@ -171,7 +172,12 @@ jobs:
               !idValuesAgree ||
               idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.registration_info_accept_with_companion_field.expected_id !== 'key_A1b2C3d4E5f6' ||
-              idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse') {
+              idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse' ||
+              t.artifact !== 'qurl-assignment-ticket-v1-vectors' || t.schema_version !== 1 ||
+              t.golden.token.split('.').length !== 3 || t.golden.signature_b64url.length !== 86 ||
+              t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
+              t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
+              t.contract.credential_kinds.includes('tunnel_bootstrap')) {
             process.exit(1);
           }
           console.log('npm ok');
@@ -192,6 +198,7 @@ jobs:
           s = q.agent_assignment_vectors()
           k = q.agent_knock_application_vectors()
           i = q.agent_api_key_id_vectors()
+          t = q.assignment_ticket_vectors()
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
@@ -291,6 +298,11 @@ jobs:
           assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['registration_info_accept_with_companion_field']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
+          assert t['artifact'] == 'qurl-assignment-ticket-v1-vectors' and t['schema_version'] == 1
+          assert len(t['golden']['token'].split('.')) == 3 and len(t['golden']['signature_b64url']) == 86
+          assert t['golden']['lrt_body_bytes'] <= t['contract']['nhp_body_max_bytes']
+          assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
+          assert 'tunnel_bootstrap' not in t['contract']['credential_kinds']
           print('py ok')
           PY
 

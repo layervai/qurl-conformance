@@ -1,4 +1,4 @@
-"""qURL v2 cross-language conformance vectors (Python accessor)."""
+"""qURL cross-language conformance vectors (Python accessor)."""
 import json
 from importlib import resources
 
@@ -40,3 +40,8 @@ def agent_knock_application_vectors():
 def agent_api_key_id_vectors():
     """Return the parsed agent_api_key_id_vectors.json."""
     return _load("agent_api_key_id_vectors.json")
+
+
+def assignment_ticket_vectors():
+    """Return the parsed assignment_ticket_v1_vectors.json."""
+    return _load("assignment_ticket_v1_vectors.json")

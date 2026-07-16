@@ -12,4 +12,5 @@ module.exports = {
   agentAssignmentVectors: () => load("agent_assignment_golden.json"),
   agentKnockApplicationVectors: () => load("agent_knock_application_vectors.json"),
   agentApiKeyIdVectors: () => load("agent_api_key_id_vectors.json"),
+  assignmentTicketVectors: () => load("assignment_ticket_v1_vectors.json"),
 };
