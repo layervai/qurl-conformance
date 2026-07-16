@@ -116,7 +116,9 @@ This module hosts six artifact families, each under its own `artifact` id:
   malformed-body rejects. Its compact authenticated request/result case sets
   separately pin duplicate-aware JSON parsing, exact case-sensitive keys,
   unknown-field rejection, phase semantics, secret non-disclosure, and the rule
-  that clients cannot supply owner identity or cell placement. The loader also
+  that clients cannot supply owner identity or cell placement. The artifact
+  notes define the consumer-neutral reject vocabulary so non-Go consumers do
+  not need to infer meanings from Go constants. The loader
   verifies canonical lowercase hex, positive decimal transaction fields,
   canonical padded base64 endpoint keys, and each static X25519 keypair. The
   assignment wire verifier pins merged qurl-go revision
