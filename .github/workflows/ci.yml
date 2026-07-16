@@ -30,6 +30,7 @@ jobs:
         run: |
           # go.mod is the root compatibility source of truth. This equality
           # proves setup-go selected its exact patch rather than floating 1.26.x.
+          # It deliberately assumes go.mod has no toolchain directive.
           expected_go="go$(awk '$1 == "go" { print $2 }' go.mod)"
           test "$(go env GOVERSION)" = "$expected_go"
           go test ./...
