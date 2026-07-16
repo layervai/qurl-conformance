@@ -551,6 +551,8 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			if err != nil || len(raw) == af.Contract.RawSignatureBytes {
 				return errors.New("malformed raw signature does not isolate exact length")
 			}
+		// These cases freeze verifier inputs and exact boundary edges; the
+		// golden path separately proves the unchanged claims/signature pair.
 		case "wrong_kid":
 			if c.TrustedKID == af.SyntheticSigningKey.KID {
 				return errors.New("wrong-kid reject trusts the golden kid")

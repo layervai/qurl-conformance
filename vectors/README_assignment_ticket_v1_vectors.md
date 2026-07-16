@@ -9,6 +9,8 @@ All credentials, keys, identifiers, signatures, and endpoints in this document
 are synthetic. The committed private scalar exists only so an independent
 consumer can prove the public key fixture; never use it outside conformance
 tests.
+`cell0.nhp.layerv.ai` is likewise a synthetic, non-production fixture hostname;
+consumers must not treat it as a deployable or discoverable endpoint.
 
 ## Positive vector
 
@@ -30,15 +32,16 @@ The signing digest is:
 SHA-256("qurl-agent-assignment-ticket-v1" || 0x00 || claims_b64url ASCII)
 ```
 
-The fixture models AWS KMS `ECDSA_SHA_256` with `MessageType=DIGEST`:
-`kms_signature_der_hex` is a valid high-S ASN.1 DER ECDSA result. A producer
-must parse it strictly, range-check `r` and `s`, normalize `s` to low-S, encode
-both integers as fixed-width 32-byte values, and concatenate `r || s`.
+The fixture models an ASN.1-DER ECDSA signer that receives a precomputed SHA-256
+digest and may emit high-S: `kms_signature_der_hex` is one valid high-S result.
+A producer must parse it strictly, range-check `r` and `s`, normalize `s` to
+low-S, encode both integers as fixed-width 32-byte values, and concatenate
+`r || s`.
 `raw_low_s_signature_hex`, its exact 86-character base64url encoding, and the
 complete ticket pin every byte of that conversion.
 The synthetic private scalar, ECDSA nonce, UTC clock, and 16 JTI random bytes
 are all fixed so the independent verifier can reproduce the DER output and
-claims bytes exactly. Production KMS signatures remain nondeterministic.
+claims bytes exactly. Production signer output remains nondeterministic.
 
 The positive ticket uses public `credential_kind=connector_bootstrap`. The
 private storage discriminator `tunnel_bootstrap` appears only as the raw input
@@ -66,6 +69,9 @@ layer. It deliberately remains in the root Go module so `go test ./...` runs
 its tests in the standard root-module CI gate; publishing the command is an
 accepted tradeoff for automatically guarding every committed cryptographic
 byte.
+Behavioral and cryptographic conformance currently run in that Go verifier;
+the npm and Python surfaces are byte-delivery accessors whose CI coverage is
+structural and whose exact bytes are protected by the three-copy identity gate.
 
 ## Fences
 
