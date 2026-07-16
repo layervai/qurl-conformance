@@ -521,7 +521,10 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			if err != nil || len(raw) != 64 {
 				return errors.New("high-S reject is not a raw signature")
 			}
-			digest, _ := hex.DecodeString(af.Golden.SigningDigestHex)
+			digest, err := hex.DecodeString(af.Golden.SigningDigestHex)
+			if err != nil {
+				return fmt.Errorf("golden signing digest: %w", err)
+			}
 			s := new(big.Int).SetBytes(raw[32:])
 			if s.Cmp(new(big.Int).Rsh(elliptic.P256().Params().N, 1)) <= 0 || !verifyRawSignature(publicKey, digest, raw) {
 				return errors.New("high-S reject is not mathematically valid high-S")
