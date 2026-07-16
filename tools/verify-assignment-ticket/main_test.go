@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/asn1"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -32,5 +34,19 @@ func TestDERRejectClassMismatchFails(t *testing.T) {
 	af.KMSDERCases[1].RejectClass = "claims"
 	if err := verifyDERCases(af.KMSDERCases); err == nil || !strings.Contains(err.Error(), `class = "claims", want der`) {
 		t.Fatalf("error = %v, want DER class mismatch", err)
+	}
+}
+
+func TestDERToRawLowSRejectsUnexpectedSequenceElement(t *testing.T) {
+	der, err := asn1.Marshal(struct {
+		R     *big.Int
+		S     *big.Int
+		Extra int
+	}{R: big.NewInt(1), S: big.NewInt(1), Extra: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := derToRawLowS(der); err == nil {
+		t.Fatal("DER with an unexpected sequence element was accepted")
 	}
 }

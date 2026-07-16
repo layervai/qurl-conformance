@@ -650,9 +650,15 @@ func verifyTrustKeyRejects(cases []conformance.AssignmentTicketTrustReject) erro
 func derToRawLowS(der []byte) ([]byte, error) {
 	var signature ecdsaSignature
 	rest, err := asn1.Unmarshal(der, &signature)
+	if err != nil || len(rest) != 0 || signature.R == nil || signature.S == nil {
+		return nil, errors.New("invalid P-256 DER signature")
+	}
+	canonicalDER, err := asn1.Marshal(signature)
+	if err != nil || !bytes.Equal(canonicalDER, der) {
+		return nil, errors.New("invalid P-256 DER signature")
+	}
 	n := elliptic.P256().Params().N
-	if err != nil || len(rest) != 0 || signature.R == nil || signature.S == nil ||
-		signature.R.Sign() <= 0 || signature.S.Sign() <= 0 || signature.R.Cmp(n) >= 0 || signature.S.Cmp(n) >= 0 {
+	if signature.R.Sign() <= 0 || signature.S.Sign() <= 0 || signature.R.Cmp(n) >= 0 || signature.S.Cmp(n) >= 0 {
 		return nil, errors.New("invalid P-256 DER signature")
 	}
 	s := new(big.Int).Set(signature.S)

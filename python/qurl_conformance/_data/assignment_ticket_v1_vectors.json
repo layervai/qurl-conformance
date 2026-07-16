@@ -587,6 +587,13 @@
       "der_hex": "3046022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d7926c00"
     },
     {
+      "name": "malformed_extra_sequence_element",
+      "outcome": "reject",
+      "reject_class": "der",
+      "reason": "The ECDSA sequence must contain exactly the r and s INTEGERs.",
+      "der_hex": "3049022100f5a5c81c9f8516b71d6a048a20fb71465f25a7d05c2a29b9cf6e7f31deb94732022100bcb408a1adae68d13b5c9294d5c5bcd7d01d527971416618f5d94262f0d7926c020101"
+    },
+    {
       "name": "invalid_zero_r",
       "outcome": "reject",
       "reject_class": "der",

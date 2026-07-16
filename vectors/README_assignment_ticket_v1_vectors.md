@@ -108,9 +108,10 @@ new/existing assignment-fence presence; private and unknown credential kinds;
 and key, digest, fence, JTI, KID, and decoded-claims bounds.
 
 `kms_der_cases` drives the producer's KMS DER converter. The accept case proves
-high-S normalization; the reject cases cover truncated/trailing DER, zero `r`,
-and an out-of-range `s`. `fence_rejects` and `trust_key_rejects` freeze the
-remaining typed-input and P-256 trust-store boundaries.
+high-S normalization; the reject cases cover truncated DER, bytes after the DER
+value, unexpected elements inside the ECDSA sequence, zero `r`, and an
+out-of-range `s`. `fence_rejects` and `trust_key_rejects` freeze the remaining
+typed-input and P-256 trust-store boundaries.
 
 `fence_rejects` are deliberately advisory typed-mutation recipes, not alternate
 golden byte strings: consumers apply each recipe to their own fence builder and
