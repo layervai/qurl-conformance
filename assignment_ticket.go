@@ -211,34 +211,74 @@ var assignmentTicketFenceEncodings = map[string]struct{}{
 	"raw_bytes_b64url": {}, "utf8": {}, "uint64_be": {}, "bool_byte": {},
 }
 
-var assignmentTicketVerifyRejectNames = []string{
-	"altered_claims", "reordered_claims_original_signature", "claims_padding",
-	"claims_noncanonical_base64url", "signature_padding", "signature_noncanonical_base64url",
-	"high_s_raw_signature", "malformed_raw_signature", "wrong_kid", "wrong_environment",
-	"wrong_signing_domain", "wrong_audience", "not_yet_valid", "expired",
-	"ticket_too_large", "claims_part_too_large",
+var assignmentTicketVerifyRejectClasses = map[string]string{
+	"altered_claims":                      "signature",
+	"reordered_claims_original_signature": "signature",
+	"claims_padding":                      "encoding",
+	"claims_noncanonical_base64url":       "encoding",
+	"signature_padding":                   "encoding",
+	"signature_noncanonical_base64url":    "encoding",
+	"high_s_raw_signature":                "high_s",
+	"malformed_raw_signature":             "wrong_length",
+	"wrong_kid":                           "unknown_kid",
+	"wrong_environment":                   "environment",
+	"wrong_signing_domain":                "signature",
+	"wrong_audience":                      "claims",
+	"not_yet_valid":                       "time",
+	"expired":                             "time",
+	"ticket_too_large":                    "size",
+	"claims_part_too_large":               "size",
 }
 
-var assignmentTicketClaimsRejectNames = []string{
-	"duplicate_claim", "unknown_claim", "trailing_json", "null_claim", "invalid_nbf_relation",
-	"exp_not_after_iat", "lifetime_too_long", "new_with_assignment_fence",
-	"existing_without_assignment_fence", "private_tunnel_bootstrap_kind", "unknown_credential_kind",
-	"credential_hash_wrong_length", "credential_fence_wrong_length", "cell_fence_wrong_length",
-	"assignment_fence_wrong_length", "agent_public_key_wrong_length", "kid_too_long",
-	"invalid_environment", "jti_wrong_length", "claims_json_too_large",
+var assignmentTicketClaimsRejectClasses = map[string]string{
+	"duplicate_claim":                   "claims",
+	"unknown_claim":                     "claims",
+	"trailing_json":                     "claims",
+	"null_claim":                        "claims",
+	"invalid_nbf_relation":              "time",
+	"exp_not_after_iat":                 "time",
+	"lifetime_too_long":                 "time",
+	"new_with_assignment_fence":         "claims",
+	"existing_without_assignment_fence": "claims",
+	"private_tunnel_bootstrap_kind":     "claims",
+	"unknown_credential_kind":           "claims",
+	"credential_hash_wrong_length":      "key_length",
+	"credential_fence_wrong_length":     "key_length",
+	"cell_fence_wrong_length":           "key_length",
+	"assignment_fence_wrong_length":     "key_length",
+	"agent_public_key_wrong_length":     "key_length",
+	"kid_too_long":                      "claims",
+	"invalid_environment":               "claims",
+	"jti_wrong_length":                  "key_length",
+	"claims_json_too_large":             "size",
 }
 
-var assignmentTicketDERCaseNames = []string{
-	"kms_high_s_normalizes", "malformed_truncated", "malformed_trailing_data",
-	"invalid_zero_r", "invalid_out_of_range_s",
+var assignmentTicketDERCaseClasses = map[string]string{
+	"kms_high_s_normalizes":   "",
+	"malformed_truncated":     "der",
+	"malformed_trailing_data": "der",
+	"invalid_zero_r":          "der",
+	"invalid_out_of_range_s":  "der",
 }
 
-var assignmentTicketFenceRejectNames = []string{
-	"credential_hash_wrong_length", "credential_scopes_unsorted", "credential_scopes_duplicate",
-	"uint64_negative_or_overflow", "bool_not_single_byte", "missing_required_cell_part",
+var assignmentTicketFenceRejectClasses = map[string]string{
+	"credential_hash_wrong_length": "key_length",
+	"credential_scopes_unsorted":   "fence_input",
+	"credential_scopes_duplicate":  "fence_input",
+	"uint64_negative_or_overflow":  "fence_input",
+	"bool_not_single_byte":         "fence_input",
+	"missing_required_cell_part":   "fence_input",
 }
 
-var assignmentTicketTrustRejectNames = []string{"wrong_curve", "malformed_spki", "empty_spki"}
+var assignmentTicketTrustRejectClasses = map[string]string{
+	"wrong_curve":    "key_length",
+	"malformed_spki": "der",
+	"empty_spki":     "der",
+}
+
+var assignmentTicketFenceRejectKinds = map[string]struct{}{
+	"credential": {}, "cell": {}, "existing": {}, "all": {},
+}
 
 // ParseAssignmentTicketFile strictly parses and structurally validates the qat1
 // artifact. Cryptographic byte identity is checked independently by
@@ -266,19 +306,19 @@ func ParseAssignmentTicketFile(data []byte) (*AssignmentTicketFile, error) {
 	if err := validateAssignmentTicketGolden(af.Golden); err != nil {
 		return nil, err
 	}
-	if err := validateNamedAssignmentCases("verify reject", assignmentTicketVerifyRejectNames, af.VerifyRejects, func(c AssignmentTicketVerifyReject) string { return c.Name }); err != nil {
+	if err := validateNamedAssignmentCases("verify reject", assignmentTicketVerifyRejectClasses, af.VerifyRejects, func(c AssignmentTicketVerifyReject) string { return c.Name }, func(c AssignmentTicketVerifyReject) string { return c.RejectClass }); err != nil {
 		return nil, err
 	}
-	if err := validateNamedAssignmentCases("claims reject", assignmentTicketClaimsRejectNames, af.ClaimsRejects, func(c AssignmentTicketClaimsReject) string { return c.Name }); err != nil {
+	if err := validateNamedAssignmentCases("claims reject", assignmentTicketClaimsRejectClasses, af.ClaimsRejects, func(c AssignmentTicketClaimsReject) string { return c.Name }, func(c AssignmentTicketClaimsReject) string { return c.RejectClass }); err != nil {
 		return nil, err
 	}
-	if err := validateNamedAssignmentCases("KMS DER", assignmentTicketDERCaseNames, af.KMSDERCases, func(c AssignmentTicketDERCase) string { return c.Name }); err != nil {
+	if err := validateNamedAssignmentCases("KMS DER", assignmentTicketDERCaseClasses, af.KMSDERCases, func(c AssignmentTicketDERCase) string { return c.Name }, func(c AssignmentTicketDERCase) string { return c.RejectClass }); err != nil {
 		return nil, err
 	}
-	if err := validateNamedAssignmentCases("fence reject", assignmentTicketFenceRejectNames, af.FenceRejects, func(c AssignmentTicketFenceReject) string { return c.Name }); err != nil {
+	if err := validateNamedAssignmentCases("fence reject", assignmentTicketFenceRejectClasses, af.FenceRejects, func(c AssignmentTicketFenceReject) string { return c.Name }, func(c AssignmentTicketFenceReject) string { return c.RejectClass }); err != nil {
 		return nil, err
 	}
-	if err := validateNamedAssignmentCases("trust-key reject", assignmentTicketTrustRejectNames, af.TrustKeyRejects, func(c AssignmentTicketTrustReject) string { return c.Name }); err != nil {
+	if err := validateNamedAssignmentCases("trust-key reject", assignmentTicketTrustRejectClasses, af.TrustKeyRejects, func(c AssignmentTicketTrustReject) string { return c.Name }, func(c AssignmentTicketTrustReject) string { return c.RejectClass }); err != nil {
 		return nil, err
 	}
 	if err := validateAssignmentTicketCaseInputs(&af); err != nil {
@@ -391,24 +431,30 @@ func validateAssignmentTicketGolden(g AssignmentTicketGolden) error {
 	return nil
 }
 
-func validateNamedAssignmentCases[T any](kind string, want []string, cases []T, name func(T) string) error {
+func validateNamedAssignmentCases[T any](kind string, want map[string]string, cases []T, name func(T) string, rejectClass func(T) string) error {
 	if len(cases) != len(want) {
 		return fmt.Errorf("conformance: assignment-ticket %s count = %d, want %d", kind, len(cases), len(want))
-	}
-	wanted := make(map[string]struct{}, len(want))
-	for _, value := range want {
-		wanted[value] = struct{}{}
 	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, c := range cases {
 		value := name(c)
-		if _, ok := wanted[value]; !ok {
+		expectedClass, ok := want[value]
+		if !ok {
 			return fmt.Errorf("conformance: unknown assignment-ticket %s case %q", kind, value)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf("conformance: duplicate assignment-ticket %s case %q", kind, value)
 		}
 		seen[value] = struct{}{}
+		actualClass := rejectClass(c)
+		if actualClass != "" {
+			if err := validateAssignmentTicketRejectClass(value, actualClass); err != nil {
+				return err
+			}
+		}
+		if actualClass != expectedClass {
+			return fmt.Errorf("conformance: assignment-ticket %s case %q reject class = %q, want %q", kind, value, actualClass, expectedClass)
+		}
 	}
 	return nil
 }
@@ -417,9 +463,6 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 	for _, c := range af.VerifyRejects {
 		if c.RejectClass == "" || c.Reason == "" || c.ExpectedEnvironmentID == "" || c.TrustedKID == "" || c.VerifyAtUnix < 1 {
 			return fmt.Errorf("conformance: assignment-ticket verify reject %q is incomplete", c.Name)
-		}
-		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
-			return err
 		}
 		hasParts := c.ClaimsB64URL != "" || c.SignatureB64URL != ""
 		if (c.Derivation != nil && (c.Token != "" || hasParts)) || (c.Token != "" && hasParts) {
@@ -433,9 +476,6 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 		if c.RejectClass == "" || c.Reason == "" || (c.ClaimsJSON == "") == (c.Derivation == nil) {
 			return fmt.Errorf("conformance: assignment-ticket claims reject %q is incomplete or ambiguous", c.Name)
 		}
-		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
-			return err
-		}
 		if _, err := c.ResolveClaims(); err != nil {
 			return fmt.Errorf("conformance: assignment-ticket claims reject %q: %w", c.Name, err)
 		}
@@ -445,26 +485,18 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 			(c.Outcome == ExpectAccept) != (c.ExpectedRawHex != "") || (c.Outcome == ExpectReject) != (c.RejectClass != "") {
 			return fmt.Errorf("conformance: assignment-ticket KMS DER case %q is incomplete", c.Name)
 		}
-		if c.RejectClass != "" {
-			if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
-				return err
-			}
-		}
 	}
 	for _, c := range af.FenceRejects {
 		if c.FenceKind == "" || c.RejectClass == "" || c.Reason == "" || c.Mutation == "" {
 			return fmt.Errorf("conformance: assignment-ticket fence reject %q is incomplete", c.Name)
 		}
-		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
-			return err
+		if _, ok := assignmentTicketFenceRejectKinds[c.FenceKind]; !ok {
+			return fmt.Errorf("conformance: assignment-ticket fence reject %q has unknown fence kind %q", c.Name, c.FenceKind)
 		}
 	}
 	for _, c := range af.TrustKeyRejects {
 		if c.RejectClass == "" || c.Reason == "" {
 			return fmt.Errorf("conformance: assignment-ticket trust-key reject %q is incomplete", c.Name)
-		}
-		if err := validateAssignmentTicketRejectClass(c.Name, c.RejectClass); err != nil {
-			return err
 		}
 	}
 	return nil
