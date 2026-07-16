@@ -1390,9 +1390,7 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if !reflect.DeepEqual(refreshResult.Assignment, initialResult.Assignment) {
 		return errors.New("conformance: refresh_assignment result changed the sticky assignment fixture")
 	}
-	if _, err := time.Parse(time.RFC3339, refreshResult.Assignment.LeaseExpiresAt); err != nil {
-		return fmt.Errorf("conformance: refresh_assignment.result lease_expires_at is not RFC3339: %w", err)
-	}
+	// DeepEqual proves the refresh lease is the initial lease validated above.
 
 	var registrationRequest *agentAssignmentRegisterRequest
 	if err := strictDecodeArtifact([]byte(af.AssignedCellRegistration.Request.BodyJSON), &registrationRequest); err != nil || registrationRequest == nil {
