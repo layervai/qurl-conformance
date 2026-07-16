@@ -98,12 +98,24 @@ high-S normalization; the reject cases cover truncated/trailing DER, zero `r`,
 and an out-of-range `s`. `fence_rejects` and `trust_key_rejects` freeze the
 remaining typed-input and P-256 trust-store boundaries.
 
+`fence_rejects` are deliberately advisory typed-mutation recipes, not alternate
+golden byte strings: consumers apply each recipe to their own fence builder and
+assert rejection before hashing. The `fence_kind=all` recipe is a cross-cutting
+integer-encoding boundary rather than the name of a fourth fence. By contrast,
+`claims_rejects` carry executable parser inputs. The `wrong_audience` complete-
+verifier case includes a valid signature for its altered claims, so it isolates
+the claims boundary without depending on claims-before-signature check order.
+
 Reject classes are a closed, coarse consumer vocabulary:
 
 - `claims`, `time`, `size`, `encoding`;
 - `signature`, `high_s`, `wrong_length`;
 - `unknown_kid`, `environment`, `key_length`;
 - `der`, `fence_input`.
+
+The coarse `key_length` trust class deliberately includes a well-formed EC key
+on the wrong curve: the trust profile accepts only the fixed-width P-256 key
+shape. Malformed and empty SPKI inputs use the separate `der` class.
 
 A consumer may expose more specific internal errors, but it must reject every
 fixture at the named boundary and must not silently reinterpret a reject as an

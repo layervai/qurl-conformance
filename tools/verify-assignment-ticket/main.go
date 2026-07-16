@@ -534,9 +534,14 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 				return errors.New("wrong-environment reject uses the golden environment")
 			}
 		case "wrong_audience":
-			raw, err := strictRawURL(c.ClaimsB64URL)
-			if err != nil || referenceParseClaims(raw, af.Contract) == nil {
+			claims, err := strictRawURL(c.ClaimsB64URL)
+			if err != nil || referenceParseClaims(claims, af.Contract) == nil {
 				return errors.New("wrong-audience reject does not reach the claims boundary")
+			}
+			signature, err := strictRawURL(c.SignatureB64URL)
+			digest := sha256.Sum256(append(append([]byte(af.Contract.SigningDomain), 0), []byte(c.ClaimsB64URL)...))
+			if err != nil || !verifyRawSignature(publicKey, digest[:], signature) {
+				return errors.New("wrong-audience reject does not isolate the claims boundary")
 			}
 		case "not_yet_valid":
 			if c.VerifyAtUnix != af.Golden.ClockUnix+int64(af.Contract.NotBeforeOffsetSeconds)-1 {
