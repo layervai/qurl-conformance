@@ -967,7 +967,7 @@ func validateAgentAssignmentResultCases(cases []AgentAssignmentResultCase) error
 		"reject_initial_private_key_kind":         {"initial_assignment", AgentAssignmentRejectSemantic},
 		"reject_initial_unknown_key_kind":         {"initial_assignment", AgentAssignmentRejectSemantic},
 		"reject_null_refresh_list":                {"refresh_assignment", AgentAssignmentRejectWrongType},
-		"reject_refresh_assignment_ticket":        {"refresh_assignment", AgentAssignmentRejectUnknownField},
+		"reject_refresh_result_assignment_ticket": {"refresh_assignment", AgentAssignmentRejectUnknownField},
 		"reject_completion_list_type":             {"registration_completion", AgentAssignmentRejectWrongType},
 		"reject_completion_device_api_key":        {"registration_completion", AgentAssignmentRejectUnknownField},
 		"reject_completion_device_api_key_hash":   {"registration_completion", AgentAssignmentRejectUnknownField},
@@ -1645,6 +1645,9 @@ func validateAgentAssignmentErrorCases(group, phase string, cases []AgentAssignm
 			if c.RetryAfterSeconds != nil {
 				return fmt.Errorf("conformance: agent-assignment %s case %q carries retry_after_seconds", group, c.Name)
 			}
+			if got := classifyAgentAssignmentValidErrorCase(c); got != "" {
+				return fmt.Errorf("conformance: agent-assignment %s case %q is over-rejected as %q", group, c.Name, got)
+			}
 			continue
 		}
 		if c.HeaderName != AgentAssignmentResultHeaderName || c.HeaderType != AgentAssignmentResultHeaderType {
@@ -1669,8 +1672,20 @@ func validateAgentAssignmentErrorCases(group, phase string, cases []AgentAssignm
 		if want.retryRequired && body.RetryAfterSeconds == nil {
 			return fmt.Errorf("conformance: agent-assignment %s case %q is missing required retryAfterSeconds", group, c.Name)
 		}
+		if got := classifyAgentAssignmentValidErrorCase(c); got != "" {
+			return fmt.Errorf("conformance: agent-assignment %s case %q is over-rejected as %q", group, c.Name, got)
+		}
 	}
 	return nil
+}
+
+func classifyAgentAssignmentValidErrorCase(c AgentAssignmentErrorCase) string {
+	return classifyAgentAssignmentMalformed(AgentAssignmentMalformedCase{
+		Phase:      c.Phase,
+		HeaderName: c.HeaderName,
+		HeaderType: c.HeaderType,
+		BodyJSON:   c.BodyJSON,
+	})
 }
 
 func equalOptionalInt(a, b *int) bool {
