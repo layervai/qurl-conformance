@@ -26,6 +26,8 @@
 //   - The agent API-key ID contract (agent_api_key_id_vectors.json): issuer
 //     construction and strict consumer cases for registration-info key_id and
 //     completion device_api_key_id.
+//   - The assignment-ticket v1 artifact (assignment_ticket_v1_vectors.json):
+//     exact qat1 claims/signature bytes, optimistic fences, and reject suites.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

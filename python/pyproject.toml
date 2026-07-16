@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qurl-conformance"
 version = "0.2.0"
-description = "qURL v2 cross-language conformance vectors"
+description = "qURL cross-language conformance vectors"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"

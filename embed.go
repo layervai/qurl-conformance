@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -16,6 +16,7 @@ const (
 	agentAssignmentName       = "vectors/agent_assignment_golden.json"
 	agentKnockApplicationName = "vectors/agent_knock_application_vectors.json"
 	agentAPIKeyIDName         = "vectors/agent_api_key_id_vectors.json"
+	assignmentTicketName      = "vectors/assignment_ticket_v1_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -102,6 +103,16 @@ func AgentAPIKeyIDVectors() []byte {
 	return b
 }
 
+// AssignmentTicketVectors returns the raw bytes of the standalone qat1
+// cryptographic and fence artifact.
+func AssignmentTicketVectors() []byte {
+	b, err := vectorsFS.ReadFile(assignmentTicketName)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", assignmentTicketName, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -121,6 +132,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(agentKnockApplicationName)
 	case agentAPIKeyIDName, "agent_api_key_id_vectors.json":
 		return vectorsFS.ReadFile(agentAPIKeyIDName)
+	case assignmentTicketName, "assignment_ticket_v1_vectors.json":
+		return vectorsFS.ReadFile(assignmentTicketName)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -168,4 +181,9 @@ func AgentKnockApplication() (*AgentKnockApplicationFile, error) {
 // AgentAPIKeyIDs strictly parses the embedded agent API-key ID artifact.
 func AgentAPIKeyIDs() (*AgentAPIKeyIDFile, error) {
 	return ParseAgentAPIKeyIDFile(AgentAPIKeyIDVectors())
+}
+
+// AssignmentTicket strictly parses the embedded standalone qat1 artifact.
+func AssignmentTicket() (*AssignmentTicketFile, error) {
+	return ParseAssignmentTicketFile(AssignmentTicketVectors())
 }
