@@ -48,8 +48,15 @@ registration obtains the user-entered OTP out of band and carries that OTP with
 the ticket in the single REG call.
 
 `lrt_body_template` composes the complete positive ticket into the exact LRT
-JSON shape. The derived body and complete encrypted NHP packet sizes prove the
-fixture stays below the frozen 3856-byte body and 4096-byte packet limits.
+JSON shape. The derived body size and conservative assumed NHP packet size
+prove the fixture stays below the frozen 3856-byte body and 4096-byte packet
+limits.
+`nhp_packet_overhead_bytes=256` is a deliberately conservative envelope
+reservation, not a claim that one current serializer always emits exactly 256
+bytes of framing. With that reservation, the 1521-byte body produces a
+1777-byte assumed packet, leaving 2335 bytes of body headroom and 2319 bytes of
+packet headroom. Any future NHP envelope that can exceed the reservation must
+update this artifact before the larger ticket path ships.
 
 The independent assignment-ticket verifier is deliberately separate from
 exported-SDK coverage: SDK and NHP transport layers carry qat1 opaquely, while

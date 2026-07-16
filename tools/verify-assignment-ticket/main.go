@@ -101,6 +101,24 @@ type referenceClaims struct {
 	AssignmentFenceB64   string `json:"assignment_fence_b64"`
 }
 
+const (
+	claimsBoundaryClaims    = "claims"
+	claimsBoundaryTime      = "time"
+	claimsBoundaryKeyLength = "key_length"
+	claimsBoundarySize      = "size"
+)
+
+type claimsBoundaryError struct {
+	class   string
+	message string
+}
+
+func (e *claimsBoundaryError) Error() string { return e.message }
+
+func rejectClaimsAt(class, message string) error {
+	return &claimsBoundaryError{class: class, message: message}
+}
+
 func verifyClaimsCases(af *conformance.AssignmentTicketFile) error {
 	if err := referenceParseClaims([]byte(af.Golden.ClaimsJSON), af.Contract); err != nil {
 		return fmt.Errorf("golden claims do not satisfy independent parser: %w", err)
@@ -110,8 +128,16 @@ func verifyClaimsCases(af *conformance.AssignmentTicketFile) error {
 		if err != nil {
 			return err
 		}
-		if err := referenceParseClaims([]byte(input), af.Contract); err == nil {
+		parseErr := referenceParseClaims([]byte(input), af.Contract)
+		if parseErr == nil {
 			return fmt.Errorf("claims reject %s passes independent parser", c.Name)
+		}
+		var boundary *claimsBoundaryError
+		if !errors.As(parseErr, &boundary) {
+			return fmt.Errorf("claims reject %s returned unclassified error: %w", c.Name, parseErr)
+		}
+		if boundary.class != c.RejectClass {
+			return fmt.Errorf("claims reject %s reached %q boundary, want %q: %w", c.Name, boundary.class, c.RejectClass, parseErr)
 		}
 	}
 	return nil
@@ -119,103 +145,106 @@ func verifyClaimsCases(af *conformance.AssignmentTicketFile) error {
 
 func referenceParseClaims(raw []byte, contract conformance.AssignmentTicketContract) error {
 	if len(raw) > contract.MaxClaimsJSONBytes {
-		return errors.New("claims exceed byte limit")
+		return rejectClaimsAt(claimsBoundarySize, "claims exceed byte limit")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	opening, err := decoder.Token()
 	if err != nil || opening != json.Delim('{') {
-		return errors.New("claims must be one object")
+		return rejectClaimsAt(claimsBoundaryClaims, "claims must be one object")
 	}
 	values := make(map[string]json.RawMessage, len(contract.ClaimOrder))
 	for decoder.More() {
 		keyToken, err := decoder.Token()
 		if err != nil {
-			return err
+			return rejectClaimsAt(claimsBoundaryClaims, err.Error())
 		}
 		key, ok := keyToken.(string)
 		if !ok {
-			return errors.New("non-string key")
+			return rejectClaimsAt(claimsBoundaryClaims, "non-string key")
 		}
 		if !slices.Contains(contract.ClaimOrder, key) {
-			return errors.New("unknown claim")
+			return rejectClaimsAt(claimsBoundaryClaims, "unknown claim")
 		}
 		if _, duplicate := values[key]; duplicate {
-			return errors.New("duplicate claim")
+			return rejectClaimsAt(claimsBoundaryClaims, "duplicate claim")
 		}
 		var value json.RawMessage
 		if err := decoder.Decode(&value); err != nil {
-			return err
+			return rejectClaimsAt(claimsBoundaryClaims, err.Error())
 		}
 		if bytes.Equal(value, []byte("null")) {
-			return errors.New("null claim")
+			return rejectClaimsAt(claimsBoundaryClaims, "null claim")
 		}
 		values[key] = value
 	}
 	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
-		return errors.New("unclosed claims")
+		return rejectClaimsAt(claimsBoundaryClaims, "unclosed claims")
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.New("trailing claims data")
+		return rejectClaimsAt(claimsBoundaryClaims, "trailing claims data")
 	}
 	for _, key := range contract.ClaimOrder[:len(contract.ClaimOrder)-1] {
 		if _, ok := values[key]; !ok {
-			return errors.New("missing required claim")
+			return rejectClaimsAt(claimsBoundaryClaims, "missing required claim")
 		}
 	}
 	var claims referenceClaims
 	typed := json.NewDecoder(bytes.NewReader(raw))
 	typed.DisallowUnknownFields()
 	if err := typed.Decode(&claims); err != nil {
-		return err
+		return rejectClaimsAt(claimsBoundaryClaims, err.Error())
 	}
 	if claims.V != 1 || claims.Iss != "qurl-assignment-authority" || claims.Aud != "qurl-agent-registration" {
-		return errors.New("profile mismatch")
+		return rejectClaimsAt(claimsBoundaryClaims, "profile mismatch")
 	}
 	if len(claims.EnvironmentID) < 1 || len(claims.EnvironmentID) > 32 || !environmentPattern.MatchString(claims.EnvironmentID) ||
 		len(claims.KID) < 1 || len(claims.KID) > contract.MaxKIDCharacters || !kidPattern.MatchString(claims.KID) {
-		return errors.New("environment or kid mismatch")
+		return rejectClaimsAt(claimsBoundaryClaims, "environment or kid mismatch")
 	}
 	if claims.IAT <= 30 || claims.NBF != claims.IAT+int64(contract.NotBeforeOffsetSeconds) ||
 		claims.EXP <= claims.IAT || claims.EXP-claims.IAT > int64(contract.MaxLifetimeSeconds) {
-		return errors.New("time relationship mismatch")
+		return rejectClaimsAt(claimsBoundaryTime, "time relationship mismatch")
 	}
 	if !strings.HasPrefix(claims.JTI, "atj_") || len(claims.JTI) != 26 {
-		return errors.New("jti shape mismatch")
+		return rejectClaimsAt(claimsBoundaryKeyLength, "jti shape mismatch")
 	}
 	jti, err := strictRawURL(strings.TrimPrefix(claims.JTI, "atj_"))
 	if err != nil || len(jti) != 16 {
-		return errors.New("jti encoding mismatch")
+		return rejectClaimsAt(claimsBoundaryKeyLength, "jti encoding mismatch")
 	}
 	if !agentIDPattern.MatchString(claims.AgentID) || !keyIDPattern.MatchString(claims.CredentialKeyID) {
-		return errors.New("agent or key id mismatch")
+		return rejectClaimsAt(claimsBoundaryClaims, "agent or key id mismatch")
 	}
 	agentKey, err := base64.StdEncoding.Strict().DecodeString(claims.AgentPublicKeyB64)
 	if err != nil || len(agentKey) != 32 || base64.StdEncoding.EncodeToString(agentKey) != claims.AgentPublicKeyB64 {
-		return errors.New("agent public key mismatch")
+		return rejectClaimsAt(claimsBoundaryKeyLength, "agent public key mismatch")
 	}
 	for _, digest := range []string{claims.CredentialKeyHashB64, claims.CredentialFenceB64, claims.CellFenceB64} {
 		decoded, err := strictRawURL(digest)
 		if err != nil || len(decoded) != sha256.Size || len(digest) != contract.DigestCharacters {
-			return errors.New("digest mismatch")
+			return rejectClaimsAt(claimsBoundaryKeyLength, "digest mismatch")
 		}
 	}
 	if !slices.Contains(contract.CredentialKinds, claims.CredentialKind) || claims.AssignmentGeneration < 1 || claims.EndpointRevision < 1 || claims.CellID == "" {
-		return errors.New("credential or placement mismatch")
+		return rejectClaimsAt(claimsBoundaryClaims, "credential or placement mismatch")
 	}
 	_, assignmentFencePresent := values["assignment_fence_b64"]
 	switch claims.PlacementMode {
 	case "new":
 		if assignmentFencePresent {
-			return errors.New("new placement has assignment fence")
+			return rejectClaimsAt(claimsBoundaryClaims, "new placement has assignment fence")
 		}
 	case "existing":
+		if !assignmentFencePresent {
+			return rejectClaimsAt(claimsBoundaryClaims, "existing placement lacks assignment fence")
+		}
 		decoded, err := strictRawURL(claims.AssignmentFenceB64)
-		if !assignmentFencePresent || err != nil || len(decoded) != sha256.Size || len(claims.AssignmentFenceB64) != contract.DigestCharacters {
-			return errors.New("existing placement lacks canonical assignment fence")
+		if err != nil || len(decoded) != sha256.Size || len(claims.AssignmentFenceB64) != contract.DigestCharacters {
+			return rejectClaimsAt(claimsBoundaryKeyLength, "existing placement has noncanonical assignment fence")
 		}
 	default:
-		return errors.New("unknown placement mode")
+		return rejectClaimsAt(claimsBoundaryClaims, "unknown placement mode")
 	}
 	return nil
 }
@@ -282,6 +311,9 @@ func verifyGolden(publicKey *ecdsa.PublicKey, privateScalar *big.Int, af *confor
 	if claimValues["credential_kind"] != "connector_bootstrap" || claimValues["placement_mode"] != "new" ||
 		claimValues["assignment_fence_b64"] != nil || claimValues["otp"] != nil || strings.Contains(golden.ClaimsJSON, "tunnel_bootstrap") {
 		return errors.New("golden claims leaked private/OTP state or lost public Connector vocabulary")
+	}
+	if len(golden.SyntheticCredential) != conformance.AssignmentTicketSyntheticCredentialBytes {
+		return errors.New("golden synthetic credential length disagrees")
 	}
 	credentialHash := sha256.Sum256([]byte(golden.SyntheticCredential))
 	if base64.RawURLEncoding.EncodeToString(credentialHash[:]) != claimValues["credential_key_hash_b64"] {
@@ -529,7 +561,9 @@ func verifyCryptographicRejects(publicKey *ecdsa.PublicKey, af *conformance.Assi
 			}
 		case "wrong_audience":
 			claims, err := strictRawURL(c.ClaimsB64URL)
-			if err != nil || referenceParseClaims(claims, af.Contract) == nil {
+			parseErr := referenceParseClaims(claims, af.Contract)
+			var boundary *claimsBoundaryError
+			if err != nil || parseErr == nil || !errors.As(parseErr, &boundary) || boundary.class != claimsBoundaryClaims {
 				return errors.New("wrong-audience reject does not reach the claims boundary")
 			}
 			signature, err := strictRawURL(c.SignatureB64URL)

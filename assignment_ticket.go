@@ -17,6 +17,10 @@ const (
 
 	AssignmentTicketPrefix        = "qat1"
 	AssignmentTicketSigningDomain = "qurl-agent-assignment-ticket-v1"
+
+	// AssignmentTicketSyntheticCredentialBytes is the byte length of the fixed
+	// ASCII test credential committed in the golden artifact.
+	AssignmentTicketSyntheticCredentialBytes = 51
 )
 
 // AssignmentTicketFile freezes the byte-level qat1 signing profile, the three
@@ -303,7 +307,7 @@ func ParseAssignmentTicketFile(data []byte) (*AssignmentTicketFile, error) {
 	if err := validateAssignmentTicketFences(af.FenceVectors); err != nil {
 		return nil, err
 	}
-	if err := validateAssignmentTicketGolden(af.Golden); err != nil {
+	if err := validateAssignmentTicketGolden(af.Golden, af.Contract); err != nil {
 		return nil, err
 	}
 	if err := validateNamedAssignmentCases("verify reject", assignmentTicketVerifyRejectClasses, af.VerifyRejects, func(c AssignmentTicketVerifyReject) string { return c.Name }, func(c AssignmentTicketVerifyReject) string { return c.RejectClass }); err != nil {
@@ -398,7 +402,7 @@ func validateAssignmentTicketFences(vectors []AssignmentTicketFenceVector) error
 	return nil
 }
 
-func validateAssignmentTicketGolden(g AssignmentTicketGolden) error {
+func validateAssignmentTicketGolden(g AssignmentTicketGolden, contract AssignmentTicketContract) error {
 	claims, err := base64.RawURLEncoding.Strict().DecodeString(g.ClaimsB64URL)
 	if err != nil || string(claims) != g.ClaimsJSON || hex.EncodeToString(claims) != g.ClaimsUTF8Hex {
 		return errors.New("conformance: assignment-ticket golden claims encodings disagree")
@@ -407,13 +411,13 @@ func validateAssignmentTicketGolden(g AssignmentTicketGolden) error {
 	if err != nil || len(sig) != 64 || len(g.SignatureB64URL) != 86 {
 		return errors.New("conformance: assignment-ticket golden signature is not canonical raw r||s")
 	}
-	if g.Token != AssignmentTicketPrefix+"."+g.ClaimsB64URL+"."+g.SignatureB64URL || len(g.Token) > 2304 ||
+	if g.Token != AssignmentTicketPrefix+"."+g.ClaimsB64URL+"."+g.SignatureB64URL || len(g.Token) > contract.MaxTicketASCIIBytes ||
 		g.EnvironmentID != "sandbox" || g.VerifyAtUnix < 1 || g.ClockUnix != 1784160000 ||
 		g.JTIRandomHex != "000102030405060708090a0b0c0d0e0f" || len(g.SyntheticECDSANonceHex) != 64 ||
-		len(g.SyntheticCredential) != 51 ||
+		len(g.SyntheticCredential) != AssignmentTicketSyntheticCredentialBytes ||
 		g.TicketMarker != "${qat1_token}" || strings.Count(g.LRTBodyTemplate, g.TicketMarker) != 1 ||
-		g.NHPPacketOverheadBytes != 256 || g.LRTBodyBytes < 1 || g.LRTBodyBytes > 3856 ||
-		g.CompleteNHPPacketBytes < 1 || g.CompleteNHPPacketBytes > 4096 {
+		g.NHPPacketOverheadBytes != 256 || g.LRTBodyBytes < 1 || g.LRTBodyBytes > contract.NHPBodyMaxBytes ||
+		g.CompleteNHPPacketBytes < 1 || g.CompleteNHPPacketBytes > contract.NHPPacketMaxBytes {
 		return errors.New("conformance: assignment-ticket golden envelope or NHP budget is invalid")
 	}
 	lrtBody := strings.Replace(g.LRTBodyTemplate, g.TicketMarker, g.Token, 1)
