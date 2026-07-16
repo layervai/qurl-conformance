@@ -122,16 +122,11 @@ func referenceParseClaims(raw []byte, contract conformance.AssignmentTicketContr
 		return errors.New("claims exceed byte limit")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
 	opening, err := decoder.Token()
 	if err != nil || opening != json.Delim('{') {
 		return errors.New("claims must be one object")
 	}
 	values := make(map[string]json.RawMessage, len(contract.ClaimOrder))
-	allowed := make(map[string]struct{}, len(contract.ClaimOrder))
-	for _, key := range contract.ClaimOrder {
-		allowed[key] = struct{}{}
-	}
 	for decoder.More() {
 		keyToken, err := decoder.Token()
 		if err != nil {
@@ -141,7 +136,7 @@ func referenceParseClaims(raw []byte, contract conformance.AssignmentTicketContr
 		if !ok {
 			return errors.New("non-string key")
 		}
-		if _, ok := allowed[key]; !ok {
+		if !slices.Contains(contract.ClaimOrder, key) {
 			return errors.New("unknown claim")
 		}
 		if _, duplicate := values[key]; duplicate {
