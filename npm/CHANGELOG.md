@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.5.0...npm-v0.6.0) (2026-07-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* add registered-agent session-control vectors ([#44](https://github.com/layervai/qurl-conformance/issues/44))
+
+### Features
+
+* add registered-agent session-control vectors ([#44](https://github.com/layervai/qurl-conformance/issues/44)) ([3843f2b](https://github.com/layervai/qurl-conformance/commit/3843f2bc04aaac9827c922b2f19fe41bd27e3008))
+
 ## [0.5.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.4.0...npm-v0.5.0) (2026-07-17)
 
 

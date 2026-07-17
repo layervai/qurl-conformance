@@ -1,6 +1,6 @@
 {
   "name": "@layervai/qurl-conformance",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "qURL cross-language conformance vectors",
   "license": "MIT",
   "type": "commonjs",
