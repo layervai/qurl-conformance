@@ -271,7 +271,7 @@ jobs:
               JSON.parse(x.overload_reknock.cookie_reply.body_json).trxId !== Number(x.overload_reknock.knock_request.counter) ||
               x.overload_reknock.ack.counter !== x.overload_reknock.reknock_request.counter ||
               x.clean_exit.ack.counter !== x.clean_exit.request.counter ||
-              x.cookie_body_cases.length !== 15 || x.flow_cases.length !== 19 ||
+              x.cookie_body_cases.length !== 16 || x.flow_cases.length !== 19 ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
               i.consumer_response_cases.length !== 26 ||
@@ -501,7 +501,7 @@ jobs:
           assert json.loads(x['overload_reknock']['cookie_reply']['body_json'])['trxId'] == int(x['overload_reknock']['knock_request']['counter'])
           assert x['overload_reknock']['ack']['counter'] == x['overload_reknock']['reknock_request']['counter']
           assert x['clean_exit']['ack']['counter'] == x['clean_exit']['request']['counter']
-          assert len(x['cookie_body_cases']) == 15 and len(x['flow_cases']) == 19
+          assert len(x['cookie_body_cases']) == 16 and len(x['flow_cases']) == 19
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
           assert len(i['consumer_response_cases']) == 26

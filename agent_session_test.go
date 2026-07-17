@@ -17,8 +17,8 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != 1 || af.ProducerRevision != AgentSessionControlProducerRevision {
 		t.Fatalf("identity = %q/v%d/%q", af.Artifact, af.SchemaVersion, af.ProducerRevision)
 	}
-	if len(af.CookieBodyCases) != 15 || len(af.FlowCases) != 19 {
-		t.Fatalf("case counts = cookie:%d flow:%d, want 15/19", len(af.CookieBodyCases), len(af.FlowCases))
+	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 19 {
+		t.Fatalf("case counts = cookie:%d flow:%d, want 16/19", len(af.CookieBodyCases), len(af.FlowCases))
 	}
 	if af.Protocol.COKWireCounterCorrelation != "unconstrained" || af.Protocol.ExitCookieChallengeAllowed {
 		t.Fatalf("protocol = %+v", af.Protocol)

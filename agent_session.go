@@ -316,9 +316,18 @@ type agentSessionACKBody struct {
 
 func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	o := f.OverloadReknock
-	knockCounter, _ := strconv.ParseUint(o.KnockRequest.Counter, 10, 64)
-	rknCounter, _ := strconv.ParseUint(o.ReknockRequest.Counter, 10, 64)
-	exitCounter, _ := strconv.ParseUint(f.CleanExit.Request.Counter, 10, 64)
+	knockCounter, err := strconv.ParseUint(o.KnockRequest.Counter, 10, 64)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-session parse KNK counter: %w", err)
+	}
+	rknCounter, err := strconv.ParseUint(o.ReknockRequest.Counter, 10, 64)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-session parse RKN counter: %w", err)
+	}
+	exitCounter, err := strconv.ParseUint(f.CleanExit.Request.Counter, 10, 64)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-session parse EXT counter: %w", err)
+	}
 	if o.ACK.Counter != o.ReknockRequest.Counter || f.CleanExit.ACK.Counter != f.CleanExit.Request.Counter {
 		return errors.New("conformance: agent-session ACK counter bindings drifted")
 	}
@@ -461,21 +470,22 @@ func validateAgentSessionCookieCases(f *AgentSessionControlFile) error {
 	required := map[string]struct {
 		outcome, class string
 	}{
-		"accept_canonical":              {AgentSessionOutcomeAccept, ""},
-		"reject_invalid_cookie_base64":  {AgentSessionOutcomeReject, AgentSessionRejectCookieEncoding},
-		"reject_cookie_31_bytes":        {AgentSessionOutcomeReject, AgentSessionRejectCookieLength},
-		"reject_cookie_33_bytes":        {AgentSessionOutcomeReject, AgentSessionRejectCookieLength},
-		"reject_unpadded_cookie":        {AgentSessionOutcomeReject, AgentSessionRejectCookieCanonical},
-		"reject_cookie_whitespace":      {AgentSessionOutcomeReject, AgentSessionRejectCookieEncoding},
-		"reject_transaction_string":     {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_null_transaction":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_cookie_number":          {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_duplicate_transaction":  {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_duplicate_cookie":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_unknown_cookie_field":   {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_trailing_cookie_value":  {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_null_cookie_body":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
-		"reject_non_object_cookie_body": {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"accept_canonical":                   {AgentSessionOutcomeAccept, ""},
+		"reject_cookie_transaction_mismatch": {AgentSessionOutcomeReject, AgentSessionRejectCounter},
+		"reject_invalid_cookie_base64":       {AgentSessionOutcomeReject, AgentSessionRejectCookieEncoding},
+		"reject_cookie_31_bytes":             {AgentSessionOutcomeReject, AgentSessionRejectCookieLength},
+		"reject_cookie_33_bytes":             {AgentSessionOutcomeReject, AgentSessionRejectCookieLength},
+		"reject_unpadded_cookie":             {AgentSessionOutcomeReject, AgentSessionRejectCookieCanonical},
+		"reject_cookie_whitespace":           {AgentSessionOutcomeReject, AgentSessionRejectCookieEncoding},
+		"reject_transaction_string":          {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_null_transaction":            {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_cookie_number":               {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_duplicate_transaction":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_duplicate_cookie":            {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_unknown_cookie_field":        {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_trailing_cookie_value":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_null_cookie_body":            {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_non_object_cookie_body":      {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
 	}
 	if len(f.CookieBodyCases) != len(required) {
 		return fmt.Errorf("conformance: agent-session cookie case count = %d, want %d", len(f.CookieBodyCases), len(required))

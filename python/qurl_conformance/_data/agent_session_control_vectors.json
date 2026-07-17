@@ -37,6 +37,12 @@
       "outcome": "accept"
     },
     {
+      "body_json": "{\"trxId\":42,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_cookie_transaction_mismatch",
+      "outcome": "reject",
+      "reject_class": "counter"
+    },
+    {
       "body_json": "{\"trxId\":41,\"cookie\":\"***\"}",
       "name": "reject_invalid_cookie_base64",
       "outcome": "reject",
