@@ -73,6 +73,12 @@
       "reject_class": "body_parse"
     },
     {
+      "body_json": "{\"trxId\":null,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_null_transaction",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
       "body_json": "{\"trxId\":41,\"cookie\":7}",
       "name": "reject_cookie_number",
       "outcome": "reject",

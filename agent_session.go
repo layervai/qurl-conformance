@@ -424,10 +424,8 @@ func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	if err := json.Unmarshal([]byte(body), &fields); err != nil || len(fields) != 2 || fields["trxId"] == nil || fields["cookie"] == nil {
 		return AgentSessionRejectBodyParse
 	}
-	for key := range fields {
-		if key != "trxId" && key != "cookie" {
-			return AgentSessionRejectBodyParse
-		}
+	if bytes.Equal(bytes.TrimSpace(fields["trxId"]), []byte("null")) {
+		return AgentSessionRejectBodyParse
 	}
 	var message *agentSessionCookieBody
 	if err := strictDecodeArtifact([]byte(body), &message); err != nil || message == nil || message.Cookie == "" {
@@ -464,6 +462,7 @@ func validateAgentSessionCookieCases(f *AgentSessionControlFile) error {
 		"reject_unpadded_cookie":        {AgentSessionOutcomeReject, AgentSessionRejectCookieCanonical},
 		"reject_cookie_whitespace":      {AgentSessionOutcomeReject, AgentSessionRejectCookieEncoding},
 		"reject_transaction_string":     {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
+		"reject_null_transaction":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
 		"reject_cookie_number":          {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
 		"reject_duplicate_transaction":  {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
 		"reject_duplicate_cookie":       {AgentSessionOutcomeReject, AgentSessionRejectBodyParse},
