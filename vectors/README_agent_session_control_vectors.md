@@ -35,6 +35,11 @@ producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`.
   from the originating KNK counter. Correlate the challenge only after server
   authentication, strict body decoding, and verifying `body.trxId` equals the
   KNK counter.
+- The frozen COK carries counter 41 because the merged producer intentionally
+  echoes the KNK counter for relay compatibility. Native UDP consumers must not
+  depend on that producer equality: the `accept_cok_wire_counter_unconstrained`
+  flow mutation proves correlation still succeeds with a different
+  authenticated outer counter.
 - An ACK counter must equal the request counter for its RKN or EXT.
 - The authenticated body's case-sensitive `headerType` must equal the outer
   packet type. A type 1 packet with a type 8 body, or the inverse, is invalid.

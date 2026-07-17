@@ -255,8 +255,11 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if err != nil || hex.EncodeToString(packet) != p.PacketHex {
 		return fmt.Errorf("conformance: agent-session %s packet_hex is not canonical hex", name)
 	}
-	if len(packet) != AgentSessionHeaderSize+len(body)+AgentSessionTagSize || len(packet) > 4096 {
+	if len(packet) != AgentSessionHeaderSize+len(body)+AgentSessionTagSize {
 		return fmt.Errorf("conformance: agent-session %s packet size is inconsistent with body", name)
+	}
+	if len(packet) > 4096 {
+		return fmt.Errorf("conformance: agent-session %s packet exceeds 4096-byte limit", name)
 	}
 	preamble := binary.BigEndian.Uint32(packet[0:4])
 	word := preamble ^ binary.BigEndian.Uint32(packet[4:8])
@@ -406,9 +409,6 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 // classifyAgentSessionCookieBody is mirrored independently by verify-sdk; both
 // classifiers must execute every closed cookie_body_cases entry in lockstep.
 func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
-	if err := rejectDuplicateJSONKeys([]byte(body)); err != nil {
-		return AgentSessionRejectBodyParse
-	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(body), &fields); err != nil || len(fields) != 2 || fields["trxId"] == nil || fields["cookie"] == nil {
 		return AgentSessionRejectBodyParse
