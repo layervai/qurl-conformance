@@ -315,8 +315,8 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	knockCounter, _ := strconv.ParseUint(o.KnockRequest.Counter, 10, 64)
 	rknCounter, _ := strconv.ParseUint(o.ReknockRequest.Counter, 10, 64)
 	exitCounter, _ := strconv.ParseUint(f.CleanExit.Request.Counter, 10, 64)
-	if o.CookieReply.Counter != o.KnockRequest.Counter || o.ACK.Counter != o.ReknockRequest.Counter || f.CleanExit.ACK.Counter != f.CleanExit.Request.Counter {
-		return errors.New("conformance: agent-session golden counter bindings drifted")
+	if o.ACK.Counter != o.ReknockRequest.Counter || f.CleanExit.ACK.Counter != f.CleanExit.Request.Counter {
+		return errors.New("conformance: agent-session ACK counter bindings drifted")
 	}
 	if knockCounter == rknCounter || rknCounter == exitCounter || knockCounter == exitCounter {
 		return errors.New("conformance: agent-session request counters must be distinct")

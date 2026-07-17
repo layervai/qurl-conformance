@@ -140,3 +140,14 @@ func TestAgentSessionControlREADMERevisionPin(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.OverloadReknock.CookieReply.Counter = "18446744073709551615"
+	if err := validateAgentSessionFlowBindings(af); err != nil {
+		t.Fatalf("different authenticated COK wire counter must not affect body transaction correlation: %v", err)
+	}
+}
