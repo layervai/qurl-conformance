@@ -393,11 +393,14 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 	if err := strictDecodeArtifact([]byte(body), &ack); err != nil {
 		return fmt.Errorf("conformance: agent-session %s body: %w", name, err)
 	}
+	if len(ack.ResourceHost) != 1 || len(ack.ACTokens) != 1 || len(ack.PreActions) != 1 {
+		return fmt.Errorf("conformance: agent-session %s resource maps must each contain exactly one entry", name)
+	}
 	if ack.ErrCode != "0" || ack.OpenTime != openTime || strings.TrimSpace(ack.AgentAddr) == "" ||
 		strings.TrimSpace(ack.ResourceHost[resourceID]) == "" || strings.TrimSpace(ack.ACTokens[resourceID]) == "" {
 		return fmt.Errorf("conformance: agent-session %s success body drifted", name)
 	}
-	if len(ack.PreActions) != 1 || string(ack.PreActions[resourceID]) != "null" {
+	if string(ack.PreActions[resourceID]) != "null" {
 		return fmt.Errorf("conformance: agent-session %s preActions drifted", name)
 	}
 	canonical, _ := json.Marshal(ack)
@@ -410,6 +413,11 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 // classifyAgentSessionCookieBody is mirrored independently by verify-sdk; both
 // classifiers must execute every closed cookie_body_cases entry in lockstep.
 func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
+	// Keep this raw shape pass separate from the strict typed decode below.
+	// Missing and null members are body-shape failures before Go's typed JSON
+	// conversions; strictDecodeArtifact then rejects duplicates, unknown fields,
+	// wrong types, and trailing values. Both stages intentionally map to
+	// body_parse, while cookie encoding and correlation get narrower classes.
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(body), &fields); err != nil || len(fields) != 2 || fields["trxId"] == nil || fields["cookie"] == nil {
 		return AgentSessionRejectBodyParse

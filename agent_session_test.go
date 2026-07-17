@@ -157,3 +157,39 @@ func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
 		t.Fatalf("different authenticated COK wire counter must not affect body transaction correlation: %v", err)
 	}
 }
+
+func TestAgentSessionACKBodyRequiresSingleResourceMaps(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	knock, err := decodeAgentSessionKnockBody(af.OverloadReknock.KnockRequest.BodyJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(*agentSessionACKBody)
+	}{
+		{"resource host", func(ack *agentSessionACKBody) { ack.ResourceHost["other"] = "other.example:7000" }},
+		{"access token", func(ack *agentSessionACKBody) { ack.ACTokens["other"] = "other-token" }},
+		{"pre-action", func(ack *agentSessionACKBody) { ack.PreActions["other"] = json.RawMessage("null") }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var ack agentSessionACKBody
+			if err := json.Unmarshal([]byte(af.OverloadReknock.ACK.BodyJSON), &ack); err != nil {
+				t.Fatal(err)
+			}
+			tc.mutate(&ack)
+			body, err := json.Marshal(ack)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = validateAgentSessionACKBody("RKN ACK", string(body), 900, knock.ResourceID)
+			if err == nil || !strings.Contains(err.Error(), "resource maps must each contain exactly one entry") {
+				t.Fatalf("error = %v, want single-resource-map rejection", err)
+			}
+		})
+	}
+}

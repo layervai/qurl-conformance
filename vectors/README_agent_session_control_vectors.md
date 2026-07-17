@@ -41,6 +41,9 @@ producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`.
   flow mutation proves correlation still succeeds with a different
   authenticated outer counter.
 - An ACK counter must equal the request counter for its RKN or EXT.
+- Each successful ACK's `resHost`, `acTokens`, and `preActions` map must contain
+  exactly one entry keyed by the session `resId`. This single-resource shape is
+  validated before the byte-canonical producer-JSON check.
 - The authenticated body's case-sensitive `headerType` must equal the outer
   packet type. A type 1 packet with a type 8 body, or the inverse, is invalid.
 - `usrId`, `devId`, `aspId`, `resId`, and the canonical 16-character lowercase
@@ -85,7 +88,16 @@ missing padding. `cookie_body_cases` is a closed suite and declares the exact
 
 `flow_cases` is also closed, but it is a consumer-driven expectation table
 rather than a stored mutated-packet suite. Each consumer synthesizes every named
-mutation against its real session parser and must produce the declared result:
+mutation against its real session parser and must produce the declared result.
+This division is contractually required: the conformance package exposes frozen
+packets and stateless cryptographic verification, not a competing session state
+machine. Reimplementing `header_type`, `reply_type`, counter, or
+`application_body` transitions here would only self-test a reference parser and
+could not prove that the shipping consumer rejects them. A consumer's
+conformance gate is incomplete until all 19 cases execute through its actual
+session entry points with no skips.
+
+The declared reject classes are:
 
 | Reject class | Meaning |
 | --- | --- |
