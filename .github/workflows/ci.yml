@@ -82,6 +82,7 @@ jobs:
           const a = c.agentRegistrationVectors();
           const s = c.agentAssignmentVectors();
           const k = c.agentKnockApplicationVectors();
+          const x = c.agentSessionControlVectors();
           const i = c.agentApiKeyIdVectors();
           const t = c.assignmentTicketVectors();
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
@@ -128,6 +129,15 @@ jobs:
           const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
           const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
           const assignmentMalformed = Object.fromEntries(s.error_contract.malformed_cases.map(v => [v.name, v]));
+          const sessionCookie = Buffer.from(x.overload_reknock.cookie_b64, 'base64');
+          const sessionPackets = [
+            x.overload_reknock.knock_request,
+            x.overload_reknock.cookie_reply,
+            x.overload_reknock.reknock_request,
+            x.overload_reknock.ack,
+            x.clean_exit.request,
+            x.clean_exit.ack,
+          ];
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
               s.schema_version !== 2 || s.initial_assignment.request.header_type !== 5 ||
@@ -245,6 +255,23 @@ jobs:
               replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
+              x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 1 ||
+              x.producer_revision !== '2a2a3d91adcf5a7930050db3561c8e00b8340a39' ||
+              x.protocol.cok_wire_counter_correlation !== 'unconstrained' ||
+              x.protocol.cok_body_transaction_correlation !== 'must_equal_knock_counter' ||
+              x.protocol.ack_counter_correlation !== 'must_echo_request' ||
+              x.protocol.exit_cookie_challenge_allowed !== false ||
+              sessionCookie.length !== 32 || sessionCookie.toString('base64') !== x.overload_reknock.cookie_b64 ||
+              sessionPackets.length !== 6 || sessionPackets.some(v => !v.packet_hex || !v.body_hex || !v.header_digest_hex) ||
+              x.overload_reknock.knock_request.header_type !== 1 ||
+              x.overload_reknock.cookie_reply.header_type !== 7 ||
+              x.overload_reknock.reknock_request.header_type !== 8 ||
+              x.overload_reknock.ack.header_type !== 2 ||
+              x.clean_exit.request.header_type !== 16 || x.clean_exit.ack.header_type !== 2 ||
+              JSON.parse(x.overload_reknock.cookie_reply.body_json).trxId !== Number(x.overload_reknock.knock_request.counter) ||
+              x.overload_reknock.ack.counter !== x.overload_reknock.reknock_request.counter ||
+              x.clean_exit.ack.counter !== x.clean_exit.request.counter ||
+              x.cookie_body_cases.length !== 16 || x.flow_cases.length !== 19 ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
               i.consumer_response_cases.length !== 26 ||
@@ -283,6 +310,7 @@ jobs:
           a = q.agent_registration_vectors()
           s = q.agent_assignment_vectors()
           k = q.agent_knock_application_vectors()
+          x = q.agent_session_control_vectors()
           i = q.agent_api_key_id_vectors()
           t = q.assignment_ticket_vectors()
           replies = {v['name']: v for v in k['reply_cases']}
@@ -327,6 +355,15 @@ jobs:
           assignment_requests = {v['name']: v for v in s['request_cases']}
           assignment_results = {v['name']: v for v in s['success_result_cases']}
           assignment_malformed = {v['name']: v for v in s['error_contract']['malformed_cases']}
+          session_cookie = base64.b64decode(x['overload_reknock']['cookie_b64'], validate=True)
+          session_packets = [
+              x['overload_reknock']['knock_request'],
+              x['overload_reknock']['cookie_reply'],
+              x['overload_reknock']['reknock_request'],
+              x['overload_reknock']['ack'],
+              x['clean_exit']['request'],
+              x['clean_exit']['ack'],
+          ]
           assert s['assigned_cell_registration']['request']['header_type'] == 13
           assert s['assigned_cell_registration']['result']['header_type'] == 14
           assert s['assigned_cell_registration']['request']['counter'] == s['assigned_cell_registration']['result']['counter']
@@ -450,6 +487,21 @@ jobs:
           assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
+          assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 1
+          assert x['producer_revision'] == '2a2a3d91adcf5a7930050db3561c8e00b8340a39'
+          assert x['protocol']['cok_wire_counter_correlation'] == 'unconstrained'
+          assert x['protocol']['cok_body_transaction_correlation'] == 'must_equal_knock_counter'
+          assert x['protocol']['ack_counter_correlation'] == 'must_echo_request'
+          assert x['protocol']['exit_cookie_challenge_allowed'] is False
+          assert len(session_cookie) == 32
+          assert base64.b64encode(session_cookie).decode() == x['overload_reknock']['cookie_b64']
+          assert len(session_packets) == 6
+          assert all(v['packet_hex'] and v['body_hex'] and v['header_digest_hex'] for v in session_packets)
+          assert [v['header_type'] for v in session_packets] == [1, 7, 8, 2, 16, 2]
+          assert json.loads(x['overload_reknock']['cookie_reply']['body_json'])['trxId'] == int(x['overload_reknock']['knock_request']['counter'])
+          assert x['overload_reknock']['ack']['counter'] == x['overload_reknock']['reknock_request']['counter']
+          assert x['clean_exit']['ack']['counter'] == x['clean_exit']['request']['counter']
+          assert len(x['cookie_body_cases']) == 16 and len(x['flow_cases']) == 19
           assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
           assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
           assert len(i['consumer_response_cases']) == 26

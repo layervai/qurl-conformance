@@ -1,0 +1,353 @@
+{
+  "artifact": "qurl-agent-session-control-vectors",
+  "clean_exit": {
+    "ack": {
+      "body_hex": "7b22657272436f6465223a2230222c22726573486f7374223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a22667270732e73616e64626f782e6578616d706c653a37303030227d2c226f706e54696d65223a312c226167656e7441646472223a223230332e302e3131332e393a3439313532222c226163546f6b656e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a2261632d746f6b656e2d636f6e666f726d616e63652d3031227d2c22707265416374696f6e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a6e756c6c7d7d",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":1,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "counter": "43",
+      "ephemeral_private_hex": "3132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f50",
+      "header_digest_hex": "6a616efac18f33d35f3acf9b1dba3283b484b7f8c29a1efcf3ee37d028ee7203",
+      "header_name": "NHP_ACK",
+      "header_type": 2,
+      "packet_hex": "66666666666466990100000000000000000000000000002b5f09b7f97a40b50220697064b43b27411b07a4aa1fe05370b27519826983d30d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021917022a9a7ab0f6653554c11ef50044c53dfc2ef6b752962cc8c44e86e159f24c8f30712677208e92d796b3e9cbd2e3c0b989de2ae6f1bea9c4ebdea75c423cf995de9a8d83b36a616efac18f33d35f3acf9b1dba3283b484b7f8c29a1efcf3ee37d028ee7203a59b02a2e784d4afd697ad86a729f28afe3dd6b9bf6264a29aa86ca3afcaab1d0ccd828c1e36c7b72d6f0a42d5ec805aea28973b21ac5ac369144c66bce48928f54f32ffc4fa8261bc263b104e0e4f149878886ebbce26e2c9cb2624a2a7c07262e6f3637ac8e6c28a59a3292ecf7752eb8d6f2a0df91d14444e96a4b343458ad6ba491e72b1704939b9e9a97296d5e0c4861cafe7622bfea186b089101bc53f232d5701fe82d676c1eca98d8d5b1d298ffd2bb7f6ce8b7e9afa9efd46fbb4e5484629c3999bf8d2ed98128771c23b8d946f1512e7d0ea0a41c0235f2d17cb10ca607895d45181d1e9ee121637d31edf38e6501f296f131dbbfe0fe5786fbf",
+      "preamble_hex": "66666666",
+      "receiver_key": "agent",
+      "sender_key": "assigned_cell",
+      "timestamp_nanos": "1800000000000000006"
+    },
+    "request": {
+      "body_hex": "7b2268656164657254797065223a31362c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
+      "body_json": "{\"headerType\":16,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
+      "counter": "43",
+      "ephemeral_private_hex": "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "header_digest_hex": "e043edd5038c4c38998b24bcc7475e6ae6be1bf593c7321814292c80a8a1469a",
+      "header_name": "NHP_EXT",
+      "header_type": 16,
+      "packet_hex": "55555555554555f80100000000000000000000000000002b4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004bb2f858a5602819f1087d64b0eebf0d9a9506ba4835b57073d52e35373565f1c7743eea4683288d59180be722946df799859dd3145f9579f54235dec0a9faeb22ff2c74df1786f5e043edd5038c4c38998b24bcc7475e6ae6be1bf593c7321814292c80a8a1469aa38ed99acadab33dc58c4cbe7ca3fb2462e151a87e5eae1eb8bdfe3af7a30f7116c7a53ff9bfb21de4e26c1cb9e7a66fa1df69662215b4367f6bd79815843ea49831d03c3337fc4cd401f9b98d26250feeef7a35a361dd867edd6ce72d243bd9c8ba9be8f8357d3629cae90a2b0437dab7c932c8f417c04c126d0a14a3ee8215086d129bbc600db43832b8f7705d5e867833a4e47b833db3504c913ddcb381b0cb351e6b1b98a64b098b019fdc",
+      "preamble_hex": "55555555",
+      "receiver_key": "assigned_cell",
+      "sender_key": "agent",
+      "timestamp_nanos": "1800000000000000005"
+    }
+  },
+  "cookie_body_cases": [
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "accept_canonical",
+      "outcome": "accept"
+    },
+    {
+      "body_json": "{\"trxId\":42,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_cookie_transaction_mismatch",
+      "outcome": "reject",
+      "reject_class": "counter"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"***\"}",
+      "name": "reject_invalid_cookie_base64",
+      "outcome": "reject",
+      "reject_class": "cookie_encoding"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHg==\"}",
+      "name": "reject_cookie_31_bytes",
+      "outcome": "reject",
+      "reject_class": "cookie_length"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g\"}",
+      "name": "reject_cookie_33_bytes",
+      "outcome": "reject",
+      "reject_class": "cookie_length"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}",
+      "name": "reject_unpadded_cookie",
+      "outcome": "reject",
+      "reject_class": "cookie_canonical"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\" AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_cookie_whitespace",
+      "outcome": "reject",
+      "reject_class": "cookie_encoding"
+    },
+    {
+      "body_json": "{\"trxId\":\"41\",\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_transaction_string",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":null,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_null_transaction",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":7}",
+      "name": "reject_cookie_number",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"trxId\":42,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_duplicate_transaction",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "name": "reject_duplicate_cookie",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"future\":true}",
+      "name": "reject_unknown_cookie_field",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}{}",
+      "name": "reject_trailing_cookie_value",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "null",
+      "name": "reject_null_cookie_body",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    },
+    {
+      "body_json": "[]",
+      "name": "reject_non_object_cookie_body",
+      "outcome": "reject",
+      "reject_class": "body_parse"
+    }
+  ],
+  "description": "Registered-agent native UDP overload re-knock and clean-exit golden packets.",
+  "flow_cases": [
+    {
+      "mutation": "none",
+      "name": "accept_canonical",
+      "outcome": "accept",
+      "stage": "flow"
+    },
+    {
+      "mutation": "wire_counter_differs_from_knock",
+      "name": "accept_cok_wire_counter_unconstrained",
+      "outcome": "accept",
+      "stage": "cookie_reply"
+    },
+    {
+      "mutation": "body_trx_id_differs_from_knock",
+      "name": "reject_cok_body_transaction_mismatch",
+      "outcome": "reject",
+      "reject_class": "counter",
+      "stage": "cookie_reply"
+    },
+    {
+      "mutation": "wire_type_1_body_type_8",
+      "name": "reject_rkn_wire_type_knk",
+      "outcome": "reject",
+      "reject_class": "header_type",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "wire_type_8_body_type_1",
+      "name": "reject_rkn_body_type_knk",
+      "outcome": "reject",
+      "reject_class": "header_type",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "wire_type_1_body_type_16",
+      "name": "reject_exit_wire_type_knk",
+      "outcome": "reject",
+      "reject_class": "header_type",
+      "stage": "exit_request"
+    },
+    {
+      "mutation": "wire_type_16_body_type_1",
+      "name": "reject_exit_body_type_knk",
+      "outcome": "reject",
+      "reject_class": "header_type",
+      "stage": "exit_request"
+    },
+    {
+      "mutation": "reply_type_7",
+      "name": "reject_rkn_ack_type_cok",
+      "outcome": "reject",
+      "reject_class": "reply_type",
+      "stage": "reknock_ack"
+    },
+    {
+      "mutation": "reply_type_7",
+      "name": "reject_exit_ack_type_cok",
+      "outcome": "reject",
+      "reject_class": "reply_type",
+      "stage": "exit_ack"
+    },
+    {
+      "mutation": "reply_counter_differs_from_rkn",
+      "name": "reject_rkn_ack_counter_mismatch",
+      "outcome": "reject",
+      "reject_class": "counter",
+      "stage": "reknock_ack"
+    },
+    {
+      "mutation": "reply_counter_differs_from_exit",
+      "name": "reject_exit_ack_counter_mismatch",
+      "outcome": "reject",
+      "reject_class": "counter",
+      "stage": "exit_ack"
+    },
+    {
+      "mutation": "digest_uses_different_cookie",
+      "name": "reject_rkn_wrong_cookie_digest",
+      "outcome": "reject",
+      "reject_class": "header_digest",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "header_digest_bit_flip",
+      "name": "reject_rkn_tampered_digest",
+      "outcome": "reject",
+      "reject_class": "header_digest",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "body_trailing_value",
+      "name": "reject_rkn_trailing_body",
+      "outcome": "reject",
+      "reject_class": "application_body",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "body_trailing_value",
+      "name": "reject_exit_trailing_body",
+      "outcome": "reject",
+      "reject_class": "application_body",
+      "stage": "exit_request"
+    },
+    {
+      "mutation": "run_id_differs_from_knock",
+      "name": "reject_rkn_changed_run_id",
+      "outcome": "reject",
+      "reject_class": "application_body",
+      "stage": "reknock_request"
+    },
+    {
+      "mutation": "run_id_differs_from_knock",
+      "name": "reject_exit_changed_run_id",
+      "outcome": "reject",
+      "reject_class": "application_body",
+      "stage": "exit_request"
+    },
+    {
+      "mutation": "decrypt_with_different_server_key",
+      "name": "reject_reply_wrong_server_key",
+      "outcome": "reject",
+      "reject_class": "peer_authentication",
+      "stage": "reply_authentication"
+    },
+    {
+      "mutation": "open_with_different_agent_key",
+      "name": "reject_request_wrong_agent_key",
+      "outcome": "reject",
+      "reject_class": "peer_authentication",
+      "stage": "request_authentication"
+    }
+  ],
+  "keys": {
+    "agent": {
+      "static_private_hex": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+      "static_public_hex": "64b101b1d0be5a8704bd078f9895001fc03e8e9f9522f188dd128d9846d48466"
+    },
+    "assigned_cell": {
+      "static_private_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "static_public_hex": "07a37cbc142093c8b755dc1b10e86cb426374ad16aa853ed0bdfc0b2b86d1c7c"
+    }
+  },
+  "notes": [
+    "Every packet was sealed by the exact producer revision with fixed synthetic key, ephemeral, timestamp, counter, preamble, body, and cookie inputs; independent consumers must rebuild initiator packets and authenticate-open replies.",
+    "The merged producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation proves that consumer rule. NHP_ACK counters must echo NHP_RKN or NHP_EXT.",
+    "The NHP_RKN header digest mixes the exact decoded 32-byte cookie after the ordinary header prefix. NHP_EXT uses the ordinary no-cookie digest and its authenticated body headerType must equal the outer type.",
+    "Each successful NHP_ACK resHost, acTokens, and preActions map contains exactly one entry keyed by the session resId.",
+    "All identities, hosts, keys, cookies, counters, and tokens are synthetic conformance data."
+  ],
+  "overload_reknock": {
+    "ack": {
+      "body_hex": "7b22657272436f6465223a2230222c22726573486f7374223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a22667270732e73616e64626f782e6578616d706c653a37303030227d2c226f706e54696d65223a3930302c226167656e7441646472223a223230332e302e3131332e393a3439313532222c226163546f6b656e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a2261632d746f6b656e2d636f6e666f726d616e63652d3031227d2c22707265416374696f6e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a6e756c6c7d7d",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "counter": "42",
+      "ephemeral_private_hex": "c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0",
+      "header_digest_hex": "25b1cfe4b6f2f882c3cea5d6611cbc58032e549fb51abe0405d4e728a725feca",
+      "header_name": "NHP_ACK",
+      "header_type": 2,
+      "packet_hex": "44444444444645450100000000000000000000000000002a3a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe240000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000917648d991288f3e19eb90193bf26510230066a7a9b70dc2b0eeb97e2d71621f6abf50e11f59ed2a11d598a884b88b68efc40ddcd8f6c91bd582d3d1717fb9f9b75b205696c7ac8f25b1cfe4b6f2f882c3cea5d6611cbc58032e549fb51abe0405d4e728a725fecac06122981023fd2590f2269f55eefe7c210db8764f9b862054547ea5ddcdf77e1490002aee98290c375baf254d5345c36deddca0833b4698485d628bdae4494d0b7e421636a4ffc5b11fe3eec72277334d0b387e8aa2d49c565ab420e26fd41b029f3ecc44359ccec83fb2d83798350a2e4c4edfe1ed75f244c8f5613d378f361577e94f4081c02d224ad9969127d76da2aca4994e27987f1a79001b6b30429918793fad2b1714c6146046be67f1c2cfde8853d45e27ed2a468b382e38e2bb501ca5c5e00f4504db18cecb22a3cff65d9cdf8358d08404b118ebc023ecf380456aa54a9ba8e7fae620866ed21ae0390cb88a21ebcbff57e56d31f0cfb38c03a3b2",
+      "preamble_hex": "44444444",
+      "receiver_key": "agent",
+      "sender_key": "assigned_cell",
+      "timestamp_nanos": "1800000000000000004"
+    },
+    "cookie_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "cookie_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "cookie_reply": {
+      "body_hex": "7b227472784964223a34312c22636f6f6b6965223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b61477877644868383d227d",
+      "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "counter": "41",
+      "ephemeral_private_hex": "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+      "header_digest_hex": "9543b72a76843fffc93a109b3b1836cbb93737f90ad6b8c164074b07f8b80835",
+      "header_name": "NHP_COK",
+      "header_type": 7,
+      "packet_hex": "2222222222252276010000000000000000000000000000295869aff450549732cbaaed5e5df9b30a6da31cb0e5742bad5ad4a1a768f1a67b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c3e744adc0e6ba3403c3a9decbdc742db440e44fd79690be593f9cba730044e13926383e3059aaee003b175bc2c3c904ef3bf6d3015e6bad113426aca956a6e21c5ceebc830f61869543b72a76843fffc93a109b3b1836cbb93737f90ad6b8c164074b07f8b80835374a137998b46a324d4ee8c9bd1af3cc92cb48a4582089b3ed92614a054003aade4d9261575c6d66b92a7d7f0e5eeebed6b1a7aecb2d5323f8ae832467dd13feb54ca2c3f5db530c1a20f07fe34b97077d316bba",
+      "preamble_hex": "22222222",
+      "receiver_key": "agent",
+      "sender_key": "assigned_cell",
+      "timestamp_nanos": "1800000000000000002"
+    },
+    "knock_request": {
+      "body_hex": "7b2268656164657254797065223a312c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
+      "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
+      "counter": "41",
+      "ephemeral_private_hex": "8182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0",
+      "header_digest_hex": "acc29a84e105148cad1bd42807a4731dbca87d9303db50ca46c61a57253e25f2",
+      "header_name": "NHP_KNK",
+      "header_type": 1,
+      "packet_hex": "11111111111011bd01000000000000000000000000000029883186b800b41d5cf0429695da9b3cc4f328ebcd184a6e482fa578c103f06c7700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001735abc776684123346b82023de4591ce37a652e08c0a9152e88c6590e0e8b0f5f88fb77cd380a7a4cd30ea15b66803e2851b345dd6d5de84dda7dc185aedf4f7847107e79fbab1cacc29a84e105148cad1bd42807a4731dbca87d9303db50ca46c61a57253e25f2402c2aedd72be51adaf3cfbbe1b01646c391b80988ef7727ea0bc766539a5ddfc4d9f686aab7411f74c6f4d74f30c48c211dff3d42f3ed5d7d48b1a43b5faef049922b3a989a4a644059afb2a40edd41a131f57ca38c8c328aa615d3f967e7e38d0c68d4e8d6461d8f6000a2e8572a3443e6f6bd69142d460bda9212d5b04251df1ec199f517ed40427c93a125ed8e43b4a7ebe1dda590866225a4ac95eab18d6f5fd15099cdf2e000bdb51e",
+      "preamble_hex": "11111111",
+      "receiver_key": "assigned_cell",
+      "sender_key": "agent",
+      "timestamp_nanos": "1800000000000000001"
+    },
+    "reknock_request": {
+      "body_hex": "7b2268656164657254797065223a382c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
+      "body_json": "{\"headerType\":8,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
+      "counter": "42",
+      "ephemeral_private_hex": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+      "header_digest_hex": "c6351ddbba799c799a42a3def62eff3822b4f0b8ddb9f144145b9e44c213e8ed",
+      "header_name": "NHP_RKN",
+      "header_type": 8,
+      "packet_hex": "33333333333b339f0100000000000000000000000000002aad438bfae31f6c093d61d4339255ea798092c9fadd07b97827f4b0ae9dee7c1c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e9229ad0f5c9c62cb065f3a78e18a72af7e720e439128461f76f2676609635537434f2b59cca78c47e592ed5269ef07b8d7eabf1f4313027454c06656df5b20d82a09fc4625d4d7c6351ddbba799c799a42a3def62eff3822b4f0b8ddb9f144145b9e44c213e8ed660d8bd74d0c72c08b3f641390b6cb8e321cf326422c71a2931704dcf006d48820da3cdccbb76eaf46633e0c3079ad7858ff9421fe79ab7a7454757528b045142bdfc673ab74665479ec5f846a66c60391f18c0b4392c84a0dc7917fc840127cc37265b20fc5fdd576d055be976dc3cc352486ef68cc6dae6f510bedf9ca6a59524bc5ecff202fa7887b4ad34642ceef6f5853b263ba92c9c5a4084c0f86c9a3bd15986bd9d3604f32cfbd4b",
+      "preamble_hex": "33333333",
+      "receiver_key": "assigned_cell",
+      "sender_key": "agent",
+      "timestamp_nanos": "1800000000000000003"
+    }
+  },
+  "producer_revision": "2a2a3d91adcf5a7930050db3561c8e00b8340a39",
+  "protocol": {
+    "ack_counter_correlation": "must_echo_request",
+    "cok_body_transaction_correlation": "must_equal_knock_counter",
+    "cok_wire_counter_correlation": "unconstrained",
+    "cookie_encoding": "base64_std_padded_canonical",
+    "cookie_size_bytes": 32,
+    "exit_cookie_challenge_allowed": false,
+    "rkn_header_digest": "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)"
+  },
+  "schema_version": 1,
+  "source_of_truth": "github.com/layervai/qurl-conformance"
+}

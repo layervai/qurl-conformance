@@ -37,6 +37,11 @@ def agent_knock_application_vectors():
     return _load("agent_knock_application_vectors.json")
 
 
+def agent_session_control_vectors():
+    """Return the parsed agent_session_control_vectors.json."""
+    return _load("agent_session_control_vectors.json")
+
+
 def agent_api_key_id_vectors():
     """Return the parsed agent_api_key_id_vectors.json."""
     return _load("agent_api_key_id_vectors.json")

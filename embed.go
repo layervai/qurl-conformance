@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -15,6 +15,7 @@ const (
 	agentRegistrationName     = "vectors/agent_registration_golden.json"
 	agentAssignmentName       = "vectors/agent_assignment_golden.json"
 	agentKnockApplicationName = "vectors/agent_knock_application_vectors.json"
+	agentSessionControlName   = "vectors/agent_session_control_vectors.json"
 	agentAPIKeyIDName         = "vectors/agent_api_key_id_vectors.json"
 	assignmentTicketName      = "vectors/assignment_ticket_v1_vectors.json"
 )
@@ -93,6 +94,16 @@ func AgentKnockApplicationVectors() []byte {
 	return b
 }
 
+// AgentSessionControlVectors returns the deterministic native-UDP overload
+// re-knock and clean-exit packet artifact.
+func AgentSessionControlVectors() []byte {
+	b, err := vectorsFS.ReadFile(agentSessionControlName)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentSessionControlName, err))
+	}
+	return b
+}
+
 // AgentAPIKeyIDVectors returns the raw bytes of the control-plane API-key ID
 // producer and consumer vectors used by agent registration.
 func AgentAPIKeyIDVectors() []byte {
@@ -131,6 +142,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(agentAssignmentName)
 	case agentKnockApplicationName, "agent_knock_application_vectors.json":
 		return vectorsFS.ReadFile(agentKnockApplicationName)
+	case agentSessionControlName, "agent_session_control_vectors.json":
+		return vectorsFS.ReadFile(agentSessionControlName)
 	case agentAPIKeyIDName, "agent_api_key_id_vectors.json":
 		return vectorsFS.ReadFile(agentAPIKeyIDName)
 	case assignmentTicketName, "assignment_ticket_v1_vectors.json":
@@ -177,6 +190,12 @@ func AgentAssignmentGolden() (*AgentAssignmentFile, error) {
 // application-body artifact into a typed document.
 func AgentKnockApplication() (*AgentKnockApplicationFile, error) {
 	return ParseAgentKnockApplicationFile(AgentKnockApplicationVectors())
+}
+
+// AgentSessionControl strictly parses the native-UDP overload re-knock and
+// clean-exit packet artifact.
+func AgentSessionControl() (*AgentSessionControlFile, error) {
+	return ParseAgentSessionControlFile(AgentSessionControlVectors())
 }
 
 // AgentAPIKeyIDs strictly parses the embedded agent API-key ID artifact.

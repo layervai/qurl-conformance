@@ -1187,6 +1187,7 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 		{"agent registration", AgentRegistrationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err }},
 		{"agent assignment", AgentAssignmentVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err }},
 		{"agent knock application", AgentKnockApplicationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentKnockApplicationFile(b); return err }},
+		{"agent session control", AgentSessionControlVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentSessionControlFile(b); return err }},
 		{"agent API-key ID", AgentAPIKeyIDVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAPIKeyIDFile(b); return err }},
 	}
 	for _, tc := range tests {
@@ -1552,6 +1553,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/agent_assignment_golden.json",
 		"agent_knock_application_vectors.json",
 		"vectors/agent_knock_application_vectors.json",
+		"agent_session_control_vectors.json",
+		"vectors/agent_session_control_vectors.json",
 		"agent_api_key_id_vectors.json",
 		"vectors/agent_api_key_id_vectors.json",
 	} {
