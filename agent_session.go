@@ -416,6 +416,8 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 	return nil
 }
 
+// classifyAgentSessionCookieBody is mirrored independently by verify-sdk; both
+// classifiers must execute every closed cookie_body_cases entry in lockstep.
 func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	if err := rejectDuplicateJSONKeys([]byte(body)); err != nil {
 		return AgentSessionRejectBodyParse

@@ -201,6 +201,8 @@ func x25519Public(t *testing.T, private []byte) []byte {
 	return key.PublicKey().Bytes()
 }
 
+// classifySessionCookieBody deliberately does not call the root classifier;
+// both implementations must execute every closed cookie_body_cases entry.
 func classifySessionCookieBody(body []byte, requestCounter uint64) string {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	token, err := decoder.Token()
