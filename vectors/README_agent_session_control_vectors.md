@@ -26,8 +26,8 @@ The artifact contains one deterministic instance of each transition:
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
-are synthetic. The committed packets were emitted by producer revision
-`e0fedfec0cf3215d8af291b21ef9eb5889ae9906`.
+are synthetic. The committed packets were emitted byte-for-byte by merged
+producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`.
 
 ## Correlation contract
 

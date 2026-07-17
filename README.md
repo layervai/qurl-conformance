@@ -181,7 +181,7 @@ This module hosts eight artifact families, each under its own `artifact` id:
   (`qurl-agent-session-control-vectors`,
   `agent_session_control_vectors.json`) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and clean exit EXT -> ACK, pinned to
-  producer revision `e0fedfec0cf3215d8af291b21ef9eb5889ae9906`. The COK wire
+  merged producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw

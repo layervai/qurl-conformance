@@ -19,7 +19,7 @@ const (
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
 	// AgentSessionControlProducerRevision is the exact reviewed NHP producer
 	// revision used to seal the golden packets.
-	AgentSessionControlProducerRevision = "e0fedfec0cf3215d8af291b21ef9eb5889ae9906"
+	AgentSessionControlProducerRevision = "2a2a3d91adcf5a7930050db3561c8e00b8340a39"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2
