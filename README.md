@@ -4,8 +4,8 @@ The single public source of truth for the **qURL cross-language conformance
 vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
-registered-agent knock application bodies, and control-plane API-key IDs
-decoupled by layer.
+registered-agent knock application bodies, registered-agent session control,
+and control-plane API-key IDs decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -25,6 +25,8 @@ trust.
 | `vectors/agent_assignment_golden.json` | deterministic hub LST/LRT assignment, account-only assigned-cell OTP, REG/RAK activation, completion LST/LRT packets, strict request/binding/size/result rejects, and the producer-pinned closed error-body taxonomy (see Scope) |
 | `vectors/agent_knock_application_vectors.json` | registered-agent KNK body and RunID request-policy cases plus already-decrypted ACK/COK dispositions; no Noise packet duplication |
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
+| `vectors/agent_session_control_vectors.json` | deterministic full-packet KNK/COK/RKN/ACK overload recovery and EXT/ACK clean exit, strict cookie parsing, authentication, and closed flow rejects |
+| `vectors/README_agent_session_control_vectors.md` | session-control wire contract, correlation rules, digest formula, reject vocabulary, and consumer algorithm |
 | `vectors/agent_api_key_id_vectors.json` | issuer and strict-consumer fixtures for agent registration `key_id` / `device_api_key_id` |
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
@@ -43,8 +45,9 @@ rk, err := conformance.RelayKnockGolden()          // strict-parsed relay-knock 
 ar, err := conformance.AgentRegistrationGolden()   // strict-parsed agent-registration golden packets
 aa, err := conformance.AgentAssignmentGolden()     // strict-parsed assignment/REG/completion packets + errors
 ka, err := conformance.AgentKnockApplication()      // strict-parsed agent KNK/ACK application vectors
+sc, err := conformance.AgentSessionControl()        // strict-parsed RKN/EXT full-packet vectors
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
-at, err := conformance.AssignmentTicket()            // strict-parsed qat1 cryptographic/fence artifact
+at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -63,7 +66,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts seven artifact families, each under its own `artifact` id:
+This module hosts eight artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -174,6 +177,21 @@ This module hosts seven artifact families, each under its own `artifact` id:
   correlation gates. Its `resId` semantic is the placement-neutral NHP
   `knock_resource_id`, not the public-key management `resource_id`. See
   `vectors/README_agent_knock_application_vectors.md`.
+- **Registered-agent session control**
+  (`qurl-agent-session-control-vectors`,
+  `agent_session_control_vectors.json`) — deterministic full packets for the
+  overload path KNK -> COK -> RKN -> ACK and clean exit EXT -> ACK, pinned to
+  producer revision `e0fedfec0cf3215d8af291b21ef9eb5889ae9906`. The COK wire
+  counter is deliberately unconstrained; its authenticated body `trxId` must
+  equal the originating KNK counter. RKN authenticates a canonical padded
+  standard-base64 32-byte cookie by extending the header digest with the raw
+  cookie bytes. ACK counters echo RKN or EXT. EXT never accepts a cookie
+  challenge. The artifact freezes both static X25519 identities, every
+  deterministic ephemeral key, body byte, header digest, and packet byte, plus
+  closed cookie and flow reject suites. Consumers must rebuild initiator
+  packets, authenticate replies against the assigned cell key, and enforce the
+  application-body and correlation gates after decryption. See
+  `vectors/README_agent_session_control_vectors.md`.
 - **Agent API-key ID contract** (`qurl-agent-api-key-id-vectors`,
   `agent_api_key_id_vectors.json`) — deterministic issuer suffix fixtures,
   direct string validation cases, and raw response-field cases for
