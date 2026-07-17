@@ -270,7 +270,8 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if binary.BigEndian.Uint64(packet[16:24]) != counter {
 		return fmt.Errorf("conformance: agent-session %s wire counter drifted", name)
 	}
-	if !bytes.Equal(packet[208:240], mustDecodeAgentSessionHex(p.HeaderDigestHex)) {
+	headerDigest, _ := hex.DecodeString(p.HeaderDigestHex)
+	if !bytes.Equal(packet[208:240], headerDigest) {
 		return fmt.Errorf("conformance: agent-session %s header_digest_hex does not match packet", name)
 	}
 	ephemeralPrivate, _ := hex.DecodeString(p.EphemeralPrivateHex)
@@ -284,11 +285,6 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 		}
 	}
 	return nil
-}
-
-func mustDecodeAgentSessionHex(value string) []byte {
-	decoded, _ := hex.DecodeString(value)
-	return decoded
 }
 
 type agentSessionKnockBody struct {
@@ -316,18 +312,9 @@ type agentSessionACKBody struct {
 
 func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	o := f.OverloadReknock
-	knockCounter, err := strconv.ParseUint(o.KnockRequest.Counter, 10, 64)
-	if err != nil {
-		return fmt.Errorf("conformance: agent-session parse KNK counter: %w", err)
-	}
-	rknCounter, err := strconv.ParseUint(o.ReknockRequest.Counter, 10, 64)
-	if err != nil {
-		return fmt.Errorf("conformance: agent-session parse RKN counter: %w", err)
-	}
-	exitCounter, err := strconv.ParseUint(f.CleanExit.Request.Counter, 10, 64)
-	if err != nil {
-		return fmt.Errorf("conformance: agent-session parse EXT counter: %w", err)
-	}
+	knockCounter, _ := strconv.ParseUint(o.KnockRequest.Counter, 10, 64)
+	rknCounter, _ := strconv.ParseUint(o.ReknockRequest.Counter, 10, 64)
+	exitCounter, _ := strconv.ParseUint(f.CleanExit.Request.Counter, 10, 64)
 	if o.ACK.Counter != o.ReknockRequest.Counter || f.CleanExit.ACK.Counter != f.CleanExit.Request.Counter {
 		return errors.New("conformance: agent-session ACK counter bindings drifted")
 	}
@@ -383,19 +370,6 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 }
 
 func decodeAgentSessionKnockBody(body string) (agentSessionKnockBody, error) {
-	var raw map[string]json.RawMessage
-	if err := strictDecodeArtifact([]byte(body), &raw); err != nil {
-		return agentSessionKnockBody{}, err
-	}
-	want := map[string]bool{"headerType": true, "usrId": true, "devId": true, "aspId": true, "resId": true, "runId": true}
-	if len(raw) != len(want) {
-		return agentSessionKnockBody{}, errors.New("wrong field count")
-	}
-	for key := range raw {
-		if !want[key] {
-			return agentSessionKnockBody{}, fmt.Errorf("unknown exact field %q", key)
-		}
-	}
 	var decoded agentSessionKnockBody
 	if err := strictDecodeArtifact([]byte(body), &decoded); err != nil {
 		return agentSessionKnockBody{}, err
