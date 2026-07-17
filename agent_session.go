@@ -416,8 +416,8 @@ func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	if bytes.Equal(bytes.TrimSpace(fields["trxId"]), []byte("null")) || bytes.Equal(bytes.TrimSpace(fields["cookie"]), []byte("null")) {
 		return AgentSessionRejectBodyParse
 	}
-	var message *agentSessionCookieBody
-	if err := strictDecodeArtifact([]byte(body), &message); err != nil || message == nil || message.Cookie == "" {
+	var message agentSessionCookieBody
+	if err := strictDecodeArtifact([]byte(body), &message); err != nil || message.Cookie == "" {
 		return AgentSessionRejectBodyParse
 	}
 	raw, err := base64.StdEncoding.Strict().DecodeString(message.Cookie)
