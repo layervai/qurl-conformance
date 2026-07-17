@@ -237,7 +237,7 @@ func classifySessionCookieBody(body []byte, requestCounter uint64) string {
 
 	var transactionID uint64
 	var cookie string
-	if bytes.Equal(fields["trxId"], []byte("null")) || bytes.Equal(fields["cookie"], []byte("null")) ||
+	if bytes.Equal(bytes.TrimSpace(fields["trxId"]), []byte("null")) || bytes.Equal(bytes.TrimSpace(fields["cookie"]), []byte("null")) ||
 		json.Unmarshal(fields["trxId"], &transactionID) != nil || json.Unmarshal(fields["cookie"], &cookie) != nil || cookie == "" {
 		return conformance.AgentSessionRejectBodyParse
 	}

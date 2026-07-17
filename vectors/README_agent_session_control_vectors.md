@@ -78,8 +78,9 @@ missing padding. `cookie_body_cases` is a closed suite and declares the exact
 
 ## Flow reject vocabulary
 
-`flow_cases` is also closed. Each named mutation must produce its declared
-result:
+`flow_cases` is also closed, but it is a consumer-driven expectation table
+rather than a stored mutated-packet suite. Each consumer synthesizes every named
+mutation against its real session parser and must produce the declared result:
 
 | Reject class | Meaning |
 | --- | --- |

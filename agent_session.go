@@ -62,7 +62,9 @@ type AgentSessionControlFile struct {
 	OverloadReknock  AgentSessionOverloadReknock  `json:"overload_reknock"`
 	CleanExit        AgentSessionCleanExit        `json:"clean_exit"`
 	CookieBodyCases  []AgentSessionCookieBodyCase `json:"cookie_body_cases"`
-	FlowCases        []AgentSessionFlowCase       `json:"flow_cases"`
+	// FlowCases is a closed, consumer-driven expectation table. Each consumer
+	// synthesizes the named mutations against its real session implementation.
+	FlowCases []AgentSessionFlowCase `json:"flow_cases"`
 }
 
 type AgentSessionProtocol struct {
@@ -428,7 +430,7 @@ func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	if err := json.Unmarshal([]byte(body), &fields); err != nil || len(fields) != 2 || fields["trxId"] == nil || fields["cookie"] == nil {
 		return AgentSessionRejectBodyParse
 	}
-	if bytes.Equal(bytes.TrimSpace(fields["trxId"]), []byte("null")) {
+	if bytes.Equal(bytes.TrimSpace(fields["trxId"]), []byte("null")) || bytes.Equal(bytes.TrimSpace(fields["cookie"]), []byte("null")) {
 		return AgentSessionRejectBodyParse
 	}
 	var message *agentSessionCookieBody
