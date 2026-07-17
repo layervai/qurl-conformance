@@ -172,6 +172,8 @@ func retagSessionRequest(t *testing.T, packet []byte, typ int, serverPublic, coo
 	if len(packet) < conformance.AgentSessionHeaderSize {
 		t.Fatalf("packet too short: %d", len(packet))
 	}
+	// The outer type is not folded into the body AEAD transcript. Reusing the KNK
+	// builder is safe only while the exact packet-byte comparison above stays green.
 	got := append([]byte(nil), packet...)
 	preamble := binary.BigEndian.Uint32(got[0:4])
 	payloadSize := len(got) - conformance.AgentSessionHeaderSize

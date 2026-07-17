@@ -224,6 +224,8 @@ func validateAgentSessionKeys(keys AgentSessionKeys) error {
 	return nil
 }
 
+// validateAgentSessionPacket is the stdlib-only structural gate. The independent
+// verify-sdk gate rebuilds and cryptographically authenticates every packet.
 func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName string, wantType int, wantSender, wantReceiver string) error {
 	if p.HeaderName != wantName || p.HeaderType != wantType || p.SenderKey != wantSender || p.ReceiverKey != wantReceiver {
 		return fmt.Errorf("conformance: agent-session %s type or key roles drifted", name)
