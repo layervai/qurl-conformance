@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.4.0...npm-v0.5.0) (2026-07-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** the assignment completion golden request and deterministic packet now use an exact production-grammar lv_live_ device key.
+
+### Bug Fixes
+
+* **vectors:** canonicalize device key fixture ([#42](https://github.com/layervai/qurl-conformance/issues/42)) ([43eccca](https://github.com/layervai/qurl-conformance/commit/43eccca560ad890abe93900df374833485944e92))
+
 ## [0.4.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.3.0...npm-v0.4.0) (2026-07-16)
 
 
