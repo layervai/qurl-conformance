@@ -578,14 +578,17 @@ const (
 
 // Exact synthetic production-shaped fixture values.
 const (
+	agentAssignmentDeviceKeySecretBytes = 32
+
 	// AgentAssignmentBootstrapCredentialFixture is the exact synthetic,
 	// production-shaped credential fixture. Secret scanners must allow only
 	// this value, never an lv_live_conformance_* wildcard.
 	AgentAssignmentBootstrapCredentialFixture = "lv_live_conformance_bootstrap_secret_0001"
 	// AgentAssignmentDeviceAPIKeyFixture is the exact synthetic,
-	// production-shaped device-key fixture. Secret scanners must allow only
-	// this value, never an lv_live_conformance_* wildcard.
-	AgentAssignmentDeviceAPIKeyFixture = "lv_live_conformance_device_secret_0001"
+	// production-shaped device-key fixture. Its body is canonical unpadded
+	// base64url for the deterministic 32-byte sequence 0x00..0x1f. Secret
+	// scanners must allow only this exact value, never an lv_live_* wildcard.
+	AgentAssignmentDeviceAPIKeyFixture = "lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 	// AgentAssignmentAccountCredentialFixture is the exact synthetic account
 	// credential carried only by the optional account OTP packet.
 	AgentAssignmentAccountCredentialFixture = "lv_live_conformance_account_secret_0001"
