@@ -89,10 +89,10 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.CleanExit.ACK.PacketHex = af.CleanExit.ACK.PacketHex[:len(af.CleanExit.ACK.PacketHex)-2]
 		}},
 		{"packet limit", "packet exceeds 4096-byte limit", func(af *AgentSessionControlFile) {
-			body := strings.Repeat("x", 4096-AgentSessionHeaderSize-AgentSessionTagSize+1)
+			body := strings.Repeat("x", AgentSessionPacketMaxBytes-AgentSessionHeaderSize-AgentSessionTagSize+1)
 			af.OverloadReknock.KnockRequest.BodyJSON = body
 			af.OverloadReknock.KnockRequest.BodyHex = hex.EncodeToString([]byte(body))
-			af.OverloadReknock.KnockRequest.PacketHex = strings.Repeat("00", 4097)
+			af.OverloadReknock.KnockRequest.PacketHex = strings.Repeat("00", AgentSessionPacketMaxBytes+1)
 		}},
 		{"packet digest", "header_digest_hex", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ReknockRequest.HeaderDigestHex = strings.Repeat("0", 64)

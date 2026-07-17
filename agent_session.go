@@ -27,9 +27,10 @@ const (
 	AgentSessionHeaderRKN = 8
 	AgentSessionHeaderEXT = 16
 
-	AgentSessionCookieSize = 32
-	AgentSessionHeaderSize = 240
-	AgentSessionTagSize    = 16
+	AgentSessionCookieSize     = 32
+	AgentSessionHeaderSize     = 240
+	AgentSessionTagSize        = 16
+	AgentSessionPacketMaxBytes = 4096
 )
 
 const (
@@ -258,8 +259,8 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if len(packet) != AgentSessionHeaderSize+len(body)+AgentSessionTagSize {
 		return fmt.Errorf("conformance: agent-session %s packet size is inconsistent with body", name)
 	}
-	if len(packet) > 4096 {
-		return fmt.Errorf("conformance: agent-session %s packet exceeds 4096-byte limit", name)
+	if len(packet) > AgentSessionPacketMaxBytes {
+		return fmt.Errorf("conformance: agent-session %s packet exceeds %d-byte limit", name, AgentSessionPacketMaxBytes)
 	}
 	preamble := binary.BigEndian.Uint32(packet[0:4])
 	word := preamble ^ binary.BigEndian.Uint32(packet[4:8])
