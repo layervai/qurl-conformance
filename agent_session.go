@@ -17,7 +17,7 @@ const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
 	// re-knock and clean-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
-	// AgentSessionControlProducerRevision is the exact reviewed NHP producer
+	// AgentSessionControlProducerRevision is the exact merged NHP producer
 	// revision used to seal the golden packets.
 	AgentSessionControlProducerRevision = "2a2a3d91adcf5a7930050db3561c8e00b8340a39"
 
