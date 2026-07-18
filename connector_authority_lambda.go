@@ -861,14 +861,22 @@ func validateConnectorAuthorityRejects(operation, kind string, cases []Connector
 			}
 			data = []byte(c.BodyJSON)
 		}
-		var gotClass string
+		var (
+			gotClass  string
+			acceptErr error
+		)
 		if kind == "request" {
 			gotClass = classifyConnectorAuthorityRequestReject(operation, data)
+			acceptErr = validateConnectorAuthorityRequest(operation, data)
 		} else {
 			gotClass = classifyConnectorAuthorityResponseReject(operation, data)
+			_, acceptErr = validateConnectorAuthorityResponse(operation, data)
 		}
 		if gotClass != c.RejectClass {
 			return fmt.Errorf("conformance: Connector Authority %s %s reject %q class = %q, want %q", operation, kind, c.Name, gotClass, c.RejectClass)
+		}
+		if acceptErr == nil {
+			return fmt.Errorf("conformance: Connector Authority %s %s reject %q is accepted by the typed validator", operation, kind, c.Name)
 		}
 	}
 	return nil
