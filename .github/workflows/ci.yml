@@ -86,6 +86,11 @@ jobs:
           const i = c.agentApiKeyIdVectors();
           const t = c.assignmentTicketVectors();
           const u = c.connectorAuthorityLambdaVectors();
+          const authorityRequests = Object.fromEntries(
+            Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
+          );
+          const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment'];
+          const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration'];
           const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
@@ -289,7 +294,12 @@ jobs:
               u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 1 ||
               Object.keys(u.operations).length !== 5 ||
               u.protocol.max_assignment_ticket_ascii_bytes !== t.contract.max_ticket_ascii_bytes ||
+              u.protocol.hub_request_id_format !== 'lowercase_sha256_hex' ||
+              !/^[0-9a-f]{64}$/.test(u.fixtures.hub_request_id) ||
+              globalAuthorityOperations.some(name => authorityRequests[name].hub_request_id !== u.fixtures.hub_request_id) ||
+              cellAuthorityOperations.some(name => Object.hasOwn(authorityRequests[name], 'hub_request_id')) ||
               u.fixtures.device_api_key === u.fixtures.credential ||
+              Object.values(u.operations).some(op => JSON.stringify({success: op.success_golden, errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
               Object.values(u.operations).some(op => op.public_mapping_cases.some(v => (v.nhp_body_json || '').includes(u.fixtures.device_api_key))) ||
               !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
               activationUnavailable?.nhp_action !== 'drop_no_reply' ||
@@ -324,6 +334,12 @@ jobs:
           i = q.agent_api_key_id_vectors()
           t = q.assignment_ticket_vectors()
           u = q.connector_authority_lambda_vectors()
+          authority_requests = {
+              name: json.loads(operation['request_golden']['body_json'])
+              for name, operation in u['operations'].items()
+          }
+          global_authority_operations = ['IssueAssignment', 'RefreshAssignment']
+          cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration']
           activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
@@ -532,7 +548,16 @@ jobs:
           assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 1
           assert len(u['operations']) == 5
           assert u['protocol']['max_assignment_ticket_ascii_bytes'] == t['contract']['max_ticket_ascii_bytes']
+          assert u['protocol']['hub_request_id_format'] == 'lowercase_sha256_hex'
+          assert re.fullmatch(r'[0-9a-f]{64}', u['fixtures']['hub_request_id'])
+          assert all(authority_requests[name]['hub_request_id'] == u['fixtures']['hub_request_id'] for name in global_authority_operations)
+          assert all('hub_request_id' not in authority_requests[name] for name in cell_authority_operations)
           assert u['fixtures']['device_api_key'] != u['fixtures']['credential']
+          assert all(u['fixtures']['hub_request_id'] not in json.dumps({
+              'success': operation['success_golden'],
+              'errors': operation['semantic_errors'],
+              'mappings': operation['public_mapping_cases'],
+          }) for operation in u['operations'].values())
           assert all(u['fixtures']['device_api_key'] not in v.get('nhp_body_json', '') for op in u['operations'].values() for v in op['public_mapping_cases'])
           assert any(v['mapping_source'] == 'nhp_preinvoke' and v['name'] == 'assignment_rate_limited' and '52204' in v['nhp_body_json'] for v in u['operations']['RefreshAssignment']['public_mapping_cases'])
           assert activation_unavailable['nhp_action'] == 'drop_no_reply'

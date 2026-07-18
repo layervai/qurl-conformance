@@ -31,6 +31,87 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	}
 }
 
+func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
+	file, err := ConnectorAuthorityLambda()
+	if err != nil {
+		t.Fatalf("ConnectorAuthorityLambda(): %v", err)
+	}
+	if !connectorAuthorityHubRequestIDPattern.MatchString(file.Fixtures.HubRequestID) {
+		t.Fatalf("hub_request_id fixture %q is not canonical lowercase 64-hex", file.Fixtures.HubRequestID)
+	}
+	for _, secret := range []string{file.Fixtures.Credential, file.Fixtures.DeviceAPIKey, file.Fixtures.RegistrationCredential} {
+		if file.Fixtures.HubRequestID == secret {
+			t.Fatal("hub_request_id reuses a credential fixture")
+		}
+	}
+
+	globalOperations := []string{
+		ConnectorAuthorityOperationIssueAssignment,
+		ConnectorAuthorityOperationRefreshAssignment,
+	}
+	for _, operation := range globalOperations {
+		t.Run(operation, func(t *testing.T) {
+			request := file.Operations[operation].RequestGolden.BodyJSON
+			var object map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(request), &object); err != nil {
+				t.Fatalf("request JSON: %v", err)
+			}
+			var got string
+			if err := json.Unmarshal(object["hub_request_id"], &got); err != nil || got != file.Fixtures.HubRequestID {
+				t.Fatalf("hub_request_id = %q, %v; want fixture", got, err)
+			}
+			if err := validateConnectorAuthorityRequest(operation, []byte(removeConnectorAuthorityJSONField(t, request, "hub_request_id"))); err == nil {
+				t.Fatal("request without hub_request_id unexpectedly accepted")
+			}
+
+			invalid := map[string]string{
+				"uppercase":   "A" + file.Fixtures.HubRequestID[1:],
+				"wrong_width": file.Fixtures.HubRequestID[:len(file.Fixtures.HubRequestID)-1],
+				"non_hex":     "g" + file.Fixtures.HubRequestID[1:],
+			}
+			for name, value := range invalid {
+				t.Run(name, func(t *testing.T) {
+					body := strings.Replace(request, file.Fixtures.HubRequestID, value, 1)
+					if err := validateConnectorAuthorityRequest(operation, []byte(body)); err == nil {
+						t.Fatalf("hub_request_id %q unexpectedly accepted", value)
+					}
+				})
+			}
+			assertConnectorAuthorityRequestHasNoCallerAuthority(t, operation, request)
+		})
+	}
+
+	cellOperations := []string{
+		ConnectorAuthorityOperationIssueRegistrationOTP,
+		ConnectorAuthorityOperationActivateRegistration,
+		ConnectorAuthorityOperationCompleteRegistration,
+	}
+	for _, operation := range cellOperations {
+		t.Run(operation+" rejects global replay id", func(t *testing.T) {
+			request := file.Operations[operation].RequestGolden.BodyJSON
+			injected := strings.Replace(request, "{", `{"hub_request_id":"`+file.Fixtures.HubRequestID+`",`, 1)
+			if err := validateConnectorAuthorityRequest(operation, []byte(injected)); err == nil {
+				t.Fatal("cell operation unexpectedly accepted hub_request_id")
+			}
+		})
+	}
+
+	for operation, contract := range file.Operations {
+		publicOrResponseBodies := []string{contract.SuccessGolden.BodyJSON}
+		for _, semanticError := range contract.SemanticErrors {
+			publicOrResponseBodies = append(publicOrResponseBodies, semanticError.BodyJSON)
+		}
+		for _, mapping := range contract.PublicMappingCases {
+			publicOrResponseBodies = append(publicOrResponseBodies, mapping.PrivateResponseBodyJSON, mapping.NHPBodyJSON)
+		}
+		for _, body := range publicOrResponseBodies {
+			if strings.Contains(body, file.Fixtures.HubRequestID) {
+				t.Errorf("%s response or public body exposes hub_request_id", operation)
+			}
+		}
+	}
+}
+
 func TestConnectorAuthorityPublicMappingsFreezeCriticalDispositions(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
@@ -91,6 +172,11 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
 			file.Fixtures.DeviceAPIKey = file.Fixtures.Credential
 		}), "must differ")
+	})
+	t.Run("fixture hub request id", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			file.Fixtures.HubRequestID = "A" + file.Fixtures.HubRequestID[1:]
+		}), "hub_request_id")
 	})
 	t.Run("missing operation", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
@@ -235,7 +321,7 @@ func TestConnectorAuthorityIssueAssignmentTicketExpiresBeforeLease(t *testing.T)
 	}
 }
 
-func TestConnectorAuthorityDeviceSecretIsDistinctAndNeverPublic(t *testing.T) {
+func TestConnectorAuthoritySecretsAreDistinctAndNeverPublic(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
 		t.Fatalf("ConnectorAuthorityLambda(): %v", err)
@@ -243,10 +329,17 @@ func TestConnectorAuthorityDeviceSecretIsDistinctAndNeverPublic(t *testing.T) {
 	if file.Fixtures.DeviceAPIKey == file.Fixtures.Credential {
 		t.Fatal("device API key reuses the initial credential")
 	}
+	secrets := map[string]string{
+		"initial credential":      file.Fixtures.Credential,
+		"registration credential": file.Fixtures.RegistrationCredential,
+		"device API key":          file.Fixtures.DeviceAPIKey,
+	}
 	for operation, contract := range file.Operations {
 		for _, mapping := range contract.PublicMappingCases {
-			if strings.Contains(mapping.NHPBodyJSON, file.Fixtures.DeviceAPIKey) {
-				t.Errorf("%s/%s public body exposes the device API key", operation, mapping.Name)
+			for name, secret := range secrets {
+				if strings.Contains(mapping.NHPBodyJSON, secret) {
+					t.Errorf("%s/%s public body exposes the %s", operation, mapping.Name, name)
+				}
 			}
 		}
 	}

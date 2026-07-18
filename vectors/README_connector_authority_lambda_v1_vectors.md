@@ -11,6 +11,23 @@ Each operation has its own request schema; there is intentionally no generic
 assignment generation. The authority derives those values from authenticated
 identity, credential state, and the provisioned-cell catalog.
 
+The global `IssueAssignment` and `RefreshAssignment` operations require a
+canonical lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker
+uses domain-separated framing over its deployment environment, the
+authenticated initiator public key, the AEAD-authenticated packet send
+timestamp, and the SHA-256 digest of the exact authenticated decrypted LST
+body. The authority uses this private value as a cross-worker replay key: it
+caches only a successful Issue/Refresh domain result for 15 minutes, and the
+same id plus request fingerprint returns that result. The same id plus a
+different semantic request fingerprint fails closed. Malformed,
+rejected-credential or identity, pre-invoke/rate-limited, and transient
+`unavailable` outcomes are not cached. An exact captured or retried packet
+produces the same id. A legitimate newly encrypted refresh has a new
+authenticated timestamp and therefore a new id, so replay handling does not
+suppress a fresh assignment read or reassignment. This id is neither a
+credential nor caller-selected authority, never appears in authority
+responses or public NHP bodies, and is rejected by all three cell operations.
+
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API
 key is deliberately distinct from the initial credential, and no public result
@@ -48,8 +65,8 @@ success or error may add fields.
 
 | Operation | Request members after `version` | Success result | Closed semantic errors |
 | --- | --- | --- | --- |
-| `IssueAssignment` | `agent_id`, `authenticated_peer_public_key_b64`, `credential` | agent id, registration metadata, assigned cell endpoint, opaque assignment ticket and expiry | `invalid_request`, `credential_invalid`, `credential_consumed`, `unavailable` |
-| `RefreshAssignment` | `agent_id`, `authenticated_peer_public_key_b64` | agent id and assigned cell endpoint | `invalid_request`, `identity_rejected`, `reassignment_in_progress`, `unavailable` |
+| `IssueAssignment` | `hub_request_id`, `agent_id`, `authenticated_peer_public_key_b64`, `credential` | agent id, registration metadata, assigned cell endpoint, opaque assignment ticket and expiry | `invalid_request`, `credential_invalid`, `credential_consumed`, `unavailable` |
+| `RefreshAssignment` | `hub_request_id`, `agent_id`, `authenticated_peer_public_key_b64` | agent id and assigned cell endpoint | `invalid_request`, `identity_rejected`, `reassignment_in_progress`, `unavailable` |
 | `IssueRegistrationOTP` | `assignment_ticket`, credential key id and secret, peer key, agent id, observed source address | `{}` | `invalid_request`, `rejected`, `email_unavailable`, `rate_limited`, `send_failed`, `unavailable` |
 | `ActivateRegistration` | `assignment_ticket`, credential key id, registration credential, peer key, agent id, hostname, agent version | `{}` | `invalid_request`, `credential_rejected`, `ticket_invalid`, `not_yet_valid`, `ticket_expired`, `identity_conflict`, `quota`, `reenrollment_required`, `unavailable` |
 | `CompleteRegistration` | peer key, agent id, device API key | `device_api_key_id` only | `invalid_request`, `identity_rejected`, `quota`, `conflict`, `unavailable` |
@@ -80,9 +97,10 @@ hostname.
 Registration-disabled `52107` is Issue/enroll-only. Assignment admission
 `52204` is a pre-invoke outcome for both Issue and Refresh and is not a private
 authority error. Public assignment code `52203` remains reserved by
-`agent_assignment_golden.json` but is deliberately not produced here: Issue
-and Refresh are read-only, while Activate atomically enforces owner quota and
-maps it to RAK `52112`.
+`agent_assignment_golden.json` but is deliberately not produced here: the Issue
+and Refresh domain operations do not mutate assignments, although their
+private adapter writes the 15-minute replay envelope; Activate atomically
+enforces owner quota and maps it to RAK `52112`.
 
 OTP issuance is fire-and-forget and uses `no_application_reply` for every
 outcome. Activation is different: a validated `unavailable` authority response

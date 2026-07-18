@@ -216,7 +216,20 @@ This module hosts nine artifact families, each under its own `artifact` id:
   `IssueRegistrationOTP`, `ActivateRegistration`, and
   `CompleteRegistration`. There is no generic operation selector and callers
   cannot supply environment, cell, owner, or assignment generation. Each
-  response is exactly `{version,result}` or `{version,error}` under a 4,096-byte
+  global `IssueAssignment` and `RefreshAssignment` request carries a required
+  lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker uses
+  domain-separated framing over its environment, authenticated initiator public
+  key, AEAD-authenticated send timestamp, and the SHA-256 digest of the exact
+  authenticated decrypted LST body. This gives the private authority a
+  cross-worker replay key without making it caller authority: a successful
+  Issue/Refresh domain result is cached for 15 minutes and the same id plus
+  request fingerprint reuses it, while the same id plus a different semantic
+  request fingerprint fails closed. Malformed, rejected-credential or identity,
+  pre-invoke/rate-limited, and transient-unavailable outcomes are not cached. A
+  legitimately newly encrypted refresh has a new authenticated timestamp and
+  therefore a new id. Cell operations reject the field, and it never appears
+  in a public NHP body or authority response. Each response is exactly
+  `{version,result}` or `{version,error}` under a 4,096-byte
   cap; only OTP `rate_limited` may carry a positive `retry_after_seconds`.
   Private-to-NHP cases freeze whether the worker emits LRT, emits RAK, follows
   OTP's normal no-application-reply protocol, or deliberately drops an
@@ -225,9 +238,11 @@ This module hosts nine artifact families, each under its own `artifact` id:
   ambiguity; it is never translated to 52107. Initial-enrollment 52107 and
   Issue/Refresh assignment-admission 52204 are explicitly NHP pre-invoke
   outcomes, not authority errors. Public 52203 remains reserved by the public
-  assignment artifact but is intentionally not produced here: issue and
-  refresh are read-only, while activation atomically enforces owner quota as
-  RAK 52112. See `vectors/README_connector_authority_lambda_v1_vectors.md`.
+  assignment artifact but is intentionally not produced here: the Issue and
+  Refresh domain operations do not mutate assignments, although their private
+  adapter writes the 15-minute replay envelope; activation atomically enforces
+  owner quota as RAK 52112. See
+  `vectors/README_connector_authority_lambda_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

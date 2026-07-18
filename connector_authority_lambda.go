@@ -35,6 +35,7 @@ const (
 	// still fits inside the operation's 4096-byte request envelope.
 	ConnectorAuthorityLambdaMaxAssignmentTicketASCIIBytes = 2304
 	ConnectorAuthorityLambdaTimestampFormat               = "RFC3339_UTC_WHOLE_SECONDS"
+	ConnectorAuthorityLambdaHubRequestIDFormat            = "lowercase_sha256_hex"
 	ConnectorAuthorityLambdaResponseRule                  = "exactly_one_of_result_or_error"
 
 	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
@@ -62,9 +63,10 @@ var connectorAuthorityOperationNames = []string{
 }
 
 var (
-	connectorAuthorityAgentIDPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
-	connectorAuthorityCellIDPattern   = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
-	connectorAuthorityDNSLabelPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	connectorAuthorityAgentIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
+	connectorAuthorityCellIDPattern       = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
+	connectorAuthorityDNSLabelPattern     = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	connectorAuthorityHubRequestIDPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 // ConnectorAuthorityLambdaFile freezes the private synchronous invocation
@@ -87,6 +89,7 @@ type ConnectorAuthorityLambdaProtocol struct {
 	MaxResponseBytes              int    `json:"max_response_bytes"`
 	MaxAssignmentTicketASCIIBytes int    `json:"max_assignment_ticket_ascii_bytes"`
 	TimestampFormat               string `json:"timestamp_format"`
+	HubRequestIDFormat            string `json:"hub_request_id_format"`
 	ResponseRule                  string `json:"response_rule"`
 }
 
@@ -95,6 +98,7 @@ type ConnectorAuthorityLambdaProtocol struct {
 type ConnectorAuthorityLambdaFixtures struct {
 	AgentID                       string `json:"agent_id"`
 	AuthenticatedPeerPublicKeyB64 string `json:"authenticated_peer_public_key_b64"`
+	HubRequestID                  string `json:"hub_request_id"`
 	Credential                    string `json:"credential"`
 	AssignmentTicket              string `json:"assignment_ticket"`
 	CredentialKeyID               string `json:"credential_key_id"`
@@ -170,6 +174,7 @@ type ConnectorAuthorityPublicMapping struct {
 // and operation selector are absent by construction.
 type ConnectorAuthorityIssueAssignmentRequest struct {
 	Version                       int    `json:"version"`
+	HubRequestID                  string `json:"hub_request_id"`
 	AgentID                       string `json:"agent_id"`
 	AuthenticatedPeerPublicKeyB64 string `json:"authenticated_peer_public_key_b64"`
 	Credential                    string `json:"credential"`
@@ -177,6 +182,7 @@ type ConnectorAuthorityIssueAssignmentRequest struct {
 
 type ConnectorAuthorityRefreshAssignmentRequest struct {
 	Version                       int    `json:"version"`
+	HubRequestID                  string `json:"hub_request_id"`
 	AgentID                       string `json:"agent_id"`
 	AuthenticatedPeerPublicKeyB64 string `json:"authenticated_peer_public_key_b64"`
 }
@@ -281,8 +287,9 @@ func ParseConnectorAuthorityLambdaFile(data []byte) (*ConnectorAuthorityLambdaFi
 	wantProtocol := ConnectorAuthorityLambdaProtocol{
 		RequestVersion: ConnectorAuthorityLambdaRequestVersion, MaxRequestBytes: ConnectorAuthorityLambdaMaxRequestBytes,
 		MaxResponseBytes: ConnectorAuthorityLambdaMaxResponseBytes, MaxAssignmentTicketASCIIBytes: ConnectorAuthorityLambdaMaxAssignmentTicketASCIIBytes,
-		TimestampFormat: ConnectorAuthorityLambdaTimestampFormat,
-		ResponseRule:    ConnectorAuthorityLambdaResponseRule,
+		TimestampFormat:    ConnectorAuthorityLambdaTimestampFormat,
+		HubRequestIDFormat: ConnectorAuthorityLambdaHubRequestIDFormat,
+		ResponseRule:       ConnectorAuthorityLambdaResponseRule,
 	}
 	if file.Protocol != wantProtocol {
 		return nil, fmt.Errorf("conformance: Connector Authority Lambda protocol = %+v, want %+v", file.Protocol, wantProtocol)
@@ -311,6 +318,9 @@ func validateConnectorAuthorityFixtures(f ConnectorAuthorityLambdaFixtures) erro
 	}
 	if err := validateConnectorAuthorityX25519KeyEncoding(f.AuthenticatedPeerPublicKeyB64); err != nil {
 		return fmt.Errorf("conformance: Connector Authority fixture peer key: %w", err)
+	}
+	if !connectorAuthorityHubRequestIDPattern.MatchString(f.HubRequestID) {
+		return errors.New("conformance: Connector Authority fixture hub_request_id is not canonical")
 	}
 	if !isConnectorAuthorityAPIKey(f.Credential) || !isConnectorAuthorityAPIKey(f.DeviceAPIKey) {
 		return errors.New("conformance: Connector Authority fixture API key is not canonical")
@@ -402,7 +412,8 @@ func validateConnectorAuthorityRequest(operation string, data []byte) error {
 			return err
 		}
 		if request.Version != 1 || !connectorAuthorityAgentIDPattern.MatchString(request.AgentID) ||
-			validateConnectorAuthorityX25519KeyEncoding(request.AuthenticatedPeerPublicKeyB64) != nil || !isConnectorAuthorityAPIKey(request.Credential) {
+			validateConnectorAuthorityX25519KeyEncoding(request.AuthenticatedPeerPublicKeyB64) != nil ||
+			!connectorAuthorityHubRequestIDPattern.MatchString(request.HubRequestID) || !isConnectorAuthorityAPIKey(request.Credential) {
 			return errors.New("invalid IssueAssignment request semantics")
 		}
 	case ConnectorAuthorityOperationRefreshAssignment:
@@ -411,7 +422,8 @@ func validateConnectorAuthorityRequest(operation string, data []byte) error {
 			return err
 		}
 		if request.Version != 1 || !connectorAuthorityAgentIDPattern.MatchString(request.AgentID) ||
-			validateConnectorAuthorityX25519KeyEncoding(request.AuthenticatedPeerPublicKeyB64) != nil {
+			validateConnectorAuthorityX25519KeyEncoding(request.AuthenticatedPeerPublicKeyB64) != nil ||
+			!connectorAuthorityHubRequestIDPattern.MatchString(request.HubRequestID) {
 			return errors.New("invalid RefreshAssignment request semantics")
 		}
 	case ConnectorAuthorityOperationIssueRegistrationOTP:
@@ -463,9 +475,9 @@ func requireConnectorAuthorityRequestMembers(operation string, data []byte) erro
 func connectorAuthorityRequestMembers(operation string) ([]string, error) {
 	switch operation {
 	case ConnectorAuthorityOperationIssueAssignment:
-		return []string{"version", "agent_id", "authenticated_peer_public_key_b64", "credential"}, nil
+		return []string{"version", "hub_request_id", "agent_id", "authenticated_peer_public_key_b64", "credential"}, nil
 	case ConnectorAuthorityOperationRefreshAssignment:
-		return []string{"version", "agent_id", "authenticated_peer_public_key_b64"}, nil
+		return []string{"version", "hub_request_id", "agent_id", "authenticated_peer_public_key_b64"}, nil
 	case ConnectorAuthorityOperationIssueRegistrationOTP:
 		return []string{"version", "assignment_ticket", "credential_key_id", "credential_secret", "authenticated_peer_public_key_b64", "agent_id", "observed_source_address"}, nil
 	case ConnectorAuthorityOperationActivateRegistration:
@@ -661,11 +673,12 @@ func connectorAuthorityGoldenRequest(operation string, f ConnectorAuthorityLambd
 	switch operation {
 	case ConnectorAuthorityOperationIssueAssignment:
 		value = ConnectorAuthorityIssueAssignmentRequest{
-			Version: 1, AgentID: f.AgentID, AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64, Credential: f.Credential,
+			Version: 1, HubRequestID: f.HubRequestID, AgentID: f.AgentID,
+			AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64, Credential: f.Credential,
 		}
 	case ConnectorAuthorityOperationRefreshAssignment:
 		value = ConnectorAuthorityRefreshAssignmentRequest{
-			Version: 1, AgentID: f.AgentID, AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64,
+			Version: 1, HubRequestID: f.HubRequestID, AgentID: f.AgentID, AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64,
 		}
 	case ConnectorAuthorityOperationIssueRegistrationOTP:
 		value = ConnectorAuthorityIssueRegistrationOTPRequest{
