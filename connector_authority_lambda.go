@@ -70,7 +70,7 @@ var (
 )
 
 // ConnectorAuthorityLambdaFile freezes the private synchronous invocation
-// bodies shared by qurl-service handlers and NHP workers. It does not define a
+// bodies shared by authority handlers and NHP workers. It does not define a
 // public API or a generic operation-dispatch envelope.
 type ConnectorAuthorityLambdaFile struct {
 	Artifact      string                                       `json:"artifact"`

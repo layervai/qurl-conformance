@@ -70,6 +70,10 @@ value must be a positive integer. No other success or error may add fields.
 | `ActivateRegistration` | `assignment_ticket`, credential key id, registration credential, peer key, agent id, hostname, agent version | `{}` | `invalid_request`, `credential_rejected`, `ticket_invalid`, `not_yet_valid`, `ticket_expired`, `identity_conflict`, `quota`, `reenrollment_required`, `unavailable` |
 | `CompleteRegistration` | peer key, agent id, device API key | `device_api_key_id` only | `invalid_request`, `identity_rejected`, `quota`, `conflict`, `unavailable` |
 
+The synthetic `IssueAssignment` success golden uses registration
+`key_kind=account`. Consumers must accept the complete frozen public vocabulary:
+`bootstrap`, `connector_bootstrap`, `account`, and `agent`.
+
 `registration_credential`, `hostname`, and `agent_version` are required
 members on activation. The registration proof may be explicitly empty only as
 a replay candidate: this private shape gate cannot know replay state, and the
