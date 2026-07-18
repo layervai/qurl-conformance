@@ -1,0 +1,307 @@
+{
+  "artifact": "qurl-connector-authority-lambda-v1-vectors",
+  "schema_version": 1,
+  "description": "Strict private synchronous invocation contract between NHP workers and the five separately permissioned Connector Authority Lambda operations; public SDK traffic remains NHP over UDP and never sends these bodies. Public assignment code 52203 remains reserved by agent_assignment_golden.json but is intentionally unproduced here: IssueAssignment and RefreshAssignment are read-only, while ActivateRegistration atomically enforces owner quota and maps it to RAK 52112.",
+  "protocol": {
+    "request_version": 1,
+    "max_request_bytes": 4096,
+    "max_response_bytes": 4096,
+    "max_assignment_ticket_ascii_bytes": 2304,
+    "timestamp_format": "RFC3339_UTC_WHOLE_SECONDS",
+    "response_rule": "exactly_one_of_result_or_error"
+  },
+  "fixtures": {
+    "agent_id": "agent-conform",
+    "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+    "credential": "lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "assignment_ticket": "conformance-account-assignment-ticket-0001",
+    "credential_key_id": "key_A1b2C3d4E5f6",
+    "registration_credential": "01234567",
+    "observed_source_address": "203.0.113.10",
+    "hostname": "builder-01",
+    "agent_version": "0.1.0",
+    "device_api_key": "lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+    "device_api_key_id": "key_DvK9mN2pQr7S",
+    "registration_key_kind": "account",
+    "cell_id": "cell0",
+    "assignment_generation": 1,
+    "endpoint_revision": 1,
+    "lease_expires_at": "2026-07-16T12:00:00Z",
+    "nhp_host": "cell0.nhp.layerv.ai",
+    "nhp_port": 62206,
+    "server_public_key_b64": "Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=",
+    "assignment_ticket_expires_at": "2026-07-15T23:15:00Z"
+  },
+  "operations": {
+    "IssueAssignment": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}"
+      },
+      "success_golden": {
+        "name": "accept_success",
+        "body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_kind\":\"account\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}"
+      },
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "credential_invalid", "body_json": "{\"version\":1,\"error\":{\"code\":\"credential_invalid\"}}"},
+        {"code": "credential_consumed", "body_json": "{\"version\":1,\"error\":{\"code\":\"credential_consumed\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"Agent_ID\":\"smuggled-agent\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"owner_id\":\"attacker\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":[]}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"credential\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_kind\":\"account\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"agent_id\":\"agent-conform\",\"registration\":{\"key_id\":\"key_A1b2C3d4E5f6\",\"key_kind\":\"account\"},\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}},\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"assignment_ticket_expires_at\":\"2026-07-15T23:15:00Z\"}}", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52109\",\"errMsg\":\"invalid enrollment input\"}", "recovery_action": "none"},
+        {"name": "credential_invalid", "mapping_source": "authority_response", "private_outcome": "credential_invalid", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"credential_invalid\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52106\",\"errMsg\":\"API key invalid\"}", "recovery_action": "none"},
+        {"name": "credential_consumed", "mapping_source": "authority_response", "private_outcome": "credential_consumed", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"credential_consumed\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52108\",\"errMsg\":\"bootstrap key already consumed\"}", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52200\",\"errMsg\":\"assignment temporarily unavailable\"}", "recovery_action": "none"},
+        {"name": "registration_disabled", "mapping_source": "nhp_preinvoke", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52107\",\"errMsg\":\"registration disabled\"}", "recovery_action": "none"},
+        {"name": "assignment_rate_limited", "mapping_source": "nhp_preinvoke", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52204\",\"errMsg\":\"assignment rate limited\",\"retryAfterSeconds\":60}", "recovery_action": "none"}
+      ]
+    },
+    "RefreshAssignment": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}"
+      },
+      "success_golden": {
+        "name": "accept_success",
+        "body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}}}}"
+      },
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "identity_rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}"},
+        {"code": "reassignment_in_progress", "body_json": "{\"version\":1,\"error\":{\"code\":\"reassignment_in_progress\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"Agent_ID\":\"smuggled-agent\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"owner_id\":\"attacker\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"agent_id\":null,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"agent_id\":[],\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}}}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"agent_id\":\"agent-conform\",\"assignment\":{\"cell_id\":\"cell0\",\"assignment_generation\":1,\"endpoint_revision\":1,\"lease_expires_at\":\"2026-07-16T12:00:00Z\",\"nhp_udp_endpoint\":{\"host\":\"cell0.nhp.layerv.ai\",\"port\":62206,\"server_public_key_b64\":\"Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=\"}}}}", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52205\",\"errMsg\":\"invalid assignment request\"}", "recovery_action": "none"},
+        {"name": "identity_rejected", "mapping_source": "authority_response", "private_outcome": "identity_rejected", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52201\",\"errMsg\":\"assignment identity rejected\"}", "recovery_action": "none"},
+        {"name": "reassignment_in_progress", "mapping_source": "authority_response", "private_outcome": "reassignment_in_progress", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"reassignment_in_progress\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52202\",\"errMsg\":\"reassignment in progress\"}", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52200\",\"errMsg\":\"assignment temporarily unavailable\"}", "recovery_action": "none"},
+        {"name": "assignment_rate_limited", "mapping_source": "nhp_preinvoke", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52204\",\"errMsg\":\"assignment rate limited\",\"retryAfterSeconds\":60}", "recovery_action": "none"}
+      ]
+    },
+    "IssueRegistrationOTP": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}"
+      },
+      "success_golden": {"name": "accept_success", "body_json": "{\"version\":1,\"result\":{}}"},
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"rejected\"}}"},
+        {"code": "email_unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"email_unavailable\"}}"},
+        {"code": "rate_limited", "body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\",\"retry_after_seconds\":60}}"},
+        {"code": "send_failed", "body_json": "{\"version\":1,\"error\":{\"code\":\"send_failed\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"Agent_ID\":\"smuggled-agent\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\",\"cell_id\":\"cell1\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":null,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":[],\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"credential_secret\":\"lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"observed_source_address\":\"203.0.113.10\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\",\"retry_after_seconds\":0}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{\"unexpected\":true}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "rejected", "mapping_source": "authority_response", "private_outcome": "rejected", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"rejected\"}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "email_unavailable", "mapping_source": "authority_response", "private_outcome": "email_unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"email_unavailable\"}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "rate_limited", "mapping_source": "authority_response", "private_outcome": "rate_limited", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\",\"retry_after_seconds\":60}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "send_failed", "mapping_source": "authority_response", "private_outcome": "send_failed", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"send_failed\"}}", "nhp_action": "no_application_reply", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "no_application_reply", "recovery_action": "none"}
+      ]
+    },
+    "ActivateRegistration": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}"
+      },
+      "success_golden": {"name": "accept_success", "body_json": "{\"version\":1,\"result\":{}}"},
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "credential_rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"credential_rejected\"}}"},
+        {"code": "ticket_invalid", "body_json": "{\"version\":1,\"error\":{\"code\":\"ticket_invalid\"}}"},
+        {"code": "not_yet_valid", "body_json": "{\"version\":1,\"error\":{\"code\":\"not_yet_valid\"}}"},
+        {"code": "ticket_expired", "body_json": "{\"version\":1,\"error\":{\"code\":\"ticket_expired\"}}"},
+        {"code": "identity_conflict", "body_json": "{\"version\":1,\"error\":{\"code\":\"identity_conflict\"}}"},
+        {"code": "quota", "body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}"},
+        {"code": "reenrollment_required", "body_json": "{\"version\":1,\"error\":{\"code\":\"reenrollment_required\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"Agent_ID\":\"smuggled-agent\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\",\"assignment_generation\":7}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":null,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":[],\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"assignment_ticket\":\"conformance-account-assignment-ticket-0001\",\"credential_key_id\":\"key_A1b2C3d4E5f6\",\"registration_credential\":\"01234567\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"hostname\":\"builder-01\",\"agent_version\":\"0.1.0\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{\"unexpected\":true}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"0\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52109\",\"errMsg\":\"invalid enrollment input\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "credential_rejected", "mapping_source": "authority_response", "private_outcome": "credential_rejected", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"credential_rejected\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52100\",\"errMsg\":\"registration credential invalid\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "ticket_invalid", "mapping_source": "authority_response", "private_outcome": "ticket_invalid", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"ticket_invalid\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52110\",\"errMsg\":\"assignment ticket invalid\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "not_yet_valid", "mapping_source": "authority_response", "private_outcome": "not_yet_valid", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"not_yet_valid\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52110\",\"errMsg\":\"assignment ticket invalid\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "ticket_expired", "mapping_source": "authority_response", "private_outcome": "ticket_expired", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"ticket_expired\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52111\",\"errMsg\":\"assignment ticket expired\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "identity_conflict", "mapping_source": "authority_response", "private_outcome": "identity_conflict", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"identity_conflict\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52103\",\"errMsg\":\"device identity already enrolled elsewhere\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "quota", "mapping_source": "authority_response", "private_outcome": "quota", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52112\",\"errMsg\":\"agent registration quota exceeded\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "reenrollment_required", "mapping_source": "authority_response", "private_outcome": "reenrollment_required", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"reenrollment_required\"}}", "nhp_action": "emit_rak", "nhp_body_json": "{\"errCode\":\"52101\",\"errMsg\":\"registration credential expired\",\"aspId\":\"agent\"}", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "drop_no_reply", "recovery_action": "bounded_exact_pending_activation_transport_retry"}
+      ]
+    },
+    "CompleteRegistration": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\"}"
+      },
+      "success_golden": {"name": "accept_success", "body_json": "{\"version\":1,\"result\":{\"device_api_key_id\":\"key_DvK9mN2pQr7S\"}}"},
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "identity_rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}"},
+        {"code": "quota", "body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}"},
+        {"code": "conflict", "body_json": "{\"version\":1,\"error\":{\"code\":\"conflict\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"Agent_ID\":\"smuggled-agent\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\",\"cell_id\":\"cell1\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":[]}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"agent_id\":\"agent-conform\",\"device_api_key\":\"lv_live_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{\"device_api_key_id\":\"key_DvK9mN2pQr7S\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"agent_registration_completion\",\"version\":1,\"device_api_key_id\":\"key_DvK9mN2pQr7S\"}}", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52304\",\"errMsg\":\"invalid completion request\"}", "recovery_action": "none"},
+        {"name": "identity_rejected", "mapping_source": "authority_response", "private_outcome": "identity_rejected", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52301\",\"errMsg\":\"completion identity rejected\"}", "recovery_action": "none"},
+        {"name": "quota", "mapping_source": "authority_response", "private_outcome": "quota", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52302\",\"errMsg\":\"device credential quota exceeded\"}", "recovery_action": "none"},
+        {"name": "conflict", "mapping_source": "authority_response", "private_outcome": "conflict", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"conflict\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52303\",\"errMsg\":\"different device credential candidate already recorded\"}", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52300\",\"errMsg\":\"completion temporarily unavailable\",\"retryAfterSeconds\":5}", "recovery_action": "none"}
+      ]
+    }
+  }
+}

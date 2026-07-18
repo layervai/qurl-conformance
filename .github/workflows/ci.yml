@@ -85,6 +85,8 @@ jobs:
           const x = c.agentSessionControlVectors();
           const i = c.agentApiKeyIdVectors();
           const t = c.assignmentTicketVectors();
+          const u = c.connectorAuthorityLambdaVectors();
+          const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
@@ -284,6 +286,14 @@ jobs:
               t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
               t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
               t.contract.credential_kinds.includes('tunnel_bootstrap') ||
+              u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 1 ||
+              Object.keys(u.operations).length !== 5 ||
+              u.protocol.max_assignment_ticket_ascii_bytes !== t.contract.max_ticket_ascii_bytes ||
+              u.fixtures.device_api_key === u.fixtures.credential ||
+              Object.values(u.operations).some(op => op.public_mapping_cases.some(v => (v.nhp_body_json || '').includes(u.fixtures.device_api_key))) ||
+              !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
+              activationUnavailable?.nhp_action !== 'drop_no_reply' ||
+              'nhp_body_json' in activationUnavailable ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -313,6 +323,8 @@ jobs:
           x = q.agent_session_control_vectors()
           i = q.agent_api_key_id_vectors()
           t = q.assignment_ticket_vectors()
+          u = q.connector_authority_lambda_vectors()
+          activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
@@ -517,6 +529,14 @@ jobs:
           assert t['golden']['lrt_body_bytes'] <= t['contract']['nhp_body_max_bytes']
           assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
           assert 'tunnel_bootstrap' not in t['contract']['credential_kinds']
+          assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 1
+          assert len(u['operations']) == 5
+          assert u['protocol']['max_assignment_ticket_ascii_bytes'] == t['contract']['max_ticket_ascii_bytes']
+          assert u['fixtures']['device_api_key'] != u['fixtures']['credential']
+          assert all(u['fixtures']['device_api_key'] not in v.get('nhp_body_json', '') for op in u['operations'].values() for v in op['public_mapping_cases'])
+          assert any(v['mapping_source'] == 'nhp_preinvoke' and v['name'] == 'assignment_rate_limited' and '52204' in v['nhp_body_json'] for v in u['operations']['RefreshAssignment']['public_mapping_cases'])
+          assert activation_unavailable['nhp_action'] == 'drop_no_reply'
+          assert 'nhp_body_json' not in activation_unavailable
           print('py ok')
           PY
 

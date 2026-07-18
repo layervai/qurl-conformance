@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -18,6 +18,7 @@ const (
 	agentSessionControlName   = "vectors/agent_session_control_vectors.json"
 	agentAPIKeyIDName         = "vectors/agent_api_key_id_vectors.json"
 	assignmentTicketName      = "vectors/assignment_ticket_v1_vectors.json"
+	connectorAuthorityName    = "vectors/connector_authority_lambda_v1_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -125,6 +126,16 @@ func AssignmentTicketVectors() []byte {
 	return b
 }
 
+// ConnectorAuthorityLambdaVectors returns the raw bytes of the private,
+// operation-specific NHP-to-authority invocation artifact.
+func ConnectorAuthorityLambdaVectors() []byte {
+	b, err := vectorsFS.ReadFile(connectorAuthorityName)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorAuthorityName, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -148,6 +159,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(agentAPIKeyIDName)
 	case assignmentTicketName, "assignment_ticket_v1_vectors.json":
 		return vectorsFS.ReadFile(assignmentTicketName)
+	case connectorAuthorityName, "connector_authority_lambda_v1_vectors.json":
+		return vectorsFS.ReadFile(connectorAuthorityName)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -206,4 +219,10 @@ func AgentAPIKeyIDs() (*AgentAPIKeyIDFile, error) {
 // AssignmentTicket strictly parses the embedded standalone qat1 artifact.
 func AssignmentTicket() (*AssignmentTicketFile, error) {
 	return ParseAssignmentTicketFile(AssignmentTicketVectors())
+}
+
+// ConnectorAuthorityLambda strictly parses the embedded private invocation
+// artifact shared by NHP workers and Connector Authority handlers.
+func ConnectorAuthorityLambda() (*ConnectorAuthorityLambdaFile, error) {
+	return ParseConnectorAuthorityLambdaFile(ConnectorAuthorityLambdaVectors())
 }

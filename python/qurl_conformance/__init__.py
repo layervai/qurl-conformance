@@ -50,3 +50,8 @@ def agent_api_key_id_vectors():
 def assignment_ticket_vectors():
     """Return the parsed assignment_ticket_v1_vectors.json."""
     return _load("assignment_ticket_v1_vectors.json")
+
+
+def connector_authority_lambda_vectors():
+    """Return the parsed connector_authority_lambda_v1_vectors.json."""
+    return _load("connector_authority_lambda_v1_vectors.json")

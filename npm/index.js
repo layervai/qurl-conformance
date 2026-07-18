@@ -14,4 +14,5 @@ module.exports = {
   agentSessionControlVectors: () => load("agent_session_control_vectors.json"),
   agentApiKeyIdVectors: () => load("agent_api_key_id_vectors.json"),
   assignmentTicketVectors: () => load("assignment_ticket_v1_vectors.json"),
+  connectorAuthorityLambdaVectors: () => load("connector_authority_lambda_v1_vectors.json"),
 };
