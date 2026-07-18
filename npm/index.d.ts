@@ -7,3 +7,4 @@ export declare function agentKnockApplicationVectors(): unknown;
 export declare function agentSessionControlVectors(): unknown;
 export declare function agentApiKeyIdVectors(): unknown;
 export declare function assignmentTicketVectors(): unknown;
+export declare function connectorAuthorityLambdaVectors(): unknown;

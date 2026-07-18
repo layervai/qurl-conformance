@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Eight families live here, each under its own artifact id so they stay decoupled
+// Nine families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -32,6 +32,9 @@
 //     completion device_api_key_id.
 //   - The assignment-ticket v1 artifact (assignment_ticket_v1_vectors.json):
 //     exact qat1 claims/signature bytes, optimistic fences, and reject suites.
+//   - The private Connector Authority Lambda contract
+//     (connector_authority_lambda_v1_vectors.json): five operation-specific
+//     request/result envelopes, strict rejects, and private-to-NHP mappings.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

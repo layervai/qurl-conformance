@@ -5,7 +5,8 @@ vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
-and control-plane API-key IDs decoupled by layer.
+control-plane API-key IDs, and private Connector Authority invocations decoupled
+by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -31,6 +32,8 @@ trust.
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
+| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for the five separately permissioned Connector Authority Lambda operations plus NHP public mappings |
+| `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -48,6 +51,7 @@ ka, err := conformance.AgentKnockApplication()      // strict-parsed agent KNK/A
 sc, err := conformance.AgentSessionControl()        // strict-parsed RKN/EXT full-packet vectors
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
+ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -66,7 +70,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts eight artifact families, each under its own `artifact` id:
+This module hosts nine artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -205,6 +209,40 @@ This module hosts eight artifact families, each under its own `artifact` id:
   existing-assignment fences, NHP size budget, and closed reject suites. NHP
   carries this ticket opaquely. See
   `vectors/README_assignment_ticket_v1_vectors.md`.
+- **Private Connector Authority Lambda v1**
+  (`qurl-connector-authority-lambda-v1-vectors`,
+  `connector_authority_lambda_v1_vectors.json`) — five distinct strict request
+  schemas for `IssueAssignment`, `RefreshAssignment`,
+  `IssueRegistrationOTP`, `ActivateRegistration`, and
+  `CompleteRegistration`. There is no generic operation selector and callers
+  cannot supply environment, cell, owner, or assignment generation. Each
+  global `IssueAssignment` and `RefreshAssignment` request carries a required
+  lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker uses
+  domain-separated framing over its environment, authenticated initiator public
+  key, AEAD-authenticated send timestamp, and the SHA-256 digest of the exact
+  authenticated decrypted LST body. This gives the private authority a
+  cross-worker replay key without making it caller authority: a successful
+  Issue/Refresh domain result is cached for 15 minutes and the same id plus
+  request fingerprint reuses it, while the same id plus a different semantic
+  request fingerprint fails closed. Malformed, rejected-credential or identity,
+  pre-invoke/rate-limited, and transient-unavailable outcomes are not cached. A
+  legitimately newly encrypted refresh has a new authenticated timestamp and
+  therefore a new id. Cell operations reject the field, and it never appears
+  in a public NHP body or authority response. Each response is exactly
+  `{version,result}` or `{version,error}` under a 4,096-byte
+  cap; only OTP `rate_limited` may carry a positive `retry_after_seconds`.
+  Private-to-NHP cases freeze whether the worker emits LRT, emits RAK, follows
+  OTP's normal no-application-reply protocol, or deliberately drops an
+  activation reply. In particular, activation `unavailable` is deliberately
+  silent so the SDK's bounded exact-pending-activation transport recovery owns
+  ambiguity; it is never translated to 52107. Initial-enrollment 52107 and
+  Issue/Refresh assignment-admission 52204 are explicitly NHP pre-invoke
+  outcomes, not authority errors. Public 52203 remains reserved by the public
+  assignment artifact but is intentionally not produced here: the Issue and
+  Refresh domain operations do not mutate assignments, although their private
+  adapter writes the 15-minute replay envelope; activation atomically enforces
+  owner quota as RAK 52112. See
+  `vectors/README_connector_authority_lambda_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via
