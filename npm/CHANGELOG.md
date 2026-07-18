@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/layervai/qurl-conformance/compare/npm-v0.6.0...npm-v0.6.1) (2026-07-18)
+
+
+### Features
+
+* add Connector Authority Lambda v1 vectors ([#46](https://github.com/layervai/qurl-conformance/issues/46)) ([20dd78d](https://github.com/layervai/qurl-conformance/commit/20dd78dcd9ee1ef9ebaffc3c99c8eaa4496da62b))
+
 ## [0.6.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.5.0...npm-v0.6.0) (2026-07-17)
 
 
