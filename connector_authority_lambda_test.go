@@ -31,6 +31,19 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	}
 }
 
+func TestOpenConnectorAuthorityLambdaArtifact(t *testing.T) {
+	want := ConnectorAuthorityLambdaVectors()
+	for _, name := range []string{"connector_authority_lambda_v1_vectors.json", "vectors/connector_authority_lambda_v1_vectors.json"} {
+		got, err := Open(name)
+		if err != nil {
+			t.Fatalf("Open(%q): %v", name, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("Open(%q) does not match embedded Connector Authority Lambda vectors", name)
+		}
+	}
+}
+
 func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
@@ -178,6 +191,24 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 			file.Fixtures.HubRequestID = "A" + file.Fixtures.HubRequestID[1:]
 		}), "hub_request_id")
 	})
+	for _, secret := range []struct {
+		name      string
+		wantError string
+		value     func(ConnectorAuthorityLambdaFixtures) string
+	}{
+		{name: "initial credential leak", wantError: "exposes the initial credential", value: func(f ConnectorAuthorityLambdaFixtures) string { return f.Credential }},
+		{name: "registration credential leak", wantError: "exposes the registration credential", value: func(f ConnectorAuthorityLambdaFixtures) string { return f.RegistrationCredential }},
+		{name: "device API key leak", wantError: "exposes the device API key", value: func(f ConnectorAuthorityLambdaFixtures) string { return f.DeviceAPIKey }},
+	} {
+		t.Run(secret.name, func(t *testing.T) {
+			assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+				op := file.Operations[ConnectorAuthorityOperationIssueAssignment]
+				body := strings.TrimSuffix(op.PublicMappingCases[0].NHPBodyJSON, "}")
+				op.PublicMappingCases[0].NHPBodyJSON = body + `,"leak":"` + secret.value(file.Fixtures) + `"}`
+				file.Operations[ConnectorAuthorityOperationIssueAssignment] = op
+			}), secret.wantError)
+		})
+	}
 	t.Run("missing operation", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
 			delete(file.Operations, ConnectorAuthorityOperationRefreshAssignment)

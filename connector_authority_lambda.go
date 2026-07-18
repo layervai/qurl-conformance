@@ -1063,14 +1063,24 @@ func validateConnectorAuthorityMappings(operation string, op ConnectorAuthorityL
 	for _, semantic := range op.SemanticErrors {
 		privateBodies[semantic.Code] = semantic.BodyJSON
 	}
+	secrets := []struct {
+		name  string
+		value string
+	}{
+		{name: "initial credential", value: f.Credential},
+		{name: "registration credential", value: f.RegistrationCredential},
+		{name: "device API key", value: f.DeviceAPIKey},
+	}
 	seen := make(map[string]struct{}, len(op.PublicMappingCases))
 	for _, mapping := range op.PublicMappingCases {
 		if _, duplicate := seen[mapping.Name]; duplicate {
 			return fmt.Errorf("conformance: Connector Authority %s duplicate mapping %q", operation, mapping.Name)
 		}
 		seen[mapping.Name] = struct{}{}
-		if strings.Contains(mapping.NHPBodyJSON, f.DeviceAPIKey) {
-			return fmt.Errorf("conformance: Connector Authority %s mapping %q exposes the device API key", operation, mapping.Name)
+		for _, secret := range secrets {
+			if strings.Contains(mapping.NHPBodyJSON, secret.value) {
+				return fmt.Errorf("conformance: Connector Authority %s mapping %q exposes the %s", operation, mapping.Name, secret.name)
+			}
 		}
 		if mapping.MappingSource == ConnectorAuthorityMappingSourcePreInvoke {
 			if !slices.Contains(preInvoke, mapping.Name) || mapping.PrivateOutcome != "" || mapping.PrivateResponseBodyJSON != "" {
