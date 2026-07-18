@@ -57,9 +57,8 @@ Every response is exactly one of:
 {"version":1,"error":{"code":"..."}}
 ```
 
-Only `IssueRegistrationOTP/rate_limited` adds
-`retry_after_seconds`, and that value must be a positive integer. No other
-success or error may add fields.
+Only `IssueRegistrationOTP/rate_limited` adds `retry_after_seconds`, and that
+value must be a positive integer. No other success or error may add fields.
 
 ## Closed operations
 
