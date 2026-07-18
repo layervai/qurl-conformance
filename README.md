@@ -5,8 +5,8 @@ vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
-control-plane API-key IDs, and private Connector Authority invocations decoupled
-by layer.
+control-plane API-key IDs, private Connector Authority invocations, and private
+Connector Hub replay identifiers decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -34,6 +34,8 @@ trust.
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
 | `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for the five separately permissioned Connector Authority Lambda operations plus NHP public mappings |
 | `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
+| `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
+| `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -52,6 +54,7 @@ sc, err := conformance.AgentSessionControl()        // strict-parsed RKN/EXT ful
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
 ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
+hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -70,7 +73,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts nine artifact families, each under its own `artifact` id:
+This module hosts ten artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -107,14 +110,20 @@ This module hosts nine artifact families, each under its own `artifact` id:
   registration completion, plus the intervening assigned-cell NHP_REG (type 13)
   / NHP_RAK (type 14) activation. Every result echoes its request counter.
   Initial and refresh packets authenticate the hub; REG and completion
-  authenticate the distinct cell public key returned by assignment. The opaque
-  ticket returned by initial assignment appears byte-for-byte in REG `usrData`
+  authenticate the distinct cell public key returned by assignment. The initial
+  and refresh LST bodies are strictly parsed and require a canonical,
+  CSPRNG-generated 32-byte `request_nonce`.
+  An SDK mints it once per logical assignment operation and reuses the exact
+  body through every nested retry, while a later operation mints a fresh nonce.
+  It is never echoed in LRT and never exposes the Hub's private replay key. The
+  separate Hub request-ID artifact freezes that private derivation.
+  The opaque ticket returned by initial assignment appears byte-for-byte in REG `usrData`
   and is consumed there. Ordinary refresh returns only the current assignment
   binding and never issues a registration ticket, while completion deliberately
   carries no ticket. Public initial-assignment `registration.key_kind` is closed
   to `bootstrap`, `connector_bootstrap`, `account`, or `agent`;
   `tunnel_bootstrap` remains a private control-plane `key_type` and is rejected
-  if it crosses the LRT wire. The schema-v2 `account_credential_otp` section
+  if it crosses the LRT wire. The `account_credential_otp` section
   freezes the exact one-way NHP_OTP (type 12) request bytes sent to the assigned
   cell: `{usrId,devId,aspId,pass,usrData:{query,version,assignment_ticket}}`.
   Its secret-bearing decrypted body must be consumed from the exact RawBody;
@@ -135,7 +144,7 @@ This module hosts nine artifact families, each under its own `artifact` id:
   cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet
   limit and max+1. This remains contract data: it does not implement ticket
   verification, OTP state, rate limiting, email delivery, SDK callbacks, or a
-  plugin. Schema v2 is a deliberate breaking shape for strict consumers: they
+  plugin. Schema v3 is a deliberate breaking shape for strict consumers: they
   must update their typed loader before adopting the release that carries this
   artifact. The completion request carries the synthetic SDK-generated
   device-key candidate
@@ -152,9 +161,12 @@ This module hosts nine artifact families, each under its own `artifact` id:
   not need to infer meanings from Go constants. The loader
   verifies canonical lowercase hex, positive decimal transaction fields,
   canonical padded base64 endpoint keys, and each static X25519 keypair. The
-  assignment wire verifier pins merged qurl-go revision
+  assignment wire verifier pins merged qurl-go packet-codec revision
   `8a69642957030b9ce0a1b8b356246d265a9f577d` and rebuilds and opens all nine
-  deterministic packets through its exported codec. The
+  deterministic packets through its exported low-level codec. That revision
+  pin does not claim the higher-level qurl-go assignment request builder already
+  supports the current artifact schema; the conformance artifact intentionally
+  lands first. The
   error taxonomy is pinned to merged NHP revision
   `9653fcb185c77629b787ad046c13c760baba88f4`, which reserves 52110-52112 and
   the 522xx/523xx ranges and adds list-result `retryAfterSeconds`. Exact OTP
@@ -218,15 +230,17 @@ This module hosts nine artifact families, each under its own `artifact` id:
   cannot supply environment, cell, owner, or assignment generation. Each
   global `IssueAssignment` and `RefreshAssignment` request carries a required
   lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker uses
-  domain-separated framing over its environment, authenticated initiator public
-  key, AEAD-authenticated send timestamp, and the SHA-256 digest of the exact
-  authenticated decrypted LST body. This gives the private authority a
+  domain-separated framing over its environment, the Hub-selected exact
+  operation, authenticated initiator public key, and the raw 32-byte
+  `request_nonce` from the strict authenticated LST. NHP timestamp, transaction
+  id, source address, and body digest are deliberately excluded so fresh-packet
+  retries retain one logical ID. This gives the private authority a
   cross-worker replay key without making it caller authority: a successful
   Issue/Refresh domain result is cached for 15 minutes and the same id plus
   request fingerprint reuses it, while the same id plus a different semantic
   request fingerprint fails closed. Malformed, rejected-credential or identity,
   pre-invoke/rate-limited, and transient-unavailable outcomes are not cached. A
-  legitimately newly encrypted refresh has a new authenticated timestamp and
+  later top-level assignment operation has a newly generated request nonce and
   therefore a new id. Cell operations reject the field, and it never appears
   in a public NHP body or authority response. Each response is exactly
   `{version,result}` or `{version,error}` under a 4,096-byte
@@ -243,6 +257,14 @@ This module hosts nine artifact families, each under its own `artifact` id:
   adapter writes the 15-minute replay envelope; activation atomically enforces
   owner quota as RAK 52112. See
   `vectors/README_connector_authority_lambda_v1_vectors.md`.
+- **Private Connector Hub request-ID v1**
+  (`qurl-connector-hub-request-id-v1-vectors`,
+  `connector_hub_request_id_v1_vectors.json`) — exact tagged framing and KATs
+  for the Hub-derived replay key. It also freezes the canonical public
+  `request_nonce` encoding and the rule that same-nonce changed semantics must
+  reach the Authority under the same operation-scoped ID and fail its semantic
+  fingerprint check. See
+  `vectors/README_connector_hub_request_id_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

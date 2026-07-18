@@ -14,19 +14,24 @@ identity, credential state, and the provisioned-cell catalog.
 The global `IssueAssignment` and `RefreshAssignment` operations require a
 canonical lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker
 uses domain-separated framing over its deployment environment, the
-authenticated initiator public key, the AEAD-authenticated packet send
-timestamp, and the SHA-256 digest of the exact authenticated decrypted LST
-body. The authority uses this private value as a cross-worker replay key: it
+Hub-selected exact operation, the authenticated initiator public key, and the
+raw 32-byte logical `request_nonce` carried in the authenticated assignment
+LST. NHP send timestamp, transaction id, source address, and body digest are
+deliberately excluded so a fresh-packet retry retains the same logical ID. The
+authority uses this private value as a cross-worker replay key: it
 caches only a successful Issue/Refresh domain result for 15 minutes, and the
 same id plus request fingerprint returns that result. The same id plus a
 different semantic request fingerprint fails closed. Malformed,
 rejected-credential or identity, pre-invoke/rate-limited, and transient
-`unavailable` outcomes are not cached. An exact captured or retried packet
-produces the same id. A legitimate newly encrypted refresh has a new
-authenticated timestamp and therefore a new id, so replay handling does not
-suppress a fresh assignment read or reassignment. This id is neither a
+`unavailable` outcomes are not cached. Retries inside one logical operation
+produce the same id even though their packet timestamps and counters change. A
+later top-level operation generates a new request nonce and therefore a new id,
+so replay handling does not suppress a fresh assignment read or reassignment.
+This id is neither a
 credential nor caller-selected authority, never appears in authority
 responses or public NHP bodies, and is rejected by all three cell operations.
+The exact private derivation and substitution KATs live in
+`connector_hub_request_id_v1_vectors.json`.
 
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API
