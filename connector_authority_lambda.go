@@ -159,7 +159,7 @@ type ConnectorAuthorityLambdaRejectCase struct {
 // ConnectorAuthorityPublicMapping freezes how an authority outcome, or an NHP
 // pre-invoke gate, becomes a public application reply or deliberate absence of
 // one. PrivateResponseBodyJSON is empty only for pre-invoke cases. NHPBodyJSON
-// is empty only when NHP must send no application reply.
+// is empty when NHPAction is no_application_reply or drop_no_reply.
 type ConnectorAuthorityPublicMapping struct {
 	Name                    string `json:"name"`
 	MappingSource           string `json:"mapping_source"`
