@@ -441,17 +441,13 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if got, want := len(af.ErrorContract.AssignmentCases), 6; got != want {
 		t.Errorf("assignment error case count = %d, want %d", got, want)
 	}
-	var invalidAssignment *AgentAssignmentErrorCase
-	for i := range af.ErrorContract.AssignmentCases {
-		if af.ErrorContract.AssignmentCases[i].ErrCode == "52205" {
-			invalidAssignment = &af.ErrorContract.AssignmentCases[i]
-			break
-		}
-	}
-	if invalidAssignment == nil {
+	invalidAssignment := slices.IndexFunc(af.ErrorContract.AssignmentCases, func(c AgentAssignmentErrorCase) bool {
+		return c.ErrCode == "52205"
+	})
+	if invalidAssignment < 0 {
 		t.Error("assignment error contract is missing 52205")
-	} else if want := []string{"initial_assignment", "refresh_assignment"}; !slices.Equal(invalidAssignment.AcceptedPhases, want) {
-		t.Errorf("52205 accepted_phases = %v, want %v", invalidAssignment.AcceptedPhases, want)
+	} else if want := []string{"initial_assignment", "refresh_assignment"}; !slices.Equal(af.ErrorContract.AssignmentCases[invalidAssignment].AcceptedPhases, want) {
+		t.Errorf("52205 accepted_phases = %v, want %v", af.ErrorContract.AssignmentCases[invalidAssignment].AcceptedPhases, want)
 	}
 	if got, want := len(af.ErrorContract.InitialCredentialCases), 4; got != want {
 		t.Errorf("initial credential error case count = %d, want %d", got, want)
@@ -729,16 +725,27 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("mode-unknown response phase acceptance drift", func(t *testing.T) {
 		b := mutate(t, func(doc *AgentAssignmentFile) {
-			for i := range doc.ErrorContract.AssignmentCases {
-				if doc.ErrorContract.AssignmentCases[i].ErrCode == "52205" {
-					doc.ErrorContract.AssignmentCases[i].AcceptedPhases = []string{"initial_assignment"}
-					return
-				}
+			i := slices.IndexFunc(doc.ErrorContract.AssignmentCases, func(c AgentAssignmentErrorCase) bool {
+				return c.ErrCode == "52205"
+			})
+			if i < 0 {
+				t.Fatal("missing 52205 fixture")
 			}
-			t.Fatal("missing 52205 fixture")
+			doc.ErrorContract.AssignmentCases[i].AcceptedPhases = []string{"initial_assignment"}
 		})
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
 			t.Fatalf("error = %v, want accepted_phases rejection", err)
+		}
+	})
+
+	t.Run("error case unknown field", func(t *testing.T) {
+		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("assignment_unavailable case count = %d, want 1", got)
+		}
+		b := bytes.Replace(raw, needle, append(bytes.Clone(needle), []byte("\n        \"future_field\": true,")...), 1)
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "future_field"`) {
+			t.Fatalf("error = %v, want unknown error-case field rejection", err)
 		}
 	})
 
