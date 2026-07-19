@@ -212,8 +212,8 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 3 {
-		t.Errorf("schema_version = %d, want 3", af.SchemaVersion)
+	if af.SchemaVersion != 4 {
+		t.Errorf("schema_version = %d, want 4", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
 		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
@@ -441,6 +441,14 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if got, want := len(af.ErrorContract.AssignmentCases), 6; got != want {
 		t.Errorf("assignment error case count = %d, want %d", got, want)
 	}
+	invalidAssignment := slices.IndexFunc(af.ErrorContract.AssignmentCases, func(c AgentAssignmentErrorCase) bool {
+		return c.ErrCode == "52205"
+	})
+	if invalidAssignment < 0 {
+		t.Error("assignment error contract is missing 52205")
+	} else if want := []string{"initial_assignment", "refresh_assignment"}; !slices.Equal(af.ErrorContract.AssignmentCases[invalidAssignment].AcceptedPhases, want) {
+		t.Errorf("52205 accepted_phases = %v, want %v", af.ErrorContract.AssignmentCases[invalidAssignment].AcceptedPhases, want)
+	}
 	if got, want := len(af.ErrorContract.InitialCredentialCases), 4; got != want {
 		t.Errorf("initial credential error case count = %d, want %d", got, want)
 	}
@@ -542,6 +550,13 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		return b
+	}
+	spliceRaw := func(t *testing.T, needle, replacement []byte) []byte {
+		t.Helper()
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("needle %q count = %d, want 1", needle, got)
+		}
+		return bytes.Replace(raw, needle, replacement, 1)
 	}
 
 	t.Run("counter mismatch", func(t *testing.T) {
@@ -665,11 +680,8 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("duplicate nested case name", func(t *testing.T) {
 		needle := []byte(`"name": "completion_unavailable",`)
-		if got := bytes.Count(raw, needle); got != 1 {
-			t.Fatalf("completion_unavailable name count = %d, want 1", got)
-		}
 		replacement := []byte(`"name": "completion_unavailable", "name": "duplicate",`)
-		b := bytes.Replace(raw, needle, replacement, 1)
+		b := spliceRaw(t, needle, replacement)
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `duplicate object key "name"`) {
 			t.Fatalf("error = %v, want nested duplicate-name rejection", err)
 		}
@@ -712,6 +724,56 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		})
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "fields drifted") {
 			t.Fatalf("error = %v, want success-result classifier rejection", err)
+		}
+	})
+
+	t.Run("mode-unknown response phase acceptance drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			i := slices.IndexFunc(doc.ErrorContract.AssignmentCases, func(c AgentAssignmentErrorCase) bool {
+				return c.ErrCode == "52205"
+			})
+			if i < 0 {
+				t.Fatal("missing 52205 fixture")
+			}
+			doc.ErrorContract.AssignmentCases[i].AcceptedPhases = []string{"initial_assignment"}
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+			t.Fatalf("error = %v, want accepted_phases rejection", err)
+		}
+	})
+
+	t.Run("error case unknown field", func(t *testing.T) {
+		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
+		b := spliceRaw(t, needle, append(needle, "\n        \"future_field\": true,"...))
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "future_field"`) {
+			t.Fatalf("error = %v, want unknown error-case field rejection", err)
+		}
+	})
+
+	t.Run("accepted phases must be absent from every other error", func(t *testing.T) {
+		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
+		b := spliceRaw(t, needle, append(needle, "\n        \"accepted_phases\": [],"...))
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+			t.Fatalf("error = %v, want noncanonical accepted_phases rejection", err)
+		}
+	})
+
+	t.Run("mode-unknown accepted phases are required and nonempty", func(t *testing.T) {
+		needle := []byte("        \"accepted_phases\": [\n          \"initial_assignment\",\n          \"refresh_assignment\"\n        ],\n")
+		for _, test := range []struct {
+			name        string
+			replacement []byte
+		}{
+			{name: "missing"},
+			{name: "empty", replacement: []byte("        \"accepted_phases\": [],\n")},
+			{name: "null", replacement: []byte("        \"accepted_phases\": null,\n")},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				b := spliceRaw(t, needle, test.replacement)
+				if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+					t.Fatalf("error = %v, want %s accepted_phases rejection", err, test.name)
+				}
+			})
 		}
 	})
 

@@ -144,16 +144,20 @@ This module hosts ten artifact families, each under its own `artifact` id:
   cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet
   limit and max+1. This remains contract data: it does not implement ticket
   verification, OTP state, rate limiting, email delivery, SDK callbacks, or a
-  plugin. Schema v3 is a deliberate breaking shape for strict consumers: they
-  must update their typed loader before adopting the release that carries this
-  artifact. The completion request carries the synthetic SDK-generated
-  device-key candidate
+  plugin. Schema v3 introduced the required assignment request nonce; schema v4
+  adds the 52205 case's exact accepted request phases. Each is a deliberate
+  breaking shape for strict consumers, which must update their typed loader
+  before adopting the corresponding release. The completion request carries the
+  synthetic SDK-generated device-key candidate
   that must be persisted before send; its result `list` contains exactly
   `query`, `version`, and `device_api_key_id`—no agent metadata, secret,
   secret-derived hash, or candidate commitment. The artifact also carries the
   closed 522xx/523xx LRT
   and ticket/quota 521xx RAK error taxonomy, including retry-delay rules and
-  malformed-body rejects. Its compact authenticated request/result case sets
+  malformed-body rejects. The assignment-family 52205 response is explicitly
+  accepted for both initial and refresh requests so a Hub can reject a
+  malformed, unidentifiable mode without guessing the intended exchange. Its
+  compact authenticated request/result case sets
   separately pin duplicate-aware JSON parsing, exact case-sensitive keys,
   unknown-field rejection, phase semantics, secret non-disclosure, and the rule
   that clients cannot supply owner identity or cell placement. The artifact
