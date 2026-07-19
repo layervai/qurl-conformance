@@ -278,6 +278,11 @@ type ConnectorHubLSTChallengeBodyCase struct {
 	ClientAction string `json:"client_action"`
 }
 
+type connectorHubLSTChallengeBody struct {
+	TransactionID uint64 `json:"trxId"`
+	Cookie        string `json:"cookie"`
+}
+
 // DeriveConnectorHubLSTCookie derives the opaque stateless Hub-LST cookie from
 // a canonical source IP, authenticated initiator key, and rolling window.
 func DeriveConnectorHubLSTCookie(signingKey []byte, sourceIP string, authenticatedPeerPublicKey []byte, windowIndex uint64) ([]byte, error) {
@@ -733,10 +738,7 @@ func validateConnectorHubLSTCookieChallenges(cases []ConnectorHubLSTChallengeBod
 	}
 	initial := flowByPhase["initial_assignment"]
 	refresh := flowByPhase["refresh_assignment"]
-	var initialBody struct {
-		TransactionID uint64 `json:"trxId"`
-		Cookie        string `json:"cookie"`
-	}
+	var initialBody connectorHubLSTChallengeBody
 	if err := strictDecodeArtifact([]byte(initial.ChallengeBodyJSON), &initialBody); err != nil {
 		return fmt.Errorf("conformance: Connector Hub LST initial challenge linkage: %w", err)
 	}
@@ -778,10 +780,7 @@ func validateConnectorHubLSTCookieChallenges(cases []ConnectorHubLSTChallengeBod
 }
 
 func validateConnectorHubLSTChallengeBody(body string) error {
-	var parsed struct {
-		TransactionID uint64 `json:"trxId"`
-		Cookie        string `json:"cookie"`
-	}
+	var parsed connectorHubLSTChallengeBody
 	if err := strictDecodeArtifact([]byte(body), &parsed); err != nil {
 		return err
 	}
