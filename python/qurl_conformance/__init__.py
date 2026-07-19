@@ -65,3 +65,8 @@ def connector_hub_request_id_vectors():
 def connector_hub_lst_cookie_vectors():
     """Return the parsed connector_hub_lst_cookie_v1_vectors.json."""
     return _load("connector_hub_lst_cookie_v1_vectors.json")
+
+
+def agent_credential_recovery_vectors():
+    """Return the parsed agent_credential_recovery_v1_vectors.json."""
+    return _load("agent_credential_recovery_v1_vectors.json")

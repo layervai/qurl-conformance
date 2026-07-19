@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Ten families live here, each under its own artifact id so they stay decoupled
+// Twelve families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -39,6 +39,12 @@
 //     (connector_hub_request_id_v1_vectors.json): byte-exact replay-key KATs
 //     over environment, authority operation, authenticated peer, and the
 //     client logical-request nonce.
+//   - The Connector Hub LST return-routability cookie contract
+//     (connector_hub_lst_cookie_v1_vectors.json): stateless challenge/proof
+//     framing and amplification gates before Authority invocation.
+//   - The agent credential recovery contract
+//     (agent_credential_recovery_v1_vectors.json): UDP-only same-agent device
+//     credential replacement bodies, grant fences, horizon, and outcomes.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

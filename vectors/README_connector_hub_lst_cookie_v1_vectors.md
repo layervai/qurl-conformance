@@ -43,6 +43,17 @@ wrong-flag, wrong-phase, transplanted-RKN, replayed, and application-malformed
 proof packets are silent and make zero Authority calls. Credential, owner,
 cell, and refresh authorization belongs to the post-proof Handler/Authority.
 
+### Additive application profiles
+
+`contract.additive_application_profiles` is the exact closed allowlist of
+`artifact/profile` identifiers that may compose the cookie primitive without
+adding a case to this artifact's closed base-flow set. The current sole entry
+allows the recovery artifact's `hub_cookie_composition` profile. Membership
+grants only composition eligibility: the additive artifact must freeze its own
+body, proof, size, Authority-call, success, and reject cases. Unknown profiles
+are forbidden, and changing the allowlist requires an explicit reviewed,
+versioned conformance release.
+
 ## Cookie derivation
 
 The cookie is an opaque 32-byte HMAC-SHA-256 output. The secret signing key is
@@ -120,12 +131,17 @@ the LST-only flag/type gates.
 The cookie intentionally does not authorize an application body. Noise AEAD
 authenticates the exact body. Reusing a valid current cookie from the same IP
 and peer on a fresh transaction proves the same source again, but grants no
-additional authority: the strict LST selects only IssueAssignment or
-RefreshAssignment, and the private `hub_request_id` remains derived from the
-authenticated peer plus `request_nonce`. Same-nonce/same-semantics retries reuse
-the Authority result; same-nonce/changed-semantics retries fail the Authority
-fingerprint fence. An exact captured proof packet is rejected by NHP's
-authenticated timestamp/counter replay gate before dispatch.
+additional authority. This artifact's closed base flows select only
+IssueAssignment or RefreshAssignment. Its primitive may also be composed by
+the explicitly allowlisted recovery application profile in
+`agent_credential_recovery_v1_vectors.json`; that additive artifact owns the
+recovery body, size, proof, and Authority-call cases without extending this
+artifact's two-flow set. In every profile, the private `hub_request_id` remains
+derived from the authenticated peer plus `request_nonce`. Same-nonce and
+same-semantics retries reuse the Authority result; same-nonce with changed
+semantics fails the Authority fingerprint fence. An exact captured proof packet
+is rejected by NHP's authenticated timestamp/counter replay gate before
+dispatch.
 
 ## COK and amplification bound
 

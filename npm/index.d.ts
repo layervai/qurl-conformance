@@ -10,3 +10,4 @@ export declare function assignmentTicketVectors(): unknown;
 export declare function connectorAuthorityLambdaVectors(): unknown;
 export declare function connectorHubRequestIdVectors(): unknown;
 export declare function connectorHubLstCookieVectors(): unknown;
+export declare function agentCredentialRecoveryVectors(): unknown;

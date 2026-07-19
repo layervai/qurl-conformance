@@ -18,8 +18,8 @@ func TestEmbeddedConnectorHubRequestIDLoadsAndDerives(t *testing.T) {
 	if file.Artifact != ConnectorHubRequestIDArtifactID || file.SchemaVersion != ConnectorHubRequestIDSchemaVersion {
 		t.Fatalf("identity = %q/v%d, want %q/v%d", file.Artifact, file.SchemaVersion, ConnectorHubRequestIDArtifactID, ConnectorHubRequestIDSchemaVersion)
 	}
-	if len(file.Cases) != 5 {
-		t.Fatalf("case count = %d, want 5", len(file.Cases))
+	if len(file.Cases) != 6 {
+		t.Fatalf("case count = %d, want 6", len(file.Cases))
 	}
 	baseline := file.Cases[0]
 	peer, err := base64.StdEncoding.Strict().DecodeString(baseline.AuthenticatedPeerPublicKeyB64)
@@ -116,6 +116,20 @@ func TestDeriveConnectorHubRequestIDRejectsInvalidInputs(t *testing.T) {
 	}
 }
 
+func TestDeriveConnectorHubRequestIDAcceptsClosedOperations(t *testing.T) {
+	peer := bytes.Repeat([]byte{1}, ConnectorHubRequestIDPeerBytes)
+	nonce := bytes.Repeat([]byte{2}, ConnectorHubRequestIDNonceBytes)
+	for _, operation := range []string{
+		ConnectorHubRequestIDOperationIssue,
+		ConnectorHubRequestIDOperationRefresh,
+		ConnectorHubRequestIDOperationRecover,
+	} {
+		if _, err := DeriveConnectorHubRequestID("sandbox", operation, peer, nonce); err != nil {
+			t.Errorf("DeriveConnectorHubRequestID(%q): %v", operation, err)
+		}
+	}
+}
+
 func TestDecodeConnectorHubRequestNonceIsCanonical(t *testing.T) {
 	if nonce, err := DecodeConnectorHubRequestNonce(AgentAssignmentRefreshRequestNonceFixture); err != nil || len(nonce) != ConnectorHubRequestIDNonceBytes {
 		t.Fatalf("valid nonce = %x, %v", nonce, err)
@@ -182,7 +196,16 @@ func TestParseConnectorHubRequestIDFileFailsClosed(t *testing.T) {
 		}},
 		{name: "id", change: func(file *ConnectorHubRequestIDFile) { file.Cases[0].HubRequestID = strings.Repeat("0", 64) }},
 		{name: "not equal", change: func(file *ConnectorHubRequestIDFile) { file.Cases[1].NotEqualTo = "environment_substitution" }},
-		{name: "two fields", change: func(file *ConnectorHubRequestIDFile) { file.Cases[1].RequestNonce = file.Cases[4].RequestNonce }},
+		{name: "two fields", change: func(file *ConnectorHubRequestIDFile) {
+			var nonce string
+			for _, c := range file.Cases {
+				if c.Name == "nonce_substitution" {
+					nonce = c.RequestNonce
+					break
+				}
+			}
+			file.Cases[1].RequestNonce = nonce
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ParseConnectorHubRequestIDFile(mutate(t, test.change)); err == nil {

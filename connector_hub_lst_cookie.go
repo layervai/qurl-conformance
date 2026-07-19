@@ -152,6 +152,7 @@ type ConnectorHubLSTCookieContract struct {
 	AuthorityBeforeProofAllowed   bool     `json:"authority_before_proof_allowed"`
 	HTTPFallbackAllowed           bool     `json:"http_fallback_allowed"`
 	RequestPaddingFallbackAllowed bool     `json:"request_padding_fallback_allowed"`
+	AdditiveApplicationProfiles   []string `json:"additive_application_profiles"`
 	CurveHeaderBytes              int      `json:"curve_header_bytes"`
 	BodyAEADTagBytes              int      `json:"body_aead_tag_bytes"`
 	EmptyBodyPacketBytes          int      `json:"empty_body_packet_bytes"`
@@ -416,7 +417,8 @@ func validateConnectorHubLSTCookieContract(contract ConnectorHubLSTCookieContrac
 		ProofRequestNonceRule: "same_request_nonce_inside_identical_body", ProofResendLimit: 1,
 		SecondChallengeAction: ConnectorHubLSTCookieClientStop, AuthorityBeforeProofAllowed: false,
 		HTTPFallbackAllowed: false, RequestPaddingFallbackAllowed: false,
-		CurveHeaderBytes: ConnectorHubLSTCookieHeaderBytes, BodyAEADTagBytes: ConnectorHubLSTCookieBodyAEADTagBytes,
+		AdditiveApplicationProfiles: []string{"qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition"},
+		CurveHeaderBytes:            ConnectorHubLSTCookieHeaderBytes, BodyAEADTagBytes: ConnectorHubLSTCookieBodyAEADTagBytes,
 		EmptyBodyPacketBytes: ConnectorHubLSTCookieHeaderBytes, NonemptyPacketOverheadBytes: ConnectorHubLSTCookiePacketOverhead,
 		MaxPlaintextBodyBytes: ConnectorHubLSTCookiePlaintextMaxBytes,
 		MaxPacketBytes:        ConnectorHubLSTCookiePacketMaxBytes, ChallengeMaxTransactionID: strconv.FormatUint(^uint64(0), 10),

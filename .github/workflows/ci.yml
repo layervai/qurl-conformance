@@ -90,6 +90,7 @@ jobs:
           const u = c.connectorAuthorityLambdaVectors();
           const h = c.connectorHubRequestIdVectors();
           const hc = c.connectorHubLstCookieVectors();
+          const cr = c.agentCredentialRecoveryVectors();
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
@@ -147,6 +148,8 @@ jobs:
             return cookie.toString('hex') === vector.cookie_hex && cookie.toString('base64') === vector.cookie_b64;
           };
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
+          const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
+          const recoveryCookieKat = hc.cookie_kats.find(v => v.name === 'ipv4');
           const authorityRequests = Object.fromEntries(
             Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
           );
@@ -414,15 +417,16 @@ jobs:
               activationUnavailable?.nhp_action !== 'drop_no_reply' ||
               'nhp_body_json' in activationUnavailable ||
               h.artifact !== 'qurl-connector-hub-request-id-v1-vectors' || h.schema_version !== 1 ||
-              h.contract.operations.join(',') !== 'IssueAssignment,RefreshAssignment' ||
+              h.contract.operations.join(',') !== 'IssueAssignment,RefreshAssignment,IssueCredentialRecovery' ||
               !h.contract.excluded_inputs.includes('nhp_send_timestamp') ||
               !h.contract.excluded_inputs.includes('exact_body_digest') ||
-              h.cases.length !== 5 || hubRequestIds.size !== h.cases.length ||
+              h.cases.length !== 6 || hubRequestIds.size !== h.cases.length ||
               h.cases.some(v => !deriveHubRequestId(v)) ||
               assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
               hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
               hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
               hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
+              !hc.contract.additive_application_profiles.includes('qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition') ||
               hc.cookie_kats.some(vector => !deriveHubLstCookie(vector)) ||
               ['reject_compressed_challenge', 'reject_unknown_flag_challenge'].some(name =>
                 hubCookieChallenges[name]?.outcome !== 'reject' ||
@@ -430,6 +434,34 @@ jobs:
               ) ||
               hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
               hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3078 ||
+              cr.artifact !== 'qurl-agent-credential-recovery-v1-vectors' || cr.schema_version !== 1 ||
+              cr.protocol.transport !== 'NHP_UDP_ONLY' || cr.protocol.http_fallback_allowed !== false ||
+              cr.protocol.relay_fallback_allowed !== false || cr.protocol.client_cell_selection_allowed !== false ||
+              cr.protocol.recovery_grant_lifetime_seconds !== 900 ||
+              cr.protocol.issue_replay_rule !== 'same_hub_request_id_and_semantic_fingerprint_returns_byte_identical_result_else_terminal_fingerprint_conflict' ||
+              !recoveryRequestIdCase || cr.fixtures.environment !== recoveryRequestIdCase.environment ||
+              cr.fixtures.authenticated_peer_public_key_b64 !== recoveryRequestIdCase.authenticated_peer_public_key_b64 ||
+              cr.fixtures.request_nonce !== recoveryRequestIdCase.request_nonce ||
+              cr.fixtures.hub_request_id !== recoveryRequestIdCase.hub_request_id ||
+              Object.keys(cr.public_exchanges).sort().join(',') !== 'assigned_cell_complete_recovery,hub_issue_recovery' ||
+              Object.keys(cr.private_operations).sort().join(',') !== 'CompleteCredentialRecovery,IssueCredentialRecovery' ||
+              cr.issue_replay_cases.length !== 7 || cr.grant_binding_cases.length !== 24 ||
+              cr.hub_cookie_composition.cases.length !== 10 ||
+              cr.hub_cookie_composition.base_contract_artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' ||
+              !recoveryCookieKat || cr.fixtures.authenticated_peer_public_key_b64 !== recoveryCookieKat.authenticated_peer_public_key_b64 ||
+              cr.hub_cookie_composition.unproven_body_json !== cr.public_exchanges.hub_issue_recovery.request_body_json ||
+              cr.hub_cookie_composition.proof_body_json !== cr.public_exchanges.hub_issue_recovery.request_body_json ||
+              cr.hub_cookie_composition.challenge_body_json !== JSON.stringify({
+                trxId: Number(cr.hub_cookie_composition.unproven_counter),
+                cookie: recoveryCookieKat.cookie_b64,
+              }) ||
+              cr.hub_cookie_composition.challenge_packet_bytes >= cr.hub_cookie_composition.unproven_request_packet_bytes ||
+              cr.private_operations.IssueCredentialRecovery.semantic_errors.length !== 7 ||
+              cr.private_operations.IssueCredentialRecovery.public_mapping_cases.length !== 10 ||
+              cr.private_operations.CompleteCredentialRecovery.semantic_errors.length !== 5 ||
+              cr.private_operations.CompleteCredentialRecovery.public_mapping_cases.length !== 7 ||
+              cr.fixtures.recovery_credential === cr.fixtures.device_api_key_candidate ||
+              cr.public_exchanges.assigned_cell_complete_recovery.success_body_json.includes(cr.fixtures.device_api_key_candidate) ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -466,6 +498,7 @@ jobs:
           u = q.connector_authority_lambda_vectors()
           h = q.connector_hub_request_id_vectors()
           hc = q.connector_hub_lst_cookie_vectors()
+          cr = q.agent_credential_recovery_vectors()
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
           def derive_hub_request_id(vector):
@@ -507,6 +540,8 @@ jobs:
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
           hub_cookie_challenges = {v['name']: v for v in hc['challenge_cases']}
+          recovery_request_id_case = next((v for v in h['cases'] if v['operation'] == 'IssueCredentialRecovery'), None)
+          recovery_cookie_kat = next((v for v in hc['cookie_kats'] if v['name'] == 'ipv4'), None)
           hub_cookie_challenge_flags = {
               'accept_initial_challenge': '0000',
               'accept_refresh_challenge': '0000',
@@ -771,9 +806,9 @@ jobs:
           assert activation_unavailable['nhp_action'] == 'drop_no_reply'
           assert 'nhp_body_json' not in activation_unavailable
           assert h['artifact'] == 'qurl-connector-hub-request-id-v1-vectors' and h['schema_version'] == 1
-          assert h['contract']['operations'] == ['IssueAssignment', 'RefreshAssignment']
+          assert h['contract']['operations'] == ['IssueAssignment', 'RefreshAssignment', 'IssueCredentialRecovery']
           assert {'nhp_send_timestamp', 'exact_body_digest'} <= set(h['contract']['excluded_inputs'])
-          assert len(h['cases']) == 5
+          assert len(h['cases']) == 6
           assert len({v['hub_request_id'] for v in h['cases']}) == len(h['cases'])
           assert all(derive_hub_request_id(v) for v in h['cases'])
           assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
@@ -781,6 +816,7 @@ jobs:
           assert hc['contract']['proof_flag_hex'] == '0004'
           assert hc['contract']['challenge_header_flags_hex'] == '0000'
           assert hc['contract']['http_fallback_allowed'] is False
+          assert 'qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition' in hc['contract']['additive_application_profiles']
           assert all(derive_hub_lst_cookie(vector) for vector in hc['cookie_kats'])
           assert len(hc['challenge_cases']) == len(hub_cookie_challenge_flags)
           assert set(hub_cookie_challenges) == set(hub_cookie_challenge_flags)
@@ -794,6 +830,38 @@ jobs:
           assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
           hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}
           assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3078
+          assert cr['artifact'] == 'qurl-agent-credential-recovery-v1-vectors' and cr['schema_version'] == 1
+          assert cr['protocol']['transport'] == 'NHP_UDP_ONLY'
+          assert cr['protocol']['http_fallback_allowed'] is False
+          assert cr['protocol']['relay_fallback_allowed'] is False
+          assert cr['protocol']['client_cell_selection_allowed'] is False
+          assert cr['protocol']['recovery_grant_lifetime_seconds'] == 900
+          assert cr['protocol']['issue_replay_rule'] == 'same_hub_request_id_and_semantic_fingerprint_returns_byte_identical_result_else_terminal_fingerprint_conflict'
+          assert recovery_request_id_case is not None
+          assert cr['fixtures']['environment'] == recovery_request_id_case['environment']
+          assert cr['fixtures']['authenticated_peer_public_key_b64'] == recovery_request_id_case['authenticated_peer_public_key_b64']
+          assert cr['fixtures']['request_nonce'] == recovery_request_id_case['request_nonce']
+          assert cr['fixtures']['hub_request_id'] == recovery_request_id_case['hub_request_id']
+          assert set(cr['public_exchanges']) == {'hub_issue_recovery', 'assigned_cell_complete_recovery'}
+          assert set(cr['private_operations']) == {'IssueCredentialRecovery', 'CompleteCredentialRecovery'}
+          assert len(cr['issue_replay_cases']) == 7 and len(cr['grant_binding_cases']) == 24
+          assert len(cr['hub_cookie_composition']['cases']) == 10
+          assert cr['hub_cookie_composition']['base_contract_artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors'
+          assert recovery_cookie_kat is not None
+          assert cr['fixtures']['authenticated_peer_public_key_b64'] == recovery_cookie_kat['authenticated_peer_public_key_b64']
+          assert cr['hub_cookie_composition']['unproven_body_json'] == cr['public_exchanges']['hub_issue_recovery']['request_body_json']
+          assert cr['hub_cookie_composition']['proof_body_json'] == cr['public_exchanges']['hub_issue_recovery']['request_body_json']
+          assert cr['hub_cookie_composition']['challenge_body_json'] == json.dumps({
+              'trxId': int(cr['hub_cookie_composition']['unproven_counter']),
+              'cookie': recovery_cookie_kat['cookie_b64'],
+          }, separators=(',', ':'))
+          assert cr['hub_cookie_composition']['challenge_packet_bytes'] < cr['hub_cookie_composition']['unproven_request_packet_bytes']
+          assert len(cr['private_operations']['IssueCredentialRecovery']['semantic_errors']) == 7
+          assert len(cr['private_operations']['IssueCredentialRecovery']['public_mapping_cases']) == 10
+          assert len(cr['private_operations']['CompleteCredentialRecovery']['semantic_errors']) == 5
+          assert len(cr['private_operations']['CompleteCredentialRecovery']['public_mapping_cases']) == 7
+          assert cr['fixtures']['recovery_credential'] != cr['fixtures']['device_api_key_candidate']
+          assert cr['fixtures']['device_api_key_candidate'] not in cr['public_exchanges']['assigned_cell_complete_recovery']['success_body_json']
           print('py ok')
           PY
 

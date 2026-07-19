@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -34,6 +33,8 @@ const (
 
 	ConnectorHubRequestIDOperationIssue   = "IssueAssignment"
 	ConnectorHubRequestIDOperationRefresh = "RefreshAssignment"
+	ConnectorHubRequestIDOperationRecover = "IssueCredentialRecovery"
+	connectorHubRequestIDDescription      = "Byte-exact private replay-key derivation contract for authenticated assignment LST handled by Connector Hub workers. The SDK supplies only a per-logical-operation request_nonce; Hub derives hub_request_id after NHP authentication and sends it only to the separately permissioned Connector Authority IssueAssignment, RefreshAssignment, or IssueCredentialRecovery operation."
 
 	ConnectorHubRequestIDEnvironmentNormalization = "none"
 	ConnectorHubRequestIDPeerFixtureEncoding      = "canonical_base64_std_padded"
@@ -54,8 +55,8 @@ var (
 	// ErrConnectorHubRequestIDEnvironment identifies an invalid immutable Hub
 	// environment. It never includes the rejected value.
 	ErrConnectorHubRequestIDEnvironment = errors.New("conformance: invalid Connector Hub request-ID environment")
-	// ErrConnectorHubRequestIDOperation identifies a value outside the two
-	// separately permissioned assignment operations.
+	// ErrConnectorHubRequestIDOperation identifies a value outside the closed
+	// separately permissioned Hub authority operations.
 	ErrConnectorHubRequestIDOperation = errors.New("conformance: invalid Connector Hub request-ID operation")
 	// ErrConnectorHubRequestIDPeer identifies a peer key that is not exactly one
 	// raw X25519 public-key width.
@@ -145,7 +146,7 @@ func connectorHubRequestIDPreimage(environment, operation string, authenticatedP
 	if !connectorHubRequestIDEnvironmentPattern.MatchString(environment) || len(environment) < ConnectorHubRequestIDMinEnvironmentBytes || len(environment) > ConnectorHubRequestIDMaxEnvironmentBytes {
 		return nil, ErrConnectorHubRequestIDEnvironment
 	}
-	if operation != ConnectorHubRequestIDOperationIssue && operation != ConnectorHubRequestIDOperationRefresh {
+	if operation != ConnectorHubRequestIDOperationIssue && operation != ConnectorHubRequestIDOperationRefresh && operation != ConnectorHubRequestIDOperationRecover {
 		return nil, ErrConnectorHubRequestIDOperation
 	}
 	if len(authenticatedPeerPublicKey) != ConnectorHubRequestIDPeerBytes {
@@ -185,7 +186,7 @@ func ParseConnectorHubRequestIDFile(data []byte) (*ConnectorHubRequestIDFile, er
 	if err := strictDecodeArtifact(data, &file); err != nil {
 		return nil, fmt.Errorf("conformance: parse Connector Hub request-ID file: %w", err)
 	}
-	if file.Artifact != ConnectorHubRequestIDArtifactID || file.SchemaVersion != ConnectorHubRequestIDSchemaVersion || strings.TrimSpace(file.Description) == "" {
+	if file.Artifact != ConnectorHubRequestIDArtifactID || file.SchemaVersion != ConnectorHubRequestIDSchemaVersion || file.Description != connectorHubRequestIDDescription {
 		return nil, errors.New("conformance: Connector Hub request-ID artifact identity is invalid")
 	}
 	if err := validateConnectorHubRequestIDContract(file.Contract); err != nil {
@@ -208,7 +209,7 @@ func validateConnectorHubRequestIDContract(contract ConnectorHubRequestIDContrac
 		EnvironmentPattern:  connectorHubRequestIDEnvironmentPattern.String(),
 		EnvironmentMinBytes: ConnectorHubRequestIDMinEnvironmentBytes, EnvironmentMaxBytes: ConnectorHubRequestIDMaxEnvironmentBytes,
 		EnvironmentNormalization: ConnectorHubRequestIDEnvironmentNormalization,
-		Operations:               []string{ConnectorHubRequestIDOperationIssue, ConnectorHubRequestIDOperationRefresh},
+		Operations:               []string{ConnectorHubRequestIDOperationIssue, ConnectorHubRequestIDOperationRefresh, ConnectorHubRequestIDOperationRecover},
 		PeerDecodedBytes:         ConnectorHubRequestIDPeerBytes, PeerFixtureEncoding: ConnectorHubRequestIDPeerFixtureEncoding,
 		PeerHashEncoding:  ConnectorHubRequestIDPeerHashEncoding,
 		NonceDecodedBytes: ConnectorHubRequestIDNonceBytes, NonceFixtureEncoding: ConnectorHubRequestIDNonceFixtureEncoding,
@@ -222,7 +223,7 @@ func validateConnectorHubRequestIDContract(contract ConnectorHubRequestIDContrac
 }
 
 func validateConnectorHubRequestIDCases(cases []ConnectorHubRequestIDCase) error {
-	required := []string{"baseline_refresh", "environment_substitution", "operation_substitution", "peer_substitution", "nonce_substitution"}
+	required := []string{"baseline_refresh", "environment_substitution", "operation_substitution", "recovery_operation_substitution", "peer_substitution", "nonce_substitution"}
 	if len(cases) != len(required) {
 		return fmt.Errorf("conformance: Connector Hub request-ID case count = %d, want %d", len(cases), len(required))
 	}
