@@ -1,0 +1,98 @@
+{
+  "artifact": "qurl-connector-hub-request-id-v1-vectors",
+  "schema_version": 1,
+  "description": "Byte-exact private replay-key derivation contract for authenticated assignment LST handled by Connector Hub workers. The SDK supplies only a per-logical-operation request_nonce; Hub derives hub_request_id after NHP authentication and sends it only to the separately permissioned Connector Authority IssueAssignment or RefreshAssignment operation.",
+  "contract": {
+    "digest": "SHA-256",
+    "output_encoding": "lowercase_hex",
+    "domain_ascii": "layerv:qurl:connector-hub-request-id:v1",
+    "domain_suffix_hex": "00",
+    "frame_encoding": "u8_field_tag_then_u16be_byte_length_then_value",
+    "environment_tag_hex": "01",
+    "operation_tag_hex": "02",
+    "peer_tag_hex": "03",
+    "nonce_tag_hex": "04",
+    "field_order": [
+      "environment",
+      "operation",
+      "authenticated_peer_public_key",
+      "request_nonce"
+    ],
+    "environment_pattern": "^[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?$",
+    "environment_min_bytes": 1,
+    "environment_max_bytes": 32,
+    "environment_normalization": "none",
+    "operations": [
+      "IssueAssignment",
+      "RefreshAssignment"
+    ],
+    "peer_decoded_bytes": 32,
+    "peer_fixture_encoding": "canonical_base64_std_padded",
+    "peer_hash_encoding": "raw_32_bytes",
+    "nonce_decoded_bytes": 32,
+    "nonce_fixture_encoding": "canonical_base64url_unpadded",
+    "nonce_hash_encoding": "raw_32_bytes",
+    "excluded_inputs": [
+      "nhp_send_timestamp",
+      "nhp_transaction_id",
+      "exact_body_digest",
+      "source_address",
+      "hub_request_id_in_public_body"
+    ]
+  },
+  "cases": [
+    {
+      "name": "baseline_refresh",
+      "environment": "sandbox",
+      "operation": "RefreshAssignment",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
+      "preimage_hex": "6c61796572763a7175726c3a636f6e6e6563746f722d6875622d726571756573742d69643a76310001000773616e64626f780200115265667265736841737369676e6d656e740300200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614040020c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "hub_request_id": "c54387a98dcdb81fd911c724c43c82a776ee0c66802dcd873718f6b201d5d2ad"
+    },
+    {
+      "name": "environment_substitution",
+      "environment": "production",
+      "operation": "RefreshAssignment",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
+      "preimage_hex": "6c61796572763a7175726c3a636f6e6e6563746f722d6875622d726571756573742d69643a76310001000a70726f64756374696f6e0200115265667265736841737369676e6d656e740300200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614040020c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "hub_request_id": "b334c2e32b1e0a59462e53529fd8006670f6afb6c151a9dc51e9533753d8dec7",
+      "mutated_field": "environment",
+      "not_equal_to": "baseline_refresh"
+    },
+    {
+      "name": "operation_substitution",
+      "environment": "sandbox",
+      "operation": "IssueAssignment",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
+      "preimage_hex": "6c61796572763a7175726c3a636f6e6e6563746f722d6875622d726571756573742d69643a76310001000773616e64626f7802000f497373756541737369676e6d656e740300200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614040020c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "hub_request_id": "c10d42b36c2de8ead1d94b72d198d0d36a82e5edfb3241adf667195e800cf5ff",
+      "mutated_field": "operation",
+      "not_equal_to": "baseline_refresh"
+    },
+    {
+      "name": "peer_substitution",
+      "environment": "sandbox",
+      "operation": "RefreshAssignment",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhU=",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
+      "preimage_hex": "6c61796572763a7175726c3a636f6e6e6563746f722d6875622d726571756573742d69643a76310001000773616e64626f780200115265667265736841737369676e6d656e740300200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7615040020c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "hub_request_id": "7a0af466bb2ebe1458a0779d7dcb529d425766550888cb9b187eb0679775aa57",
+      "mutated_field": "authenticated_peer_public_key",
+      "not_equal_to": "baseline_refresh"
+    },
+    {
+      "name": "nonce_substitution",
+      "environment": "sandbox",
+      "operation": "RefreshAssignment",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t4",
+      "preimage_hex": "6c61796572763a7175726c3a636f6e6e6563746f722d6875622d726571756573742d69643a76310001000773616e64626f780200115265667265736841737369676e6d656e740300200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614040020c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddede",
+      "hub_request_id": "add38351e98053e811b6ec7bba3db07d8b27786b526ec6d863923b97ebaa716e",
+      "mutated_field": "request_nonce",
+      "not_equal_to": "baseline_refresh"
+    }
+  ]
+}

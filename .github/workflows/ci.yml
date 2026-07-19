@@ -77,6 +77,7 @@ jobs:
       - name: npm package smoke
         run: |
           node <<'NODE'
+          const crypto = require('node:crypto');
           const c = require('./npm');
           const r = c.relayKnockVectors();
           const a = c.agentRegistrationVectors();
@@ -86,6 +87,27 @@ jobs:
           const i = c.agentApiKeyIdVectors();
           const t = c.assignmentTicketVectors();
           const u = c.connectorAuthorityLambdaVectors();
+          const h = c.connectorHubRequestIdVectors();
+          const hubFrame = (tag, value) => {
+            const prefix = Buffer.alloc(3);
+            prefix[0] = tag;
+            prefix.writeUInt16BE(value.length, 1);
+            return Buffer.concat([prefix, value]);
+          };
+          const deriveHubRequestId = vector => {
+            const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
+            const nonce = Buffer.from(vector.request_nonce, 'base64url');
+            const preimage = Buffer.concat([
+              Buffer.from(`${h.contract.domain_ascii}\0`, 'ascii'),
+              hubFrame(1, Buffer.from(vector.environment, 'ascii')),
+              hubFrame(2, Buffer.from(vector.operation, 'ascii')),
+              hubFrame(3, peer),
+              hubFrame(4, nonce),
+            ]);
+            if (preimage.toString('hex') !== vector.preimage_hex) return false;
+            return crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
+          };
+          const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const authorityRequests = Object.fromEntries(
             Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
           );
@@ -107,6 +129,12 @@ jobs:
           const uncheckedAlias = JSON.parse(requests.reject_alias_run_id.body_json);
           const assignmentInitial = JSON.parse(s.initial_assignment.result.body_json).list;
           const assignmentRefresh = JSON.parse(s.refresh_assignment.result.body_json).list;
+          const assignmentInitialRequest = JSON.parse(s.initial_assignment.request.body_json);
+          const assignmentRefreshRequest = JSON.parse(s.refresh_assignment.request.body_json);
+          const nonceIsCanonical32 = value => {
+            const decoded = Buffer.from(value, 'base64url');
+            return decoded.length === 32 && decoded.toString('base64url') === value;
+          };
           const assignmentRegister = JSON.parse(s.assigned_cell_registration.request.body_json);
           const assignmentOtp = JSON.parse(s.account_credential_otp.request.body_json);
           const assignmentOtpBinding = s.account_credential_otp.enrollment_binding;
@@ -134,6 +162,10 @@ jobs:
             deviceApiKeyBytes.toString('base64url') === deviceApiKeyBody;
           const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
           const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
+          const nullNonce = JSON.parse(assignmentRequests.reject_null_initial_request_nonce.body_json).usrData.request_nonce;
+          const standardBase64Nonce = JSON.parse(assignmentRequests.reject_standard_base64_refresh_request_nonce.body_json).usrData.request_nonce;
+          const nonCanonicalTailNonce = JSON.parse(assignmentRequests.reject_noncanonical_tail_bits_refresh_request_nonce.body_json).usrData.request_nonce;
+          const refreshNonceBytes = Buffer.from(assignmentRefreshRequest.usrData.request_nonce, 'base64url');
           const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
           const assignmentMalformed = Object.fromEntries(s.error_contract.malformed_cases.map(v => [v.name, v]));
           const sessionCookie = Buffer.from(x.overload_reknock.cookie_b64, 'base64');
@@ -147,7 +179,10 @@ jobs:
           ];
           if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
-              s.schema_version !== 2 || s.initial_assignment.request.header_type !== 5 ||
+              s.schema_version !== 3 || s.initial_assignment.request.header_type !== 5 ||
+              !nonceIsCanonical32(assignmentInitialRequest.usrData.request_nonce) ||
+              !nonceIsCanonical32(assignmentRefreshRequest.usrData.request_nonce) ||
+              assignmentInitialRequest.usrData.request_nonce === assignmentRefreshRequest.usrData.request_nonce ||
               JSON.stringify(s.public_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'account', 'agent']) ||
               s.initial_assignment.result.header_type !== 6 ||
               s.initial_assignment.request.counter !== s.initial_assignment.result.counter ||
@@ -212,8 +247,21 @@ jobs:
               s.registration_completion.request.receiver_key !== 'assigned_cell' ||
               assignmentCompletionRequest.usrData.assignment_ticket !== undefined ||
               JSON.stringify(Object.keys(assignmentCompletion).sort()) !== JSON.stringify(['device_api_key_id', 'query', 'version']) ||
-              s.request_cases.length !== 21 ||
+              s.request_cases.length !== 30 ||
               assignmentRequests.reject_duplicate_outer_dev_id.reject_class !== 'body_parse' ||
+              assignmentRequests.reject_missing_initial_request_nonce.reject_class !== 'missing_field' ||
+              assignmentRequests.reject_duplicate_initial_request_nonce.reject_class !== 'body_parse' ||
+              assignmentRequests.reject_alias_refresh_request_nonce.reject_class !== 'unknown_field' ||
+              assignmentRequests.reject_null_initial_request_nonce.reject_class !== 'wrong_type' ||
+              assignmentRequests.reject_padded_initial_request_nonce.reject_class !== 'semantic' ||
+              assignmentRequests.reject_short_refresh_request_nonce.reject_class !== 'semantic' ||
+              assignmentRequests.reject_standard_base64_refresh_request_nonce.reject_class !== 'semantic' ||
+              assignmentRequests.reject_noncanonical_tail_bits_refresh_request_nonce.reject_class !== 'semantic' ||
+              nullNonce !== null ||
+              standardBase64Nonce.length !== 43 || !/[+/]/.test(standardBase64Nonce) || nonceIsCanonical32(standardBase64Nonce) ||
+              nonCanonicalTailNonce !== `${assignmentRefreshRequest.usrData.request_nonce.slice(0, -1)}9` ||
+              nonceIsCanonical32(nonCanonicalTailNonce) ||
+              !Buffer.from(nonCanonicalTailNonce, 'base64url').equals(refreshNonceBytes) ||
               assignmentRequests.reject_alias_outer_dev_id.reject_class !== 'unknown_field' ||
               assignmentRequests.reject_client_public_key.reject_class !== 'unknown_field' ||
               assignmentRequests.reject_refresh_assignment_ticket.reject_class !== 'unknown_field' ||
@@ -304,6 +352,13 @@ jobs:
               !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
               activationUnavailable?.nhp_action !== 'drop_no_reply' ||
               'nhp_body_json' in activationUnavailable ||
+              h.artifact !== 'qurl-connector-hub-request-id-v1-vectors' || h.schema_version !== 1 ||
+              h.contract.operations.join(',') !== 'IssueAssignment,RefreshAssignment' ||
+              !h.contract.excluded_inputs.includes('nhp_send_timestamp') ||
+              !h.contract.excluded_inputs.includes('exact_body_digest') ||
+              h.cases.length !== 5 || hubRequestIds.size !== h.cases.length ||
+              h.cases.some(v => !deriveHubRequestId(v)) ||
+              assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -320,8 +375,10 @@ jobs:
           cd python
           python3 <<'PY'
           import base64
+          import hashlib
           import json
           import re
+          import struct
           import sys
           sys.path.insert(0, '.')
           import qurl_conformance as q
@@ -334,6 +391,20 @@ jobs:
           i = q.agent_api_key_id_vectors()
           t = q.assignment_ticket_vectors()
           u = q.connector_authority_lambda_vectors()
+          h = q.connector_hub_request_id_vectors()
+          def hub_frame(tag, value):
+              return bytes([tag]) + struct.pack('>H', len(value)) + value
+          def derive_hub_request_id(vector):
+              peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
+              nonce = base64.urlsafe_b64decode(vector['request_nonce'] + '=' * (-len(vector['request_nonce']) % 4))
+              preimage = b''.join((
+                  h['contract']['domain_ascii'].encode('ascii'), b'\0',
+                  hub_frame(1, vector['environment'].encode('ascii')),
+                  hub_frame(2, vector['operation'].encode('ascii')),
+                  hub_frame(3, peer),
+                  hub_frame(4, nonce),
+              ))
+              return preimage.hex() == vector['preimage_hex'] and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
           authority_requests = {
               name: json.loads(operation['request_golden']['body_json'])
               for name, operation in u['operations'].items()
@@ -353,13 +424,21 @@ jobs:
           assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
-          assert s['schema_version'] == 2
+          assert s['schema_version'] == 3
           assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
           assert s['initial_assignment']['request']['header_type'] == 5
           assert s['initial_assignment']['result']['header_type'] == 6
           assert s['initial_assignment']['request']['counter'] == s['initial_assignment']['result']['counter']
           initial_assignment = json.loads(s['initial_assignment']['result']['body_json'])['list']
           refresh_assignment = json.loads(s['refresh_assignment']['result']['body_json'])['list']
+          initial_assignment_request = json.loads(s['initial_assignment']['request']['body_json'])
+          refresh_assignment_request = json.loads(s['refresh_assignment']['request']['body_json'])
+          for request in (initial_assignment_request, refresh_assignment_request):
+              nonce = request['usrData']['request_nonce']
+              decoded_nonce = base64.urlsafe_b64decode(nonce + '=' * (-len(nonce) % 4))
+              assert len(decoded_nonce) == 32
+              assert base64.urlsafe_b64encode(decoded_nonce).decode().rstrip('=') == nonce
+          assert initial_assignment_request['usrData']['request_nonce'] != refresh_assignment_request['usrData']['request_nonce']
           registration = json.loads(s['assigned_cell_registration']['request']['body_json'])
           completion_request = json.loads(s['registration_completion']['request']['body_json'])
           device_api_key = completion_request['usrData']['device_api_key']
@@ -381,6 +460,11 @@ jobs:
           account_otp_sizes = {v['name']: v for v in account_otp['packet_size_contract']['cases']}
           completion = json.loads(s['registration_completion']['result']['body_json'])['list']
           assignment_requests = {v['name']: v for v in s['request_cases']}
+          null_nonce = json.loads(assignment_requests['reject_null_initial_request_nonce']['body_json'])['usrData']['request_nonce']
+          standard_base64_nonce = json.loads(assignment_requests['reject_standard_base64_refresh_request_nonce']['body_json'])['usrData']['request_nonce']
+          noncanonical_tail_nonce = json.loads(assignment_requests['reject_noncanonical_tail_bits_refresh_request_nonce']['body_json'])['usrData']['request_nonce']
+          refresh_nonce = refresh_assignment_request['usrData']['request_nonce']
+          refresh_nonce_bytes = base64.urlsafe_b64decode(refresh_nonce + '=' * (-len(refresh_nonce) % 4))
           assignment_results = {v['name']: v for v in s['success_result_cases']}
           assignment_malformed = {v['name']: v for v in s['error_contract']['malformed_cases']}
           session_cookie = base64.b64decode(x['overload_reknock']['cookie_b64'], validate=True)
@@ -461,8 +545,24 @@ jobs:
           assert s['registration_completion']['request']['receiver_key'] == 'assigned_cell'
           assert 'assignment_ticket' not in completion_request['usrData']
           assert set(completion) == {'query', 'version', 'device_api_key_id'}
-          assert len(s['request_cases']) == 21
+          assert len(s['request_cases']) == 30
           assert assignment_requests['reject_duplicate_outer_dev_id']['reject_class'] == 'body_parse'
+          assert assignment_requests['reject_missing_initial_request_nonce']['reject_class'] == 'missing_field'
+          assert assignment_requests['reject_duplicate_initial_request_nonce']['reject_class'] == 'body_parse'
+          assert assignment_requests['reject_alias_refresh_request_nonce']['reject_class'] == 'unknown_field'
+          assert assignment_requests['reject_null_initial_request_nonce']['reject_class'] == 'wrong_type'
+          assert assignment_requests['reject_padded_initial_request_nonce']['reject_class'] == 'semantic'
+          assert assignment_requests['reject_short_refresh_request_nonce']['reject_class'] == 'semantic'
+          assert assignment_requests['reject_standard_base64_refresh_request_nonce']['reject_class'] == 'semantic'
+          assert assignment_requests['reject_noncanonical_tail_bits_refresh_request_nonce']['reject_class'] == 'semantic'
+          assert null_nonce is None
+          assert len(standard_base64_nonce) == 43 and any(v in standard_base64_nonce for v in '+/')
+          standard_base64_nonce_bytes = base64.urlsafe_b64decode(standard_base64_nonce + '=' * (-len(standard_base64_nonce) % 4))
+          assert base64.urlsafe_b64encode(standard_base64_nonce_bytes).decode().rstrip('=') != standard_base64_nonce
+          assert noncanonical_tail_nonce == refresh_nonce[:-1] + '9'
+          noncanonical_tail_bytes = base64.urlsafe_b64decode(noncanonical_tail_nonce + '=' * (-len(noncanonical_tail_nonce) % 4))
+          assert noncanonical_tail_bytes == refresh_nonce_bytes
+          assert base64.urlsafe_b64encode(noncanonical_tail_bytes).decode().rstrip('=') != noncanonical_tail_nonce
           assert assignment_requests['reject_alias_outer_dev_id']['reject_class'] == 'unknown_field'
           assert assignment_requests['reject_client_public_key']['reject_class'] == 'unknown_field'
           assert assignment_requests['reject_refresh_assignment_ticket']['reject_class'] == 'unknown_field'
@@ -562,6 +662,13 @@ jobs:
           assert any(v['mapping_source'] == 'nhp_preinvoke' and v['name'] == 'assignment_rate_limited' and '52204' in v['nhp_body_json'] for v in u['operations']['RefreshAssignment']['public_mapping_cases'])
           assert activation_unavailable['nhp_action'] == 'drop_no_reply'
           assert 'nhp_body_json' not in activation_unavailable
+          assert h['artifact'] == 'qurl-connector-hub-request-id-v1-vectors' and h['schema_version'] == 1
+          assert h['contract']['operations'] == ['IssueAssignment', 'RefreshAssignment']
+          assert {'nhp_send_timestamp', 'exact_body_digest'} <= set(h['contract']['excluded_inputs'])
+          assert len(h['cases']) == 5
+          assert len({v['hub_request_id'] for v in h['cases']}) == len(h['cases'])
+          assert all(derive_hub_request_id(v) for v in h['cases'])
+          assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
           print('py ok')
           PY
 

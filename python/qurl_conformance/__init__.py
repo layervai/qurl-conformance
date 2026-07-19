@@ -55,3 +55,8 @@ def assignment_ticket_vectors():
 def connector_authority_lambda_vectors():
     """Return the parsed connector_authority_lambda_v1_vectors.json."""
     return _load("connector_authority_lambda_v1_vectors.json")
+
+
+def connector_hub_request_id_vectors():
+    """Return the parsed connector_hub_request_id_v1_vectors.json."""
+    return _load("connector_hub_request_id_v1_vectors.json")

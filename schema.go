@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Nine families live here, each under its own artifact id so they stay decoupled
+// Ten families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -35,6 +35,10 @@
 //   - The private Connector Authority Lambda contract
 //     (connector_authority_lambda_v1_vectors.json): five operation-specific
 //     request/result envelopes, strict rejects, and private-to-NHP mappings.
+//   - The private Connector Hub request-ID contract
+//     (connector_hub_request_id_v1_vectors.json): byte-exact replay-key KATs
+//     over environment, authority operation, authenticated peer, and the
+//     client logical-request nonce.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject
@@ -570,8 +574,11 @@ const (
 
 // Producer revisions for the deterministic wire and error contracts.
 const (
-	// AgentAssignmentQURLGoProducerRevision is the merged qurl-go revision
-	// used to build and authenticate-open every assignment lifecycle packet.
+	// AgentAssignmentQURLGoProducerRevision is the merged qurl-go packet-codec
+	// revision used to build and authenticate-open every assignment lifecycle
+	// packet from the artifact's exact application body. It does not claim that
+	// the revision's higher-level assignment request builder knows the current
+	// artifact schema; consumers add that support conformance-first.
 	AgentAssignmentQURLGoProducerRevision = "8a69642957030b9ce0a1b8b356246d265a9f577d"
 	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
 	// the closed assignment and registration error-code taxonomy.
@@ -598,6 +605,12 @@ const (
 	// AgentAssignmentAccountCredentialFixture is the exact synthetic account
 	// credential carried only by the optional account OTP packet.
 	AgentAssignmentAccountCredentialFixture = "lv_live_conformance_account_secret_0001"
+	// AgentAssignmentInitialRequestNonceFixture is canonical unpadded base64url
+	// for the deterministic 32-byte sequence 0xa0..0xbf.
+	AgentAssignmentInitialRequestNonceFixture = "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8"
+	// AgentAssignmentRefreshRequestNonceFixture is canonical unpadded base64url
+	// for the deterministic 32-byte sequence 0xc0..0xdf.
+	AgentAssignmentRefreshRequestNonceFixture = "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8"
 )
 
 // NHP Curve packets use a 240-byte HeaderCurve and the transport reads into a
@@ -773,16 +786,18 @@ type agentAssignmentListRequest struct {
 }
 
 type agentAssignmentInitialRequestData struct {
-	Query      string `json:"query"`
-	Version    int    `json:"version"`
-	Mode       string `json:"mode"`
-	Credential string `json:"credential"`
+	Query        string `json:"query"`
+	Version      int    `json:"version"`
+	Mode         string `json:"mode"`
+	RequestNonce string `json:"request_nonce"`
+	Credential   string `json:"credential"`
 }
 
 type agentAssignmentRefreshRequestData struct {
-	Query   string `json:"query"`
-	Version int    `json:"version"`
-	Mode    string `json:"mode"`
+	Query        string `json:"query"`
+	Version      int    `json:"version"`
+	Mode         string `json:"mode"`
+	RequestNonce string `json:"request_nonce"`
 }
 
 type agentAssignmentCompletionRequestData struct {
@@ -1049,8 +1064,8 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		return nil, fmt.Errorf("conformance: agent-assignment file has artifact %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 2 {
-		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 2", af.SchemaVersion)
+	if af.SchemaVersion != 3 {
+		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 3", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
 		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
@@ -1417,27 +1432,36 @@ func validateAgentAssignmentOTPPacketSizeContract(contract AgentAssignmentOTPPac
 
 func validateAgentAssignmentRequestCases(cases []AgentAssignmentRequestCase) error {
 	expected := map[string]agentAssignmentCaseExpectation{
-		"reject_duplicate_outer_dev_id":              {"initial_assignment", AgentAssignmentRejectBodyParse},
-		"reject_duplicate_initial_credential":        {"initial_assignment", AgentAssignmentRejectBodyParse},
-		"reject_alias_outer_dev_id":                  {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_alias_initial_query":                 {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_missing_initial_credential":          {"initial_assignment", AgentAssignmentRejectMissingField},
-		"reject_client_owner_id":                     {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_client_public_key":                   {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_client_cell_id":                      {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_client_endpoint":                     {"initial_assignment", AgentAssignmentRejectUnknownField},
-		"reject_trailing_initial_value":              {"initial_assignment", AgentAssignmentRejectBodyParse},
-		"reject_null_usr_data":                       {"initial_assignment", AgentAssignmentRejectWrongType},
-		"reject_non_object_usr_data":                 {"initial_assignment", AgentAssignmentRejectWrongType},
-		"reject_refresh_credential":                  {"refresh_assignment", AgentAssignmentRejectUnknownField},
-		"reject_refresh_assignment_ticket":           {"refresh_assignment", AgentAssignmentRejectUnknownField},
-		"reject_completion_assignment_ticket":        {"registration_completion", AgentAssignmentRejectUnknownField},
-		"reject_duplicate_completion_device_api_key": {"registration_completion", AgentAssignmentRejectBodyParse},
-		"reject_duplicate_registration_ticket":       {"assigned_cell_registration", AgentAssignmentRejectBodyParse},
-		"reject_registration_client_placement":       {"assigned_cell_registration", AgentAssignmentRejectUnknownField},
-		"reject_wrong_query":                         {"initial_assignment", AgentAssignmentRejectSemantic},
-		"reject_wrong_version":                       {"refresh_assignment", AgentAssignmentRejectSemantic},
-		"reject_wrong_mode":                          {"refresh_assignment", AgentAssignmentRejectSemantic},
+		"reject_duplicate_outer_dev_id":                       {"initial_assignment", AgentAssignmentRejectBodyParse},
+		"reject_duplicate_initial_credential":                 {"initial_assignment", AgentAssignmentRejectBodyParse},
+		"reject_alias_outer_dev_id":                           {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_alias_initial_query":                          {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_missing_initial_credential":                   {"initial_assignment", AgentAssignmentRejectMissingField},
+		"reject_client_owner_id":                              {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_client_public_key":                            {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_client_cell_id":                               {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_client_endpoint":                              {"initial_assignment", AgentAssignmentRejectUnknownField},
+		"reject_trailing_initial_value":                       {"initial_assignment", AgentAssignmentRejectBodyParse},
+		"reject_null_usr_data":                                {"initial_assignment", AgentAssignmentRejectWrongType},
+		"reject_non_object_usr_data":                          {"initial_assignment", AgentAssignmentRejectWrongType},
+		"reject_missing_initial_request_nonce":                {"initial_assignment", AgentAssignmentRejectMissingField},
+		"reject_missing_refresh_request_nonce":                {"refresh_assignment", AgentAssignmentRejectMissingField},
+		"reject_duplicate_initial_request_nonce":              {"initial_assignment", AgentAssignmentRejectBodyParse},
+		"reject_alias_refresh_request_nonce":                  {"refresh_assignment", AgentAssignmentRejectUnknownField},
+		"reject_null_initial_request_nonce":                   {"initial_assignment", AgentAssignmentRejectWrongType},
+		"reject_padded_initial_request_nonce":                 {"initial_assignment", AgentAssignmentRejectSemantic},
+		"reject_short_refresh_request_nonce":                  {"refresh_assignment", AgentAssignmentRejectSemantic},
+		"reject_standard_base64_refresh_request_nonce":        {"refresh_assignment", AgentAssignmentRejectSemantic},
+		"reject_noncanonical_tail_bits_refresh_request_nonce": {"refresh_assignment", AgentAssignmentRejectSemantic},
+		"reject_refresh_credential":                           {"refresh_assignment", AgentAssignmentRejectUnknownField},
+		"reject_refresh_assignment_ticket":                    {"refresh_assignment", AgentAssignmentRejectUnknownField},
+		"reject_completion_assignment_ticket":                 {"registration_completion", AgentAssignmentRejectUnknownField},
+		"reject_duplicate_completion_device_api_key":          {"registration_completion", AgentAssignmentRejectBodyParse},
+		"reject_duplicate_registration_ticket":                {"assigned_cell_registration", AgentAssignmentRejectBodyParse},
+		"reject_registration_client_placement":                {"assigned_cell_registration", AgentAssignmentRejectUnknownField},
+		"reject_wrong_query":                                  {"initial_assignment", AgentAssignmentRejectSemantic},
+		"reject_wrong_version":                                {"refresh_assignment", AgentAssignmentRejectSemantic},
+		"reject_wrong_mode":                                   {"refresh_assignment", AgentAssignmentRejectSemantic},
 	}
 	baseCases := make([]AgentAssignmentCase, len(cases))
 	for i, c := range cases {
@@ -1596,12 +1620,18 @@ func classifyAgentAssignmentRequest(c AgentAssignmentRequestCase) string {
 		if data.Query != "cell_assignment" || data.Version != 1 || data.Mode != "enroll" || data.Credential == "" {
 			return AgentAssignmentRejectSemantic
 		}
+		if _, err := DecodeConnectorHubRequestNonce(data.RequestNonce); err != nil {
+			return AgentAssignmentRejectSemantic
+		}
 	case "refresh_assignment":
 		var data *agentAssignmentRefreshRequestData
 		if err := strictDecodeArtifact(body.UsrData, &data); err != nil || data == nil {
 			return classifyAgentAssignmentStrictError(err)
 		}
 		if data.Query != "cell_assignment" || data.Version != 1 || data.Mode != "refresh" {
+			return AgentAssignmentRejectSemantic
+		}
+		if _, err := DecodeConnectorHubRequestNonce(data.RequestNonce); err != nil {
 			return AgentAssignmentRejectSemantic
 		}
 	case "registration_completion":
@@ -1627,8 +1657,18 @@ func validateAgentAssignmentRequestKeys(phase string, body []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := checkAgentAssignmentExactObject("usrData", outer["usrData"], schema.requestDataKeys); err != nil {
+	requestData, err := checkAgentAssignmentExactObject("usrData", outer["usrData"], schema.requestDataKeys)
+	if err != nil {
 		return err
+	}
+	if phase == "initial_assignment" || phase == "refresh_assignment" {
+		// Exact-object validation above proves the key exists with a non-empty
+		// JSON value; the first token therefore distinguishes a string from null
+		// and every other JSON type without changing the reject class.
+		rawNonce := bytes.TrimSpace(requestData["request_nonce"])
+		if rawNonce[0] != '"' {
+			return newAgentAssignmentRejectError(AgentAssignmentRejectWrongType, "usrData.request_nonce is not a string")
+		}
 	}
 	return nil
 }
@@ -1804,8 +1844,11 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if err := strictDecodeArtifact(initialRequest.UsrData, &initialData); err != nil || initialData == nil {
 		return fmt.Errorf("conformance: initial_assignment.request usrData is not strict v1 JSON: %v", err)
 	}
-	if initialRequest.UsrID != "" || initialRequest.DevID == "" || initialRequest.AspID != "agent" || initialData.Query != "cell_assignment" || initialData.Version != 1 || initialData.Mode != "enroll" || initialData.Credential != AgentAssignmentBootstrapCredentialFixture {
+	if initialRequest.UsrID != "" || initialRequest.DevID == "" || initialRequest.AspID != "agent" || initialData.Query != "cell_assignment" || initialData.Version != 1 || initialData.Mode != "enroll" || initialData.RequestNonce != AgentAssignmentInitialRequestNonceFixture || initialData.Credential != AgentAssignmentBootstrapCredentialFixture {
 		return errors.New("conformance: initial_assignment.request semantic fields drifted")
+	}
+	if _, err := DecodeConnectorHubRequestNonce(initialData.RequestNonce); err != nil {
+		return fmt.Errorf("conformance: initial_assignment.request request_nonce: %w", err)
 	}
 
 	initialList, err := decodeAgentAssignmentListSuccess("initial_assignment.result", af.InitialAssignment.Result.BodyJSON)
@@ -1837,8 +1880,11 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if err := strictDecodeArtifact(refreshRequest.UsrData, &refreshData); err != nil || refreshData == nil {
 		return fmt.Errorf("conformance: refresh_assignment.request usrData is not strict v1 JSON: %v", err)
 	}
-	if refreshRequest.UsrID != "" || refreshRequest.DevID != initialRequest.DevID || refreshRequest.AspID != "agent" || refreshData.Query != "cell_assignment" || refreshData.Version != 1 || refreshData.Mode != "refresh" {
+	if refreshRequest.UsrID != "" || refreshRequest.DevID != initialRequest.DevID || refreshRequest.AspID != "agent" || refreshData.Query != "cell_assignment" || refreshData.Version != 1 || refreshData.Mode != "refresh" || refreshData.RequestNonce != AgentAssignmentRefreshRequestNonceFixture {
 		return errors.New("conformance: refresh_assignment.request semantic fields drifted")
+	}
+	if _, err := DecodeConnectorHubRequestNonce(refreshData.RequestNonce); err != nil {
+		return fmt.Errorf("conformance: refresh_assignment.request request_nonce: %w", err)
 	}
 	refreshList, err := decodeAgentAssignmentListSuccess("refresh_assignment.result", af.RefreshAssignment.Result.BodyJSON)
 	if err != nil {

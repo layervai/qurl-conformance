@@ -212,8 +212,8 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 2 {
-		t.Errorf("schema_version = %d, want 2", af.SchemaVersion)
+	if af.SchemaVersion != 3 {
+		t.Errorf("schema_version = %d, want 3", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
 		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
@@ -297,15 +297,16 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 		UsrID   string `json:"usrId"`
 		DevID   string `json:"devId"`
 		UsrData struct {
-			Query      string `json:"query"`
-			Mode       string `json:"mode"`
-			Credential string `json:"credential"`
+			Query        string `json:"query"`
+			Mode         string `json:"mode"`
+			RequestNonce string `json:"request_nonce"`
+			Credential   string `json:"credential"`
 		} `json:"usrData"`
 	}
 	if err := json.Unmarshal([]byte(af.InitialAssignment.Request.BodyJSON), &initialRequest); err != nil {
 		t.Fatalf("initial request body: %v", err)
 	}
-	if initialRequest.UsrID != "" || initialRequest.DevID != "agent-conform" || initialRequest.UsrData.Query != "cell_assignment" || initialRequest.UsrData.Mode != "enroll" || initialRequest.UsrData.Credential == "" {
+	if initialRequest.UsrID != "" || initialRequest.DevID != "agent-conform" || initialRequest.UsrData.Query != "cell_assignment" || initialRequest.UsrData.Mode != "enroll" || initialRequest.UsrData.RequestNonce != AgentAssignmentInitialRequestNonceFixture || initialRequest.UsrData.Credential == "" {
 		t.Errorf("initial request identity/query fields drifted: %+v", initialRequest)
 	}
 	if strings.Contains(af.InitialAssignment.Result.BodyJSON, initialRequest.UsrData.Credential) {
@@ -393,7 +394,7 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.RegistrationCompletion.Request.ReceiverKey != "assigned_cell" || af.RegistrationCompletion.Result.SenderKey != "assigned_cell" {
 		t.Errorf("completion trust boundary = %q/%q, want assigned_cell/assigned_cell", af.RegistrationCompletion.Request.ReceiverKey, af.RegistrationCompletion.Result.SenderKey)
 	}
-	if got, want := len(af.RequestCases), 21; got != want {
+	if got, want := len(af.RequestCases), 30; got != want {
 		t.Errorf("request case count = %d, want %d", got, want)
 	}
 	requestCases := make(map[string]AgentAssignmentRequestCase, len(af.RequestCases))
@@ -401,12 +402,17 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 		requestCases[c.Name] = c
 	}
 	for name, wantClass := range map[string]string{
-		"reject_duplicate_outer_dev_id":        AgentAssignmentRejectBodyParse,
-		"reject_alias_outer_dev_id":            AgentAssignmentRejectUnknownField,
-		"reject_client_public_key":             AgentAssignmentRejectUnknownField,
-		"reject_refresh_assignment_ticket":     AgentAssignmentRejectUnknownField,
-		"reject_duplicate_registration_ticket": AgentAssignmentRejectBodyParse,
-		"reject_wrong_mode":                    AgentAssignmentRejectSemantic,
+		"reject_duplicate_outer_dev_id":                       AgentAssignmentRejectBodyParse,
+		"reject_missing_initial_request_nonce":                AgentAssignmentRejectMissingField,
+		"reject_null_initial_request_nonce":                   AgentAssignmentRejectWrongType,
+		"reject_short_refresh_request_nonce":                  AgentAssignmentRejectSemantic,
+		"reject_standard_base64_refresh_request_nonce":        AgentAssignmentRejectSemantic,
+		"reject_noncanonical_tail_bits_refresh_request_nonce": AgentAssignmentRejectSemantic,
+		"reject_alias_outer_dev_id":                           AgentAssignmentRejectUnknownField,
+		"reject_client_public_key":                            AgentAssignmentRejectUnknownField,
+		"reject_refresh_assignment_ticket":                    AgentAssignmentRejectUnknownField,
+		"reject_duplicate_registration_ticket":                AgentAssignmentRejectBodyParse,
+		"reject_wrong_mode":                                   AgentAssignmentRejectSemantic,
 	} {
 		c, ok := requestCases[name]
 		if !ok {
