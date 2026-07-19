@@ -55,6 +55,11 @@ to the separately permissioned `IssueAssignment` or `RefreshAssignment`
 Authority operation. The SDK, qURL Connector, relay, assigned-cell workers, and
 all public NHP bodies neither receive nor derive it.
 
+The `hub_request_id` fixture in `connector_authority_lambda_v1_vectors.json` is
+intentionally not this artifact's derived baseline ID. The Authority artifact
+tests that the private field remains an opaque canonical lowercase SHA-256 hex
+value at its own trust boundary; this artifact alone freezes its derivation.
+
 ## Cases
 
 The baseline uses the authenticated agent key and refresh nonce from

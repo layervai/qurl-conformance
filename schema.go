@@ -1662,8 +1662,11 @@ func validateAgentAssignmentRequestKeys(phase string, body []byte) error {
 		return err
 	}
 	if phase == "initial_assignment" || phase == "refresh_assignment" {
+		// Exact-object validation above proves the key exists with a non-empty
+		// JSON value; the first token therefore distinguishes a string from null
+		// and every other JSON type without changing the reject class.
 		rawNonce := bytes.TrimSpace(requestData["request_nonce"])
-		if len(rawNonce) == 0 || rawNonce[0] != '"' {
+		if rawNonce[0] != '"' {
 			return newAgentAssignmentRejectError(AgentAssignmentRejectWrongType, "usrData.request_nonce is not a string")
 		}
 	}

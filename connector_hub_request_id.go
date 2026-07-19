@@ -166,6 +166,8 @@ func connectorHubRequestIDPreimage(environment, operation string, authenticatedP
 }
 
 func appendConnectorHubRequestIDFrame(dst []byte, tag byte, value []byte) []byte {
+	// connectorHubRequestIDPreimage validates every field at 32 bytes or less
+	// before framing, so the uint16 length conversion cannot truncate.
 	var length [2]byte
 	binary.BigEndian.PutUint16(length[:], uint16(len(value)))
 	dst = append(dst, tag)
