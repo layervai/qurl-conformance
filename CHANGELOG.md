@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/layervai/qurl-conformance/compare/v0.8.0...v0.8.1) (2026-07-19)
+
+
+### Features
+
+* **vectors:** freeze Hub LST cookie challenge ([#52](https://github.com/layervai/qurl-conformance/issues/52)) ([cb96ccc](https://github.com/layervai/qurl-conformance/commit/cb96ccca742d0b0512797bb89dda51e4aab0e252))
+
 ## [0.8.0](https://github.com/layervai/qurl-conformance/compare/v0.7.0...v0.8.0) (2026-07-19)
 
 
