@@ -36,6 +36,7 @@
     "challenge_header_name": "NHP_COK",
     "challenge_header_type": 7,
     "challenge_compressed": false,
+    "challenge_header_flags_hex": "0000",
     "challenge_size_rule": "sealed_cok_packet_bytes_strictly_less_than_received_lst_packet_bytes",
     "success_header_name": "NHP_LRT",
     "success_header_type": 6,
@@ -402,6 +403,7 @@
       "name": "accept_initial_challenge",
       "stage": "challenge_reply",
       "mutation": "none_initial",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "accept",
       "client_action": "send_one_fresh_proof_lst"
@@ -410,6 +412,7 @@
       "name": "accept_refresh_challenge",
       "stage": "challenge_reply",
       "mutation": "none_refresh",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "accept",
       "client_action": "send_one_fresh_proof_lst"
@@ -418,6 +421,7 @@
       "name": "reject_malformed_body",
       "stage": "challenge_reply",
       "mutation": "malformed_json",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -426,6 +430,7 @@
       "name": "reject_unknown_field",
       "stage": "challenge_reply",
       "mutation": "unknown_field",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\",\"future\":true}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -434,6 +439,7 @@
       "name": "reject_duplicate_field",
       "stage": "challenge_reply",
       "mutation": "duplicate_trx_id",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21,\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -442,6 +448,7 @@
       "name": "reject_wrong_transaction",
       "stage": "challenge_reply",
       "mutation": "trx_id_not_equal_unproven_lst_counter",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -450,6 +457,7 @@
       "name": "reject_cookie_encoding",
       "stage": "challenge_reply",
       "mutation": "cookie_not_canonical_padded_base64",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21,\"cookie\":\"***\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -458,6 +466,7 @@
       "name": "reject_cookie_length",
       "stage": "challenge_reply",
       "mutation": "decoded_cookie_not_32_bytes",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":21,\"cookie\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -466,6 +475,25 @@
       "name": "reject_untrusted_server",
       "stage": "challenge_reply",
       "mutation": "cok_not_authenticated_by_pinned_hub_key",
+      "header_flags_hex": "0000",
+      "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_compressed_challenge",
+      "stage": "challenge_reply",
+      "mutation": "compress_flag_set",
+      "header_flags_hex": "0002",
+      "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_unknown_flag_challenge",
+      "stage": "challenge_reply",
+      "mutation": "unknown_flag_set",
+      "header_flags_hex": "0008",
       "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -474,6 +502,7 @@
       "name": "reject_second_challenge",
       "stage": "proof_reply",
       "mutation": "authenticated_cok_after_proof_lst",
+      "header_flags_hex": "0000",
       "body_json": "{\"trxId\":23,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"

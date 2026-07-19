@@ -33,11 +33,12 @@ const (
 	ConnectorHubLSTCookiePeerBytes       = 32
 	ConnectorHubLSTCookieWindowSeconds   = 30
 
-	ConnectorHubLSTCookieProofFlagName = "NHP_FLAG_HUB_LST_COOKIE_PROOF"
-	ConnectorHubLSTCookieProofFlagHex  = "0004"
-	ConnectorHubLSTCookieProofFlag     = uint16(0x0004)
-	ConnectorHubLSTProofKATPurpose     = "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet"
-	connectorHubLSTProofExpectedDigest = "7aaa44aaf8f8876973120c8870b761603b6125bbe5322bb7c242fc9ca502efe3"
+	ConnectorHubLSTCookieProofFlagName     = "NHP_FLAG_HUB_LST_COOKIE_PROOF"
+	ConnectorHubLSTCookieProofFlagHex      = "0004"
+	ConnectorHubLSTCookieProofFlag         = uint16(0x0004)
+	ConnectorHubLSTCookieChallengeFlagsHex = "0000"
+	ConnectorHubLSTProofKATPurpose         = "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet"
+	connectorHubLSTProofExpectedDigest     = "7aaa44aaf8f8876973120c8870b761603b6125bbe5322bb7c242fc9ca502efe3"
 
 	ConnectorHubLSTCookieHeaderBytes       = 240
 	ConnectorHubLSTCookieBodyAEADTagBytes  = 16
@@ -73,18 +74,20 @@ var connectorHubLSTCookieRejects = map[string]struct {
 }
 
 var connectorHubLSTCookieChallengeCases = map[string]struct {
-	stage, mutation, outcome, action string
+	stage, mutation, flags, outcome, action string
 }{
-	"accept_initial_challenge": {"challenge_reply", "none_initial", ConnectorHubLSTCookieOutcomeAccept, ConnectorHubLSTCookieClientProof},
-	"accept_refresh_challenge": {"challenge_reply", "none_refresh", ConnectorHubLSTCookieOutcomeAccept, ConnectorHubLSTCookieClientProof},
-	"reject_malformed_body":    {"challenge_reply", "malformed_json", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_unknown_field":     {"challenge_reply", "unknown_field", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_duplicate_field":   {"challenge_reply", "duplicate_trx_id", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_wrong_transaction": {"challenge_reply", "trx_id_not_equal_unproven_lst_counter", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_cookie_encoding":   {"challenge_reply", "cookie_not_canonical_padded_base64", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_cookie_length":     {"challenge_reply", "decoded_cookie_not_32_bytes", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_untrusted_server":  {"challenge_reply", "cok_not_authenticated_by_pinned_hub_key", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_second_challenge":  {"proof_reply", "authenticated_cok_after_proof_lst", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"accept_initial_challenge":      {"challenge_reply", "none_initial", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeAccept, ConnectorHubLSTCookieClientProof},
+	"accept_refresh_challenge":      {"challenge_reply", "none_refresh", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeAccept, ConnectorHubLSTCookieClientProof},
+	"reject_malformed_body":         {"challenge_reply", "malformed_json", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_unknown_field":          {"challenge_reply", "unknown_field", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_duplicate_field":        {"challenge_reply", "duplicate_trx_id", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_wrong_transaction":      {"challenge_reply", "trx_id_not_equal_unproven_lst_counter", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_cookie_encoding":        {"challenge_reply", "cookie_not_canonical_padded_base64", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_cookie_length":          {"challenge_reply", "decoded_cookie_not_32_bytes", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_untrusted_server":       {"challenge_reply", "cok_not_authenticated_by_pinned_hub_key", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_compressed_challenge":   {"challenge_reply", "compress_flag_set", "0002", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_unknown_flag_challenge": {"challenge_reply", "unknown_flag_set", "0008", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_second_challenge":       {"proof_reply", "authenticated_cok_after_proof_lst", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
 }
 
 // ConnectorHubLSTCookieFile freezes the strict challenge/proof contract that
@@ -131,6 +134,7 @@ type ConnectorHubLSTCookieContract struct {
 	ChallengeHeaderName           string   `json:"challenge_header_name"`
 	ChallengeHeaderType           int      `json:"challenge_header_type"`
 	ChallengeCompressed           bool     `json:"challenge_compressed"`
+	ChallengeHeaderFlagsHex       string   `json:"challenge_header_flags_hex"`
 	ChallengeSizeRule             string   `json:"challenge_size_rule"`
 	SuccessHeaderName             string   `json:"success_header_name"`
 	SuccessHeaderType             int      `json:"success_header_type"`
@@ -270,12 +274,13 @@ type ConnectorHubLSTCookieKeyCase struct {
 // ConnectorHubLSTChallengeBodyCase drives the SDK's strict authenticated COK
 // parser and its one-proof-flight state machine.
 type ConnectorHubLSTChallengeBodyCase struct {
-	Name         string `json:"name"`
-	Stage        string `json:"stage"`
-	Mutation     string `json:"mutation"`
-	BodyJSON     string `json:"body_json,omitempty"`
-	Outcome      string `json:"outcome"`
-	ClientAction string `json:"client_action"`
+	Name           string `json:"name"`
+	Stage          string `json:"stage"`
+	Mutation       string `json:"mutation"`
+	HeaderFlagsHex string `json:"header_flags_hex"`
+	BodyJSON       string `json:"body_json,omitempty"`
+	Outcome        string `json:"outcome"`
+	ClientAction   string `json:"client_action"`
 }
 
 type connectorHubLSTChallengeBody struct {
@@ -400,8 +405,9 @@ func validateConnectorHubLSTCookieContract(contract ConnectorHubLSTCookieContrac
 		CookieKeyIDOnWire: false,
 		RequestHeaderName: AgentAssignmentRequestHeaderName, RequestHeaderType: AgentAssignmentRequestHeaderType,
 		ChallengeHeaderName: "NHP_COK", ChallengeHeaderType: 7, ChallengeCompressed: false,
-		ChallengeSizeRule: "sealed_cok_packet_bytes_strictly_less_than_received_lst_packet_bytes",
-		SuccessHeaderName: AgentAssignmentResultHeaderName, SuccessHeaderType: AgentAssignmentResultHeaderType,
+		ChallengeHeaderFlagsHex: ConnectorHubLSTCookieChallengeFlagsHex,
+		ChallengeSizeRule:       "sealed_cok_packet_bytes_strictly_less_than_received_lst_packet_bytes",
+		SuccessHeaderName:       AgentAssignmentResultHeaderName, SuccessHeaderType: AgentAssignmentResultHeaderType,
 		UnprovenHeaderFlagsHex: "0000", ProofFlagName: ConnectorHubLSTCookieProofFlagName,
 		ProofFlagHex: ConnectorHubLSTCookieProofFlagHex, ProofFlagExclusive: true,
 		ProofHeaderDigest:      "BLAKE2s-256(initial_hash || hub_server_static_public_key || header[0:208] || raw_cookie)",
@@ -745,21 +751,24 @@ func validateConnectorHubLSTCookieChallenges(cases []ConnectorHubLSTChallengeBod
 	validCookie := initialBody.Cookie
 	shortCookie := base64.StdEncoding.EncodeToString(make([]byte, ConnectorHubLSTCookieBytes-1))
 	expectedBodies := map[string]string{
-		"accept_initial_challenge": initial.ChallengeBodyJSON,
-		"accept_refresh_challenge": refresh.ChallengeBodyJSON,
-		"reject_malformed_body":    `{"trxId":21`,
-		"reject_unknown_field":     `{"trxId":21,"cookie":"` + validCookie + `","future":true}`,
-		"reject_duplicate_field":   `{"trxId":21,"trxId":21,"cookie":"` + validCookie + `"}`,
-		"reject_wrong_transaction": refresh.ChallengeBodyJSON,
-		"reject_cookie_encoding":   `{"trxId":21,"cookie":"***"}`,
-		"reject_cookie_length":     `{"trxId":21,"cookie":"` + shortCookie + `"}`,
-		"reject_untrusted_server":  initial.ChallengeBodyJSON,
-		"reject_second_challenge":  `{"trxId":` + initial.ProofCounter + `,"cookie":"` + validCookie + `"}`,
+		"accept_initial_challenge":      initial.ChallengeBodyJSON,
+		"accept_refresh_challenge":      refresh.ChallengeBodyJSON,
+		"reject_malformed_body":         `{"trxId":21`,
+		"reject_unknown_field":          `{"trxId":21,"cookie":"` + validCookie + `","future":true}`,
+		"reject_duplicate_field":        `{"trxId":21,"trxId":21,"cookie":"` + validCookie + `"}`,
+		"reject_wrong_transaction":      refresh.ChallengeBodyJSON,
+		"reject_cookie_encoding":        `{"trxId":21,"cookie":"***"}`,
+		"reject_cookie_length":          `{"trxId":21,"cookie":"` + shortCookie + `"}`,
+		"reject_untrusted_server":       initial.ChallengeBodyJSON,
+		"reject_compressed_challenge":   initial.ChallengeBodyJSON,
+		"reject_unknown_flag_challenge": initial.ChallengeBodyJSON,
+		"reject_second_challenge":       `{"trxId":` + initial.ProofCounter + `,"cookie":"` + validCookie + `"}`,
 	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, c := range cases {
 		want, ok := connectorHubLSTCookieChallengeCases[c.Name]
-		if !ok || c.Stage != want.stage || c.Mutation != want.mutation || c.Outcome != want.outcome || c.ClientAction != want.action {
+		if !ok || c.Stage != want.stage || c.Mutation != want.mutation || c.HeaderFlagsHex != want.flags ||
+			c.Outcome != want.outcome || c.ClientAction != want.action {
 			return fmt.Errorf("conformance: Connector Hub LST challenge %q drift", c.Name)
 		}
 		if _, duplicate := seen[c.Name]; duplicate {

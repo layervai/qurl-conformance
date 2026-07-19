@@ -19,11 +19,12 @@ func TestEmbeddedConnectorHubLSTCookieLoads(t *testing.T) {
 		t.Fatalf("identity = %q/v%d", file.Artifact, file.SchemaVersion)
 	}
 	if len(file.CookieKATs) != 3 || len(file.Flows) != 2 || len(file.SizeCases) != 6 ||
-		len(file.SuccessSizes) != 3 || len(file.KeyCases) != 5 || len(file.RejectCases) != 13 || len(file.ChallengeCases) != 10 {
+		len(file.SuccessSizes) != 3 || len(file.KeyCases) != 5 || len(file.RejectCases) != 13 || len(file.ChallengeCases) != 12 {
 		t.Fatalf("case counts = KAT:%d flow:%d size:%d success:%d key:%d reject:%d challenge:%d",
 			len(file.CookieKATs), len(file.Flows), len(file.SizeCases), len(file.SuccessSizes), len(file.KeyCases), len(file.RejectCases), len(file.ChallengeCases))
 	}
 	if file.Contract.ProofFlagHex != "0004" || !file.Contract.ProofFlagExclusive || file.Contract.ChallengeCompressed ||
+		file.Contract.ChallengeHeaderFlagsHex != ConnectorHubLSTCookieChallengeFlagsHex ||
 		file.Contract.AuthorityBeforeProofAllowed || file.Contract.HTTPFallbackAllowed || file.Contract.RequestPaddingFallbackAllowed {
 		t.Fatalf("security contract drifted: %+v", file.Contract)
 	}
@@ -171,6 +172,7 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 	}{
 		{"identity", "identity", func(file *ConnectorHubLSTCookieFile) { file.Artifact = "other" }},
 		{"contract", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ProofFlagHex = "0002" }},
+		{"challenge contract flags", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ChallengeHeaderFlagsHex = "0002" }},
 		{"cookie KAT", "preimage drift", func(file *ConnectorHubLSTCookieFile) {
 			file.CookieKATs[0].PreimageHex = strings.Repeat("0", len(file.CookieKATs[0].PreimageHex))
 		}},
@@ -188,6 +190,9 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 		{"reject disposition", "reject", func(file *ConnectorHubLSTCookieFile) { file.RejectCases[0].AuthorityInvocations = 1 }},
 		{"challenge disposition", "challenge", func(file *ConnectorHubLSTCookieFile) {
 			file.ChallengeCases[0].ClientAction = ConnectorHubLSTCookieClientStop
+		}},
+		{"challenge flags", "challenge", func(file *ConnectorHubLSTCookieFile) {
+			file.ChallengeCases[0].HeaderFlagsHex = "0002"
 		}},
 	}
 	for _, test := range tests {

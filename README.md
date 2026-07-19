@@ -277,7 +277,8 @@ This module hosts eleven artifact families, each under its own `artifact` id:
   (`qurl-connector-hub-lst-cookie-v1-vectors`,
   `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing,
   the Hub-LST-only `0x0004` proof flag and digest input, initial and refresh
-  flows, strict COK parsing, dynamic no-amplification bounds, and silent
+  flows, strict zero-flag COK parsing (including terminal compressed and
+  unknown-flag rejects), dynamic no-amplification bounds, and silent
   pre-Authority rejects. It neither changes nor reuses the existing overload
   KNK/RKN cookie domain. See
   `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.

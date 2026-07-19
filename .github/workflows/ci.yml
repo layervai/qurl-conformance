@@ -118,6 +118,26 @@ jobs:
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
           const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
+          const hubCookieChallenges = Object.fromEntries(hc.challenge_cases.map(v => [v.name, v]));
+          const hubCookieChallengeFlags = {
+            accept_initial_challenge: '0000',
+            accept_refresh_challenge: '0000',
+            reject_malformed_body: '0000',
+            reject_unknown_field: '0000',
+            reject_duplicate_field: '0000',
+            reject_wrong_transaction: '0000',
+            reject_cookie_encoding: '0000',
+            reject_cookie_length: '0000',
+            reject_untrusted_server: '0000',
+            reject_compressed_challenge: '0002',
+            reject_unknown_flag_challenge: '0008',
+            reject_second_challenge: '0000',
+          };
+          const hubCookieChallengesComplete =
+            hc.challenge_cases.length === Object.keys(hubCookieChallengeFlags).length &&
+            Object.entries(hubCookieChallengeFlags).every(([name, flags]) =>
+              hubCookieChallenges[name]?.header_flags_hex === flags
+            );
           const idValuePattern = new RegExp(i.contract.pattern);
           const idValuesAgree = i.consumer_value_cases.every(
             v => idValuePattern.test(v.value) === (v.outcome === 'accept')
@@ -363,7 +383,12 @@ jobs:
               h.cases.some(v => !deriveHubRequestId(v)) ||
               assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
               hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
-              hc.contract.proof_flag_hex !== '0004' || hc.contract.http_fallback_allowed !== false ||
+              hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
+              hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
+              ['reject_compressed_challenge', 'reject_unknown_flag_challenge'].some(name =>
+                hubCookieChallenges[name]?.outcome !== 'reject' ||
+                hubCookieChallenges[name]?.client_action !== 'stop_without_third_lst_or_fallback'
+              ) ||
               hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
               hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3078 ||
               !deviceApiKeyCanonical) {
@@ -423,6 +448,21 @@ jobs:
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
           id_responses = {v['name']: v for v in i['consumer_response_cases']}
+          hub_cookie_challenges = {v['name']: v for v in hc['challenge_cases']}
+          hub_cookie_challenge_flags = {
+              'accept_initial_challenge': '0000',
+              'accept_refresh_challenge': '0000',
+              'reject_malformed_body': '0000',
+              'reject_unknown_field': '0000',
+              'reject_duplicate_field': '0000',
+              'reject_wrong_transaction': '0000',
+              'reject_cookie_encoding': '0000',
+              'reject_cookie_length': '0000',
+              'reject_untrusted_server': '0000',
+              'reject_compressed_challenge': '0002',
+              'reject_unknown_flag_challenge': '0008',
+              'reject_second_challenge': '0000',
+          }
           canonical = '0123456789abcdef'
           resource = 'connector-conformance-01'
           # Stock JSON parsing is intentionally insufficient for these cases:
@@ -680,7 +720,17 @@ jobs:
           assert all(derive_hub_request_id(v) for v in h['cases'])
           assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
           assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 1
-          assert hc['contract']['proof_flag_hex'] == '0004' and hc['contract']['http_fallback_allowed'] is False
+          assert hc['contract']['proof_flag_hex'] == '0004'
+          assert hc['contract']['challenge_header_flags_hex'] == '0000'
+          assert hc['contract']['http_fallback_allowed'] is False
+          assert len(hc['challenge_cases']) == len(hub_cookie_challenge_flags)
+          assert set(hub_cookie_challenges) == set(hub_cookie_challenge_flags)
+          assert all(hub_cookie_challenges[name]['header_flags_hex'] == flags for name, flags in hub_cookie_challenge_flags.items())
+          assert all(
+              hub_cookie_challenges[name]['outcome'] == 'reject'
+              and hub_cookie_challenges[name]['client_action'] == 'stop_without_third_lst_or_fallback'
+              for name in ('reject_compressed_challenge', 'reject_unknown_flag_challenge')
+          )
           hub_cookie_sizes = {v['name']: v for v in hc['size_cases']}
           assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
           hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}

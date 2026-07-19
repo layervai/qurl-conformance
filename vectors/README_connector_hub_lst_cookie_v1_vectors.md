@@ -16,16 +16,19 @@ Both `initial_assignment` and `refresh_assignment` use the same four steps:
    `0x0000`.
 2. After the Noise static-key decrypt and body AEAD open succeed, global
    admission permits a challenge, and the exact sealed COK packet is strictly
-   smaller than the received LST, the Hub may return one authenticated,
-   uncompressed NHP_COK. Core does not call an application codec at this stage;
+   smaller than the received LST, the Hub may return one authenticated NHP_COK
+   with header flags exactly `0x0000`. Core does not call an application codec
+   at this stage;
    even crypto-valid framing around malformed application JSON may receive the
    smaller challenge. No Handler or Authority operation has run and COK is not
    an Authority outcome.
-3. The SDK verifies COK under the pinned Hub public key, requires its `trxId` to
-   equal the first LST counter, and sends exactly one fresh NHP_LST. The second
-   LST has fresh Noise ephemeral material, timestamp, and counter; flags exactly
-   `0x0004`; and a byte-identical authenticated application body, including the
-   same `request_nonce`.
+3. The SDK verifies COK under the pinned Hub public key, requires its header
+   flags to equal `0x0000` and its `trxId` to equal the first LST counter, then
+   sends exactly one fresh NHP_LST. An authenticated compressed COK or one with
+   any unknown flag is terminal: no proof LST, third LST, or fallback is sent.
+   The second LST has fresh Noise ephemeral material, timestamp, and counter;
+   flags exactly `0x0004`; and a byte-identical authenticated application body,
+   including the same `request_nonce`.
 4. NHP core verifies return routability before dispatch. The worker then
    strict-decodes the assignment body; malformed application JSON is silent.
    Only a valid body may reach the Handler and phase's one private Authority
@@ -126,7 +129,8 @@ authenticated timestamp/counter replay gate before dispatch.
 
 ## COK and amplification bound
 
-COK is uncompressed and its plaintext is exactly:
+COK has header flags exactly `0x0000` (uncompressed, with no unknown bits) and
+its plaintext is exactly:
 
 ```json
 {"trxId":21,"cookie":"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY="}
@@ -168,7 +172,8 @@ Consumers must:
 2. Recompute the KAT preimage, HMAC, and compact COK bodies.
 3. Drive both flows through their real state machine, including exact body and
    `request_nonce` equality, fresh proof packet material, the exclusive flag,
-   one-proof limit, duplicate/unknown COK rejection, and zero pre-proof
+   one-proof limit, duplicate/unknown COK rejection, exact zero COK header
+   flags, terminal compressed/unknown-flag COK rejection, and zero pre-proof
    Authority calls.
 4. Execute every size, server-reject, and client-challenge case at the named
    boundary. Missing cases are failures, never skips.
