@@ -250,6 +250,8 @@ func validateConnectorHubRequestIDCases(cases []ConnectorHubRequestIDCase) error
 		if test.PreimageHex != hex.EncodeToString(preimage) {
 			return errors.New("conformance: Connector Hub request-ID preimage mismatch")
 		}
+		// Re-derive through the exported consumer path so every substitution KAT,
+		// not only the baseline unit test, also guards its complete behavior.
 		requestID, err := DeriveConnectorHubRequestID(test.Environment, test.Operation, peer, nonce)
 		if err != nil || requestID != test.HubRequestID || !connectorHubRequestIDHexPattern.MatchString(test.HubRequestID) {
 			return errors.New("conformance: Connector Hub request-ID KAT mismatch")
@@ -304,20 +306,20 @@ func validateConnectorHubRequestIDSingleMutation(base, changed ConnectorHubReque
 }
 
 func decodeCanonicalConnectorHubRequestIDPeer(value string) ([]byte, error) {
-	decoded, err := base64.StdEncoding.Strict().DecodeString(value)
-	if err != nil || len(decoded) != ConnectorHubRequestIDPeerBytes || base64.StdEncoding.EncodeToString(decoded) != value {
-		return nil, ErrConnectorHubRequestIDPeer
-	}
-	return decoded, nil
+	return decodeCanonicalConnectorHubRequestIDField(base64.StdEncoding, value, ConnectorHubRequestIDPeerBytes, ErrConnectorHubRequestIDPeer)
 }
 
 // DecodeConnectorHubRequestNonce strictly decodes the public LST request_nonce
 // grammar shared by SDKs and the Hub. The returned raw bytes are suitable for
 // DeriveConnectorHubRequestID.
 func DecodeConnectorHubRequestNonce(value string) ([]byte, error) {
-	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil || len(decoded) != ConnectorHubRequestIDNonceBytes || base64.RawURLEncoding.EncodeToString(decoded) != value {
-		return nil, ErrConnectorHubRequestIDNonce
+	return decodeCanonicalConnectorHubRequestIDField(base64.RawURLEncoding, value, ConnectorHubRequestIDNonceBytes, ErrConnectorHubRequestIDNonce)
+}
+
+func decodeCanonicalConnectorHubRequestIDField(encoding *base64.Encoding, value string, wantBytes int, rejectErr error) ([]byte, error) {
+	decoded, err := encoding.Strict().DecodeString(value)
+	if err != nil || len(decoded) != wantBytes || encoding.EncodeToString(decoded) != value {
+		return nil, rejectErr
 	}
 	return decoded, nil
 }
