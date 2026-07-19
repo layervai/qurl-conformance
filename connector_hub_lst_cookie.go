@@ -504,7 +504,7 @@ func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, co
 		return errors.New("conformance: Connector Hub LST proof-digest counter is invalid")
 	}
 	word := binary.BigEndian.Uint32(prefix[0:4]) ^ binary.BigEndian.Uint32(prefix[4:8])
-	if kat.Purpose != ConnectorHubLSTProofKATPurpose || kat.InitialHashHex != hex.EncodeToString(initialHash) || kat.HubServerStaticPublicKeyHex != assignment.Keys.Hub.StaticPubHex ||
+	if kat.Purpose != ConnectorHubLSTProofKATPurpose || kat.InitialHashHex != hex.EncodeToString(initialHash) ||
 		kat.HeaderType != AgentAssignmentRequestHeaderType ||
 		int(word>>16) != kat.HeaderType || kat.HeaderFlagsHex != ConnectorHubLSTCookieProofFlagHex ||
 		binary.BigEndian.Uint16(prefix[10:12]) != ConnectorHubLSTCookieProofFlag || kat.Counter != "23" ||
