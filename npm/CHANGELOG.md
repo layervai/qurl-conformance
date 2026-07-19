@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.8.1...npm-v0.9.0) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** freeze UDP credential recovery contract ([#54](https://github.com/layervai/qurl-conformance/issues/54))
+
+### Features
+
+* **vectors:** freeze UDP credential recovery contract ([#54](https://github.com/layervai/qurl-conformance/issues/54)) ([9a9d4d0](https://github.com/layervai/qurl-conformance/commit/9a9d4d040cd8e66c9837766beb3d16cdb623fda1))
+
 ## [0.8.1](https://github.com/layervai/qurl-conformance/compare/npm-v0.8.0...npm-v0.8.1) (2026-07-19)
 
 
