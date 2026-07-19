@@ -176,6 +176,9 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 		}},
 		{"mapped KAT", "identity drift", func(file *ConnectorHubLSTCookieFile) { file.CookieKATs[1].EqualTo = "" }},
 		{"proof digest", "header prefix drift", func(file *ConnectorHubLSTCookieFile) { file.ProofDigestKAT.HeaderPrefixHex = strings.Repeat("0", 416) }},
+		{"proof digest output", "output drift", func(file *ConnectorHubLSTCookieFile) {
+			file.ProofDigestKAT.ExpectedDigestHex = strings.Repeat("0", 64)
+		}},
 		{"flow body", "flow drift", func(file *ConnectorHubLSTCookieFile) { file.Flows[0].ProofBodyJSON += " " }},
 		{"size equality", "size case", func(file *ConnectorHubLSTCookieFile) {
 			file.SizeCases[2].SizeGateAction = ConnectorHubLSTCookieActionContinue

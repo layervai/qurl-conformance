@@ -37,6 +37,7 @@ const (
 	ConnectorHubLSTCookieProofFlagHex  = "0004"
 	ConnectorHubLSTCookieProofFlag     = uint16(0x0004)
 	ConnectorHubLSTProofKATPurpose     = "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet"
+	connectorHubLSTProofExpectedDigest = "7aaa44aaf8f8876973120c8870b761603b6125bbe5322bb7c242fc9ca502efe3"
 
 	ConnectorHubLSTCookieHeaderBytes       = 240
 	ConnectorHubLSTCookieBodyAEADTagBytes  = 16
@@ -507,6 +508,9 @@ func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, co
 	}
 	if len(cookieKATs) == 0 || kat.RawCookieHex != cookieKATs[0].CookieHex {
 		return errors.New("conformance: Connector Hub LST proof-digest cookie linkage drift")
+	}
+	if kat.ExpectedDigestHex != connectorHubLSTProofExpectedDigest {
+		return errors.New("conformance: Connector Hub LST proof-digest output drift")
 	}
 	for name, check := range map[string]struct {
 		value string
