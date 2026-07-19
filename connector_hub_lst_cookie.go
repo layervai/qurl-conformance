@@ -46,8 +46,6 @@ const (
 
 	ConnectorHubLSTCookieOutcomeAccept  = "accept"
 	ConnectorHubLSTCookieOutcomeReject  = "reject"
-	ConnectorHubLSTCookieActionCOK      = "emit_cok"
-	ConnectorHubLSTCookieActionLRT      = "emit_lrt"
 	ConnectorHubLSTCookieActionDrop     = "drop_silently"
 	ConnectorHubLSTCookieActionSizeSafe = "challenge_size_eligible"
 	ConnectorHubLSTCookieActionContinue = "continue_strict_request_validation"
