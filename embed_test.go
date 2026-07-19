@@ -744,7 +744,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("error case unknown field", func(t *testing.T) {
 		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
-		b := spliceRaw(t, needle, append(needle, []byte("\n        \"future_field\": true,")...))
+		b := spliceRaw(t, needle, append(needle, "\n        \"future_field\": true,"...))
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "future_field"`) {
 			t.Fatalf("error = %v, want unknown error-case field rejection", err)
 		}
@@ -752,7 +752,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("accepted phases must be absent from every other error", func(t *testing.T) {
 		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
-		b := spliceRaw(t, needle, append(needle, []byte("\n        \"accepted_phases\": [],")...))
+		b := spliceRaw(t, needle, append(needle, "\n        \"accepted_phases\": [],"...))
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
 			t.Fatalf("error = %v, want noncanonical accepted_phases rejection", err)
 		}
