@@ -6,8 +6,8 @@ against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, private Connector Authority invocations, private
-Connector Hub replay identifiers, and Hub LST return-routability cookies
-decoupled by layer.
+Connector Hub replay identifiers, Hub LST return-routability cookies, and
+same-agent device-credential recovery decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -37,8 +37,10 @@ trust.
 | `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
 | `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
 | `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
-| `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, initial/refresh flows, amplification bounds, and closed rejects |
+| `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, closed initial/refresh flows, allowlisted additive profiles, amplification bounds, and rejects |
 | `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
+| `vectors/agent_credential_recovery_v1_vectors.json` | UDP-only same-agent device-credential recovery public/private bodies, grant bindings, exact replay, recovery horizon, and closed errors |
+| `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -59,6 +61,7 @@ at, err := conformance.AssignmentTicket()           // strict-parsed qat1 crypto
 ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
 hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
+cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -77,7 +80,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts eleven artifact families, each under its own `artifact` id:
+This module hosts twelve artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -282,6 +285,14 @@ This module hosts eleven artifact families, each under its own `artifact` id:
   pre-Authority rejects. It neither changes nor reuses the existing overload
   KNK/RKN cookie domain. See
   `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
+- **Agent credential recovery v1**
+  (`qurl-agent-credential-recovery-v1-vectors`,
+  `agent_credential_recovery_v1_vectors.json`) — strict UDP-only public Hub and
+  assigned-cell bodies, operation-specific private Authority bodies, recovery
+  error mappings, additive Hub-cookie proof/size cases, replay fingerprints,
+  grant bindings, no-takeover/no-placement-hint policy, exact-candidate replay,
+  per-episode immutable 90-day horizon, and closed `524xx` outcomes. See
+  `vectors/README_agent_credential_recovery_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

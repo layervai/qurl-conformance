@@ -54,6 +54,9 @@
     "authority_before_proof_allowed": false,
     "http_fallback_allowed": false,
     "request_padding_fallback_allowed": false,
+    "additive_application_profiles": [
+      "qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition"
+    ],
     "curve_header_bytes": 240,
     "body_aead_tag_bytes": 16,
     "empty_body_packet_bytes": 240,
