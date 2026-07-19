@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/layervai/qurl-conformance/compare/v0.6.1...v0.7.0) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** bind Hub requests to logical nonces ([#48](https://github.com/layervai/qurl-conformance/issues/48))
+
+### Features
+
+* **vectors:** bind Hub requests to logical nonces ([#48](https://github.com/layervai/qurl-conformance/issues/48)) ([852b5ab](https://github.com/layervai/qurl-conformance/commit/852b5ab4b1528719ff37b1f14f89211c3433773b))
+
 ## [0.6.1](https://github.com/layervai/qurl-conformance/compare/v0.6.0...v0.6.1) (2026-07-18)
 
 
