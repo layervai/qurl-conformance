@@ -551,6 +551,13 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		}
 		return b
 	}
+	spliceRaw := func(t *testing.T, needle, replacement []byte) []byte {
+		t.Helper()
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("needle %q count = %d, want 1", needle, got)
+		}
+		return bytes.Replace(raw, needle, replacement, 1)
+	}
 
 	t.Run("counter mismatch", func(t *testing.T) {
 		b := mutate(t, func(doc *AgentAssignmentFile) {
@@ -673,11 +680,8 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("duplicate nested case name", func(t *testing.T) {
 		needle := []byte(`"name": "completion_unavailable",`)
-		if got := bytes.Count(raw, needle); got != 1 {
-			t.Fatalf("completion_unavailable name count = %d, want 1", got)
-		}
 		replacement := []byte(`"name": "completion_unavailable", "name": "duplicate",`)
-		b := bytes.Replace(raw, needle, replacement, 1)
+		b := spliceRaw(t, needle, replacement)
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `duplicate object key "name"`) {
 			t.Fatalf("error = %v, want nested duplicate-name rejection", err)
 		}
@@ -740,10 +744,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("error case unknown field", func(t *testing.T) {
 		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
-		if got := bytes.Count(raw, needle); got != 1 {
-			t.Fatalf("assignment_unavailable case count = %d, want 1", got)
-		}
-		b := bytes.Replace(raw, needle, append(bytes.Clone(needle), []byte("\n        \"future_field\": true,")...), 1)
+		b := spliceRaw(t, needle, append(bytes.Clone(needle), []byte("\n        \"future_field\": true,")...))
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), `unknown field "future_field"`) {
 			t.Fatalf("error = %v, want unknown error-case field rejection", err)
 		}
@@ -751,10 +752,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("accepted phases must be absent from every other error", func(t *testing.T) {
 		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
-		if got := bytes.Count(raw, needle); got != 1 {
-			t.Fatalf("assignment_unavailable case count = %d, want 1", got)
-		}
-		b := bytes.Replace(raw, needle, append(bytes.Clone(needle), []byte("\n        \"accepted_phases\": [],")...), 1)
+		b := spliceRaw(t, needle, append(bytes.Clone(needle), []byte("\n        \"accepted_phases\": [],")...))
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
 			t.Fatalf("error = %v, want noncanonical accepted_phases rejection", err)
 		}
@@ -762,10 +760,7 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 
 	t.Run("mode-unknown accepted phases cannot be null", func(t *testing.T) {
 		needle := []byte("\"accepted_phases\": [\n          \"initial_assignment\",\n          \"refresh_assignment\"\n        ]")
-		if got := bytes.Count(raw, needle); got != 1 {
-			t.Fatalf("mode-unknown accepted_phases count = %d, want 1", got)
-		}
-		b := bytes.Replace(raw, needle, []byte(`"accepted_phases": null`), 1)
+		b := spliceRaw(t, needle, []byte(`"accepted_phases": null`))
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
 			t.Fatalf("error = %v, want null accepted_phases rejection", err)
 		}
