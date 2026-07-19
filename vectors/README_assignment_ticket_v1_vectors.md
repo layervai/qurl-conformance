@@ -51,15 +51,19 @@ registration obtains the user-entered OTP out of band and carries that OTP with
 the ticket in the single REG call.
 
 `lrt_body_template` composes the complete positive ticket into the exact LRT
-JSON shape. The derived body size and conservative assumed NHP packet size
-prove the fixture stays below the frozen 3856-byte body and 4096-byte packet
-limits.
-`nhp_packet_overhead_bytes=256` is a deliberately conservative envelope
-reservation, not a claim that one current serializer always emits exactly 256
-bytes of framing. With that reservation, the 1521-byte body produces a
-1777-byte assumed packet, leaving 2335 bytes of body headroom and 2319 bytes of
-packet headroom. Any future NHP envelope that can exceed the reservation must
-update this artifact before the larger ticket path ships.
+JSON shape. NHP's nonempty Curve packet uses a 240-byte header and a 16-byte
+body AEAD tag, so `nhp_packet_overhead_bytes=256` and the 4,096-byte packet cap
+leave an exact 3,840-byte plaintext-body maximum. The prior 3,856-byte value
+incorrectly omitted the AEAD tag and is intentionally corrected here.
+
+The positive 1,003-byte ticket produces a 1,521-byte LRT body and a 1,777-byte
+packet. More importantly, the size proof includes the JSON envelope instead of
+comparing the ticket directly to the NHP body limit: the 531-byte template minus
+the 13-byte `${qat1_token}` marker leaves 518 fixed envelope bytes. Substituting
+the contract's maximum 2,304-byte ticket therefore produces at most a 2,822-byte
+body and 3,078-byte packet, leaving 1,018 bytes of body and packet headroom.
+Any change to the template, ticket maximum, Curve header, or body tag must
+recompute all four derived bounds before the larger ticket path ships.
 
 The independent assignment-ticket verifier is deliberately separate from
 exported-SDK coverage: SDK and NHP transport layers carry qat1 opaquely, while

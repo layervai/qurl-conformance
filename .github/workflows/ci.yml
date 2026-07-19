@@ -88,6 +88,7 @@ jobs:
           const t = c.assignmentTicketVectors();
           const u = c.connectorAuthorityLambdaVectors();
           const h = c.connectorHubRequestIdVectors();
+          const hc = c.connectorHubLstCookieVectors();
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
@@ -361,6 +362,10 @@ jobs:
               h.cases.length !== 5 || hubRequestIds.size !== h.cases.length ||
               h.cases.some(v => !deriveHubRequestId(v)) ||
               assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
+              hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
+              hc.contract.proof_flag_hex !== '0004' || hc.contract.http_fallback_allowed !== false ||
+              hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
+              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3078 ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -394,6 +399,7 @@ jobs:
           t = q.assignment_ticket_vectors()
           u = q.connector_authority_lambda_vectors()
           h = q.connector_hub_request_id_vectors()
+          hc = q.connector_hub_lst_cookie_vectors()
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
           def derive_hub_request_id(vector):
@@ -673,6 +679,12 @@ jobs:
           assert len({v['hub_request_id'] for v in h['cases']}) == len(h['cases'])
           assert all(derive_hub_request_id(v) for v in h['cases'])
           assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
+          assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 1
+          assert hc['contract']['proof_flag_hex'] == '0004' and hc['contract']['http_fallback_allowed'] is False
+          hub_cookie_sizes = {v['name']: v for v in hc['size_cases']}
+          assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
+          hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}
+          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3078
           print('py ok')
           PY
 

@@ -1,0 +1,482 @@
+{
+  "artifact": "qurl-connector-hub-lst-cookie-v1-vectors",
+  "schema_version": 1,
+  "description": "Strict native-UDP return-routability challenge for authenticated initial and refresh assignment LST handled by Connector Hub workers. The challenge prevents an unregistered LST from reflecting a larger Authority-backed LRT to an unproven source address.",
+  "source_of_truth": "layervai/qurl-conformance",
+  "contract": {
+    "cookie_algorithm": "HMAC-SHA-256",
+    "cookie_domain_ascii": "nhp-connector-hub-lst-cookie-v1",
+    "cookie_domain_suffix_hex": "00",
+    "cookie_input_framing": "domain_then_00_then_u8_ip_family_then_u32be_length_framed_raw_ip_and_peer_then_u64be_window",
+    "signing_key_bytes": 32,
+    "cookie_bytes": 32,
+    "cookie_encoding": "base64_std_padded_canonical",
+    "source_ip_encoding": "netip_unmap_then_u8_family_04_or_06_then_u32be_raw_length_then_raw_bytes",
+    "source_port_bound": false,
+    "authenticated_peer_bytes": 32,
+    "window_seconds": 30,
+    "accepted_window_offsets": [
+      0,
+      -1
+    ],
+    "future_window_accepted": false,
+    "signing_key_slots": 2,
+    "active_signing_key_required": true,
+    "previous_signing_key_optional": true,
+    "mint_key_slot": "active_only",
+    "verify_key_window_order": [
+      "active_current",
+      "active_previous_window",
+      "previous_current",
+      "previous_previous_window"
+    ],
+    "cookie_key_id_on_wire": false,
+    "request_header_name": "NHP_LST",
+    "request_header_type": 5,
+    "challenge_header_name": "NHP_COK",
+    "challenge_header_type": 7,
+    "challenge_compressed": false,
+    "challenge_size_rule": "sealed_cok_packet_bytes_strictly_less_than_received_lst_packet_bytes",
+    "success_header_name": "NHP_LRT",
+    "success_header_type": 6,
+    "unproven_header_flags_hex": "0000",
+    "proof_flag_name": "NHP_FLAG_HUB_LST_COOKIE_PROOF",
+    "proof_flag_hex": "0004",
+    "proof_flag_exclusive": true,
+    "proof_header_digest": "BLAKE2s-256(initial_hash || hub_server_static_public_key || header[0:208] || raw_cookie)",
+    "proof_cookie_digest_input": "raw_32_bytes",
+    "proof_header_freshness_rule": "fresh_ephemeral_timestamp_and_counter",
+    "proof_body_rule": "byte_identical_to_unproven_authenticated_body",
+    "proof_request_nonce_rule": "same_request_nonce_inside_identical_body",
+    "proof_resend_limit": 1,
+    "second_challenge_action": "stop_without_third_lst_or_fallback",
+    "authority_before_proof_allowed": false,
+    "http_fallback_allowed": false,
+    "request_padding_fallback_allowed": false,
+    "curve_header_bytes": 240,
+    "body_aead_tag_bytes": 16,
+    "empty_body_packet_bytes": 240,
+    "nonempty_packet_overhead_bytes": 256,
+    "max_plaintext_body_bytes": 3840,
+    "max_packet_bytes": 4096,
+    "challenge_max_transaction_id": "18446744073709551615",
+    "challenge_max_body_json": "{\"trxId\":18446744073709551615,\"cookie\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"}",
+    "challenge_max_body_bytes": 86,
+    "challenge_max_packet_bytes": 342
+  },
+  "cookie_kats": [
+    {
+      "name": "ipv4",
+      "signing_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "source_ip": "203.0.113.7",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "window_index": "59472000",
+      "preimage_hex": "6e68702d636f6e6e6563746f722d6875622d6c73742d636f6f6b69652d7631000400000004cb007107000000200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac761400000000038b7880",
+      "cookie_hex": "606fc2b99882d8dc6254d89a8756493c5183d068c07475005127f1adf8ebacb6",
+      "cookie_b64": "YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY="
+    },
+    {
+      "name": "ipv4_mapped",
+      "signing_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "source_ip": "::ffff:203.0.113.7",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "window_index": "59472000",
+      "preimage_hex": "6e68702d636f6e6e6563746f722d6875622d6c73742d636f6f6b69652d7631000400000004cb007107000000200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac761400000000038b7880",
+      "cookie_hex": "606fc2b99882d8dc6254d89a8756493c5183d068c07475005127f1adf8ebacb6",
+      "cookie_b64": "YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=",
+      "equal_to": "ipv4"
+    },
+    {
+      "name": "ipv6",
+      "signing_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "source_ip": "2001:db8::7",
+      "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
+      "window_index": "59472000",
+      "preimage_hex": "6e68702d636f6e6e6563746f722d6875622d6c73742d636f6f6b69652d763100060000001020010db8000000000000000000000007000000200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac761400000000038b7880",
+      "cookie_hex": "da0558a748b79eec892f485a11c3deeedb9041dfecd7d13b15eb37d901323f1d",
+      "cookie_b64": "2gVYp0i3nuyJL0haEcPe7tuQQd/s19E7Fes32QEyPx0="
+    }
+  ],
+  "proof_digest_kat": {
+    "purpose": "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet",
+    "initial_hash_hex": "4e4850206861736867656e20762e32303233303432314064656570636c6f75647364702e636f6d",
+    "hub_server_static_public_key_hex": "4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c",
+    "header_prefix_hex": "c1d2e3f4c1d7e331010000040000000000000000000000173a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe240000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e51c96e754bba5426ed4b5d6cf38cb3c173568c29010c70049925f42dd10c0c1cecf72766c7475288fd5da54d18c2cf7f6656361fcaefc4c25c8f5069da44db732656a2e235c7212",
+    "header_type": 5,
+    "header_flags_hex": "0004",
+    "counter": "23",
+    "timestamp_nanos": "1700000000000002000",
+    "ephemeral_public_key_hex": "3a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe24",
+    "raw_cookie_hex": "606fc2b99882d8dc6254d89a8756493c5183d068c07475005127f1adf8ebacb6",
+    "expected_digest_hex": "7aaa44aaf8f8876973120c8870b761603b6125bbe5322bb7c242fc9ca502efe3"
+  },
+  "flows": [
+    {
+      "phase": "initial_assignment",
+      "unproven_counter": "21",
+      "proof_counter": "23",
+      "unproven_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"request_nonce\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "proof_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"request_nonce\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
+      "request_nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+      "unproven_header_flags_hex": "0000",
+      "proof_header_flags_hex": "0004",
+      "unproven_request_packet_bytes": 493,
+      "challenge_body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "challenge_body_bytes": 68,
+      "challenge_packet_bytes": 324,
+      "proof_request_packet_bytes": 493,
+      "legacy_assignment_fixture_result_packet_bytes": 797,
+      "authority_invocations_before_proof": 0,
+      "authority_invocations_after_proof": 1
+    },
+    {
+      "phase": "refresh_assignment",
+      "unproven_counter": "22",
+      "proof_counter": "24",
+      "unproven_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"request_nonce\":\"wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8\"}}",
+      "proof_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"request_nonce\":\"wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8\"}}",
+      "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
+      "unproven_header_flags_hex": "0000",
+      "proof_header_flags_hex": "0004",
+      "unproven_request_packet_bytes": 437,
+      "challenge_body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "challenge_body_bytes": 68,
+      "challenge_packet_bytes": 324,
+      "proof_request_packet_bytes": 437,
+      "legacy_assignment_fixture_result_packet_bytes": 619,
+      "authority_invocations_before_proof": 0,
+      "authority_invocations_after_proof": 1
+    }
+  ],
+  "size_cases": [
+    {
+      "name": "drop_crypto_valid_empty_body",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "empty",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 0,
+      "received_lst_packet_bytes": 240,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "drop_silently"
+    },
+    {
+      "name": "drop_crypto_valid_smaller_request",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "opaque_fill_85",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 85,
+      "received_lst_packet_bytes": 341,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "drop_silently"
+    },
+    {
+      "name": "drop_crypto_valid_equal_size",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "opaque_fill_86",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 86,
+      "received_lst_packet_bytes": 342,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "drop_silently"
+    },
+    {
+      "name": "allow_real_refresh_size",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "refresh_assignment",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 181,
+      "received_lst_packet_bytes": 437,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "challenge_size_eligible"
+    },
+    {
+      "name": "allow_crypto_valid_malformed_application_size",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "malformed_json_87",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 87,
+      "received_lst_packet_bytes": 343,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "challenge_size_eligible"
+    },
+    {
+      "name": "allow_real_initial_size",
+      "crypto_valid_nhp_framing": true,
+      "application_body_class": "initial_assignment",
+      "challenge_transaction_id": "18446744073709551615",
+      "request_plaintext_body_bytes": 237,
+      "received_lst_packet_bytes": 493,
+      "candidate_cok_packet_bytes": 342,
+      "size_gate_action": "challenge_size_eligible"
+    }
+  ],
+  "assignment_success_sizes": [
+    {
+      "name": "initial_real_qat1_golden",
+      "phase": "initial_assignment",
+      "basis": "assignment_ticket_v1.golden_lrt_envelope",
+      "request_packet_bytes": 493,
+      "result_body_bytes": 1521,
+      "result_packet_bytes": 1777,
+      "amplification_numerator_bytes": 1777,
+      "amplification_denominator_bytes": 493,
+      "legacy_assignment_fixture_packet_bytes": 797
+    },
+    {
+      "name": "initial_max_ticket_envelope",
+      "phase": "initial_assignment",
+      "basis": "assignment_ticket_v1.template_plus_max_ticket",
+      "request_packet_bytes": 493,
+      "result_body_bytes": 2822,
+      "result_packet_bytes": 3078,
+      "amplification_numerator_bytes": 3078,
+      "amplification_denominator_bytes": 493
+    },
+    {
+      "name": "refresh_assignment_golden",
+      "phase": "refresh_assignment",
+      "basis": "agent_assignment_golden.refresh_result",
+      "request_packet_bytes": 437,
+      "result_body_bytes": 363,
+      "result_packet_bytes": 619,
+      "amplification_numerator_bytes": 619,
+      "amplification_denominator_bytes": 437,
+      "legacy_assignment_fixture_packet_bytes": 619
+    }
+  ],
+  "key_cases": [
+    {
+      "name": "accept_active_current",
+      "active_key_present": true,
+      "previous_key_present": false,
+      "cookie_key_slot": "active",
+      "window_offset": 0,
+      "outcome": "accept",
+      "server_action": "continue_strict_request_validation"
+    },
+    {
+      "name": "accept_active_previous_window",
+      "active_key_present": true,
+      "previous_key_present": false,
+      "cookie_key_slot": "active",
+      "window_offset": -1,
+      "outcome": "accept",
+      "server_action": "continue_strict_request_validation"
+    },
+    {
+      "name": "accept_previous_current",
+      "active_key_present": true,
+      "previous_key_present": true,
+      "cookie_key_slot": "previous",
+      "window_offset": 0,
+      "outcome": "accept",
+      "server_action": "continue_strict_request_validation"
+    },
+    {
+      "name": "accept_previous_previous_window",
+      "active_key_present": true,
+      "previous_key_present": true,
+      "cookie_key_slot": "previous",
+      "window_offset": -1,
+      "outcome": "accept",
+      "server_action": "continue_strict_request_validation"
+    },
+    {
+      "name": "reject_previous_without_active",
+      "active_key_present": false,
+      "previous_key_present": true,
+      "cookie_key_slot": "previous",
+      "window_offset": 0,
+      "outcome": "reject",
+      "server_action": "drop_silently"
+    }
+  ],
+  "reject_cases": [
+    {
+      "name": "unproven_header_or_framing_invalid",
+      "stage": "unproven_request",
+      "mutation": "invalid_nhp_header_or_packet_framing",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "unproven_static_decrypt_failed",
+      "stage": "unproven_request",
+      "mutation": "initiator_static_key_decrypt_failed",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "unproven_body_aead_failed",
+      "stage": "unproven_request",
+      "mutation": "application_body_aead_open_failed",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_malformed_initial_body",
+      "stage": "proof_request",
+      "mutation": "malformed_initial_assignment_body",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_malformed_refresh_body",
+      "stage": "proof_request",
+      "mutation": "malformed_refresh_assignment_body",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_wrong_source_ip",
+      "stage": "proof_request",
+      "mutation": "cookie_bound_to_different_source_ip",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_wrong_peer",
+      "stage": "proof_request",
+      "mutation": "cookie_bound_to_different_authenticated_peer",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_expired_window",
+      "stage": "proof_request",
+      "mutation": "cookie_from_window_minus_2",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_future_window",
+      "stage": "proof_request",
+      "mutation": "cookie_from_window_plus_1",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_wrong_flag",
+      "stage": "proof_request",
+      "mutation": "proof_flag_missing_or_combined_with_another_flag",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_rkn_cookie_transplant",
+      "stage": "proof_request",
+      "mutation": "cookie_from_nhp_overload_cookie_v1_domain",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "replayed_proof_packet",
+      "stage": "proof_request",
+      "mutation": "exact_authenticated_packet_replay",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    },
+    {
+      "name": "proof_wrong_phase",
+      "stage": "proof_request",
+      "mutation": "proof_flag_on_non_assignment_lst",
+      "outcome": "reject",
+      "server_action": "drop_silently",
+      "authority_invocations": 0
+    }
+  ],
+  "challenge_cases": [
+    {
+      "name": "accept_initial_challenge",
+      "stage": "challenge_reply",
+      "mutation": "none_initial",
+      "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "accept",
+      "client_action": "send_one_fresh_proof_lst"
+    },
+    {
+      "name": "accept_refresh_challenge",
+      "stage": "challenge_reply",
+      "mutation": "none_refresh",
+      "body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "accept",
+      "client_action": "send_one_fresh_proof_lst"
+    },
+    {
+      "name": "reject_malformed_body",
+      "stage": "challenge_reply",
+      "mutation": "malformed_json",
+      "body_json": "{\"trxId\":21",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_unknown_field",
+      "stage": "challenge_reply",
+      "mutation": "unknown_field",
+      "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\",\"future\":true}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_duplicate_field",
+      "stage": "challenge_reply",
+      "mutation": "duplicate_trx_id",
+      "body_json": "{\"trxId\":21,\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_wrong_transaction",
+      "stage": "challenge_reply",
+      "mutation": "trx_id_not_equal_unproven_lst_counter",
+      "body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_cookie_encoding",
+      "stage": "challenge_reply",
+      "mutation": "cookie_not_canonical_padded_base64",
+      "body_json": "{\"trxId\":21,\"cookie\":\"***\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_cookie_length",
+      "stage": "challenge_reply",
+      "mutation": "decoded_cookie_not_32_bytes",
+      "body_json": "{\"trxId\":21,\"cookie\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_untrusted_server",
+      "stage": "challenge_reply",
+      "mutation": "cok_not_authenticated_by_pinned_hub_key",
+      "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    },
+    {
+      "name": "reject_second_challenge",
+      "stage": "proof_reply",
+      "mutation": "authenticated_cok_after_proof_lst",
+      "body_json": "{\"trxId\":23,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
+      "outcome": "reject",
+      "client_action": "stop_without_third_lst_or_fallback"
+    }
+  ]
+}

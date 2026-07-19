@@ -29,7 +29,8 @@
     "./agent_api_key_id_vectors.json": "./vectors/agent_api_key_id_vectors.json",
     "./assignment_ticket_v1_vectors.json": "./vectors/assignment_ticket_v1_vectors.json",
     "./connector_authority_lambda_v1_vectors.json": "./vectors/connector_authority_lambda_v1_vectors.json",
-    "./connector_hub_request_id_v1_vectors.json": "./vectors/connector_hub_request_id_v1_vectors.json"
+    "./connector_hub_request_id_v1_vectors.json": "./vectors/connector_hub_request_id_v1_vectors.json",
+    "./connector_hub_lst_cookie_v1_vectors.json": "./vectors/connector_hub_lst_cookie_v1_vectors.json"
   },
   "repository": {
     "type": "git",

@@ -20,7 +20,7 @@
     "agent_public_key_characters": 44,
     "max_lifetime_seconds": 900,
     "not_before_offset_seconds": -30,
-    "nhp_body_max_bytes": 3856,
+    "nhp_body_max_bytes": 3840,
     "nhp_packet_max_bytes": 4096,
     "claim_order": [
       "v",

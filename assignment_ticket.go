@@ -21,6 +21,11 @@ const (
 	// AssignmentTicketSyntheticCredentialBytes is the byte length of the fixed
 	// ASCII test credential committed in the golden artifact.
 	AssignmentTicketSyntheticCredentialBytes = 51
+
+	assignmentTicketNHPPacketOverheadBytes        = 256
+	assignmentTicketLRTEnvelopeWithoutTicketBytes = 518
+	assignmentTicketMaxLRTBodyBytes               = 2822
+	assignmentTicketMaxLRTPacketBytes             = 3078
 )
 
 // AssignmentTicketFile freezes the byte-level qat1 signing profile, the three
@@ -341,7 +346,7 @@ func validateAssignmentTicketContract(c AssignmentTicketContract) error {
 		c.RawSignatureBytes != 64 || c.SignaturePartCharacters != 86 || c.MaxKIDCharacters != 64 ||
 		c.DigestCharacters != 43 || c.AgentPublicKeyCharacters != 44 ||
 		c.MaxLifetimeSeconds != 900 || c.NotBeforeOffsetSeconds != -30 ||
-		c.NHPBodyMaxBytes != 3856 || c.NHPPacketMaxBytes != 4096 ||
+		c.NHPBodyMaxBytes != 3840 || c.NHPPacketMaxBytes != 4096 ||
 		!slices.Equal(c.ClaimOrder, assignmentTicketClaimOrder) ||
 		!slices.Equal(c.CredentialKinds, assignmentTicketCredentialKinds) ||
 		!slices.Equal(c.PlacementModes, assignmentTicketPlacementModes) {
@@ -417,13 +422,21 @@ func validateAssignmentTicketGolden(g AssignmentTicketGolden, contract Assignmen
 		g.JTIRandomHex != "000102030405060708090a0b0c0d0e0f" || len(g.SyntheticECDSANonceHex) != 64 ||
 		len(g.SyntheticCredential) != AssignmentTicketSyntheticCredentialBytes ||
 		g.TicketMarker != "${qat1_token}" || strings.Count(g.LRTBodyTemplate, g.TicketMarker) != 1 ||
-		g.NHPPacketOverheadBytes != 256 || g.LRTBodyBytes < 1 || g.LRTBodyBytes > contract.NHPBodyMaxBytes ||
+		g.NHPPacketOverheadBytes != assignmentTicketNHPPacketOverheadBytes || g.LRTBodyBytes < 1 || g.LRTBodyBytes > contract.NHPBodyMaxBytes ||
 		g.CompleteNHPPacketBytes < 1 || g.CompleteNHPPacketBytes > contract.NHPPacketMaxBytes {
 		return errors.New("conformance: assignment-ticket golden envelope or NHP budget is invalid")
 	}
 	lrtBody := strings.Replace(g.LRTBodyTemplate, g.TicketMarker, g.Token, 1)
 	if len(lrtBody) != g.LRTBodyBytes || len(lrtBody)+g.NHPPacketOverheadBytes != g.CompleteNHPPacketBytes {
 		return errors.New("conformance: assignment-ticket golden NHP budget derivation disagrees")
+	}
+	envelopeWithoutTicket := len(g.LRTBodyTemplate) - len(g.TicketMarker)
+	maxLRTBody := envelopeWithoutTicket + contract.MaxTicketASCIIBytes
+	maxLRTPacket := maxLRTBody + g.NHPPacketOverheadBytes
+	if envelopeWithoutTicket != assignmentTicketLRTEnvelopeWithoutTicketBytes ||
+		maxLRTBody != assignmentTicketMaxLRTBodyBytes || maxLRTPacket != assignmentTicketMaxLRTPacketBytes ||
+		maxLRTBody > contract.NHPBodyMaxBytes || maxLRTPacket > contract.NHPPacketMaxBytes {
+		return errors.New("conformance: assignment-ticket maximum LRT envelope budget disagrees")
 	}
 	for _, value := range []string{g.SigningPreimageHex, g.SigningDigestHex, g.KMSSignatureDERHex, g.RawLowSSignatureHex} {
 		if _, err := hex.DecodeString(value); err != nil {

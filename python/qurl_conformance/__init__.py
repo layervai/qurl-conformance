@@ -60,3 +60,8 @@ def connector_authority_lambda_vectors():
 def connector_hub_request_id_vectors():
     """Return the parsed connector_hub_request_id_v1_vectors.json."""
     return _load("connector_hub_request_id_v1_vectors.json")
+
+
+def connector_hub_lst_cookie_vectors():
+    """Return the parsed connector_hub_lst_cookie_v1_vectors.json."""
+    return _load("connector_hub_lst_cookie_v1_vectors.json")
