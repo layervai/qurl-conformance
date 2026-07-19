@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.7.0...npm-v0.8.0) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** pin mode-unknown assignment response phases ([#50](https://github.com/layervai/qurl-conformance/issues/50))
+
+### Features
+
+* **vectors:** pin mode-unknown assignment response phases ([#50](https://github.com/layervai/qurl-conformance/issues/50)) ([4feae03](https://github.com/layervai/qurl-conformance/commit/4feae037b15a1e529a8969d8d1d9d7f48370adce))
+
 ## [0.7.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.6.1...npm-v0.7.0) (2026-07-19)
 
 
