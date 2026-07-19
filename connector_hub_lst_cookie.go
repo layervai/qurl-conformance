@@ -347,16 +347,24 @@ func ParseConnectorHubLSTCookieFile(data []byte) (*ConnectorHubLSTCookieFile, er
 	if err := validateConnectorHubLSTCookieKATs(file.CookieKATs); err != nil {
 		return nil, err
 	}
-	if err := validateConnectorHubLSTProofDigestKAT(file.ProofDigestKAT, file.CookieKATs); err != nil {
+	assignment, err := AgentAssignmentGolden()
+	if err != nil {
+		return nil, fmt.Errorf("conformance: load Connector Hub assignment linkage: %w", err)
+	}
+	ticket, err := AssignmentTicket()
+	if err != nil {
+		return nil, fmt.Errorf("conformance: load Connector Hub ticket linkage: %w", err)
+	}
+	if err := validateConnectorHubLSTProofDigestKAT(file.ProofDigestKAT, file.CookieKATs, assignment); err != nil {
 		return nil, err
 	}
-	if err := validateConnectorHubLSTCookieFlows(file.Flows, file.CookieKATs[0]); err != nil {
+	if err := validateConnectorHubLSTCookieFlows(file.Flows, file.CookieKATs[0], assignment); err != nil {
 		return nil, err
 	}
 	if err := validateConnectorHubLSTCookieSizes(file.SizeCases, file.Contract); err != nil {
 		return nil, err
 	}
-	if err := validateConnectorHubAssignmentSuccessSizes(file.SuccessSizes); err != nil {
+	if err := validateConnectorHubAssignmentSuccessSizes(file.SuccessSizes, assignment, ticket); err != nil {
 		return nil, err
 	}
 	if err := validateConnectorHubLSTCookieKeyCases(file.KeyCases); err != nil {
@@ -457,11 +465,7 @@ func validateConnectorHubLSTCookieKATs(kats []ConnectorHubLSTCookieKAT) error {
 	return nil
 }
 
-func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, cookieKATs []ConnectorHubLSTCookieKAT) error {
-	assignment, err := AgentAssignmentGolden()
-	if err != nil {
-		return fmt.Errorf("conformance: load proof-digest assignment linkage: %w", err)
-	}
+func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, cookieKATs []ConnectorHubLSTCookieKAT, assignment *AgentAssignmentFile) error {
 	initialHash := []byte("NHP hashgen v.20230421@deepcloudsdp.com")
 	hubKey, err := hex.DecodeString(kat.HubServerStaticPublicKeyHex)
 	if err != nil || hex.EncodeToString(hubKey) != kat.HubServerStaticPublicKeyHex || len(hubKey) != 32 ||
@@ -520,13 +524,9 @@ func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, co
 	return nil
 }
 
-func validateConnectorHubLSTCookieFlows(flows []ConnectorHubLSTCookieFlow, kat ConnectorHubLSTCookieKAT) error {
+func validateConnectorHubLSTCookieFlows(flows []ConnectorHubLSTCookieFlow, kat ConnectorHubLSTCookieKAT, assignment *AgentAssignmentFile) error {
 	if len(flows) != 2 {
 		return fmt.Errorf("conformance: Connector Hub LST cookie flow count = %d, want 2", len(flows))
-	}
-	assignment, err := AgentAssignmentGolden()
-	if err != nil {
-		return fmt.Errorf("conformance: load assignment linkage: %w", err)
 	}
 	want := map[string]struct {
 		exchange AgentAssignmentExchange
@@ -611,15 +611,7 @@ func validateConnectorHubLSTCookieSizes(cases []ConnectorHubLSTCookieSizeCase, c
 	return nil
 }
 
-func validateConnectorHubAssignmentSuccessSizes(cases []ConnectorHubAssignmentSuccessSize) error {
-	assignment, err := AgentAssignmentGolden()
-	if err != nil {
-		return fmt.Errorf("conformance: load assignment success-size linkage: %w", err)
-	}
-	ticket, err := AssignmentTicket()
-	if err != nil {
-		return fmt.Errorf("conformance: load ticket success-size linkage: %w", err)
-	}
+func validateConnectorHubAssignmentSuccessSizes(cases []ConnectorHubAssignmentSuccessSize, assignment *AgentAssignmentFile, ticket *AssignmentTicketFile) error {
 	initialRequestBytes := len(assignment.InitialAssignment.Request.PacketHex) / 2
 	refreshRequestBytes := len(assignment.RefreshAssignment.Request.PacketHex) / 2
 	refreshBodyBytes := len(assignment.RefreshAssignment.Result.BodyJSON)
