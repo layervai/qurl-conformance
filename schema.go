@@ -917,14 +917,17 @@ type AgentAssignmentErrorRules struct {
 }
 
 type AgentAssignmentErrorCase struct {
-	Name              string `json:"name"`
-	Phase             string `json:"phase"`
-	HeaderName        string `json:"header_name"`
-	HeaderType        int    `json:"header_type"`
-	BodyJSON          string `json:"body_json"`
-	ErrCode           string `json:"err_code"`
-	Outcome           string `json:"outcome"`
-	RetryAfterSeconds *int   `json:"retry_after_seconds,omitempty"`
+	Name  string `json:"name"`
+	Phase string `json:"phase"`
+	// AcceptedPhases names concrete request exchanges when this error is valid
+	// before the producer can identify a single mode. It is otherwise omitted.
+	AcceptedPhases    []string `json:"accepted_phases,omitempty"`
+	HeaderName        string   `json:"header_name"`
+	HeaderType        int      `json:"header_type"`
+	BodyJSON          string   `json:"body_json"`
+	ErrCode           string   `json:"err_code"`
+	Outcome           string   `json:"outcome"`
+	RetryAfterSeconds *int     `json:"retry_after_seconds,omitempty"`
 }
 
 type AgentAssignmentMalformedCase struct {
@@ -1064,8 +1067,8 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		return nil, fmt.Errorf("conformance: agent-assignment file has artifact %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 3 {
-		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 3", af.SchemaVersion)
+	if af.SchemaVersion != 4 {
+		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 4", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
 		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
@@ -1996,6 +1999,7 @@ type agentAssignmentExpectedError struct {
 	outcome        string
 	retryPermitted bool
 	retryRequired  bool
+	acceptedPhases []string
 }
 
 var (
@@ -2005,7 +2009,7 @@ var (
 		"52202": {outcome: "reassignment_required"},
 		"52203": {outcome: "quota_exceeded"},
 		"52204": {outcome: "rate_limited", retryPermitted: true, retryRequired: true},
-		"52205": {outcome: "invalid_request"},
+		"52205": {outcome: "invalid_request", acceptedPhases: []string{"initial_assignment", "refresh_assignment"}},
 	}
 	agentAssignmentInitialCredentialErrors = map[string]agentAssignmentExpectedError{
 		"52106": {outcome: "key_rejected"},
@@ -2149,6 +2153,9 @@ func validateAgentAssignmentErrorCases(group, phase string, cases []AgentAssignm
 		names[c.Name] = struct{}{}
 		if c.Name == "" || c.Phase != phase || c.BodyJSON == "" || c.Outcome != want.outcome {
 			return fmt.Errorf("conformance: agent-assignment %s case for %s has invalid name/phase/body/outcome", group, c.ErrCode)
+		}
+		if !slices.Equal(c.AcceptedPhases, want.acceptedPhases) {
+			return fmt.Errorf("conformance: agent-assignment %s case %q accepted_phases = %v, want %v", group, c.Name, c.AcceptedPhases, want.acceptedPhases)
 		}
 		if registration {
 			if c.HeaderName != AgentAssignmentRegistrationResultHeaderName || c.HeaderType != AgentAssignmentRegistrationResultHeaderType {

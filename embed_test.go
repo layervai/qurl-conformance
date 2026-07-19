@@ -212,8 +212,8 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 3 {
-		t.Errorf("schema_version = %d, want 3", af.SchemaVersion)
+	if af.SchemaVersion != 4 {
+		t.Errorf("schema_version = %d, want 4", af.SchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
 		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
@@ -440,6 +440,18 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	}
 	if got, want := len(af.ErrorContract.AssignmentCases), 6; got != want {
 		t.Errorf("assignment error case count = %d, want %d", got, want)
+	}
+	var invalidAssignment *AgentAssignmentErrorCase
+	for i := range af.ErrorContract.AssignmentCases {
+		if af.ErrorContract.AssignmentCases[i].ErrCode == "52205" {
+			invalidAssignment = &af.ErrorContract.AssignmentCases[i]
+			break
+		}
+	}
+	if invalidAssignment == nil {
+		t.Error("assignment error contract is missing 52205")
+	} else if want := []string{"initial_assignment", "refresh_assignment"}; !slices.Equal(invalidAssignment.AcceptedPhases, want) {
+		t.Errorf("52205 accepted_phases = %v, want %v", invalidAssignment.AcceptedPhases, want)
 	}
 	if got, want := len(af.ErrorContract.InitialCredentialCases), 4; got != want {
 		t.Errorf("initial credential error case count = %d, want %d", got, want)
@@ -712,6 +724,21 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		})
 		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "fields drifted") {
 			t.Fatalf("error = %v, want success-result classifier rejection", err)
+		}
+	})
+
+	t.Run("mode-unknown response phase acceptance drift", func(t *testing.T) {
+		b := mutate(t, func(doc *AgentAssignmentFile) {
+			for i := range doc.ErrorContract.AssignmentCases {
+				if doc.ErrorContract.AssignmentCases[i].ErrCode == "52205" {
+					doc.ErrorContract.AssignmentCases[i].AcceptedPhases = []string{"initial_assignment"}
+					return
+				}
+			}
+			t.Fatal("missing 52205 fixture")
+		})
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+			t.Fatalf("error = %v, want accepted_phases rejection", err)
 		}
 	})
 
