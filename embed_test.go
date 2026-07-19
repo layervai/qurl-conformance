@@ -742,6 +742,28 @@ func TestParseAgentAssignmentFileFailsClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("accepted phases must be absent from every other error", func(t *testing.T) {
+		needle := []byte("\"name\": \"assignment_unavailable\",\n        \"phase\": \"cell_assignment\",")
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("assignment_unavailable case count = %d, want 1", got)
+		}
+		b := bytes.Replace(raw, needle, append(bytes.Clone(needle), []byte("\n        \"accepted_phases\": [],")...), 1)
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+			t.Fatalf("error = %v, want noncanonical accepted_phases rejection", err)
+		}
+	})
+
+	t.Run("mode-unknown accepted phases cannot be null", func(t *testing.T) {
+		needle := []byte("\"accepted_phases\": [\n          \"initial_assignment\",\n          \"refresh_assignment\"\n        ]")
+		if got := bytes.Count(raw, needle); got != 1 {
+			t.Fatalf("mode-unknown accepted_phases count = %d, want 1", got)
+		}
+		b := bytes.Replace(raw, needle, []byte(`"accepted_phases": null`), 1)
+		if _, err := ParseAgentAssignmentFile(b); err == nil || !strings.Contains(err.Error(), "accepted_phases") {
+			t.Fatalf("error = %v, want null accepted_phases rejection", err)
+		}
+	})
+
 	t.Run("case-insensitive request alias", func(t *testing.T) {
 		b := mutate(t, func(doc *AgentAssignmentFile) {
 			body := strings.Replace(doc.InitialAssignment.Request.BodyJSON, `"devId":`, `"devID":`, 1)

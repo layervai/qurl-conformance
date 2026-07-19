@@ -928,6 +928,25 @@ type AgentAssignmentErrorCase struct {
 	ErrCode           string   `json:"err_code"`
 	Outcome           string   `json:"outcome"`
 	RetryAfterSeconds *int     `json:"retry_after_seconds,omitempty"`
+	acceptedPhasesSet bool
+}
+
+// UnmarshalJSON preserves whether accepted_phases was present so strict
+// validation can distinguish the canonical omission from [] or null. A slice
+// alone cannot represent that wire distinction.
+func (c *AgentAssignmentErrorCase) UnmarshalJSON(data []byte) error {
+	type wire AgentAssignmentErrorCase
+	var decoded wire
+	if err := strictDecodeArtifact(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*c = AgentAssignmentErrorCase(decoded)
+	_, c.acceptedPhasesSet = fields["accepted_phases"]
+	return nil
 }
 
 type AgentAssignmentMalformedCase struct {
@@ -2154,7 +2173,7 @@ func validateAgentAssignmentErrorCases(group, phase string, cases []AgentAssignm
 		if c.Name == "" || c.Phase != phase || c.BodyJSON == "" || c.Outcome != want.outcome {
 			return fmt.Errorf("conformance: agent-assignment %s case for %s has invalid name/phase/body/outcome", group, c.ErrCode)
 		}
-		if !slices.Equal(c.AcceptedPhases, want.acceptedPhases) {
+		if c.acceptedPhasesSet != (want.acceptedPhases != nil) || !slices.Equal(c.AcceptedPhases, want.acceptedPhases) {
 			return fmt.Errorf("conformance: agent-assignment %s case %q accepted_phases = %v, want %v", group, c.Name, c.AcceptedPhases, want.acceptedPhases)
 		}
 		if registration {
