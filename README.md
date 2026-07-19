@@ -5,8 +5,9 @@ vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
-control-plane API-key IDs, private Connector Authority invocations, and private
-Connector Hub replay identifiers decoupled by layer.
+control-plane API-key IDs, private Connector Authority invocations, private
+Connector Hub replay identifiers, and Hub LST return-routability cookies
+decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -36,6 +37,8 @@ trust.
 | `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
 | `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
 | `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
+| `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, initial/refresh flows, amplification bounds, and closed rejects |
+| `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -55,6 +58,7 @@ ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-k
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
 ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
 hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
+hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -73,7 +77,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts ten artifact families, each under its own `artifact` id:
+This module hosts eleven artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -269,6 +273,15 @@ This module hosts ten artifact families, each under its own `artifact` id:
   reach the Authority under the same operation-scoped ID and fail its semantic
   fingerprint check. See
   `vectors/README_connector_hub_request_id_v1_vectors.md`.
+- **Connector Hub LST return-routability cookie v1**
+  (`qurl-connector-hub-lst-cookie-v1-vectors`,
+  `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing,
+  the Hub-LST-only `0x0004` proof flag and digest input, initial and refresh
+  flows, strict zero-flag COK parsing (including terminal compressed and
+  unknown-flag rejects), dynamic no-amplification bounds, and silent
+  pre-Authority rejects. It neither changes nor reuses the existing overload
+  KNK/RKN cookie domain. See
+  `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

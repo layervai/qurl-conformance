@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -20,6 +20,7 @@ const (
 	assignmentTicketName      = "vectors/assignment_ticket_v1_vectors.json"
 	connectorAuthorityName    = "vectors/connector_authority_lambda_v1_vectors.json"
 	connectorHubRequestIDName = "vectors/connector_hub_request_id_v1_vectors.json"
+	connectorHubLSTCookieName = "vectors/connector_hub_lst_cookie_v1_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -147,6 +148,16 @@ func ConnectorHubRequestIDVectors() []byte {
 	return b
 }
 
+// ConnectorHubLSTCookieVectors returns the Hub assignment return-routability
+// challenge and proof contract.
+func ConnectorHubLSTCookieVectors() []byte {
+	b, err := vectorsFS.ReadFile(connectorHubLSTCookieName)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorHubLSTCookieName, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -174,6 +185,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(connectorAuthorityName)
 	case connectorHubRequestIDName, "connector_hub_request_id_v1_vectors.json":
 		return vectorsFS.ReadFile(connectorHubRequestIDName)
+	case connectorHubLSTCookieName, "connector_hub_lst_cookie_v1_vectors.json":
+		return vectorsFS.ReadFile(connectorHubLSTCookieName)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -244,4 +257,10 @@ func ConnectorAuthorityLambda() (*ConnectorAuthorityLambdaFile, error) {
 // derivation artifact.
 func ConnectorHubRequestID() (*ConnectorHubRequestIDFile, error) {
 	return ParseConnectorHubRequestIDFile(ConnectorHubRequestIDVectors())
+}
+
+// ConnectorHubLSTCookie strictly parses the Hub assignment
+// return-routability challenge artifact.
+func ConnectorHubLSTCookie() (*ConnectorHubLSTCookieFile, error) {
+	return ParseConnectorHubLSTCookieFile(ConnectorHubLSTCookieVectors())
 }

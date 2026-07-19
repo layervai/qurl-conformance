@@ -37,6 +37,23 @@ func TestEmbeddedAssignmentTicketLoads(t *testing.T) {
 	}
 }
 
+func TestAssignmentTicketMaximumLRTEnvelopeIncludesJSONOverhead(t *testing.T) {
+	af, err := AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelopeWithoutTicket := len(af.Golden.LRTBodyTemplate) - len(af.Golden.TicketMarker)
+	maxBody := envelopeWithoutTicket + af.Contract.MaxTicketASCIIBytes
+	maxPacket := maxBody + af.Golden.NHPPacketOverheadBytes
+	if af.Contract.NHPBodyMaxBytes != 3840 || envelopeWithoutTicket != 518 || maxBody != 2822 || maxPacket != 3078 {
+		t.Fatalf("NHP/LRT budget = body-max:%d envelope:%d max-body:%d max-packet:%d, want 3840/518/2822/3078",
+			af.Contract.NHPBodyMaxBytes, envelopeWithoutTicket, maxBody, maxPacket)
+	}
+	if maxBody > af.Contract.NHPBodyMaxBytes || maxPacket > af.Contract.NHPPacketMaxBytes {
+		t.Fatal("maximum ticket plus exact LRT JSON envelope exceeds NHP packet budget")
+	}
+}
+
 func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 	raw := AssignmentTicketVectors()
 	mutate := func(t *testing.T, change func(*AssignmentTicketFile)) []byte {
