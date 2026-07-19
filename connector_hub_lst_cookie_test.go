@@ -39,6 +39,19 @@ func TestEmbeddedConnectorHubLSTCookieLoads(t *testing.T) {
 	}
 }
 
+func TestConnectorHubLSTCookieAssignmentNarrativeConsistent(t *testing.T) {
+	assignment, err := AgentAssignmentGolden()
+	if err != nil {
+		t.Fatal(err)
+	}
+	notes := strings.Join(assignment.Notes, "\n")
+	if strings.Contains(notes, "LST/LRT never uses NHP_COK") ||
+		!strings.Contains(notes, "Connector Hub assignment profile") ||
+		!strings.Contains(notes, ConnectorHubLSTCookieArtifactID) {
+		t.Fatal("assignment golden does not distinguish the Hub return-routability COK profile")
+	}
+}
+
 func TestConnectorHubLSTCookieAddressCanonicalization(t *testing.T) {
 	file, err := ConnectorHubLSTCookie()
 	if err != nil {
