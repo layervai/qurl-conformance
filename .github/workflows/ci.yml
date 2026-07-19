@@ -78,6 +78,7 @@ jobs:
         run: |
           node <<'NODE'
           const crypto = require('node:crypto');
+          const net = require('node:net');
           const c = require('./npm');
           const r = c.relayKnockVectors();
           const a = c.agentRegistrationVectors();
@@ -107,6 +108,43 @@ jobs:
             ]);
             if (preimage.toString('hex') !== vector.preimage_hex) return false;
             return crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
+          };
+          const rawHubCookieIp = source => {
+            const unmapped = source.startsWith('::ffff:') ? source.slice(7) : source;
+            if (net.isIPv4(unmapped)) {
+              return {family: 4, raw: Buffer.from(unmapped.split('.').map(Number))};
+            }
+            if (!net.isIPv6(unmapped)) return null;
+            const halves = unmapped.split('::');
+            if (halves.length > 2) return null;
+            const left = halves[0] ? halves[0].split(':') : [];
+            const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+            const zeroes = 8 - left.length - right.length;
+            if (zeroes < 0 || (halves.length === 1 && zeroes !== 0)) return null;
+            const words = [...left, ...Array(zeroes).fill('0'), ...right];
+            const raw = Buffer.alloc(16);
+            words.forEach((word, index) => raw.writeUInt16BE(Number.parseInt(word, 16), index * 2));
+            return {family: 6, raw};
+          };
+          const deriveHubLstCookie = vector => {
+            const ip = rawHubCookieIp(vector.source_ip);
+            if (!ip) return false;
+            const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
+            const rawLength = Buffer.alloc(4);
+            rawLength.writeUInt32BE(ip.raw.length);
+            const peerLength = Buffer.alloc(4);
+            peerLength.writeUInt32BE(peer.length);
+            const window = Buffer.alloc(8);
+            window.writeBigUInt64BE(BigInt(vector.window_index));
+            const preimage = Buffer.concat([
+              Buffer.from(`${hc.contract.cookie_domain_ascii}\0`, 'ascii'),
+              Buffer.from([ip.family]), rawLength, ip.raw,
+              peerLength, peer, window,
+            ]);
+            if (preimage.toString('hex') !== vector.preimage_hex) return false;
+            const cookie = crypto.createHmac('sha256', Buffer.from(vector.signing_key_hex, 'hex'))
+              .update(preimage).digest();
+            return cookie.toString('hex') === vector.cookie_hex && cookie.toString('base64') === vector.cookie_b64;
           };
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const authorityRequests = Object.fromEntries(
@@ -385,6 +423,7 @@ jobs:
               hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
               hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
               hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
+              hc.cookie_kats.some(vector => !deriveHubLstCookie(vector)) ||
               ['reject_compressed_challenge', 'reject_unknown_flag_challenge'].some(name =>
                 hubCookieChallenges[name]?.outcome !== 'reject' ||
                 hubCookieChallenges[name]?.client_action !== 'stop_without_third_lst_or_fallback'
@@ -408,6 +447,8 @@ jobs:
           python3 <<'PY'
           import base64
           import hashlib
+          import hmac
+          import ipaddress
           import json
           import re
           import struct
@@ -438,6 +479,23 @@ jobs:
                   hub_frame(4, nonce),
               ))
               return preimage.hex() == vector['preimage_hex'] and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
+          def derive_hub_lst_cookie(vector):
+              address = ipaddress.ip_address(vector['source_ip'])
+              if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+                  address = address.ipv4_mapped
+              raw_ip = address.packed
+              family = b'\x04' if address.version == 4 else b'\x06'
+              peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
+              preimage = b''.join((
+                  hc['contract']['cookie_domain_ascii'].encode('ascii'), b'\0', family,
+                  struct.pack('>I', len(raw_ip)), raw_ip,
+                  struct.pack('>I', len(peer)), peer,
+                  struct.pack('>Q', int(vector['window_index'])),
+              ))
+              if preimage.hex() != vector['preimage_hex']:
+                  return False
+              cookie = hmac.new(bytes.fromhex(vector['signing_key_hex']), preimage, hashlib.sha256).digest()
+              return cookie.hex() == vector['cookie_hex'] and base64.b64encode(cookie).decode('ascii') == vector['cookie_b64']
           authority_requests = {
               name: json.loads(operation['request_golden']['body_json'])
               for name, operation in u['operations'].items()
@@ -723,6 +781,7 @@ jobs:
           assert hc['contract']['proof_flag_hex'] == '0004'
           assert hc['contract']['challenge_header_flags_hex'] == '0000'
           assert hc['contract']['http_fallback_allowed'] is False
+          assert all(derive_hub_lst_cookie(vector) for vector in hc['cookie_kats'])
           assert len(hc['challenge_cases']) == len(hub_cookie_challenge_flags)
           assert set(hub_cookie_challenges) == set(hub_cookie_challenge_flags)
           assert all(hub_cookie_challenges[name]['header_flags_hex'] == flags for name, flags in hub_cookie_challenge_flags.items())
