@@ -88,10 +88,10 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	}
 	for name, body := range map[string]string{
 		"arm missing pinned cell": removeConnectorAuthorityJSONField(t, operation.AdditionalRequestGoldens[0].BodyJSON, "pinned_cell_id"),
-		"arm same cells":          strings.Replace(operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`, 1),
-		"move carries arm field":  strings.Replace(operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`, 1),
-		"expire carries target":   strings.Replace(operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`, 1),
-		"invalid correlation":     strings.Replace(operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64), 1),
+		"arm same cells":          replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`),
+		"move carries arm field":  replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`),
+		"expire carries target":   replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`),
+		"invalid correlation":     replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64)),
 	} {
 		t.Run("reject "+name, func(t *testing.T) {
 			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
@@ -101,13 +101,13 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	}
 
 	for name, body := range map[string]string{
-		"missing discriminator": strings.Replace(operation.SuccessGolden.BodyJSON, `"mutation":"move",`, "", 1),
-		"mixed union": strings.Replace(operation.SuccessGolden.BodyJSON,
-			`"new_assignment_generation":8,`, `"new_assignment_generation":8,"lease_seconds":60,`, 1),
-		"nonincrementing generation": strings.Replace(operation.SuccessGolden.BodyJSON,
-			`"new_assignment_generation":8`, `"new_assignment_generation":7`, 1),
-		"unknown mutation": strings.Replace(operation.SuccessGolden.BodyJSON,
-			`"mutation":"move"`, `"mutation":"revoke"`, 1),
+		"missing discriminator": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON, `"mutation":"move",`, ""),
+		"mixed union": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8,`, `"new_assignment_generation":8,"lease_seconds":60,`),
+		"nonincrementing generation": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8`, `"new_assignment_generation":7`),
+		"unknown mutation": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"mutation":"move"`, `"mutation":"revoke"`),
 	} {
 		t.Run("reject result "+name, func(t *testing.T) {
 			if _, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
@@ -778,4 +778,18 @@ func removeConnectorAuthorityJSONField(t *testing.T, body, field string) string 
 		t.Fatalf("json.Marshal: %v", err)
 	}
 	return string(encoded)
+}
+
+// replaceConnectorAuthorityGoldenOnce mutates a golden body once, failing the test if the
+// target substring is absent. This turns a stale fixture (a rotated cell id, generation, or
+// changed JSON serialization) into a clear "fixture no longer contains" diagnostic instead of
+// a silent no-op that leaves the unmodified golden valid and surfaces as a confusing
+// "unexpectedly accepted" failure.
+func replaceConnectorAuthorityGoldenOnce(t *testing.T, body, old, new string) string {
+	t.Helper()
+	replaced := strings.Replace(body, old, new, 1)
+	if replaced == body {
+		t.Fatalf("golden body no longer contains %q; update the reject fixture", old)
+	}
+	return replaced
 }

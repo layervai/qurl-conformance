@@ -715,6 +715,24 @@ func connectorAuthorityRequestMembers(operation string) ([]string, error) {
 	}
 }
 
+// connectorAuthorityMutateProofAgentConditionalMembers returns the mutation-specific
+// request members that a MutateProofAgent mutation admits on top of the shared base
+// members, and false when the discriminator is not a frozen union arm. It is the single
+// source of the closed per-mutation union so the member requirer and reject classifier
+// cannot drift apart.
+func connectorAuthorityMutateProofAgentConditionalMembers(mutation string) ([]string, bool) {
+	switch mutation {
+	case "arm":
+		return []string{"pinned_cell_id", "target_cell_id", "lease_seconds"}, true
+	case "move":
+		return []string{"target_cell_id"}, true
+	case "expire_lease":
+		return []string{"lease_seconds"}, true
+	default:
+		return nil, false
+	}
+}
+
 func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error {
 	allowed := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), "pinned_cell_id", "target_cell_id", "lease_seconds")
 	object, err := validateConnectorAuthorityExactObject(data, connectorAuthorityMutateProofAgentRequestMembers, allowed)
@@ -725,17 +743,11 @@ func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error 
 	if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
 		return errors.New("mutation must be a string")
 	}
-	required := slices.Clone(connectorAuthorityMutateProofAgentRequestMembers)
-	switch mutation {
-	case "arm":
-		required = append(required, "pinned_cell_id", "target_cell_id", "lease_seconds")
-	case "move":
-		required = append(required, "target_cell_id")
-	case "expire_lease":
-		required = append(required, "lease_seconds")
-	default:
+	conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+	if !ok {
 		return errors.New("invalid MutateProofAgent mutation")
 	}
+	required := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...)
 	_, err = validateConnectorAuthorityExactObject(data, required, required)
 	return err
 }
@@ -1300,17 +1312,11 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 		if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
 			return "wrong_type"
 		}
-		required = slices.Clone(connectorAuthorityMutateProofAgentRequestMembers)
-		switch mutation {
-		case "arm":
-			required = append(required, "pinned_cell_id", "target_cell_id", "lease_seconds")
-		case "move":
-			required = append(required, "target_cell_id")
-		case "expire_lease":
-			required = append(required, "lease_seconds")
-		default:
+		conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+		if !ok {
 			return ""
 		}
+		required = append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...)
 		if class := classifyConnectorAuthorityObjectFields(object, required, required); class != "" {
 			return class
 		}
