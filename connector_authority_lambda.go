@@ -736,21 +736,29 @@ func connectorAuthorityMutateProofAgentConditionalMembers(mutation string) ([]st
 	}
 }
 
-// connectorAuthorityMutateProofAgentAllConditionalMembers returns the union of every
-// mutation arm's conditional members, in first-seen order. It is the allowed superset for
-// the exact-object shape check, folded over connectorAuthorityMutateProofAgentConditionalMembers
-// so the accepted superset cannot drift from the per-arm required sets it is derived from.
-func connectorAuthorityMutateProofAgentAllConditionalMembers() []string {
+// connectorAuthorityMutateProofAgentMemberUnion folds the members every mutation arm
+// admits into a single first-seen-order union. Parameterizing it by the per-mutation
+// member accessor keeps both the request and result supersets derived from one fold over
+// the same discriminator order, so a new arm cannot slip into one superset but not the other.
+func connectorAuthorityMutateProofAgentMemberUnion(members func(string) ([]string, bool)) []string {
 	union := []string{}
 	for _, mutation := range []string{"arm", "move", "expire_lease"} {
-		conditional, _ := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
-		for _, member := range conditional {
+		arm, _ := members(mutation)
+		for _, member := range arm {
 			if !slices.Contains(union, member) {
 				union = append(union, member)
 			}
 		}
 	}
 	return union
+}
+
+// connectorAuthorityMutateProofAgentAllConditionalMembers returns the union of every
+// mutation arm's conditional members, in first-seen order. It is the allowed superset for
+// the exact-object shape check, folded over connectorAuthorityMutateProofAgentConditionalMembers
+// so the accepted superset cannot drift from the per-arm required sets it is derived from.
+func connectorAuthorityMutateProofAgentAllConditionalMembers() []string {
+	return connectorAuthorityMutateProofAgentMemberUnion(connectorAuthorityMutateProofAgentConditionalMembers)
 }
 
 // connectorAuthorityMutateProofAgentRequiredMembers returns the exact request member
@@ -941,16 +949,7 @@ func connectorAuthorityMutateProofAgentResultMembers(mutation string) ([]string,
 // Folding over connectorAuthorityMutateProofAgentResultMembers keeps the superset from
 // drifting away from the per-arm exact sets it is derived from.
 func connectorAuthorityMutateProofAgentAllResultMembers() []string {
-	union := []string{}
-	for _, mutation := range []string{"arm", "move", "expire_lease"} {
-		members, _ := connectorAuthorityMutateProofAgentResultMembers(mutation)
-		for _, member := range members {
-			if !slices.Contains(union, member) {
-				union = append(union, member)
-			}
-		}
-	}
-	return union
+	return connectorAuthorityMutateProofAgentMemberUnion(connectorAuthorityMutateProofAgentResultMembers)
 }
 
 func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
