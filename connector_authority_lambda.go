@@ -750,6 +750,19 @@ func connectorAuthorityMutateProofAgentAllConditionalMembers() []string {
 	return union
 }
 
+// connectorAuthorityMutateProofAgentRequiredMembers returns the exact request member
+// set for a MutateProofAgent mutation (the shared base plus the arm's conditional
+// members), and false when the discriminator is not a frozen union arm. The member
+// requirer and the reject classifier both derive their required set here so the
+// acceptor and the reject classifier cannot drift apart.
+func connectorAuthorityMutateProofAgentRequiredMembers(mutation string) ([]string, bool) {
+	conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+	if !ok {
+		return nil, false
+	}
+	return append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...), true
+}
+
 func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error {
 	allowed := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
 	object, err := validateConnectorAuthorityExactObject(data, connectorAuthorityMutateProofAgentRequestMembers, allowed)
@@ -760,11 +773,10 @@ func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error 
 	if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
 		return errors.New("mutation must be a string")
 	}
-	conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+	required, ok := connectorAuthorityMutateProofAgentRequiredMembers(mutation)
 	if !ok {
 		return errors.New("invalid MutateProofAgent mutation")
 	}
-	required := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...)
 	_, err = validateConnectorAuthorityExactObject(data, required, required)
 	return err
 }
@@ -904,12 +916,42 @@ func validateConnectorAuthorityResult(operation string, raw []byte) error {
 	}
 }
 
+// connectorAuthorityMutateProofAgentResultMembers returns the exact result member set
+// for a MutateProofAgent mutation, and false when the discriminator is not a frozen
+// union arm. It is the single source of the per-arm result shape so the base superset
+// check and each arm's exact check cannot drift apart.
+func connectorAuthorityMutateProofAgentResultMembers(mutation string) ([]string, bool) {
+	switch mutation {
+	case "arm":
+		return []string{"mutation", "agent_id", "pinned_cell_id", "target_cell_id", "lease_seconds", "grant_correlation_id", "mutated_at"}, true
+	case "move":
+		return []string{"mutation", "agent_id", "previous_cell_id", "previous_assignment_generation", "new_cell_id", "new_assignment_generation", "lease_expires_at", "mutated_at"}, true
+	case "expire_lease":
+		return []string{"mutation", "agent_id", "lease_expires_at", "mutated_at"}, true
+	default:
+		return nil, false
+	}
+}
+
+// connectorAuthorityMutateProofAgentAllResultMembers returns the union of every result
+// arm's members, in first-seen order, as the allowed superset for the base shape check.
+// Folding over connectorAuthorityMutateProofAgentResultMembers keeps the superset from
+// drifting away from the per-arm exact sets it is derived from.
+func connectorAuthorityMutateProofAgentAllResultMembers() []string {
+	union := []string{}
+	for _, mutation := range []string{"arm", "move", "expire_lease"} {
+		members, _ := connectorAuthorityMutateProofAgentResultMembers(mutation)
+		for _, member := range members {
+			if !slices.Contains(union, member) {
+				union = append(union, member)
+			}
+		}
+	}
+	return union
+}
+
 func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
-	base, err := validateConnectorAuthorityExactObject(raw, []string{"mutation", "agent_id"}, []string{
-		"mutation", "agent_id", "pinned_cell_id", "target_cell_id", "lease_seconds",
-		"grant_correlation_id", "previous_cell_id", "previous_assignment_generation",
-		"new_cell_id", "new_assignment_generation", "lease_expires_at", "mutated_at",
-	})
+	base, err := validateConnectorAuthorityExactObject(raw, []string{"mutation", "agent_id"}, connectorAuthorityMutateProofAgentAllResultMembers())
 	if err != nil {
 		return err
 	}
@@ -917,13 +959,15 @@ func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
 	if err := json.Unmarshal(base["mutation"], &mutation); err != nil {
 		return errors.New("mutation result discriminator must be a string")
 	}
+	members, ok := connectorAuthorityMutateProofAgentResultMembers(mutation)
+	if !ok {
+		return fmt.Errorf("unknown MutateProofAgent result mutation %q", mutation)
+	}
+	if _, err := validateConnectorAuthorityExactObject(raw, members, members); err != nil {
+		return err
+	}
 	switch mutation {
 	case "arm":
-		if _, err := validateConnectorAuthorityExactObject(raw,
-			[]string{"mutation", "agent_id", "pinned_cell_id", "target_cell_id", "lease_seconds", "grant_correlation_id", "mutated_at"},
-			[]string{"mutation", "agent_id", "pinned_cell_id", "target_cell_id", "lease_seconds", "grant_correlation_id", "mutated_at"}); err != nil {
-			return err
-		}
 		var result ConnectorAuthorityMutateProofAgentArmResult
 		if err := strictDecodeArtifact(raw, &result); err != nil {
 			return err
@@ -937,11 +981,6 @@ func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
 			return errors.New("invalid MutateProofAgent arm result semantics")
 		}
 	case "move":
-		if _, err := validateConnectorAuthorityExactObject(raw,
-			[]string{"mutation", "agent_id", "previous_cell_id", "previous_assignment_generation", "new_cell_id", "new_assignment_generation", "lease_expires_at", "mutated_at"},
-			[]string{"mutation", "agent_id", "previous_cell_id", "previous_assignment_generation", "new_cell_id", "new_assignment_generation", "lease_expires_at", "mutated_at"}); err != nil {
-			return err
-		}
 		var result ConnectorAuthorityMutateProofAgentMoveResult
 		if err := strictDecodeArtifact(raw, &result); err != nil {
 			return err
@@ -956,11 +995,6 @@ func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
 			return errors.New("invalid MutateProofAgent move result semantics")
 		}
 	case "expire_lease":
-		if _, err := validateConnectorAuthorityExactObject(raw,
-			[]string{"mutation", "agent_id", "lease_expires_at", "mutated_at"},
-			[]string{"mutation", "agent_id", "lease_expires_at", "mutated_at"}); err != nil {
-			return err
-		}
 		var result ConnectorAuthorityMutateProofAgentExpireLeaseResult
 		if err := strictDecodeArtifact(raw, &result); err != nil {
 			return err
@@ -969,8 +1003,6 @@ func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
 			!connectorAuthorityMutationPrecedesLease(result.MutatedAt, result.LeaseExpiresAt) {
 			return errors.New("invalid MutateProofAgent expire_lease result semantics")
 		}
-	default:
-		return fmt.Errorf("unknown MutateProofAgent result mutation %q", mutation)
 	}
 	return nil
 }
@@ -1329,11 +1361,11 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 		if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
 			return "wrong_type"
 		}
-		conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+		conditionalRequired, ok := connectorAuthorityMutateProofAgentRequiredMembers(mutation)
 		if !ok {
 			return ""
 		}
-		required = append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...)
+		required = conditionalRequired
 		if class := classifyConnectorAuthorityObjectFields(object, required, required); class != "" {
 			return class
 		}
