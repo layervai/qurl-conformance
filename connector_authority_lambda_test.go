@@ -95,11 +95,12 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 		t.Fatalf("grant correlation fixture %q does not match the controller contract", file.Fixtures.ProofGrantCorrelationID)
 	}
 	for name, body := range map[string]string{
-		"arm missing pinned cell": removeConnectorAuthorityJSONField(t, operation.AdditionalRequestGoldens[0].BodyJSON, "pinned_cell_id"),
-		"arm same cells":          replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`),
-		"move carries arm field":  replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`),
-		"expire carries target":   replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`),
-		"invalid correlation":     replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64)),
+		"arm missing pinned cell":  removeConnectorAuthorityJSONField(t, operation.AdditionalRequestGoldens[0].BodyJSON, "pinned_cell_id"),
+		"arm same cells":           replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`),
+		"move carries arm field":   replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`),
+		"move carries lease field": replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell1","lease_seconds":60`),
+		"expire carries target":    replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`),
+		"invalid correlation":      replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64)),
 	} {
 		t.Run("reject "+name, func(t *testing.T) {
 			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
@@ -814,9 +815,9 @@ func removeConnectorAuthorityJSONField(t *testing.T, body, field string) string 
 // changed JSON serialization) into a clear "fixture no longer contains" diagnostic instead of
 // a silent no-op that leaves the unmodified golden valid and surfaces as a confusing
 // "unexpectedly accepted" failure.
-func replaceConnectorAuthorityGoldenOnce(t *testing.T, body, old, new string) string {
+func replaceConnectorAuthorityGoldenOnce(t *testing.T, body, old, replacement string) string {
 	t.Helper()
-	replaced := strings.Replace(body, old, new, 1)
+	replaced := strings.Replace(body, old, replacement, 1)
 	if replaced == body {
 		t.Fatalf("golden body no longer contains %q; update the reject fixture", old)
 	}

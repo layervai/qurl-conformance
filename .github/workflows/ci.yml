@@ -155,6 +155,8 @@ jobs:
           );
           const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent'];
           const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration'];
+          // Keep proof-mutation assertions in lockstep with the Python package
+          // smoke below; the deliberate re-encoding catches consumer drift.
           const proofMutationRejectNames = new Set(['reject_unknown_field', 'reject_wrong_type', 'reject_missing_field']);
           const proofMutationRejects = Object.fromEntries(
             u.operations.MutateProofAgent.request_rejects
@@ -579,6 +581,8 @@ jobs:
           }
           global_authority_operations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent']
           cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration']
+          # Keep proof-mutation assertions in lockstep with the JavaScript
+          # package smoke above; the deliberate re-encoding catches consumer drift.
           proof_mutation_rejects = {
               value['name']: json.loads(value['body_json'])
               for value in u['operations']['MutateProofAgent']['request_rejects']

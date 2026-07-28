@@ -1374,7 +1374,7 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 		}
 	}
 	for _, name := range required[1:] {
-		if name == "lease_seconds" {
+		if operation == ConnectorAuthorityOperationMutateProofAgent && name == "lease_seconds" {
 			var seconds int64
 			if len(object[name]) == 0 || json.Unmarshal(object[name], &seconds) != nil {
 				return "wrong_type"
