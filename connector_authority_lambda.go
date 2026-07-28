@@ -733,8 +733,25 @@ func connectorAuthorityMutateProofAgentConditionalMembers(mutation string) ([]st
 	}
 }
 
+// connectorAuthorityMutateProofAgentAllConditionalMembers returns the union of every
+// mutation arm's conditional members, in first-seen order. It is the allowed superset for
+// the exact-object shape check, folded over connectorAuthorityMutateProofAgentConditionalMembers
+// so the accepted superset cannot drift from the per-arm required sets it is derived from.
+func connectorAuthorityMutateProofAgentAllConditionalMembers() []string {
+	union := []string{}
+	for _, mutation := range []string{"arm", "move", "expire_lease"} {
+		conditional, _ := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+		for _, member := range conditional {
+			if !slices.Contains(union, member) {
+				union = append(union, member)
+			}
+		}
+	}
+	return union
+}
+
 func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error {
-	allowed := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), "pinned_cell_id", "target_cell_id", "lease_seconds")
+	allowed := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
 	object, err := validateConnectorAuthorityExactObject(data, connectorAuthorityMutateProofAgentRequestMembers, allowed)
 	if err != nil {
 		return err
@@ -1296,7 +1313,7 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 	}
 	allowed := required
 	if operation == ConnectorAuthorityOperationMutateProofAgent {
-		allowed = append(slices.Clone(required), "pinned_cell_id", "target_cell_id", "lease_seconds")
+		allowed = append(slices.Clone(required), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
 	}
 	if class := classifyConnectorAuthorityObjectFields(object, required, allowed); class != "" {
 		return class
