@@ -276,8 +276,14 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   `hub_request_id` replay returns byte-identical success, changed semantics
   cannot commit a mutation, and each mutation is atomically fenced by its
   exact-fingerprint command write. Pending move recovery admits only the
-  frozen moving-on-pinned transition. An additional 24-hour tombstone prevents
-  expired request IDs from being reused as fresh commands.
+  frozen moving-on-pinned transition. A move accepted into durable pending
+  before logical expiry remains authorized for a bounded five-minute recovery
+  window: it either finishes with the exact success or atomically compensates
+  back to active on the pinned cell at the same generation and leaves a
+  terminal unavailable tombstone. A first observation of an already-expired
+  durable ID, and every expired terminal replay, remains unavailable without
+  mutation. The existing 24-hour tombstone prevents expired request IDs from
+  being reused as fresh commands.
   See
   `vectors/README_connector_authority_lambda_v1_vectors.md`.
 - **Private Connector Hub request-ID v1**

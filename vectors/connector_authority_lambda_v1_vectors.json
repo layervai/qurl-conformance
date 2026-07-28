@@ -318,6 +318,7 @@
       "replay_contract": {
         "logical_lifetime_seconds": 900,
         "tombstone_seconds_after_logical_expiry": 86400,
+        "pending_recovery_seconds_after_logical_expiry": 300,
         "fingerprint_fields": [
           "version",
           "mutation",
@@ -331,8 +332,8 @@
         "changed_replay_outcome": "invalid_request_before_mutation",
         "mutation_fence_rule": "conditional_exact_fingerprint_command_write_atomic_with_first_mutation",
         "commit_rule": "arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic",
-        "pending_move_resume_rule": "moving_pinned_finishes_success_replays_otherwise_unavailable",
-        "expired_id_outcome": "unavailable_without_mutation"
+        "pending_move_resume_rule": "accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window",
+        "expired_id_outcome": "expired_first_seen_or_terminal_unavailable_without_mutation"
       },
       "request_golden": {
         "name": "accept_request",

@@ -39,12 +39,13 @@ const (
 	ConnectorAuthorityLambdaResponseRule                  = "exactly_one_of_result_or_error"
 	ConnectorAuthorityProofMutationReplayLifetimeSeconds  = 900
 	ConnectorAuthorityProofMutationTombstoneSeconds       = 86400
+	ConnectorAuthorityProofMutationPendingRecoverySeconds = 300
 	ConnectorAuthorityProofMutationExactReplayOutcome     = "byte_identical_success"
 	ConnectorAuthorityProofMutationChangedReplayOutcome   = "invalid_request_before_mutation"
 	ConnectorAuthorityProofMutationFenceRule              = "conditional_exact_fingerprint_command_write_atomic_with_first_mutation"
 	ConnectorAuthorityProofMutationCommitRule             = "arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic"
-	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "moving_pinned_finishes_success_replays_otherwise_unavailable"
-	ConnectorAuthorityProofMutationExpiredIDOutcome       = "unavailable_without_mutation"
+	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window"
+	ConnectorAuthorityProofMutationExpiredIDOutcome       = "expired_first_seen_or_terminal_unavailable_without_mutation"
 
 	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
 	ConnectorAuthorityOperationRefreshAssignment    = "RefreshAssignment"
@@ -165,6 +166,7 @@ type ConnectorAuthorityLambdaOperation struct {
 type ConnectorAuthorityProofMutationReplayContract struct {
 	LogicalLifetimeSeconds int      `json:"logical_lifetime_seconds"`
 	TombstoneSeconds       int      `json:"tombstone_seconds_after_logical_expiry"`
+	PendingRecoverySeconds int      `json:"pending_recovery_seconds_after_logical_expiry"`
 	FingerprintFields      []string `json:"fingerprint_fields"`
 	ExactReplayOutcome     string   `json:"exact_replay_outcome"`
 	ChangedReplayOutcome   string   `json:"changed_replay_outcome"`
@@ -520,6 +522,7 @@ func validateConnectorAuthorityReplayContract(
 	if contract == nil ||
 		contract.LogicalLifetimeSeconds != ConnectorAuthorityProofMutationReplayLifetimeSeconds ||
 		contract.TombstoneSeconds != ConnectorAuthorityProofMutationTombstoneSeconds ||
+		contract.PendingRecoverySeconds != ConnectorAuthorityProofMutationPendingRecoverySeconds ||
 		!slices.Equal(contract.FingerprintFields, connectorAuthorityProofMutationFingerprintFields()) ||
 		contract.ExactReplayOutcome != ConnectorAuthorityProofMutationExactReplayOutcome ||
 		contract.ChangedReplayOutcome != ConnectorAuthorityProofMutationChangedReplayOutcome ||

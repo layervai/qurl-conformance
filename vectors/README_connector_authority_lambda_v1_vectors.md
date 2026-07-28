@@ -58,13 +58,24 @@ expired or corrupt id returns `unavailable` and never starts a fresh mutation.
 `move` may use its required two assignment transitions: the active-to-moving
 transition and pending command commit atomically, then the final
 assignment/directive transition and exact success commit atomically. A pending
-move resumes only from moving on the pinned cell; pending plus active is
-impossible under the transaction contract and therefore fails closed rather
-than being repaired. A completed command replays its stored bytes, and every
-other state fails closed as `unavailable`. The logical replay window is 900
-seconds. The command row remains as a tombstone for another 86,400 seconds so
-an expired request id cannot be reused to start a second mutation while
-the producer's background retention sweep catches up.
+move resumes only from moving on the pinned cell. Once that state was accepted
+before logical expiry, the exact pending command remains authorized for a
+bounded 300-second recovery window after logical expiry. During that window
+it either finishes with the exact success or atomically compensates to active
+on the pinned cell at the same generation and records a terminal
+`unavailable` tombstone. The compensation transaction changes pending to that
+terminal tombstone in the same write that restores active-on-pinned; a durable
+pending-plus-active pair is still corrupt. Every other pending-state mismatch
+also fails closed. A completed command replays its stored bytes only while its
+logical window is live. A first observation of an already-expired durable ID,
+and every expired terminal replay, returns `unavailable` without mutation.
+While a command is live or an accepted pending move is inside its recovery
+window, a same-ID changed fingerprint remains `invalid_request` with zero
+writes. The logical replay window is 900 seconds. The command row remains until
+86,400 seconds after logical expiry. Because the recovery window ends earlier,
+at least 86,100 seconds of terminal tombstone runway remains even when recovery
+completes at its deadline; an expired request id therefore cannot be reused to
+start a second mutation while background retention completes.
 
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API

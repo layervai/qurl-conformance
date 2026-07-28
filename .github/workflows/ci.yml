@@ -430,10 +430,12 @@ jobs:
                 'logical_lifetime_seconds',
                 'mutation_fence_rule',
                 'pending_move_resume_rule',
+                'pending_recovery_seconds_after_logical_expiry',
                 'tombstone_seconds_after_logical_expiry',
               ]) ||
               proofMutationReplay.logical_lifetime_seconds !== 900 ||
               proofMutationReplay.tombstone_seconds_after_logical_expiry !== 86400 ||
+              proofMutationReplay.pending_recovery_seconds_after_logical_expiry !== 300 ||
               JSON.stringify(proofMutationReplay.fingerprint_fields) !== JSON.stringify([
                 'version', 'mutation', 'agent_id', 'grant_correlation_id',
                 'pinned_cell_id_if_arm', 'target_cell_id_if_arm_or_move',
@@ -443,8 +445,8 @@ jobs:
               proofMutationReplay.changed_replay_outcome !== 'invalid_request_before_mutation' ||
               proofMutationReplay.mutation_fence_rule !== 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation' ||
               proofMutationReplay.commit_rule !== 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic' ||
-              proofMutationReplay.pending_move_resume_rule !== 'moving_pinned_finishes_success_replays_otherwise_unavailable' ||
-              proofMutationReplay.expired_id_outcome !== 'unavailable_without_mutation' ||
+              proofMutationReplay.pending_move_resume_rule !== 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window' ||
+              proofMutationReplay.expired_id_outcome !== 'expired_first_seen_or_terminal_unavailable_without_mutation' ||
               Object.entries(u.operations).some(([name, operation]) =>
                 name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
               proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
@@ -850,6 +852,7 @@ jobs:
           assert proof_mutation_replay == {
               'logical_lifetime_seconds': 900,
               'tombstone_seconds_after_logical_expiry': 86400,
+              'pending_recovery_seconds_after_logical_expiry': 300,
               'fingerprint_fields': [
                   'version',
                   'mutation',
@@ -863,8 +866,8 @@ jobs:
               'changed_replay_outcome': 'invalid_request_before_mutation',
               'mutation_fence_rule': 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation',
               'commit_rule': 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic',
-              'pending_move_resume_rule': 'moving_pinned_finishes_success_replays_otherwise_unavailable',
-              'expired_id_outcome': 'unavailable_without_mutation',
+              'pending_move_resume_rule': 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window',
+              'expired_id_outcome': 'expired_first_seen_or_terminal_unavailable_without_mutation',
           }
           assert all(
               'replay_contract' not in operation

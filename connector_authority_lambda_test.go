@@ -62,6 +62,14 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	); err != nil {
 		t.Fatalf("proof replay contract: %v", err)
 	}
+	if operation.ReplayContract.PendingRecoverySeconds <= 0 ||
+		operation.ReplayContract.PendingRecoverySeconds >= operation.ReplayContract.TombstoneSeconds {
+		t.Fatalf(
+			"pending recovery window %d must leave terminal tombstone runway inside %d-second retention",
+			operation.ReplayContract.PendingRecoverySeconds,
+			operation.ReplayContract.TombstoneSeconds,
+		)
+	}
 	if len(operation.AdditionalRequestGoldens) != 2 || len(operation.AdditionalSuccessGoldens) != 2 {
 		t.Fatalf("additional mutation goldens = requests:%d successes:%d", len(operation.AdditionalRequestGoldens), len(operation.AdditionalSuccessGoldens))
 	}
@@ -337,6 +345,27 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
 			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
 			op.ReplayContract.TombstoneSeconds = 0
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof accepted pending recovery window is required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.PendingRecoverySeconds = 0
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof accepted pending recovery rule is exact", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.PendingMoveResumeRule = "moving_pinned_finishes_success_replays_otherwise_unavailable"
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof expired first-seen and terminal outcome is fail closed", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.ExpiredIDOutcome = "byte_identical_success"
 			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
 		}), "replay contract")
 	})
