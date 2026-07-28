@@ -421,6 +421,17 @@ jobs:
               u.operations.MutateProofAgent.additional_request_goldens.length !== 2 ||
               u.operations.MutateProofAgent.additional_success_goldens.length !== 2 ||
               u.operations.MutateProofAgent.public_mapping_cases.length !== 0 ||
+              JSON.stringify(Object.keys(proofMutationReplay).sort()) !== JSON.stringify([
+                'changed_replay_outcome',
+                'commit_rule',
+                'exact_replay_outcome',
+                'expired_id_outcome',
+                'fingerprint_fields',
+                'logical_lifetime_seconds',
+                'mutation_fence_rule',
+                'pending_move_resume_rule',
+                'tombstone_seconds_after_logical_expiry',
+              ]) ||
               proofMutationReplay.logical_lifetime_seconds !== 900 ||
               proofMutationReplay.tombstone_seconds_after_logical_expiry !== 86400 ||
               JSON.stringify(proofMutationReplay.fingerprint_fields) !== JSON.stringify([
@@ -430,9 +441,9 @@ jobs:
               ]) ||
               proofMutationReplay.exact_replay_outcome !== 'byte_identical_success' ||
               proofMutationReplay.changed_replay_outcome !== 'invalid_request_before_mutation' ||
-              proofMutationReplay.claim_rule !== 'durable_pending_exact_fingerprint_before_mutation' ||
-              proofMutationReplay.commit_rule !== 'arm_expire_atomic_mutation_success_move_atomic_final_mutation_success' ||
-              proofMutationReplay.pending_move_resume_rule !== 'active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable' ||
+              proofMutationReplay.mutation_fence_rule !== 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation' ||
+              proofMutationReplay.commit_rule !== 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic' ||
+              proofMutationReplay.pending_move_resume_rule !== 'moving_pinned_finishes_success_replays_otherwise_unavailable' ||
               proofMutationReplay.expired_id_outcome !== 'unavailable_without_mutation' ||
               Object.entries(u.operations).some(([name, operation]) =>
                 name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
@@ -850,9 +861,9 @@ jobs:
               ],
               'exact_replay_outcome': 'byte_identical_success',
               'changed_replay_outcome': 'invalid_request_before_mutation',
-              'claim_rule': 'durable_pending_exact_fingerprint_before_mutation',
-              'commit_rule': 'arm_expire_atomic_mutation_success_move_atomic_final_mutation_success',
-              'pending_move_resume_rule': 'active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable',
+              'mutation_fence_rule': 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation',
+              'commit_rule': 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic',
+              'pending_move_resume_rule': 'moving_pinned_finishes_success_replays_otherwise_unavailable',
               'expired_id_outcome': 'unavailable_without_mutation',
           }
           assert all(

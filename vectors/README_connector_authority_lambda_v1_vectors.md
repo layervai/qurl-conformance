@@ -48,21 +48,23 @@ The mutation replay contract is behavioral, not decorative. Its
 domain-separated semantic fingerprint covers `version`, `mutation`,
 `agent_id`, `grant_correlation_id`, and exactly the fields admitted by the
 selected mutation; `hub_request_id` is the lookup key and is excluded from the
-fingerprint. The Authority durably claims that exact fingerprint before any
-mutation. The same live id and fingerprint returns the byte-identical success;
-the same id with changed semantics returns `invalid_request` before any write.
-An expired or corrupt id returns `unavailable` and never starts a fresh
-mutation.
+fingerprint. Every first mutation is atomically fenced by a conditional command
+write carrying that exact fingerprint. The same live id and fingerprint returns
+the byte-identical success; the same id with changed semantics loses the
+condition and returns `invalid_request` without committing its mutation. An
+expired or corrupt id returns `unavailable` and never starts a fresh mutation.
 
 `arm` and `expire_lease` commit their mutation and exact success atomically.
-`move` may use its required two assignment transitions, but both are fenced by
-the durable pending command and its final assignment/directive transition
-commits the exact success atomically. A pending move resumes only from active
-on the pinned cell or moving on the pinned cell; a completed command replays
-its stored bytes, and every other state fails closed as `unavailable`. The
-logical replay window is 900 seconds. The command row remains as a tombstone
-for another 86,400 seconds so an expired request id cannot be reused to start a
-second mutation while DynamoDB TTL deletion catches up.
+`move` may use its required two assignment transitions: the active-to-moving
+transition and pending command commit atomically, then the final
+assignment/directive transition and exact success commit atomically. A pending
+move resumes only from moving on the pinned cell; pending plus active is
+impossible under the transaction contract and therefore fails closed rather
+than being repaired. A completed command replays its stored bytes, and every
+other state fails closed as `unavailable`. The logical replay window is 900
+seconds. The command row remains as a tombstone for another 86,400 seconds so
+an expired request id cannot be reused to start a second mutation while
+the producer's background retention sweep catches up.
 
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API

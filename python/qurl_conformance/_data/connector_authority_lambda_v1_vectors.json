@@ -329,9 +329,9 @@
         ],
         "exact_replay_outcome": "byte_identical_success",
         "changed_replay_outcome": "invalid_request_before_mutation",
-        "claim_rule": "durable_pending_exact_fingerprint_before_mutation",
-        "commit_rule": "arm_expire_atomic_mutation_success_move_atomic_final_mutation_success",
-        "pending_move_resume_rule": "active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable",
+        "mutation_fence_rule": "conditional_exact_fingerprint_command_write_atomic_with_first_mutation",
+        "commit_rule": "arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic",
+        "pending_move_resume_rule": "moving_pinned_finishes_success_replays_otherwise_unavailable",
         "expired_id_outcome": "unavailable_without_mutation"
       },
       "request_golden": {

@@ -41,9 +41,9 @@ const (
 	ConnectorAuthorityProofMutationTombstoneSeconds       = 86400
 	ConnectorAuthorityProofMutationExactReplayOutcome     = "byte_identical_success"
 	ConnectorAuthorityProofMutationChangedReplayOutcome   = "invalid_request_before_mutation"
-	ConnectorAuthorityProofMutationClaimRule              = "durable_pending_exact_fingerprint_before_mutation"
-	ConnectorAuthorityProofMutationCommitRule             = "arm_expire_atomic_mutation_success_move_atomic_final_mutation_success"
-	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable"
+	ConnectorAuthorityProofMutationFenceRule              = "conditional_exact_fingerprint_command_write_atomic_with_first_mutation"
+	ConnectorAuthorityProofMutationCommitRule             = "arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic"
+	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "moving_pinned_finishes_success_replays_otherwise_unavailable"
 	ConnectorAuthorityProofMutationExpiredIDOutcome       = "unavailable_without_mutation"
 
 	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
@@ -168,7 +168,7 @@ type ConnectorAuthorityProofMutationReplayContract struct {
 	FingerprintFields      []string `json:"fingerprint_fields"`
 	ExactReplayOutcome     string   `json:"exact_replay_outcome"`
 	ChangedReplayOutcome   string   `json:"changed_replay_outcome"`
-	ClaimRule              string   `json:"claim_rule"`
+	MutationFenceRule      string   `json:"mutation_fence_rule"`
 	CommitRule             string   `json:"commit_rule"`
 	PendingMoveResumeRule  string   `json:"pending_move_resume_rule"`
 	ExpiredIDOutcome       string   `json:"expired_id_outcome"`
@@ -523,7 +523,7 @@ func validateConnectorAuthorityReplayContract(
 		!slices.Equal(contract.FingerprintFields, connectorAuthorityProofMutationFingerprintFields()) ||
 		contract.ExactReplayOutcome != ConnectorAuthorityProofMutationExactReplayOutcome ||
 		contract.ChangedReplayOutcome != ConnectorAuthorityProofMutationChangedReplayOutcome ||
-		contract.ClaimRule != ConnectorAuthorityProofMutationClaimRule ||
+		contract.MutationFenceRule != ConnectorAuthorityProofMutationFenceRule ||
 		contract.CommitRule != ConnectorAuthorityProofMutationCommitRule ||
 		contract.PendingMoveResumeRule != ConnectorAuthorityProofMutationPendingMoveResumeRule ||
 		contract.ExpiredIDOutcome != ConnectorAuthorityProofMutationExpiredIDOutcome {

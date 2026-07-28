@@ -274,9 +274,10 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   unions, closed proof-only errors, no public NHP mapping or numeric code, and
   a durable 900-second command/replay contract: an exact live
   `hub_request_id` replay returns byte-identical success, changed semantics
-  fail before mutation, and pending move recovery admits only the frozen
-  pinned-state transitions. An additional 24-hour tombstone prevents expired
-  request IDs from being reused as fresh commands.
+  cannot commit a mutation, and each mutation is atomically fenced by its
+  exact-fingerprint command write. Pending move recovery admits only the
+  frozen moving-on-pinned transition. An additional 24-hour tombstone prevents
+  expired request IDs from being reused as fresh commands.
   See
   `vectors/README_connector_authority_lambda_v1_vectors.md`.
 - **Private Connector Hub request-ID v1**
