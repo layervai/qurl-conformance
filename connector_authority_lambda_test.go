@@ -56,6 +56,12 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	if len(operation.PublicMappingCases) != 0 {
 		t.Fatalf("proof-only operation has %d public NHP mappings", len(operation.PublicMappingCases))
 	}
+	if err := validateConnectorAuthorityReplayContract(
+		ConnectorAuthorityOperationMutateProofAgent,
+		operation.ReplayContract,
+	); err != nil {
+		t.Fatalf("proof replay contract: %v", err)
+	}
 	if len(operation.AdditionalRequestGoldens) != 2 || len(operation.AdditionalSuccessGoldens) != 2 {
 		t.Fatalf("additional mutation goldens = requests:%d successes:%d", len(operation.AdditionalRequestGoldens), len(operation.AdditionalSuccessGoldens))
 	}
@@ -312,6 +318,45 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 			op.AdditionalSuccessGoldens = op.AdditionalSuccessGoldens[:1]
 			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
 		}), "additional golden count")
+	})
+	t.Run("proof replay contract required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract = nil
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof changed replay outcome is fail closed", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.ChangedReplayOutcome = "byte_identical_success"
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof replay tombstone retention is required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.TombstoneSeconds = 0
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof replay fingerprint fields are exact", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.FingerprintFields = append(
+				op.ReplayContract.FingerprintFields,
+				"hub_request_id",
+			)
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("runtime operation cannot acquire proof replay contract", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			proof := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op := file.Operations[ConnectorAuthorityOperationIssueAssignment]
+			op.ReplayContract = proof.ReplayContract
+			file.Operations[ConnectorAuthorityOperationIssueAssignment] = op
+		}), "unexpected proof replay contract")
 	})
 	t.Run("proof public mapping forbidden", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {

@@ -271,7 +271,12 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   adapter writes the 15-minute replay envelope; activation atomically enforces
   owner quota as RAK 52112.
   `MutateProofAgent` has exact `arm`, `move`, and `expire_lease` request/result
-  unions, closed proof-only errors, and no public NHP mapping or numeric code.
+  unions, closed proof-only errors, no public NHP mapping or numeric code, and
+  a durable 900-second command/replay contract: an exact live
+  `hub_request_id` replay returns byte-identical success, changed semantics
+  fail before mutation, and pending move recovery admits only the frozen
+  pinned-state transitions. An additional 24-hour tombstone prevents expired
+  request IDs from being reused as fresh commands.
   See
   `vectors/README_connector_authority_lambda_v1_vectors.md`.
 - **Private Connector Hub request-ID v1**

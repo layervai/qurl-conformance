@@ -44,6 +44,26 @@ client is `connector` or `qurl_go` and phase is `pre_removal` or
 the arm receipt returns the correlation id so the controller can bind the
 durable directive it just created to the dispatched proof.
 
+The mutation replay contract is behavioral, not decorative. Its
+domain-separated semantic fingerprint covers `version`, `mutation`,
+`agent_id`, `grant_correlation_id`, and exactly the fields admitted by the
+selected mutation; `hub_request_id` is the lookup key and is excluded from the
+fingerprint. The Authority durably claims that exact fingerprint before any
+mutation. The same live id and fingerprint returns the byte-identical success;
+the same id with changed semantics returns `invalid_request` before any write.
+An expired or corrupt id returns `unavailable` and never starts a fresh
+mutation.
+
+`arm` and `expire_lease` commit their mutation and exact success atomically.
+`move` may use its required two assignment transitions, but both are fenced by
+the durable pending command and its final assignment/directive transition
+commits the exact success atomically. A pending move resumes only from active
+on the pinned cell or moving on the pinned cell; a completed command replays
+its stored bytes, and every other state fails closed as `unavailable`. The
+logical replay window is 900 seconds. The command row remains as a tombstone
+for another 86,400 seconds so an expired request id cannot be reused to start a
+second mutation while DynamoDB TTL deletion catches up.
+
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API
 key is deliberately distinct from the initial credential, and no public result

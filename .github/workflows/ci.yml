@@ -161,6 +161,7 @@ jobs:
               .filter(v => proofMutationRejectNames.has(v.name))
               .map(v => [v.name, JSON.parse(v.body_json)])
           );
+          const proofMutationReplay = u.operations.MutateProofAgent.replay_contract;
           const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
@@ -420,6 +421,21 @@ jobs:
               u.operations.MutateProofAgent.additional_request_goldens.length !== 2 ||
               u.operations.MutateProofAgent.additional_success_goldens.length !== 2 ||
               u.operations.MutateProofAgent.public_mapping_cases.length !== 0 ||
+              proofMutationReplay.logical_lifetime_seconds !== 900 ||
+              proofMutationReplay.tombstone_seconds_after_logical_expiry !== 86400 ||
+              JSON.stringify(proofMutationReplay.fingerprint_fields) !== JSON.stringify([
+                'version', 'mutation', 'agent_id', 'grant_correlation_id',
+                'pinned_cell_id_if_arm', 'target_cell_id_if_arm_or_move',
+                'lease_seconds_if_arm_or_expire_lease',
+              ]) ||
+              proofMutationReplay.exact_replay_outcome !== 'byte_identical_success' ||
+              proofMutationReplay.changed_replay_outcome !== 'invalid_request_before_mutation' ||
+              proofMutationReplay.claim_rule !== 'durable_pending_exact_fingerprint_before_mutation' ||
+              proofMutationReplay.commit_rule !== 'arm_expire_atomic_mutation_success_move_atomic_final_mutation_success' ||
+              proofMutationReplay.pending_move_resume_rule !== 'active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable' ||
+              proofMutationReplay.expired_id_outcome !== 'unavailable_without_mutation' ||
+              Object.entries(u.operations).some(([name, operation]) =>
+                name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
               proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
               !Object.hasOwn(proofMutationRejects.reject_unknown_field, 'pinned_cell_id') ||
               proofMutationRejects.reject_wrong_type.mutation !== 'expire_lease' ||
@@ -555,6 +571,7 @@ jobs:
               for value in u['operations']['MutateProofAgent']['request_rejects']
               if value['name'] in {'reject_unknown_field', 'reject_wrong_type', 'reject_missing_field'}
           }
+          proof_mutation_replay = u['operations']['MutateProofAgent']['replay_contract']
           activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
@@ -819,6 +836,30 @@ jobs:
           assert len(u['operations']['MutateProofAgent']['additional_request_goldens']) == 2
           assert len(u['operations']['MutateProofAgent']['additional_success_goldens']) == 2
           assert u['operations']['MutateProofAgent']['public_mapping_cases'] == []
+          assert proof_mutation_replay == {
+              'logical_lifetime_seconds': 900,
+              'tombstone_seconds_after_logical_expiry': 86400,
+              'fingerprint_fields': [
+                  'version',
+                  'mutation',
+                  'agent_id',
+                  'grant_correlation_id',
+                  'pinned_cell_id_if_arm',
+                  'target_cell_id_if_arm_or_move',
+                  'lease_seconds_if_arm_or_expire_lease',
+              ],
+              'exact_replay_outcome': 'byte_identical_success',
+              'changed_replay_outcome': 'invalid_request_before_mutation',
+              'claim_rule': 'durable_pending_exact_fingerprint_before_mutation',
+              'commit_rule': 'arm_expire_atomic_mutation_success_move_atomic_final_mutation_success',
+              'pending_move_resume_rule': 'active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable',
+              'expired_id_outcome': 'unavailable_without_mutation',
+          }
+          assert all(
+              'replay_contract' not in operation
+              for name, operation in u['operations'].items()
+              if name != 'MutateProofAgent'
+          )
           assert proof_mutation_rejects['reject_unknown_field']['mutation'] == 'move'
           assert 'pinned_cell_id' in proof_mutation_rejects['reject_unknown_field']
           assert proof_mutation_rejects['reject_wrong_type']['mutation'] == 'expire_lease'

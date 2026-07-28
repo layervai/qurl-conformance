@@ -37,6 +37,14 @@ const (
 	ConnectorAuthorityLambdaTimestampFormat               = "RFC3339_UTC_WHOLE_SECONDS"
 	ConnectorAuthorityLambdaHubRequestIDFormat            = "lowercase_sha256_hex"
 	ConnectorAuthorityLambdaResponseRule                  = "exactly_one_of_result_or_error"
+	ConnectorAuthorityProofMutationReplayLifetimeSeconds  = 900
+	ConnectorAuthorityProofMutationTombstoneSeconds       = 86400
+	ConnectorAuthorityProofMutationExactReplayOutcome     = "byte_identical_success"
+	ConnectorAuthorityProofMutationChangedReplayOutcome   = "invalid_request_before_mutation"
+	ConnectorAuthorityProofMutationClaimRule              = "durable_pending_exact_fingerprint_before_mutation"
+	ConnectorAuthorityProofMutationCommitRule             = "arm_expire_atomic_mutation_success_move_atomic_final_mutation_success"
+	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "active_pinned_marks_moving_moving_pinned_finishes_success_replays_otherwise_unavailable"
+	ConnectorAuthorityProofMutationExpiredIDOutcome       = "unavailable_without_mutation"
 
 	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
 	ConnectorAuthorityOperationRefreshAssignment    = "RefreshAssignment"
@@ -139,14 +147,31 @@ type ConnectorAuthorityLambdaFixtures struct {
 // ConnectorAuthorityLambdaOperation is one separately permissioned function's
 // complete request, response, reject, and public-mapping contract.
 type ConnectorAuthorityLambdaOperation struct {
-	RequestGolden            ConnectorAuthorityLambdaBodyCase     `json:"request_golden"`
-	AdditionalRequestGoldens []ConnectorAuthorityLambdaBodyCase   `json:"additional_request_goldens,omitempty"`
-	SuccessGolden            ConnectorAuthorityLambdaBodyCase     `json:"success_golden"`
-	AdditionalSuccessGoldens []ConnectorAuthorityLambdaBodyCase   `json:"additional_success_goldens,omitempty"`
-	SemanticErrors           []ConnectorAuthorityLambdaErrorCase  `json:"semantic_errors"`
-	RequestRejects           []ConnectorAuthorityLambdaRejectCase `json:"request_rejects"`
-	ResponseProducerRejects  []ConnectorAuthorityLambdaRejectCase `json:"response_producer_rejects"`
-	PublicMappingCases       []ConnectorAuthorityPublicMapping    `json:"public_mapping_cases"`
+	ReplayContract           *ConnectorAuthorityProofMutationReplayContract `json:"replay_contract,omitempty"`
+	RequestGolden            ConnectorAuthorityLambdaBodyCase               `json:"request_golden"`
+	AdditionalRequestGoldens []ConnectorAuthorityLambdaBodyCase             `json:"additional_request_goldens,omitempty"`
+	SuccessGolden            ConnectorAuthorityLambdaBodyCase               `json:"success_golden"`
+	AdditionalSuccessGoldens []ConnectorAuthorityLambdaBodyCase             `json:"additional_success_goldens,omitempty"`
+	SemanticErrors           []ConnectorAuthorityLambdaErrorCase            `json:"semantic_errors"`
+	RequestRejects           []ConnectorAuthorityLambdaRejectCase           `json:"request_rejects"`
+	ResponseProducerRejects  []ConnectorAuthorityLambdaRejectCase           `json:"response_producer_rejects"`
+	PublicMappingCases       []ConnectorAuthorityPublicMapping              `json:"public_mapping_cases"`
+}
+
+// ConnectorAuthorityProofMutationReplayContract freezes the behavioral
+// meaning of MutateProofAgent's private hub_request_id. It is deliberately
+// absent from the five runtime operations, whose replay contracts are owned by
+// their existing operation-specific artifacts and services.
+type ConnectorAuthorityProofMutationReplayContract struct {
+	LogicalLifetimeSeconds int      `json:"logical_lifetime_seconds"`
+	TombstoneSeconds       int      `json:"tombstone_seconds_after_logical_expiry"`
+	FingerprintFields      []string `json:"fingerprint_fields"`
+	ExactReplayOutcome     string   `json:"exact_replay_outcome"`
+	ChangedReplayOutcome   string   `json:"changed_replay_outcome"`
+	ClaimRule              string   `json:"claim_rule"`
+	CommitRule             string   `json:"commit_rule"`
+	PendingMoveResumeRule  string   `json:"pending_move_resume_rule"`
+	ExpiredIDOutcome       string   `json:"expired_id_outcome"`
 }
 
 // ConnectorAuthorityLambdaBodyCase preserves exact raw JSON bytes for a valid
@@ -446,6 +471,9 @@ func validateConnectorAuthorityFixtures(f ConnectorAuthorityLambdaFixtures) erro
 }
 
 func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
+	if err := validateConnectorAuthorityReplayContract(name, op.ReplayContract); err != nil {
+		return err
+	}
 	if op.RequestGolden.Name != "accept_request" || op.SuccessGolden.Name != "accept_success" {
 		return fmt.Errorf("conformance: Connector Authority %s golden names are not canonical", name)
 	}
@@ -477,6 +505,43 @@ func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambd
 		return err
 	}
 	return validateConnectorAuthorityMappings(name, op, f)
+}
+
+func validateConnectorAuthorityReplayContract(
+	operation string,
+	contract *ConnectorAuthorityProofMutationReplayContract,
+) error {
+	if operation != ConnectorAuthorityOperationMutateProofAgent {
+		if contract != nil {
+			return fmt.Errorf("conformance: Connector Authority %s has an unexpected proof replay contract", operation)
+		}
+		return nil
+	}
+	if contract == nil ||
+		contract.LogicalLifetimeSeconds != ConnectorAuthorityProofMutationReplayLifetimeSeconds ||
+		contract.TombstoneSeconds != ConnectorAuthorityProofMutationTombstoneSeconds ||
+		!slices.Equal(contract.FingerprintFields, connectorAuthorityProofMutationFingerprintFields()) ||
+		contract.ExactReplayOutcome != ConnectorAuthorityProofMutationExactReplayOutcome ||
+		contract.ChangedReplayOutcome != ConnectorAuthorityProofMutationChangedReplayOutcome ||
+		contract.ClaimRule != ConnectorAuthorityProofMutationClaimRule ||
+		contract.CommitRule != ConnectorAuthorityProofMutationCommitRule ||
+		contract.PendingMoveResumeRule != ConnectorAuthorityProofMutationPendingMoveResumeRule ||
+		contract.ExpiredIDOutcome != ConnectorAuthorityProofMutationExpiredIDOutcome {
+		return errors.New("conformance: Connector Authority MutateProofAgent replay contract is not canonical")
+	}
+	return nil
+}
+
+func connectorAuthorityProofMutationFingerprintFields() []string {
+	return []string{
+		"version",
+		"mutation",
+		"agent_id",
+		"grant_correlation_id",
+		"pinned_cell_id_if_arm",
+		"target_cell_id_if_arm_or_move",
+		"lease_seconds_if_arm_or_expire_lease",
+	}
 }
 
 func validateConnectorAuthorityAdditionalGoldens(operation string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
