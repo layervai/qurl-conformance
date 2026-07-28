@@ -580,7 +580,12 @@ func validateConnectorAuthorityAdditionalGoldens(operation string, op ConnectorA
 			return fmt.Errorf("conformance: Connector Authority MutateProofAgent %s success golden is not canonical", mutation)
 		}
 		if outcome, err := validateConnectorAuthorityResponse(operation, []byte(successCase.BodyJSON)); err != nil || outcome != "success" {
-			return fmt.Errorf("conformance: Connector Authority MutateProofAgent %s success golden: %v", mutation, err)
+			return fmt.Errorf(
+				"conformance: Connector Authority MutateProofAgent %s success golden: outcome=%q err=%v",
+				mutation,
+				outcome,
+				err,
+			)
 		}
 	}
 	return nil
