@@ -131,7 +131,9 @@ operation. Its request union is exact:
 Conditional members for a different mutation are unknown fields, not ignored
 options. The move golden is the primary request/success pair;
 `additional_request_goldens` and `additional_success_goldens` freeze the arm
-and expiry pairs.
+and expiry pairs. These are independent single-command scenarios: they
+deliberately reuse the canonical fixture `hub_request_id` and must not be
+preloaded together into one stateful replay store.
 
 Each success result begins with its required `mutation` discriminator:
 
