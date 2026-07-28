@@ -1,7 +1,7 @@
 {
   "artifact": "qurl-connector-authority-lambda-v1-vectors",
   "schema_version": 1,
-  "description": "Strict private synchronous invocation contract between authenticated NHP workers and the five separately permissioned Connector Authority Lambda operations; global assignment requests carry a worker-derived replay id whose matching successful domain result alone is cached for 15 minutes, while same-id semantic fingerprint conflicts fail closed and public SDK traffic remains NHP over UDP. Public assignment code 52203 remains reserved by agent_assignment_golden.json but is intentionally unproduced here: the IssueAssignment and RefreshAssignment domain operations do not mutate assignments although their private adapter writes the replay envelope, while ActivateRegistration atomically enforces owner quota and maps it to RAK 52112.",
+  "description": "Strict private synchronous invocation contract for five separately permissioned Connector Authority Lambda operations called by authenticated NHP workers plus the sandbox-only attended-proof MutateProofAgent control; global assignment and proof-control requests carry replay ids, while public SDK traffic remains NHP over UDP. MutateProofAgent has no public NHP mapping and must never enter a production dispatch table or numeric-code mapping. Public assignment code 52203 remains reserved by agent_assignment_golden.json but is intentionally unproduced here: ordinary IssueAssignment and RefreshAssignment do not mutate assignments, while ActivateRegistration atomically enforces owner quota and maps it to RAK 52112.",
   "protocol": {
     "request_version": 1,
     "max_request_bytes": 4096,
@@ -32,7 +32,16 @@
     "nhp_host": "cell0.nhp.layerv.ai",
     "nhp_port": 62206,
     "server_public_key_b64": "Xwm3+XpAtQIgaXBktDsnQRsHpKof4FNwsnUZgmmD0w0=",
-    "assignment_ticket_expires_at": "2026-07-15T23:15:00Z"
+    "assignment_ticket_expires_at": "2026-07-15T23:15:00Z",
+    "proof_agent_id": "qurl-go-sandbox-conform",
+    "proof_grant_correlation_id": "nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef",
+    "proof_pinned_cell_id": "cell0",
+    "proof_target_cell_id": "cell1",
+    "proof_lease_seconds": 60,
+    "proof_previous_assignment_generation": 7,
+    "proof_new_assignment_generation": 8,
+    "proof_lease_expires_at": "2026-07-16T11:01:00Z",
+    "proof_mutated_at": "2026-07-16T11:00:00Z"
   },
   "operations": {
     "IssueAssignment": {
@@ -304,6 +313,74 @@
         {"name": "conflict", "mapping_source": "authority_response", "private_outcome": "conflict", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"conflict\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52303\",\"errMsg\":\"different device credential candidate already recorded\"}", "recovery_action": "none"},
         {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52300\",\"errMsg\":\"completion temporarily unavailable\",\"retryAfterSeconds\":5}", "recovery_action": "none"}
       ]
+    },
+    "MutateProofAgent": {
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\"}"
+      },
+      "additional_request_goldens": [
+        {
+          "name": "accept_arm_request",
+          "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"arm\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"pinned_cell_id\":\"cell0\",\"target_cell_id\":\"cell1\",\"lease_seconds\":60}"
+        },
+        {
+          "name": "accept_expire_lease_request",
+          "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"expire_lease\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"lease_seconds\":60}"
+        }
+      ],
+      "success_golden": {
+        "name": "accept_success",
+        "body_json": "{\"version\":1,\"result\":{\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"previous_cell_id\":\"cell0\",\"previous_assignment_generation\":7,\"new_cell_id\":\"cell1\",\"new_assignment_generation\":8,\"lease_expires_at\":\"2026-07-16T11:01:00Z\",\"mutated_at\":\"2026-07-16T11:00:00Z\"}}"
+      },
+      "additional_success_goldens": [
+        {
+          "name": "accept_arm_success",
+          "body_json": "{\"version\":1,\"result\":{\"mutation\":\"arm\",\"agent_id\":\"qurl-go-sandbox-conform\",\"pinned_cell_id\":\"cell0\",\"target_cell_id\":\"cell1\",\"lease_seconds\":60,\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"mutated_at\":\"2026-07-16T11:00:00Z\"}}"
+        },
+        {
+          "name": "accept_expire_lease_success",
+          "body_json": "{\"version\":1,\"result\":{\"mutation\":\"expire_lease\",\"agent_id\":\"qurl-go-sandbox-conform\",\"lease_expires_at\":\"2026-07-16T11:01:00Z\",\"mutated_at\":\"2026-07-16T11:00:00Z\"}}"
+        }
+      ],
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "identity_rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}"},
+        {"code": "directive_absent", "body_json": "{\"version\":1,\"error\":{\"code\":\"directive_absent\"}}"},
+        {"code": "directive_expired", "body_json": "{\"version\":1,\"error\":{\"code\":\"directive_expired\"}}"},
+        {"code": "reassignment_in_progress", "body_json": "{\"version\":1,\"error\":{\"code\":\"reassignment_in_progress\"}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"Agent_ID\":\"smuggled-agent\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\",\"owner_id\":\"proof-owner\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":[]}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"hub_request_id\":\"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\",\"mutation\":\"move\",\"agent_id\":\"qurl-go-sandbox-conform\",\"grant_correlation_id\":\"nhp-123456789-1-qurl_go-pre_removal-0123456789abcdef0123456789abcdef\",\"target_cell_id\":\"cell1\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": []
     }
   }
 }

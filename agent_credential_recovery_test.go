@@ -45,8 +45,8 @@ func TestAgentCredentialRecoveryComposesWithClosedAuthorityV1Artifact(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authority.Operations) != 5 {
-		t.Fatalf("base Authority operation count = %d, want closed five-operation artifact", len(authority.Operations))
+	if len(authority.Operations) != 6 {
+		t.Fatalf("base Authority operation count = %d, want five runtime operations plus the proof-only control", len(authority.Operations))
 	}
 	for _, recoveryOperation := range []string{AgentCredentialRecoveryIssueOperation, AgentCredentialRecoveryCompleteOperation} {
 		if _, exists := authority.Operations[recoveryOperation]; exists {

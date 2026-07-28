@@ -16,8 +16,8 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	if file.Artifact != ConnectorAuthorityLambdaArtifactID || file.SchemaVersion != ConnectorAuthorityLambdaSchemaVersion {
 		t.Fatalf("identity = %q/v%d, want %q/v%d", file.Artifact, file.SchemaVersion, ConnectorAuthorityLambdaArtifactID, ConnectorAuthorityLambdaSchemaVersion)
 	}
-	if len(file.Operations) != 5 {
-		t.Fatalf("operation count = %d, want 5", len(file.Operations))
+	if len(file.Operations) != 6 {
+		t.Fatalf("operation count = %d, want 6", len(file.Operations))
 	}
 	for _, operation := range connectorAuthorityOperationNames {
 		op := file.Operations[operation]
@@ -44,6 +44,73 @@ func TestOpenConnectorAuthorityLambdaArtifact(t *testing.T) {
 	}
 }
 
+func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
+	file, err := ConnectorAuthorityLambda()
+	if err != nil {
+		t.Fatalf("ConnectorAuthorityLambda(): %v", err)
+	}
+	if ConnectorAuthorityOperationMutateProofAgent != "MutateProofAgent" {
+		t.Fatalf("operation constant = %q", ConnectorAuthorityOperationMutateProofAgent)
+	}
+	operation := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+	if len(operation.PublicMappingCases) != 0 {
+		t.Fatalf("proof-only operation has %d public NHP mappings", len(operation.PublicMappingCases))
+	}
+	if len(operation.AdditionalRequestGoldens) != 2 || len(operation.AdditionalSuccessGoldens) != 2 {
+		t.Fatalf("additional mutation goldens = requests:%d successes:%d", len(operation.AdditionalRequestGoldens), len(operation.AdditionalSuccessGoldens))
+	}
+
+	requests := append([]ConnectorAuthorityLambdaBodyCase{operation.RequestGolden}, operation.AdditionalRequestGoldens...)
+	successes := append([]ConnectorAuthorityLambdaBodyCase{operation.SuccessGolden}, operation.AdditionalSuccessGoldens...)
+	for _, request := range requests {
+		t.Run(request.Name, func(t *testing.T) {
+			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(request.BodyJSON)); err != nil {
+				t.Fatalf("request rejected: %v", err)
+			}
+		})
+	}
+	for _, success := range successes {
+		t.Run(success.Name, func(t *testing.T) {
+			if outcome, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationMutateProofAgent, []byte(success.BodyJSON)); err != nil || outcome != "success" {
+				t.Fatalf("success = %q, %v", outcome, err)
+			}
+		})
+	}
+
+	if !connectorAuthorityGrantCorrelationIDPattern.MatchString(file.Fixtures.ProofGrantCorrelationID) {
+		t.Fatalf("grant correlation fixture %q does not match the controller contract", file.Fixtures.ProofGrantCorrelationID)
+	}
+	for name, body := range map[string]string{
+		"arm missing pinned cell": removeConnectorAuthorityJSONField(t, operation.AdditionalRequestGoldens[0].BodyJSON, "pinned_cell_id"),
+		"arm same cells":          strings.Replace(operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`, 1),
+		"move carries arm field":  strings.Replace(operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`, 1),
+		"expire carries target":   strings.Replace(operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`, 1),
+		"invalid correlation":     strings.Replace(operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64), 1),
+	} {
+		t.Run("reject "+name, func(t *testing.T) {
+			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
+				t.Fatal("invalid conditional request unexpectedly accepted")
+			}
+		})
+	}
+
+	for name, body := range map[string]string{
+		"missing discriminator": strings.Replace(operation.SuccessGolden.BodyJSON, `"mutation":"move",`, "", 1),
+		"mixed union": strings.Replace(operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8,`, `"new_assignment_generation":8,"lease_seconds":60,`, 1),
+		"nonincrementing generation": strings.Replace(operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8`, `"new_assignment_generation":7`, 1),
+		"unknown mutation": strings.Replace(operation.SuccessGolden.BodyJSON,
+			`"mutation":"move"`, `"mutation":"revoke"`, 1),
+	} {
+		t.Run("reject result "+name, func(t *testing.T) {
+			if _, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
+				t.Fatal("invalid result union unexpectedly accepted")
+			}
+		})
+	}
+}
+
 func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
@@ -61,6 +128,7 @@ func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 	globalOperations := []string{
 		ConnectorAuthorityOperationIssueAssignment,
 		ConnectorAuthorityOperationRefreshAssignment,
+		ConnectorAuthorityOperationMutateProofAgent,
 	}
 	for _, operation := range globalOperations {
 		t.Run(operation, func(t *testing.T) {
@@ -111,6 +179,9 @@ func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 
 	for operation, contract := range file.Operations {
 		publicOrResponseBodies := []string{contract.SuccessGolden.BodyJSON}
+		for _, success := range contract.AdditionalSuccessGoldens {
+			publicOrResponseBodies = append(publicOrResponseBodies, success.BodyJSON)
+		}
 		for _, semanticError := range contract.SemanticErrors {
 			publicOrResponseBodies = append(publicOrResponseBodies, semanticError.BodyJSON)
 		}
@@ -234,6 +305,20 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 			op.SemanticErrors[0].BodyJSON = strings.Replace(op.SemanticErrors[0].BodyJSON, `{"version":1,`, `{ "version":1,`, 1)
 			file.Operations[ConnectorAuthorityOperationRefreshAssignment] = op
 		}), "not canonical")
+	})
+	t.Run("proof additional golden set", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.AdditionalSuccessGoldens = op.AdditionalSuccessGoldens[:1]
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "additional golden count")
+	})
+	t.Run("proof public mapping forbidden", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.PublicMappingCases = []ConnectorAuthorityPublicMapping{{Name: "success"}}
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "must not define a public NHP mapping")
 	})
 	t.Run("reject body must prove claimed class", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {

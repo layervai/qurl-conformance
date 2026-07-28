@@ -1,15 +1,17 @@
 # Connector Authority Lambda v1 vectors
 
 `connector_authority_lambda_v1_vectors.json` freezes the private synchronous
-contract between an authenticated NHP worker and five separately permissioned
-Connector Authority Lambda operations. These bodies are not a public API and
-never travel between an SDK and LayerV. Native SDK traffic remains NHP over
-UDP.
+contract for five separately permissioned Connector Authority Lambda operations
+called by authenticated NHP workers and one sandbox-only attended-proof
+operation. These bodies are not a public API and never travel between an SDK
+and LayerV. Native SDK traffic remains NHP over UDP.
 
 Each operation has its own request schema; there is intentionally no generic
-`operation` envelope. A caller cannot choose environment, cell, owner, or
-assignment generation. The authority derives those values from authenticated
-identity, credential state, and the provisioned-cell catalog.
+`operation` envelope. NHP runtime callers cannot choose environment, cell,
+owner, or assignment generation. The authority derives those values from
+authenticated identity, credential state, and the provisioned-cell catalog.
+Only the separately permissioned sandbox proof controller may name the pinned
+and target cells in its closed mutation request.
 
 The global `IssueAssignment` and `RefreshAssignment` operations require a
 canonical lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker
@@ -32,6 +34,15 @@ credential nor caller-selected authority, never appears in authority
 responses or public NHP bodies, and is rejected by all three cell operations.
 The exact private derivation and substitution KATs live in
 `connector_hub_request_id_v1_vectors.json`.
+
+The attended controller also supplies a canonical `hub_request_id` to
+`MutateProofAgent` as its replay key. Its `grant_correlation_id` is the exact
+controller dispatch identity:
+`nhp-<run-id>-<run-attempt>-<client>-<proof-phase>-<32-lowercase-hex>`, where
+client is `connector` or `qurl_go` and phase is `pre_removal` or
+`post_removal`. Neither identifier appears in a move or lease-expiry receipt;
+the arm receipt returns the correlation id so the controller can bind the
+durable directive it just created to the dispatched proof.
 
 All identifiers, keys, credentials, addresses, timestamps, and endpoints in
 the artifact are synthetic non-production fixtures. The completion device API
@@ -74,6 +85,33 @@ value must be a positive integer. No other success or error may add fields.
 | `IssueRegistrationOTP` | `assignment_ticket`, credential key id and secret, peer key, agent id, observed source address | `{}` | `invalid_request`, `rejected`, `email_unavailable`, `rate_limited`, `send_failed`, `unavailable` |
 | `ActivateRegistration` | `assignment_ticket`, credential key id, registration credential, peer key, agent id, hostname, agent version | `{}` | `invalid_request`, `credential_rejected`, `ticket_invalid`, `not_yet_valid`, `ticket_expired`, `identity_conflict`, `quota`, `reenrollment_required`, `unavailable` |
 | `CompleteRegistration` | peer key, agent id, device API key | `device_api_key_id` only | `invalid_request`, `identity_rejected`, `quota`, `conflict`, `unavailable` |
+| `MutateProofAgent` | replay id, mutation, proof agent id, grant correlation id, and mutation-specific fields | strict result union described below | `invalid_request`, `identity_rejected`, `directive_absent`, `directive_expired`, `reassignment_in_progress`, `unavailable` |
+
+`MutateProofAgent` is a proof-controller operation, not an NHP worker
+operation. Its request union is exact:
+
+- `arm` requires `pinned_cell_id`, `target_cell_id`, and positive
+  `lease_seconds`;
+- `move` requires only `target_cell_id`;
+- `expire_lease` requires only positive `lease_seconds`.
+
+Conditional members for a different mutation are unknown fields, not ignored
+options. The move golden is the primary request/success pair;
+`additional_request_goldens` and `additional_success_goldens` freeze the arm
+and expiry pairs.
+
+Each success result begins with its required `mutation` discriminator:
+
+- `arm` returns the agent, pinned and target cells, lease seconds, grant
+  correlation id, and mutation timestamp;
+- `move` returns the agent, previous cell/generation, new cell/generation,
+  lease expiry, and mutation timestamp. The cells differ and the new generation
+  is exactly the previous generation plus one;
+- `expire_lease` returns the agent, new lease expiry, and mutation timestamp.
+
+All three results are closed exact-member objects. A mixed union rejects.
+Mutation timestamps and lease expiries are canonical whole-second UTC values,
+and mutation precedes expiry where an expiry is present.
 
 The synthetic `IssueAssignment` success golden uses registration
 `key_kind=account`. Consumers must accept the complete frozen public vocabulary:
@@ -101,6 +139,10 @@ hostname.
 
 - `authority_response` maps a validated private success or semantic error;
 - `nhp_preinvoke` maps a worker admission decision made before invocation.
+
+`MutateProofAgent.public_mapping_cases` is exactly empty. The operation is
+invoked only through its sandbox proof alias and must not enter an NHP
+production dispatch table or numeric-code mapping.
 
 Registration-disabled `52107` is Issue/enroll-only. Assignment admission
 `52204` is a pre-invoke outcome for both Issue and Refresh and is not a private
@@ -140,11 +182,13 @@ For each operation, a consumer should:
 2. reject duplicate keys, trailing data, and non-object roots;
 3. require exact member names, presence, null policy, types, and version lexeme;
 4. validate operation-specific semantics and producer-domain fences;
-5. accept the request and success goldens byte-for-byte;
+5. accept the request and success goldens byte-for-byte, including every
+   additional proof-mutation golden;
 6. parse each semantic error and require its exact canonical response bytes;
 7. prove every reject fails for the named reject class;
 8. map every private or pre-invoke outcome to the exact NHP action, body, and
-   recovery action in `public_mapping_cases`.
+   recovery action in `public_mapping_cases`, except that the proof-only
+   operation must have no mappings.
 
 The Go loader performs these checks independently when loading the embedded
 artifact. npm and Python expose byte-identical synchronized copies; their CI
