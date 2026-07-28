@@ -155,6 +155,12 @@ jobs:
           );
           const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent'];
           const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration'];
+          const proofMutationRejectNames = new Set(['reject_unknown_field', 'reject_wrong_type', 'reject_missing_field']);
+          const proofMutationRejects = Object.fromEntries(
+            u.operations.MutateProofAgent.request_rejects
+              .filter(v => proofMutationRejectNames.has(v.name))
+              .map(v => [v.name, JSON.parse(v.body_json)])
+          );
           const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
@@ -414,8 +420,13 @@ jobs:
               u.operations.MutateProofAgent.additional_request_goldens.length !== 2 ||
               u.operations.MutateProofAgent.additional_success_goldens.length !== 2 ||
               u.operations.MutateProofAgent.public_mapping_cases.length !== 0 ||
+              proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
+              !Object.hasOwn(proofMutationRejects.reject_unknown_field, 'pinned_cell_id') ||
+              proofMutationRejects.reject_wrong_type.mutation !== 'expire_lease' ||
+              proofMutationRejects.reject_missing_field.mutation !== 'arm' ||
+              Object.hasOwn(proofMutationRejects.reject_missing_field, 'pinned_cell_id') ||
               u.fixtures.device_api_key === u.fixtures.credential ||
-              Object.values(u.operations).some(op => JSON.stringify({success: op.success_golden, errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
+              Object.values(u.operations).some(op => JSON.stringify({successes: [op.success_golden, ...(op.additional_success_goldens ?? [])], errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
               Object.values(u.operations).some(op => op.public_mapping_cases.some(v => (v.nhp_body_json || '').includes(u.fixtures.device_api_key))) ||
               !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
               activationUnavailable?.nhp_action !== 'drop_no_reply' ||
@@ -539,6 +550,11 @@ jobs:
           }
           global_authority_operations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent']
           cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration']
+          proof_mutation_rejects = {
+              value['name']: json.loads(value['body_json'])
+              for value in u['operations']['MutateProofAgent']['request_rejects']
+              if value['name'] in {'reject_unknown_field', 'reject_wrong_type', 'reject_missing_field'}
+          }
           activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
@@ -803,9 +819,14 @@ jobs:
           assert len(u['operations']['MutateProofAgent']['additional_request_goldens']) == 2
           assert len(u['operations']['MutateProofAgent']['additional_success_goldens']) == 2
           assert u['operations']['MutateProofAgent']['public_mapping_cases'] == []
+          assert proof_mutation_rejects['reject_unknown_field']['mutation'] == 'move'
+          assert 'pinned_cell_id' in proof_mutation_rejects['reject_unknown_field']
+          assert proof_mutation_rejects['reject_wrong_type']['mutation'] == 'expire_lease'
+          assert proof_mutation_rejects['reject_missing_field']['mutation'] == 'arm'
+          assert 'pinned_cell_id' not in proof_mutation_rejects['reject_missing_field']
           assert u['fixtures']['device_api_key'] != u['fixtures']['credential']
           assert all(u['fixtures']['hub_request_id'] not in json.dumps({
-              'success': operation['success_golden'],
+              'successes': [operation['success_golden'], *operation.get('additional_success_goldens', [])],
               'errors': operation['semantic_errors'],
               'mappings': operation['public_mapping_cases'],
           }) for operation in u['operations'].values())

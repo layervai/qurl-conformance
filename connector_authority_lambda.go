@@ -65,14 +65,17 @@ var connectorAuthorityOperationNames = []string{
 }
 
 var (
-	connectorAuthorityAgentIDPattern                 = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
-	connectorAuthorityCellIDPattern                  = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
-	connectorAuthorityDNSLabelPattern                = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
-	connectorAuthorityHubRequestIDPattern            = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	connectorAuthorityGrantCorrelationIDPattern      = regexp.MustCompile(`^nhp-[1-9][0-9]*-[1-9][0-9]*-(?:connector|qurl_go)-(?:pre_removal|post_removal)-[0-9a-f]{32}$`)
-	connectorAuthorityProofAgentIDFixturePrefix      = "qurl-go-sandbox-"
+	connectorAuthorityAgentIDPattern            = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
+	connectorAuthorityCellIDPattern             = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
+	connectorAuthorityDNSLabelPattern           = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	connectorAuthorityHubRequestIDPattern       = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	connectorAuthorityGrantCorrelationIDPattern = regexp.MustCompile(`^nhp-[1-9][0-9]*-[1-9][0-9]*-(?:connector|qurl_go)-(?:pre_removal|post_removal)-[0-9a-f]{32}$`)
+	// Every append site must clone this closed base slice first so one
+	// mutation-specific allowlist cannot change another request's shape.
 	connectorAuthorityMutateProofAgentRequestMembers = []string{"version", "hub_request_id", "mutation", "agent_id", "grant_correlation_id"}
 )
+
+const connectorAuthorityProofAgentIDFixturePrefix = "qurl-go-sandbox-"
 
 // ConnectorAuthorityLambdaFile freezes the private synchronous invocation
 // bodies shared by authority handlers and NHP workers. It does not define a
