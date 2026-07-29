@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0](https://github.com/layervai/qurl-conformance/compare/v0.9.0...v0.10.0) (2026-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** freeze proof mutation control ([#67](https://github.com/layervai/qurl-conformance/issues/67))
+
+### Features
+
+* **vectors:** freeze proof mutation control ([#67](https://github.com/layervai/qurl-conformance/issues/67)) ([d0893ac](https://github.com/layervai/qurl-conformance/commit/d0893aca7ebccd54c339b4b5c257fe764d5ac506))
+
 ## [0.9.0](https://github.com/layervai/qurl-conformance/compare/v0.8.1...v0.9.0) (2026-07-19)
 
 
