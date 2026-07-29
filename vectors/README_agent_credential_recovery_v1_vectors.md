@@ -89,10 +89,11 @@ serialized body and never remints an outcome. An exact Issue replay may return
 its stored result after the bound credential is revoked, but the cell's live
 credential-status check prevents that replay from completing.
 
-`connector_authority_lambda_v1_vectors.json` remains the closed five-operation
-assignment and registration artifact. Recovery producers compose that existing
-artifact with this additive two-operation artifact; they must not infer
-recovery operations from the older five-operation set or silently extend it.
+`connector_authority_lambda_v1_vectors.json` remains the closed artifact for
+five assignment/registration operations plus the isolated proof-mutation
+control. Recovery producers compose that existing artifact with this additive
+two-operation artifact; they must not infer recovery operations from the base
+operation set or silently extend it.
 
 ## Crash and time contract
 

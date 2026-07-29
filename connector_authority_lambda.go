@@ -37,12 +37,22 @@ const (
 	ConnectorAuthorityLambdaTimestampFormat               = "RFC3339_UTC_WHOLE_SECONDS"
 	ConnectorAuthorityLambdaHubRequestIDFormat            = "lowercase_sha256_hex"
 	ConnectorAuthorityLambdaResponseRule                  = "exactly_one_of_result_or_error"
+	ConnectorAuthorityProofMutationReplayLifetimeSeconds  = 900
+	ConnectorAuthorityProofMutationTombstoneSeconds       = 86400
+	ConnectorAuthorityProofMutationPendingRecoverySeconds = 300
+	ConnectorAuthorityProofMutationExactReplayOutcome     = "byte_identical_success"
+	ConnectorAuthorityProofMutationChangedReplayOutcome   = "invalid_request_before_mutation"
+	ConnectorAuthorityProofMutationFenceRule              = "conditional_exact_fingerprint_command_write_atomic_with_first_mutation"
+	ConnectorAuthorityProofMutationCommitRule             = "arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic"
+	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window"
+	ConnectorAuthorityProofMutationExpiredIDOutcome       = "expired_first_seen_or_terminal_unavailable_without_mutation"
 
 	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
 	ConnectorAuthorityOperationRefreshAssignment    = "RefreshAssignment"
 	ConnectorAuthorityOperationIssueRegistrationOTP = "IssueRegistrationOTP"
 	ConnectorAuthorityOperationActivateRegistration = "ActivateRegistration"
 	ConnectorAuthorityOperationCompleteRegistration = "CompleteRegistration"
+	ConnectorAuthorityOperationMutateProofAgent     = "MutateProofAgent"
 
 	ConnectorAuthorityMappingSourceResponse  = "authority_response"
 	ConnectorAuthorityMappingSourcePreInvoke = "nhp_preinvoke"
@@ -60,14 +70,21 @@ var connectorAuthorityOperationNames = []string{
 	ConnectorAuthorityOperationIssueRegistrationOTP,
 	ConnectorAuthorityOperationActivateRegistration,
 	ConnectorAuthorityOperationCompleteRegistration,
+	ConnectorAuthorityOperationMutateProofAgent,
 }
 
 var (
-	connectorAuthorityAgentIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
-	connectorAuthorityCellIDPattern       = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
-	connectorAuthorityDNSLabelPattern     = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
-	connectorAuthorityHubRequestIDPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	connectorAuthorityAgentIDPattern            = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
+	connectorAuthorityCellIDPattern             = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
+	connectorAuthorityDNSLabelPattern           = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	connectorAuthorityHubRequestIDPattern       = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	connectorAuthorityGrantCorrelationIDPattern = regexp.MustCompile(`^nhp-[1-9][0-9]*-[1-9][0-9]*-(?:connector|qurl_go)-(?:pre_removal|post_removal)-[0-9a-f]{32}$`)
+	// Every append site must clone this closed base slice first so one
+	// mutation-specific allowlist cannot change another request's shape.
+	connectorAuthorityMutateProofAgentRequestMembers = []string{"version", "hub_request_id", "mutation", "agent_id", "grant_correlation_id"}
 )
+
+const connectorAuthorityProofAgentIDFixturePrefix = "qurl-go-sandbox-"
 
 // ConnectorAuthorityLambdaFile freezes the private synchronous invocation
 // bodies shared by authority handlers and NHP workers. It does not define a
@@ -117,17 +134,46 @@ type ConnectorAuthorityLambdaFixtures struct {
 	NHPPort                       int    `json:"nhp_port"`
 	ServerPublicKeyB64            string `json:"server_public_key_b64"`
 	AssignmentTicketExpiresAt     string `json:"assignment_ticket_expires_at"`
+	ProofAgentID                  string `json:"proof_agent_id"`
+	ProofGrantCorrelationID       string `json:"proof_grant_correlation_id"`
+	ProofPinnedCellID             string `json:"proof_pinned_cell_id"`
+	ProofTargetCellID             string `json:"proof_target_cell_id"`
+	ProofLeaseSeconds             int64  `json:"proof_lease_seconds"`
+	ProofPreviousGeneration       int64  `json:"proof_previous_assignment_generation"`
+	ProofNewGeneration            int64  `json:"proof_new_assignment_generation"`
+	ProofLeaseExpiresAt           string `json:"proof_lease_expires_at"`
+	ProofMutatedAt                string `json:"proof_mutated_at"`
 }
 
 // ConnectorAuthorityLambdaOperation is one separately permissioned function's
 // complete request, response, reject, and public-mapping contract.
 type ConnectorAuthorityLambdaOperation struct {
-	RequestGolden           ConnectorAuthorityLambdaBodyCase     `json:"request_golden"`
-	SuccessGolden           ConnectorAuthorityLambdaBodyCase     `json:"success_golden"`
-	SemanticErrors          []ConnectorAuthorityLambdaErrorCase  `json:"semantic_errors"`
-	RequestRejects          []ConnectorAuthorityLambdaRejectCase `json:"request_rejects"`
-	ResponseProducerRejects []ConnectorAuthorityLambdaRejectCase `json:"response_producer_rejects"`
-	PublicMappingCases      []ConnectorAuthorityPublicMapping    `json:"public_mapping_cases"`
+	ReplayContract           *ConnectorAuthorityProofMutationReplayContract `json:"replay_contract,omitempty"`
+	RequestGolden            ConnectorAuthorityLambdaBodyCase               `json:"request_golden"`
+	AdditionalRequestGoldens []ConnectorAuthorityLambdaBodyCase             `json:"additional_request_goldens,omitempty"`
+	SuccessGolden            ConnectorAuthorityLambdaBodyCase               `json:"success_golden"`
+	AdditionalSuccessGoldens []ConnectorAuthorityLambdaBodyCase             `json:"additional_success_goldens,omitempty"`
+	SemanticErrors           []ConnectorAuthorityLambdaErrorCase            `json:"semantic_errors"`
+	RequestRejects           []ConnectorAuthorityLambdaRejectCase           `json:"request_rejects"`
+	ResponseProducerRejects  []ConnectorAuthorityLambdaRejectCase           `json:"response_producer_rejects"`
+	PublicMappingCases       []ConnectorAuthorityPublicMapping              `json:"public_mapping_cases"`
+}
+
+// ConnectorAuthorityProofMutationReplayContract freezes the behavioral
+// meaning of MutateProofAgent's private hub_request_id. It is deliberately
+// absent from the five runtime operations, whose replay contracts are owned by
+// their existing operation-specific artifacts and services.
+type ConnectorAuthorityProofMutationReplayContract struct {
+	LogicalLifetimeSeconds int      `json:"logical_lifetime_seconds"`
+	TombstoneSeconds       int      `json:"tombstone_seconds_after_logical_expiry"`
+	PendingRecoverySeconds int      `json:"pending_recovery_seconds_after_logical_expiry"`
+	FingerprintFields      []string `json:"fingerprint_fields"`
+	ExactReplayOutcome     string   `json:"exact_replay_outcome"`
+	ChangedReplayOutcome   string   `json:"changed_replay_outcome"`
+	MutationFenceRule      string   `json:"mutation_fence_rule"`
+	CommitRule             string   `json:"commit_rule"`
+	PendingMoveResumeRule  string   `json:"pending_move_resume_rule"`
+	ExpiredIDOutcome       string   `json:"expired_id_outcome"`
 }
 
 // ConnectorAuthorityLambdaBodyCase preserves exact raw JSON bytes for a valid
@@ -215,6 +261,21 @@ type ConnectorAuthorityCompleteRegistrationRequest struct {
 	DeviceAPIKey                  string `json:"device_api_key"`
 }
 
+// ConnectorAuthorityMutateProofAgentRequest is the sandbox-only attended-proof
+// control request. Its final three members form a closed union selected by
+// Mutation: arm requires all three, move requires only TargetCellID, and
+// expire_lease requires only LeaseSeconds.
+type ConnectorAuthorityMutateProofAgentRequest struct {
+	Version            int     `json:"version"`
+	HubRequestID       string  `json:"hub_request_id"`
+	Mutation           string  `json:"mutation"`
+	AgentID            string  `json:"agent_id"`
+	GrantCorrelationID string  `json:"grant_correlation_id"`
+	PinnedCellID       *string `json:"pinned_cell_id,omitempty"`
+	TargetCellID       *string `json:"target_cell_id,omitempty"`
+	LeaseSeconds       *int64  `json:"lease_seconds,omitempty"`
+}
+
 // ConnectorAuthorityAssignmentResult is the only placement result shape. The
 // initial operation additionally wraps registration metadata and a ticket;
 // refresh does not.
@@ -252,6 +313,34 @@ type ConnectorAuthorityRefreshAssignmentResult struct {
 
 type ConnectorAuthorityCompleteRegistrationResult struct {
 	DeviceAPIKeyID string `json:"device_api_key_id"`
+}
+
+type ConnectorAuthorityMutateProofAgentArmResult struct {
+	Mutation           string `json:"mutation"`
+	AgentID            string `json:"agent_id"`
+	PinnedCellID       string `json:"pinned_cell_id"`
+	TargetCellID       string `json:"target_cell_id"`
+	LeaseSeconds       int64  `json:"lease_seconds"`
+	GrantCorrelationID string `json:"grant_correlation_id"`
+	MutatedAt          string `json:"mutated_at"`
+}
+
+type ConnectorAuthorityMutateProofAgentMoveResult struct {
+	Mutation                     string `json:"mutation"`
+	AgentID                      string `json:"agent_id"`
+	PreviousCellID               string `json:"previous_cell_id"`
+	PreviousAssignmentGeneration int64  `json:"previous_assignment_generation"`
+	NewCellID                    string `json:"new_cell_id"`
+	NewAssignmentGeneration      int64  `json:"new_assignment_generation"`
+	LeaseExpiresAt               string `json:"lease_expires_at"`
+	MutatedAt                    string `json:"mutated_at"`
+}
+
+type ConnectorAuthorityMutateProofAgentExpireLeaseResult struct {
+	Mutation       string `json:"mutation"`
+	AgentID        string `json:"agent_id"`
+	LeaseExpiresAt string `json:"lease_expires_at"`
+	MutatedAt      string `json:"mutated_at"`
 }
 
 type connectorAuthorityResponseEnvelope struct {
@@ -358,10 +447,35 @@ func validateConnectorAuthorityFixtures(f ConnectorAuthorityLambdaFixtures) erro
 	if !ticketExpiry.Before(lease) {
 		return errors.New("conformance: Connector Authority fixture ticket expiry must precede lease expiry")
 	}
+	if !strings.HasPrefix(f.ProofAgentID, connectorAuthorityProofAgentIDFixturePrefix) ||
+		!connectorAuthorityAgentIDPattern.MatchString(f.ProofAgentID) ||
+		!connectorAuthorityGrantCorrelationIDPattern.MatchString(f.ProofGrantCorrelationID) ||
+		!connectorAuthorityCellIDPattern.MatchString(f.ProofPinnedCellID) ||
+		!connectorAuthorityCellIDPattern.MatchString(f.ProofTargetCellID) ||
+		f.ProofPinnedCellID == f.ProofTargetCellID ||
+		f.ProofLeaseSeconds < 1 ||
+		f.ProofPreviousGeneration < 1 ||
+		f.ProofNewGeneration != f.ProofPreviousGeneration+1 {
+		return errors.New("conformance: Connector Authority proof fixture metadata is invalid")
+	}
+	proofLease, err := parseConnectorAuthorityTimestamp(f.ProofLeaseExpiresAt)
+	if err != nil {
+		return fmt.Errorf("conformance: Connector Authority proof fixture lease: %w", err)
+	}
+	proofMutation, err := parseConnectorAuthorityTimestamp(f.ProofMutatedAt)
+	if err != nil {
+		return fmt.Errorf("conformance: Connector Authority proof fixture mutation time: %w", err)
+	}
+	if !proofMutation.Before(proofLease) {
+		return errors.New("conformance: Connector Authority proof fixture mutation time must precede lease expiry")
+	}
 	return nil
 }
 
 func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
+	if err := validateConnectorAuthorityReplayContract(name, op.ReplayContract); err != nil {
+		return err
+	}
 	if op.RequestGolden.Name != "accept_request" || op.SuccessGolden.Name != "accept_success" {
 		return fmt.Errorf("conformance: Connector Authority %s golden names are not canonical", name)
 	}
@@ -380,6 +494,9 @@ func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambd
 	if err := validateConnectorAuthorityGoldenSuccess(name, op.SuccessGolden.BodyJSON, f); err != nil {
 		return err
 	}
+	if err := validateConnectorAuthorityAdditionalGoldens(name, op, f); err != nil {
+		return err
+	}
 	if err := validateConnectorAuthoritySemanticErrors(name, op.SemanticErrors); err != nil {
 		return err
 	}
@@ -390,6 +507,88 @@ func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambd
 		return err
 	}
 	return validateConnectorAuthorityMappings(name, op, f)
+}
+
+func validateConnectorAuthorityReplayContract(
+	operation string,
+	contract *ConnectorAuthorityProofMutationReplayContract,
+) error {
+	if operation != ConnectorAuthorityOperationMutateProofAgent {
+		if contract != nil {
+			return fmt.Errorf("conformance: Connector Authority %s has an unexpected proof replay contract", operation)
+		}
+		return nil
+	}
+	if contract == nil ||
+		contract.LogicalLifetimeSeconds != ConnectorAuthorityProofMutationReplayLifetimeSeconds ||
+		contract.TombstoneSeconds != ConnectorAuthorityProofMutationTombstoneSeconds ||
+		contract.PendingRecoverySeconds != ConnectorAuthorityProofMutationPendingRecoverySeconds ||
+		!slices.Equal(contract.FingerprintFields, connectorAuthorityProofMutationFingerprintFields()) ||
+		contract.ExactReplayOutcome != ConnectorAuthorityProofMutationExactReplayOutcome ||
+		contract.ChangedReplayOutcome != ConnectorAuthorityProofMutationChangedReplayOutcome ||
+		contract.MutationFenceRule != ConnectorAuthorityProofMutationFenceRule ||
+		contract.CommitRule != ConnectorAuthorityProofMutationCommitRule ||
+		contract.PendingMoveResumeRule != ConnectorAuthorityProofMutationPendingMoveResumeRule ||
+		contract.ExpiredIDOutcome != ConnectorAuthorityProofMutationExpiredIDOutcome {
+		return errors.New("conformance: Connector Authority MutateProofAgent replay contract is not canonical")
+	}
+	return nil
+}
+
+func connectorAuthorityProofMutationFingerprintFields() []string {
+	return []string{
+		"version",
+		"mutation",
+		"agent_id",
+		"grant_correlation_id",
+		"pinned_cell_id_if_arm",
+		"target_cell_id_if_arm_or_move",
+		"lease_seconds_if_arm_or_expire_lease",
+	}
+}
+
+func validateConnectorAuthorityAdditionalGoldens(operation string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
+	if operation != ConnectorAuthorityOperationMutateProofAgent {
+		if len(op.AdditionalRequestGoldens) != 0 || len(op.AdditionalSuccessGoldens) != 0 {
+			return fmt.Errorf("conformance: Connector Authority %s has unexpected additional goldens", operation)
+		}
+		return nil
+	}
+	requestModes := []string{"arm", "expire_lease"}
+	if len(op.AdditionalRequestGoldens) != len(requestModes) || len(op.AdditionalSuccessGoldens) != len(requestModes) {
+		return errors.New("conformance: Connector Authority MutateProofAgent additional golden count is not canonical")
+	}
+	for index, mutation := range requestModes {
+		requestCase := op.AdditionalRequestGoldens[index]
+		if requestCase.Name != "accept_"+mutation+"_request" {
+			return fmt.Errorf("conformance: Connector Authority MutateProofAgent additional request golden %d has noncanonical name", index)
+		}
+		wantRequest, err := connectorAuthorityMutateProofAgentGoldenRequest(mutation, f)
+		if err != nil || requestCase.BodyJSON != wantRequest {
+			return fmt.Errorf("conformance: Connector Authority MutateProofAgent %s request golden is not canonical", mutation)
+		}
+		if err := validateConnectorAuthorityRequest(operation, []byte(requestCase.BodyJSON)); err != nil {
+			return fmt.Errorf("conformance: Connector Authority MutateProofAgent %s request golden: %w", mutation, err)
+		}
+
+		successCase := op.AdditionalSuccessGoldens[index]
+		if successCase.Name != "accept_"+mutation+"_success" {
+			return fmt.Errorf("conformance: Connector Authority MutateProofAgent additional success golden %d has noncanonical name", index)
+		}
+		wantSuccess, err := connectorAuthorityMutateProofAgentGoldenSuccess(mutation, f)
+		if err != nil || successCase.BodyJSON != wantSuccess {
+			return fmt.Errorf("conformance: Connector Authority MutateProofAgent %s success golden is not canonical", mutation)
+		}
+		if outcome, err := validateConnectorAuthorityResponse(operation, []byte(successCase.BodyJSON)); err != nil || outcome != "success" {
+			return fmt.Errorf(
+				"conformance: Connector Authority MutateProofAgent %s success golden: outcome=%q err=%v",
+				mutation,
+				outcome,
+				err,
+			)
+		}
+	}
+	return nil
 }
 
 func validateConnectorAuthorityRequest(operation string, data []byte) error {
@@ -457,6 +656,36 @@ func validateConnectorAuthorityRequest(operation string, data []byte) error {
 			!connectorAuthorityAgentIDPattern.MatchString(request.AgentID) || !isConnectorAuthorityAPIKey(request.DeviceAPIKey) {
 			return errors.New("invalid CompleteRegistration request semantics")
 		}
+	case ConnectorAuthorityOperationMutateProofAgent:
+		var request ConnectorAuthorityMutateProofAgentRequest
+		if err := strictDecodeArtifact(data, &request); err != nil {
+			return err
+		}
+		if request.Version != 1 ||
+			!connectorAuthorityHubRequestIDPattern.MatchString(request.HubRequestID) ||
+			!connectorAuthorityAgentIDPattern.MatchString(request.AgentID) ||
+			!connectorAuthorityGrantCorrelationIDPattern.MatchString(request.GrantCorrelationID) {
+			return errors.New("invalid MutateProofAgent request semantics")
+		}
+		switch request.Mutation {
+		case "arm":
+			if request.PinnedCellID == nil || request.TargetCellID == nil || request.LeaseSeconds == nil ||
+				!connectorAuthorityCellIDPattern.MatchString(*request.PinnedCellID) ||
+				!connectorAuthorityCellIDPattern.MatchString(*request.TargetCellID) ||
+				*request.PinnedCellID == *request.TargetCellID || *request.LeaseSeconds < 1 {
+				return errors.New("invalid MutateProofAgent arm request semantics")
+			}
+		case "move":
+			if request.TargetCellID == nil || !connectorAuthorityCellIDPattern.MatchString(*request.TargetCellID) {
+				return errors.New("invalid MutateProofAgent move request semantics")
+			}
+		case "expire_lease":
+			if request.LeaseSeconds == nil || *request.LeaseSeconds < 1 {
+				return errors.New("invalid MutateProofAgent expire_lease request semantics")
+			}
+		default:
+			return errors.New("invalid MutateProofAgent mutation")
+		}
 	default:
 		return fmt.Errorf("unknown operation %q", operation)
 	}
@@ -464,6 +693,9 @@ func validateConnectorAuthorityRequest(operation string, data []byte) error {
 }
 
 func requireConnectorAuthorityRequestMembers(operation string, data []byte) error {
+	if operation == ConnectorAuthorityOperationMutateProofAgent {
+		return requireConnectorAuthorityMutateProofAgentRequestMembers(data)
+	}
 	required, err := connectorAuthorityRequestMembers(operation)
 	if err != nil {
 		return err
@@ -484,9 +716,85 @@ func connectorAuthorityRequestMembers(operation string) ([]string, error) {
 		return []string{"version", "assignment_ticket", "credential_key_id", "registration_credential", "authenticated_peer_public_key_b64", "agent_id", "hostname", "agent_version"}, nil
 	case ConnectorAuthorityOperationCompleteRegistration:
 		return []string{"version", "authenticated_peer_public_key_b64", "agent_id", "device_api_key"}, nil
+	case ConnectorAuthorityOperationMutateProofAgent:
+		return slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), nil
 	default:
 		return nil, fmt.Errorf("unknown operation %q", operation)
 	}
+}
+
+// connectorAuthorityMutateProofAgentConditionalMembers returns the mutation-specific
+// request members that a MutateProofAgent mutation admits on top of the shared base
+// members, and false when the discriminator is not a frozen union arm. It is the single
+// source of the closed per-mutation union so the member requirer and reject classifier
+// cannot drift apart.
+func connectorAuthorityMutateProofAgentConditionalMembers(mutation string) ([]string, bool) {
+	switch mutation {
+	case "arm":
+		return []string{"pinned_cell_id", "target_cell_id", "lease_seconds"}, true
+	case "move":
+		return []string{"target_cell_id"}, true
+	case "expire_lease":
+		return []string{"lease_seconds"}, true
+	default:
+		return nil, false
+	}
+}
+
+// connectorAuthorityMutateProofAgentMemberUnion folds the members every mutation arm
+// admits into a single first-seen-order union. Parameterizing it by the per-mutation
+// member accessor keeps both the request and result supersets derived from one fold over
+// the same discriminator order, so a new arm cannot slip into one superset but not the other.
+func connectorAuthorityMutateProofAgentMemberUnion(members func(string) ([]string, bool)) []string {
+	union := []string{}
+	for _, mutation := range []string{"arm", "move", "expire_lease"} {
+		arm, _ := members(mutation)
+		for _, member := range arm {
+			if !slices.Contains(union, member) {
+				union = append(union, member)
+			}
+		}
+	}
+	return union
+}
+
+// connectorAuthorityMutateProofAgentAllConditionalMembers returns the union of every
+// mutation arm's conditional members, in first-seen order. It is the allowed superset for
+// the exact-object shape check, folded over connectorAuthorityMutateProofAgentConditionalMembers
+// so the accepted superset cannot drift from the per-arm required sets it is derived from.
+func connectorAuthorityMutateProofAgentAllConditionalMembers() []string {
+	return connectorAuthorityMutateProofAgentMemberUnion(connectorAuthorityMutateProofAgentConditionalMembers)
+}
+
+// connectorAuthorityMutateProofAgentRequiredMembers returns the exact request member
+// set for a MutateProofAgent mutation (the shared base plus the arm's conditional
+// members), and false when the discriminator is not a frozen union arm. The member
+// requirer and the reject classifier both derive their required set here so the
+// acceptor and the reject classifier cannot drift apart.
+func connectorAuthorityMutateProofAgentRequiredMembers(mutation string) ([]string, bool) {
+	conditional, ok := connectorAuthorityMutateProofAgentConditionalMembers(mutation)
+	if !ok {
+		return nil, false
+	}
+	return append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), conditional...), true
+}
+
+func requireConnectorAuthorityMutateProofAgentRequestMembers(data []byte) error {
+	allowed := append(slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
+	object, err := validateConnectorAuthorityExactObject(data, connectorAuthorityMutateProofAgentRequestMembers, allowed)
+	if err != nil {
+		return err
+	}
+	var mutation string
+	if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
+		return errors.New("mutation must be a string")
+	}
+	required, ok := connectorAuthorityMutateProofAgentRequiredMembers(mutation)
+	if !ok {
+		return errors.New("invalid MutateProofAgent mutation")
+	}
+	_, err = validateConnectorAuthorityExactObject(data, required, required)
+	return err
 }
 
 func validateConnectorAuthorityResponse(operation string, data []byte) (string, error) {
@@ -617,9 +925,102 @@ func validateConnectorAuthorityResult(operation string, raw []byte) error {
 			return errors.New("invalid CompleteRegistration device_api_key_id")
 		}
 		return nil
+	case ConnectorAuthorityOperationMutateProofAgent:
+		return validateConnectorAuthorityMutateProofAgentResult(raw)
 	default:
 		return fmt.Errorf("unknown operation %q", operation)
 	}
+}
+
+// connectorAuthorityMutateProofAgentResultMembers returns the exact result member set
+// for a MutateProofAgent mutation, and false when the discriminator is not a frozen
+// union arm. It is the single source of the per-arm result shape so the base superset
+// check and each arm's exact check cannot drift apart.
+func connectorAuthorityMutateProofAgentResultMembers(mutation string) ([]string, bool) {
+	switch mutation {
+	case "arm":
+		return []string{"mutation", "agent_id", "pinned_cell_id", "target_cell_id", "lease_seconds", "grant_correlation_id", "mutated_at"}, true
+	case "move":
+		return []string{"mutation", "agent_id", "previous_cell_id", "previous_assignment_generation", "new_cell_id", "new_assignment_generation", "lease_expires_at", "mutated_at"}, true
+	case "expire_lease":
+		return []string{"mutation", "agent_id", "lease_expires_at", "mutated_at"}, true
+	default:
+		return nil, false
+	}
+}
+
+// connectorAuthorityMutateProofAgentAllResultMembers returns the union of every result
+// arm's members, in first-seen order, as the allowed superset for the base shape check.
+// Folding over connectorAuthorityMutateProofAgentResultMembers keeps the superset from
+// drifting away from the per-arm exact sets it is derived from.
+func connectorAuthorityMutateProofAgentAllResultMembers() []string {
+	return connectorAuthorityMutateProofAgentMemberUnion(connectorAuthorityMutateProofAgentResultMembers)
+}
+
+func validateConnectorAuthorityMutateProofAgentResult(raw []byte) error {
+	base, err := validateConnectorAuthorityExactObject(raw, []string{"mutation", "agent_id"}, connectorAuthorityMutateProofAgentAllResultMembers())
+	if err != nil {
+		return err
+	}
+	var mutation string
+	if err := json.Unmarshal(base["mutation"], &mutation); err != nil {
+		return errors.New("mutation result discriminator must be a string")
+	}
+	members, ok := connectorAuthorityMutateProofAgentResultMembers(mutation)
+	if !ok {
+		return fmt.Errorf("unknown MutateProofAgent result mutation %q", mutation)
+	}
+	if _, err := validateConnectorAuthorityExactObject(raw, members, members); err != nil {
+		return err
+	}
+	switch mutation {
+	case "arm":
+		var result ConnectorAuthorityMutateProofAgentArmResult
+		if err := strictDecodeArtifact(raw, &result); err != nil {
+			return err
+		}
+		if !connectorAuthorityAgentIDPattern.MatchString(result.AgentID) ||
+			!connectorAuthorityCellIDPattern.MatchString(result.PinnedCellID) ||
+			!connectorAuthorityCellIDPattern.MatchString(result.TargetCellID) ||
+			result.PinnedCellID == result.TargetCellID || result.LeaseSeconds < 1 ||
+			!connectorAuthorityGrantCorrelationIDPattern.MatchString(result.GrantCorrelationID) ||
+			validateConnectorAuthorityTimestamp(result.MutatedAt) != nil {
+			return errors.New("invalid MutateProofAgent arm result semantics")
+		}
+	case "move":
+		var result ConnectorAuthorityMutateProofAgentMoveResult
+		if err := strictDecodeArtifact(raw, &result); err != nil {
+			return err
+		}
+		if !connectorAuthorityAgentIDPattern.MatchString(result.AgentID) ||
+			!connectorAuthorityCellIDPattern.MatchString(result.PreviousCellID) ||
+			!connectorAuthorityCellIDPattern.MatchString(result.NewCellID) ||
+			result.PreviousCellID == result.NewCellID ||
+			result.PreviousAssignmentGeneration < 1 ||
+			result.NewAssignmentGeneration != result.PreviousAssignmentGeneration+1 ||
+			!connectorAuthorityMutationPrecedesLease(result.MutatedAt, result.LeaseExpiresAt) {
+			return errors.New("invalid MutateProofAgent move result semantics")
+		}
+	case "expire_lease":
+		var result ConnectorAuthorityMutateProofAgentExpireLeaseResult
+		if err := strictDecodeArtifact(raw, &result); err != nil {
+			return err
+		}
+		if !connectorAuthorityAgentIDPattern.MatchString(result.AgentID) ||
+			!connectorAuthorityMutationPrecedesLease(result.MutatedAt, result.LeaseExpiresAt) {
+			return errors.New("invalid MutateProofAgent expire_lease result semantics")
+		}
+	}
+	return nil
+}
+
+func connectorAuthorityMutationPrecedesLease(mutatedAt, leaseExpiresAt string) bool {
+	mutation, err := parseConnectorAuthorityTimestamp(mutatedAt)
+	if err != nil {
+		return false
+	}
+	lease, err := parseConnectorAuthorityTimestamp(leaseExpiresAt)
+	return err == nil && mutation.Before(lease)
 }
 
 func validateConnectorAuthorityAssignmentRaw(raw []byte) error {
@@ -694,6 +1095,8 @@ func connectorAuthorityGoldenRequest(operation string, f ConnectorAuthorityLambd
 		value = ConnectorAuthorityCompleteRegistrationRequest{
 			Version: 1, AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64, AgentID: f.AgentID, DeviceAPIKey: f.DeviceAPIKey,
 		}
+	case ConnectorAuthorityOperationMutateProofAgent:
+		return connectorAuthorityMutateProofAgentGoldenRequest("move", f)
 	default:
 		return "", fmt.Errorf("unknown operation %q", operation)
 	}
@@ -730,8 +1133,59 @@ func connectorAuthorityGoldenSuccess(operation string, f ConnectorAuthorityLambd
 		result = struct{}{}
 	case ConnectorAuthorityOperationCompleteRegistration:
 		result = ConnectorAuthorityCompleteRegistrationResult{DeviceAPIKeyID: f.DeviceAPIKeyID}
+	case ConnectorAuthorityOperationMutateProofAgent:
+		return connectorAuthorityMutateProofAgentGoldenSuccess("move", f)
 	default:
 		return "", fmt.Errorf("unknown operation %q", operation)
+	}
+	return marshalConnectorAuthorityResponse(result, nil)
+}
+
+func connectorAuthorityMutateProofAgentGoldenRequest(mutation string, f ConnectorAuthorityLambdaFixtures) (string, error) {
+	request := ConnectorAuthorityMutateProofAgentRequest{
+		Version: 1, HubRequestID: f.HubRequestID, Mutation: mutation,
+		AgentID: f.ProofAgentID, GrantCorrelationID: f.ProofGrantCorrelationID,
+	}
+	switch mutation {
+	case "arm":
+		request.PinnedCellID = &f.ProofPinnedCellID
+		request.TargetCellID = &f.ProofTargetCellID
+		request.LeaseSeconds = &f.ProofLeaseSeconds
+	case "move":
+		request.TargetCellID = &f.ProofTargetCellID
+	case "expire_lease":
+		request.LeaseSeconds = &f.ProofLeaseSeconds
+	default:
+		return "", fmt.Errorf("unknown MutateProofAgent request mutation %q", mutation)
+	}
+	encoded, err := json.Marshal(request)
+	return string(encoded), err
+}
+
+func connectorAuthorityMutateProofAgentGoldenSuccess(mutation string, f ConnectorAuthorityLambdaFixtures) (string, error) {
+	var result any
+	switch mutation {
+	case "arm":
+		result = ConnectorAuthorityMutateProofAgentArmResult{
+			Mutation: mutation, AgentID: f.ProofAgentID,
+			PinnedCellID: f.ProofPinnedCellID, TargetCellID: f.ProofTargetCellID,
+			LeaseSeconds: f.ProofLeaseSeconds, GrantCorrelationID: f.ProofGrantCorrelationID,
+			MutatedAt: f.ProofMutatedAt,
+		}
+	case "move":
+		result = ConnectorAuthorityMutateProofAgentMoveResult{
+			Mutation: mutation, AgentID: f.ProofAgentID,
+			PreviousCellID: f.ProofPinnedCellID, PreviousAssignmentGeneration: f.ProofPreviousGeneration,
+			NewCellID: f.ProofTargetCellID, NewAssignmentGeneration: f.ProofNewGeneration,
+			LeaseExpiresAt: f.ProofLeaseExpiresAt, MutatedAt: f.ProofMutatedAt,
+		}
+	case "expire_lease":
+		result = ConnectorAuthorityMutateProofAgentExpireLeaseResult{
+			Mutation: mutation, AgentID: f.ProofAgentID,
+			LeaseExpiresAt: f.ProofLeaseExpiresAt, MutatedAt: f.ProofMutatedAt,
+		}
+	default:
+		return "", fmt.Errorf("unknown MutateProofAgent success mutation %q", mutation)
 	}
 	return marshalConnectorAuthorityResponse(result, nil)
 }
@@ -758,6 +1212,8 @@ func connectorAuthoritySemanticCodes(operation string) []string {
 		return []string{"invalid_request", "credential_rejected", "ticket_invalid", "not_yet_valid", "ticket_expired", "identity_conflict", "quota", "reenrollment_required", "unavailable"}
 	case ConnectorAuthorityOperationCompleteRegistration:
 		return []string{"invalid_request", "identity_rejected", "quota", "conflict", "unavailable"}
+	case ConnectorAuthorityOperationMutateProofAgent:
+		return []string{"invalid_request", "identity_rejected", "directive_absent", "directive_expired", "reassignment_in_progress", "unavailable"}
 	default:
 		return nil
 	}
@@ -894,15 +1350,41 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 	if err != nil {
 		return ""
 	}
-	if class := classifyConnectorAuthorityObjectFields(object, required, required); class != "" {
+	allowed := required
+	if operation == ConnectorAuthorityOperationMutateProofAgent {
+		allowed = append(slices.Clone(required), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
+	}
+	if class := classifyConnectorAuthorityObjectFields(object, required, allowed); class != "" {
 		return class
 	}
 	if class := classifyConnectorAuthorityVersionLexeme(object["version"]); class != "" {
 		return class
 	}
-	// Every non-version member in the closed v1 request set is a JSON string.
-	// Adding another wire type requires extending this classifier and its fixtures.
+	if operation == ConnectorAuthorityOperationMutateProofAgent {
+		if len(object["mutation"]) == 0 || object["mutation"][0] != '"' {
+			return "wrong_type"
+		}
+		var mutation string
+		if err := json.Unmarshal(object["mutation"], &mutation); err != nil {
+			return "wrong_type"
+		}
+		conditionalRequired, ok := connectorAuthorityMutateProofAgentRequiredMembers(mutation)
+		if !ok {
+			return ""
+		}
+		required = conditionalRequired
+		if class := classifyConnectorAuthorityObjectFields(object, required, required); class != "" {
+			return class
+		}
+	}
 	for _, name := range required[1:] {
+		if operation == ConnectorAuthorityOperationMutateProofAgent && name == "lease_seconds" {
+			var seconds int64
+			if len(object[name]) == 0 || json.Unmarshal(object[name], &seconds) != nil {
+				return "wrong_type"
+			}
+			continue
+		}
 		if len(object[name]) == 0 || object[name][0] != '"' {
 			return "wrong_type"
 		}
@@ -1054,6 +1536,12 @@ func connectorAuthorityPreInvokeMappings(operation string) []string {
 }
 
 func validateConnectorAuthorityMappings(operation string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
+	if operation == ConnectorAuthorityOperationMutateProofAgent {
+		if len(op.PublicMappingCases) != 0 {
+			return errors.New("conformance: Connector Authority MutateProofAgent must not define a public NHP mapping")
+		}
+		return nil
+	}
 	preInvoke := connectorAuthorityPreInvokeMappings(operation)
 	wantCount := 1 + len(op.SemanticErrors) + len(preInvoke)
 	if len(op.PublicMappingCases) != wantCount {

@@ -16,8 +16,8 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	if file.Artifact != ConnectorAuthorityLambdaArtifactID || file.SchemaVersion != ConnectorAuthorityLambdaSchemaVersion {
 		t.Fatalf("identity = %q/v%d, want %q/v%d", file.Artifact, file.SchemaVersion, ConnectorAuthorityLambdaArtifactID, ConnectorAuthorityLambdaSchemaVersion)
 	}
-	if len(file.Operations) != 5 {
-		t.Fatalf("operation count = %d, want 5", len(file.Operations))
+	if len(file.Operations) != 6 {
+		t.Fatalf("operation count = %d, want 6", len(file.Operations))
 	}
 	for _, operation := range connectorAuthorityOperationNames {
 		op := file.Operations[operation]
@@ -44,6 +44,88 @@ func TestOpenConnectorAuthorityLambdaArtifact(t *testing.T) {
 	}
 }
 
+func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
+	file, err := ConnectorAuthorityLambda()
+	if err != nil {
+		t.Fatalf("ConnectorAuthorityLambda(): %v", err)
+	}
+	if ConnectorAuthorityOperationMutateProofAgent != "MutateProofAgent" {
+		t.Fatalf("operation constant = %q", ConnectorAuthorityOperationMutateProofAgent)
+	}
+	operation := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+	if len(operation.PublicMappingCases) != 0 {
+		t.Fatalf("proof-only operation has %d public NHP mappings", len(operation.PublicMappingCases))
+	}
+	if err := validateConnectorAuthorityReplayContract(
+		ConnectorAuthorityOperationMutateProofAgent,
+		operation.ReplayContract,
+	); err != nil {
+		t.Fatalf("proof replay contract: %v", err)
+	}
+	if operation.ReplayContract.PendingRecoverySeconds <= 0 ||
+		operation.ReplayContract.PendingRecoverySeconds >= operation.ReplayContract.TombstoneSeconds {
+		t.Fatalf(
+			"pending recovery window %d must leave terminal tombstone runway inside %d-second retention",
+			operation.ReplayContract.PendingRecoverySeconds,
+			operation.ReplayContract.TombstoneSeconds,
+		)
+	}
+	if len(operation.AdditionalRequestGoldens) != 2 || len(operation.AdditionalSuccessGoldens) != 2 {
+		t.Fatalf("additional mutation goldens = requests:%d successes:%d", len(operation.AdditionalRequestGoldens), len(operation.AdditionalSuccessGoldens))
+	}
+
+	requests := append([]ConnectorAuthorityLambdaBodyCase{operation.RequestGolden}, operation.AdditionalRequestGoldens...)
+	successes := append([]ConnectorAuthorityLambdaBodyCase{operation.SuccessGolden}, operation.AdditionalSuccessGoldens...)
+	for _, request := range requests {
+		t.Run(request.Name, func(t *testing.T) {
+			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(request.BodyJSON)); err != nil {
+				t.Fatalf("request rejected: %v", err)
+			}
+		})
+	}
+	for _, success := range successes {
+		t.Run(success.Name, func(t *testing.T) {
+			if outcome, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationMutateProofAgent, []byte(success.BodyJSON)); err != nil || outcome != "success" {
+				t.Fatalf("success = %q, %v", outcome, err)
+			}
+		})
+	}
+
+	if !connectorAuthorityGrantCorrelationIDPattern.MatchString(file.Fixtures.ProofGrantCorrelationID) {
+		t.Fatalf("grant correlation fixture %q does not match the controller contract", file.Fixtures.ProofGrantCorrelationID)
+	}
+	for name, body := range map[string]string{
+		"arm missing pinned cell":  removeConnectorAuthorityJSONField(t, operation.AdditionalRequestGoldens[0].BodyJSON, "pinned_cell_id"),
+		"arm same cells":           replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[0].BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell0"`),
+		"move carries arm field":   replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"pinned_cell_id":"cell0","target_cell_id":"cell1"`),
+		"move carries lease field": replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, `"target_cell_id":"cell1"`, `"target_cell_id":"cell1","lease_seconds":60`),
+		"expire carries target":    replaceConnectorAuthorityGoldenOnce(t, operation.AdditionalRequestGoldens[1].BodyJSON, `"lease_seconds":60`, `"target_cell_id":"cell1","lease_seconds":60`),
+		"invalid correlation":      replaceConnectorAuthorityGoldenOnce(t, operation.RequestGolden.BodyJSON, file.Fixtures.ProofGrantCorrelationID, strings.Repeat("a", 64)),
+	} {
+		t.Run("reject "+name, func(t *testing.T) {
+			if err := validateConnectorAuthorityRequest(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
+				t.Fatal("invalid conditional request unexpectedly accepted")
+			}
+		})
+	}
+
+	for name, body := range map[string]string{
+		"missing discriminator": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON, `"mutation":"move",`, ""),
+		"mixed union": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8,`, `"new_assignment_generation":8,"lease_seconds":60,`),
+		"nonincrementing generation": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"new_assignment_generation":8`, `"new_assignment_generation":7`),
+		"unknown mutation": replaceConnectorAuthorityGoldenOnce(t, operation.SuccessGolden.BodyJSON,
+			`"mutation":"move"`, `"mutation":"revoke"`),
+	} {
+		t.Run("reject result "+name, func(t *testing.T) {
+			if _, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationMutateProofAgent, []byte(body)); err == nil {
+				t.Fatal("invalid result union unexpectedly accepted")
+			}
+		})
+	}
+}
+
 func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
@@ -61,6 +143,7 @@ func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 	globalOperations := []string{
 		ConnectorAuthorityOperationIssueAssignment,
 		ConnectorAuthorityOperationRefreshAssignment,
+		ConnectorAuthorityOperationMutateProofAgent,
 	}
 	for _, operation := range globalOperations {
 		t.Run(operation, func(t *testing.T) {
@@ -111,6 +194,9 @@ func TestConnectorAuthorityHubRequestIDContract(t *testing.T) {
 
 	for operation, contract := range file.Operations {
 		publicOrResponseBodies := []string{contract.SuccessGolden.BodyJSON}
+		for _, success := range contract.AdditionalSuccessGoldens {
+			publicOrResponseBodies = append(publicOrResponseBodies, success.BodyJSON)
+		}
 		for _, semanticError := range contract.SemanticErrors {
 			publicOrResponseBodies = append(publicOrResponseBodies, semanticError.BodyJSON)
 		}
@@ -234,6 +320,80 @@ func TestParseConnectorAuthorityLambdaFileFailsClosed(t *testing.T) {
 			op.SemanticErrors[0].BodyJSON = strings.Replace(op.SemanticErrors[0].BodyJSON, `{"version":1,`, `{ "version":1,`, 1)
 			file.Operations[ConnectorAuthorityOperationRefreshAssignment] = op
 		}), "not canonical")
+	})
+	t.Run("proof additional golden set", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.AdditionalSuccessGoldens = op.AdditionalSuccessGoldens[:1]
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "additional golden count")
+	})
+	t.Run("proof replay contract required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract = nil
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof changed replay outcome is fail closed", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.ChangedReplayOutcome = "byte_identical_success"
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof replay tombstone retention is required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.TombstoneSeconds = 0
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof accepted pending recovery window is required", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.PendingRecoverySeconds = 0
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof accepted pending recovery rule is exact", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.PendingMoveResumeRule = "moving_pinned_finishes_success_replays_otherwise_unavailable"
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof expired first-seen and terminal outcome is fail closed", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.ExpiredIDOutcome = "byte_identical_success"
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("proof replay fingerprint fields are exact", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.ReplayContract.FingerprintFields = append(
+				op.ReplayContract.FingerprintFields,
+				"hub_request_id",
+			)
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "replay contract")
+	})
+	t.Run("runtime operation cannot acquire proof replay contract", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			proof := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op := file.Operations[ConnectorAuthorityOperationIssueAssignment]
+			op.ReplayContract = proof.ReplayContract
+			file.Operations[ConnectorAuthorityOperationIssueAssignment] = op
+		}), "unexpected proof replay contract")
+	})
+	t.Run("proof public mapping forbidden", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
+			op := file.Operations[ConnectorAuthorityOperationMutateProofAgent]
+			op.PublicMappingCases = []ConnectorAuthorityPublicMapping{{Name: "success"}}
+			file.Operations[ConnectorAuthorityOperationMutateProofAgent] = op
+		}), "must not define a public NHP mapping")
 	})
 	t.Run("reject body must prove claimed class", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(file *ConnectorAuthorityLambdaFile) {
@@ -648,4 +808,18 @@ func removeConnectorAuthorityJSONField(t *testing.T, body, field string) string 
 		t.Fatalf("json.Marshal: %v", err)
 	}
 	return string(encoded)
+}
+
+// replaceConnectorAuthorityGoldenOnce mutates a golden body once, failing the test if the
+// target substring is absent. This turns a stale fixture (a rotated cell id, generation, or
+// changed JSON serialization) into a clear "fixture no longer contains" diagnostic instead of
+// a silent no-op that leaves the unmodified golden valid and surfaces as a confusing
+// "unexpectedly accepted" failure.
+func replaceConnectorAuthorityGoldenOnce(t *testing.T, body, old, replacement string) string {
+	t.Helper()
+	replaced := strings.Replace(body, old, replacement, 1)
+	if replaced == body {
+		t.Fatalf("golden body no longer contains %q; update the reject fixture", old)
+	}
+	return replaced
 }

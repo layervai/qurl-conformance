@@ -153,8 +153,17 @@ jobs:
           const authorityRequests = Object.fromEntries(
             Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
           );
-          const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment'];
+          const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent'];
           const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration'];
+          // Keep proof-mutation assertions in lockstep with the Python package
+          // smoke below; the deliberate re-encoding catches consumer drift.
+          const proofMutationRejectNames = new Set(['reject_unknown_field', 'reject_wrong_type', 'reject_missing_field']);
+          const proofMutationRejects = Object.fromEntries(
+            u.operations.MutateProofAgent.request_rejects
+              .filter(v => proofMutationRejectNames.has(v.name))
+              .map(v => [v.name, JSON.parse(v.body_json)])
+          );
+          const proofMutationReplay = u.operations.MutateProofAgent.replay_contract;
           const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
@@ -404,14 +413,51 @@ jobs:
               t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
               t.contract.credential_kinds.includes('tunnel_bootstrap') ||
               u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 1 ||
-              Object.keys(u.operations).length !== 5 ||
+              Object.keys(u.operations).length !== 6 ||
               u.protocol.max_assignment_ticket_ascii_bytes !== t.contract.max_ticket_ascii_bytes ||
               u.protocol.hub_request_id_format !== 'lowercase_sha256_hex' ||
               !/^[0-9a-f]{64}$/.test(u.fixtures.hub_request_id) ||
               globalAuthorityOperations.some(name => authorityRequests[name].hub_request_id !== u.fixtures.hub_request_id) ||
               cellAuthorityOperations.some(name => Object.hasOwn(authorityRequests[name], 'hub_request_id')) ||
+              !/^nhp-[1-9][0-9]*-[1-9][0-9]*-(connector|qurl_go)-(pre_removal|post_removal)-[0-9a-f]{32}$/.test(u.fixtures.proof_grant_correlation_id) ||
+              u.operations.MutateProofAgent.additional_request_goldens.length !== 2 ||
+              u.operations.MutateProofAgent.additional_success_goldens.length !== 2 ||
+              u.operations.MutateProofAgent.public_mapping_cases.length !== 0 ||
+              JSON.stringify(Object.keys(proofMutationReplay).sort()) !== JSON.stringify([
+                'changed_replay_outcome',
+                'commit_rule',
+                'exact_replay_outcome',
+                'expired_id_outcome',
+                'fingerprint_fields',
+                'logical_lifetime_seconds',
+                'mutation_fence_rule',
+                'pending_move_resume_rule',
+                'pending_recovery_seconds_after_logical_expiry',
+                'tombstone_seconds_after_logical_expiry',
+              ]) ||
+              proofMutationReplay.logical_lifetime_seconds !== 900 ||
+              proofMutationReplay.tombstone_seconds_after_logical_expiry !== 86400 ||
+              proofMutationReplay.pending_recovery_seconds_after_logical_expiry !== 300 ||
+              JSON.stringify(proofMutationReplay.fingerprint_fields) !== JSON.stringify([
+                'version', 'mutation', 'agent_id', 'grant_correlation_id',
+                'pinned_cell_id_if_arm', 'target_cell_id_if_arm_or_move',
+                'lease_seconds_if_arm_or_expire_lease',
+              ]) ||
+              proofMutationReplay.exact_replay_outcome !== 'byte_identical_success' ||
+              proofMutationReplay.changed_replay_outcome !== 'invalid_request_before_mutation' ||
+              proofMutationReplay.mutation_fence_rule !== 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation' ||
+              proofMutationReplay.commit_rule !== 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic' ||
+              proofMutationReplay.pending_move_resume_rule !== 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window' ||
+              proofMutationReplay.expired_id_outcome !== 'expired_first_seen_or_terminal_unavailable_without_mutation' ||
+              Object.entries(u.operations).some(([name, operation]) =>
+                name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
+              proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
+              !Object.hasOwn(proofMutationRejects.reject_unknown_field, 'pinned_cell_id') ||
+              proofMutationRejects.reject_wrong_type.mutation !== 'expire_lease' ||
+              proofMutationRejects.reject_missing_field.mutation !== 'arm' ||
+              Object.hasOwn(proofMutationRejects.reject_missing_field, 'pinned_cell_id') ||
               u.fixtures.device_api_key === u.fixtures.credential ||
-              Object.values(u.operations).some(op => JSON.stringify({success: op.success_golden, errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
+              Object.values(u.operations).some(op => JSON.stringify({successes: [op.success_golden, ...(op.additional_success_goldens ?? [])], errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
               Object.values(u.operations).some(op => op.public_mapping_cases.some(v => (v.nhp_body_json || '').includes(u.fixtures.device_api_key))) ||
               !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
               activationUnavailable?.nhp_action !== 'drop_no_reply' ||
@@ -533,8 +579,16 @@ jobs:
               name: json.loads(operation['request_golden']['body_json'])
               for name, operation in u['operations'].items()
           }
-          global_authority_operations = ['IssueAssignment', 'RefreshAssignment']
+          global_authority_operations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent']
           cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration']
+          # Keep proof-mutation assertions in lockstep with the JavaScript
+          # package smoke above; the deliberate re-encoding catches consumer drift.
+          proof_mutation_rejects = {
+              value['name']: json.loads(value['body_json'])
+              for value in u['operations']['MutateProofAgent']['request_rejects']
+              if value['name'] in {'reject_unknown_field', 'reject_wrong_type', 'reject_missing_field'}
+          }
+          proof_mutation_replay = u['operations']['MutateProofAgent']['replay_contract']
           activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
@@ -789,15 +843,49 @@ jobs:
           assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
           assert 'tunnel_bootstrap' not in t['contract']['credential_kinds']
           assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 1
-          assert len(u['operations']) == 5
+          assert len(u['operations']) == 6
           assert u['protocol']['max_assignment_ticket_ascii_bytes'] == t['contract']['max_ticket_ascii_bytes']
           assert u['protocol']['hub_request_id_format'] == 'lowercase_sha256_hex'
           assert re.fullmatch(r'[0-9a-f]{64}', u['fixtures']['hub_request_id'])
           assert all(authority_requests[name]['hub_request_id'] == u['fixtures']['hub_request_id'] for name in global_authority_operations)
           assert all('hub_request_id' not in authority_requests[name] for name in cell_authority_operations)
+          assert re.fullmatch(r'nhp-[1-9][0-9]*-[1-9][0-9]*-(connector|qurl_go)-(pre_removal|post_removal)-[0-9a-f]{32}', u['fixtures']['proof_grant_correlation_id'])
+          assert len(u['operations']['MutateProofAgent']['additional_request_goldens']) == 2
+          assert len(u['operations']['MutateProofAgent']['additional_success_goldens']) == 2
+          assert u['operations']['MutateProofAgent']['public_mapping_cases'] == []
+          assert proof_mutation_replay == {
+              'logical_lifetime_seconds': 900,
+              'tombstone_seconds_after_logical_expiry': 86400,
+              'pending_recovery_seconds_after_logical_expiry': 300,
+              'fingerprint_fields': [
+                  'version',
+                  'mutation',
+                  'agent_id',
+                  'grant_correlation_id',
+                  'pinned_cell_id_if_arm',
+                  'target_cell_id_if_arm_or_move',
+                  'lease_seconds_if_arm_or_expire_lease',
+              ],
+              'exact_replay_outcome': 'byte_identical_success',
+              'changed_replay_outcome': 'invalid_request_before_mutation',
+              'mutation_fence_rule': 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation',
+              'commit_rule': 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic',
+              'pending_move_resume_rule': 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window',
+              'expired_id_outcome': 'expired_first_seen_or_terminal_unavailable_without_mutation',
+          }
+          assert all(
+              'replay_contract' not in operation
+              for name, operation in u['operations'].items()
+              if name != 'MutateProofAgent'
+          )
+          assert proof_mutation_rejects['reject_unknown_field']['mutation'] == 'move'
+          assert 'pinned_cell_id' in proof_mutation_rejects['reject_unknown_field']
+          assert proof_mutation_rejects['reject_wrong_type']['mutation'] == 'expire_lease'
+          assert proof_mutation_rejects['reject_missing_field']['mutation'] == 'arm'
+          assert 'pinned_cell_id' not in proof_mutation_rejects['reject_missing_field']
           assert u['fixtures']['device_api_key'] != u['fixtures']['credential']
           assert all(u['fixtures']['hub_request_id'] not in json.dumps({
-              'success': operation['success_golden'],
+              'successes': [operation['success_golden'], *operation.get('additional_success_goldens', [])],
               'errors': operation['semantic_errors'],
               'mappings': operation['public_mapping_cases'],
           }) for operation in u['operations'].values())

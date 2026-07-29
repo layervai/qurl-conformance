@@ -33,7 +33,7 @@ trust.
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
-| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for the five separately permissioned Connector Authority Lambda operations plus NHP public mappings |
+| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for five NHP runtime Authority operations plus the sandbox-only attended-proof mutation control and the runtime operations' NHP public mappings |
 | `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
 | `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
 | `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
@@ -234,11 +234,14 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   `vectors/README_assignment_ticket_v1_vectors.md`.
 - **Private Connector Authority Lambda v1**
   (`qurl-connector-authority-lambda-v1-vectors`,
-  `connector_authority_lambda_v1_vectors.json`) — five distinct strict request
+  `connector_authority_lambda_v1_vectors.json`) — six distinct strict request
   schemas for `IssueAssignment`, `RefreshAssignment`,
   `IssueRegistrationOTP`, `ActivateRegistration`, and
-  `CompleteRegistration`. There is no generic operation selector and callers
-  cannot supply environment, cell, owner, or assignment generation. Each
+  `CompleteRegistration`, plus the sandbox-only attended-controller
+  `MutateProofAgent` control. There is no generic operation selector. NHP
+  runtime callers cannot supply environment, cell, owner, or assignment
+  generation; only the separately permissioned proof operation accepts its
+  exact pinned/target-cell mutation fields. Each
   global `IssueAssignment` and `RefreshAssignment` request carries a required
   lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker uses
   domain-separated framing over its environment, the Hub-selected exact
@@ -266,7 +269,22 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   assignment artifact but is intentionally not produced here: the Issue and
   Refresh domain operations do not mutate assignments, although their private
   adapter writes the 15-minute replay envelope; activation atomically enforces
-  owner quota as RAK 52112. See
+  owner quota as RAK 52112.
+  `MutateProofAgent` has exact `arm`, `move`, and `expire_lease` request/result
+  unions, closed proof-only errors, no public NHP mapping or numeric code, and
+  a durable 900-second command/replay contract: an exact live
+  `hub_request_id` replay returns byte-identical success, changed semantics
+  cannot commit a mutation, and each mutation is atomically fenced by its
+  exact-fingerprint command write. Pending move recovery admits only the
+  frozen moving-on-pinned transition. A move accepted into durable pending
+  before logical expiry remains authorized for a bounded five-minute recovery
+  window: it either finishes with the exact success or atomically compensates
+  back to active on the pinned cell at the same generation and leaves a
+  terminal unavailable tombstone. A first observation of an already-expired
+  durable ID, and every expired terminal replay, remains unavailable without
+  mutation. The existing 24-hour tombstone prevents expired request IDs from
+  being reused as fresh commands.
+  See
   `vectors/README_connector_authority_lambda_v1_vectors.md`.
 - **Private Connector Hub request-ID v1**
   (`qurl-connector-hub-request-id-v1-vectors`,
