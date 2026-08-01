@@ -479,7 +479,7 @@ jobs:
                 hubCookieChallenges[name]?.client_action !== 'stop_without_third_lst_or_fallback'
               ) ||
               hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
-              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3078 ||
+              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3076 ||
               cr.artifact !== 'qurl-agent-credential-recovery-v1-vectors' || cr.schema_version !== 1 ||
               cr.protocol.transport !== 'NHP_UDP_ONLY' || cr.protocol.http_fallback_allowed !== false ||
               cr.protocol.relay_fallback_allowed !== false || cr.protocol.client_cell_selection_allowed !== false ||
@@ -917,7 +917,7 @@ jobs:
           hub_cookie_sizes = {v['name']: v for v in hc['size_cases']}
           assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
           hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}
-          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3078
+          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3076
           assert cr['artifact'] == 'qurl-agent-credential-recovery-v1-vectors' and cr['schema_version'] == 1
           assert cr['protocol']['transport'] == 'NHP_UDP_ONLY'
           assert cr['protocol']['http_fallback_allowed'] is False
