@@ -132,8 +132,8 @@ func TestConnectorHubLSTCookieSizeGateIsStrict(t *testing.T) {
 			t.Fatalf("case %q violates strict comparison: %+v", c.Name, c)
 		}
 	}
-	if got := file.SuccessSizes[1]; got.ResultBodyBytes != 2822 || got.ResultPacketBytes != 3078 ||
-		got.AmplificationNumeratorBytes != 3078 || got.AmplificationDenominatorBytes != 493 {
+	if got := file.SuccessSizes[1]; got.ResultBodyBytes != 2820 || got.ResultPacketBytes != 3076 ||
+		got.AmplificationNumeratorBytes != 3076 || got.AmplificationDenominatorBytes != 493 {
 		t.Fatalf("max ticket success size = %+v", got)
 	}
 }

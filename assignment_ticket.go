@@ -23,9 +23,9 @@ const (
 	AssignmentTicketSyntheticCredentialBytes = 51
 
 	assignmentTicketNHPPacketOverheadBytes        = 256
-	assignmentTicketLRTEnvelopeWithoutTicketBytes = 518
-	assignmentTicketMaxLRTBodyBytes               = 2822
-	assignmentTicketMaxLRTPacketBytes             = 3078
+	assignmentTicketLRTEnvelopeWithoutTicketBytes = 516
+	assignmentTicketMaxLRTBodyBytes               = 2820
+	assignmentTicketMaxLRTPacketBytes             = 3076
 )
 
 // AssignmentTicketFile freezes the byte-level qat1 signing profile, the three
