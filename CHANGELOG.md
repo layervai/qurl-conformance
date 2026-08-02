@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.0](https://github.com/layervai/qurl-conformance/compare/v0.10.0...v0.11.0) (2026-08-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** every NHP UDP endpoint in the vectors is now port 443. Consumers pinning 62206 must move in lockstep with their servers.
+
+### Features
+
+* **vectors:** move NHP UDP endpoints to port 443 ([#69](https://github.com/layervai/qurl-conformance/issues/69)) ([160c66c](https://github.com/layervai/qurl-conformance/commit/160c66c03f2c44cfbf906288238e10e72e67fb1a))
+
 ## [0.10.0](https://github.com/layervai/qurl-conformance/compare/v0.9.0...v0.10.0) (2026-07-29)
 
 
