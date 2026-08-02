@@ -129,7 +129,7 @@
       "challenge_body_bytes": 68,
       "challenge_packet_bytes": 324,
       "proof_request_packet_bytes": 493,
-      "legacy_assignment_fixture_result_packet_bytes": 797,
+      "legacy_assignment_fixture_result_packet_bytes": 795,
       "authority_invocations_before_proof": 0,
       "authority_invocations_after_proof": 1
     },
@@ -147,7 +147,7 @@
       "challenge_body_bytes": 68,
       "challenge_packet_bytes": 324,
       "proof_request_packet_bytes": 437,
-      "legacy_assignment_fixture_result_packet_bytes": 619,
+      "legacy_assignment_fixture_result_packet_bytes": 617,
       "authority_invocations_before_proof": 0,
       "authority_invocations_after_proof": 1
     }
@@ -220,20 +220,20 @@
       "phase": "initial_assignment",
       "basis": "assignment_ticket_v1.golden_lrt_envelope",
       "request_packet_bytes": 493,
-      "result_body_bytes": 1521,
-      "result_packet_bytes": 1777,
-      "amplification_numerator_bytes": 1777,
+      "result_body_bytes": 1519,
+      "result_packet_bytes": 1775,
+      "amplification_numerator_bytes": 1775,
       "amplification_denominator_bytes": 493,
-      "legacy_assignment_fixture_packet_bytes": 797
+      "legacy_assignment_fixture_packet_bytes": 795
     },
     {
       "name": "initial_max_ticket_envelope",
       "phase": "initial_assignment",
       "basis": "assignment_ticket_v1.template_plus_max_ticket",
       "request_packet_bytes": 493,
-      "result_body_bytes": 2822,
-      "result_packet_bytes": 3078,
-      "amplification_numerator_bytes": 3078,
+      "result_body_bytes": 2820,
+      "result_packet_bytes": 3076,
+      "amplification_numerator_bytes": 3076,
       "amplification_denominator_bytes": 493
     },
     {
@@ -241,11 +241,11 @@
       "phase": "refresh_assignment",
       "basis": "agent_assignment_golden.refresh_result",
       "request_packet_bytes": 437,
-      "result_body_bytes": 363,
-      "result_packet_bytes": 619,
-      "amplification_numerator_bytes": 619,
+      "result_body_bytes": 361,
+      "result_packet_bytes": 617,
+      "amplification_numerator_bytes": 617,
       "amplification_denominator_bytes": 437,
-      "legacy_assignment_fixture_packet_bytes": 619
+      "legacy_assignment_fixture_packet_bytes": 617
     }
   ],
   "key_cases": [
