@@ -498,6 +498,9 @@ func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, co
 	if err != nil || len(refreshPacket) < 208 {
 		return errors.New("conformance: Connector Hub LST proof-digest fresh-header source is invalid")
 	}
+	// The KAT prefix is the refresh request's own header bytes with only the
+	// proof flag and counter restamped, so its HeaderCommon[8:10] is covered by
+	// the assignment family's protocol-version gate; do not restate that here.
 	wantPrefix := bytes.Clone(refreshPacket[:208])
 	binary.BigEndian.PutUint16(wantPrefix[10:12], ConnectorHubLSTCookieProofFlag)
 	binary.BigEndian.PutUint64(wantPrefix[16:24], 23)

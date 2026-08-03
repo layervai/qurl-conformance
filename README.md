@@ -172,9 +172,9 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   not need to infer meanings from Go constants. The loader
   verifies canonical lowercase hex, positive decimal transaction fields,
   canonical padded base64 endpoint keys, and each static X25519 keypair. The
-  assignment wire verifier pins merged qurl-go packet-codec revision
-  `8a69642957030b9ce0a1b8b356246d265a9f577d` and rebuilds and opens all nine
-  deterministic packets through its exported low-level codec. That revision
+  artifact pins `layervai/qurl-go` packet-codec revision
+  `6e4040594b67a56dabe04f5089b5837e885fee07`, which built and opened all nine
+  deterministic packets through its low-level codec. That revision
   pin does not claim the higher-level qurl-go assignment request builder already
   supports the current artifact schema; the conformance artifact intentionally
   lands first. The
@@ -208,7 +208,8 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   (`qurl-agent-session-control-vectors`,
   `agent_session_control_vectors.json`) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and clean exit EXT -> ACK, pinned to
-  merged producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`. The COK wire
+  `layervai/qurl-go` producer revision
+  `6e4040594b67a56dabe04f5089b5837e885fee07`. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw
@@ -317,6 +318,42 @@ produces the verify-path vectors lives at `tools/gen` and is run via
 `make gen-vectors` once per issuer-key rotation; it is never run in CI (the accept
 signature uses a random nonce, so it is not reproducible). The committed JSON is
 the artifact. Vectors are edited under `vectors/`.
+
+## NHP protocol version
+
+Every NHP packet in this repository — relay-knock, agent-registration,
+agent-assignment, and agent-session — carries **protocol 1.1** in
+`HeaderCommon[8:10]` (`01 01`), exposed as `NHPProtocolVersionMajor` /
+`NHPProtocolVersionMinor`. All four families moved from 1.0 together and the
+loaders assert the bytes.
+
+1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
+as the body-seal AAD, so **editing any header field breaks the body open**.
+Under 1.0 the flag word, header type and declared payload size rode outside
+every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
+holding the peer's static *public* key can recompute — so those fields were
+forgeable. Chain-key derivation, the body key, the nonce, and the header-digest
+input are unchanged.
+
+A 1.1 receiver rejects a 1.0 sender by design, so senders must never lead
+receivers on a rollout. Reject a lower minor on the version byte rather than on
+an AEAD tag, so the failure is explicit; admit a higher minor so a later
+compatible release cannot strand deployed clients.
+
+## Who authenticates these bytes
+
+This repository publishes wire truth; it does not authenticate it. The module is
+stdlib-only by rule (`go.mod` carries no `require`), so no BLAKE2s or AEAD
+primitive exists here and no in-repo check can recompute a packet, a header
+digest, or the Hub proof digest. The in-repo gates are **structural**: framing,
+lengths, canonical hex/base64, key roles, counter and version bytes, cross-field
+correlation. A transcription error inside an otherwise well-formed regenerated
+`packet_hex` would pass CI here.
+
+Cryptographic verification belongs to the consumers, which rebuild and open
+these exact bytes against their real codecs in their own CI. Regenerating any
+packet family therefore hands verification to a release gate, not to this
+repository's tests — see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Releases
 

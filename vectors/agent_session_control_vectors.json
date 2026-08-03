@@ -273,7 +273,7 @@
   },
   "notes": [
     "Every packet was sealed by the exact producer revision with fixed synthetic key, ephemeral, timestamp, counter, preamble, body, and cookie inputs; independent consumers must rebuild initiator packets and authenticate-open replies.",
-    "The merged producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation proves that consumer rule. NHP_ACK counters must echo NHP_RKN or NHP_EXT.",
+    "The producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation proves that consumer rule. NHP_ACK counters must echo NHP_RKN or NHP_EXT.",
     "The NHP_RKN header digest mixes the exact decoded 32-byte cookie after the ordinary header prefix. NHP_EXT uses the ordinary no-cookie digest and its authenticated body headerType must equal the outer type.",
     "Each successful NHP_ACK resHost, acTokens, and preActions map contains exactly one entry keyed by the session resId.",
     "All identities, hosts, keys, cookies, counters, and tokens are synthetic conformance data."
@@ -338,7 +338,7 @@
       "timestamp_nanos": "1800000000000000003"
     }
   },
-  "producer_revision": "2a2a3d91adcf5a7930050db3561c8e00b8340a39",
+  "producer_revision": "6e4040594b67a56dabe04f5089b5837e885fee07",
   "protocol": {
     "ack_counter_correlation": "must_echo_request",
     "cok_body_transaction_correlation": "must_equal_knock_counter",

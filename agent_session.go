@@ -17,9 +17,14 @@ const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
 	// re-knock and clean-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
-	// AgentSessionControlProducerRevision is the exact merged NHP producer
-	// revision used to seal the golden packets.
-	AgentSessionControlProducerRevision = "2a2a3d91adcf5a7930050db3561c8e00b8340a39"
+	// AgentSessionControlProducerRevision is the exact producer revision that
+	// sealed the golden packets: the layervai/qurl-go protocol-1.1 codec commit
+	// on branch justin/feat/authenticate-nhp-header-aad. That branch is pushed
+	// and immutable but NOT yet merged, and a squash-merge will mint a different
+	// SHA, so re-pinning to the merged commit is a release-checklist item (see
+	// RELEASE_CHECKLIST.md). Before 1.1 this named an NHP server revision; the
+	// 1.1 bytes come from qurl-go.
+	AgentSessionControlProducerRevision = "6e4040594b67a56dabe04f5089b5837e885fee07"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2
@@ -32,14 +37,12 @@ const (
 	AgentSessionTagSize        = 16
 	AgentSessionPacketMaxBytes = 4096
 
-	// AgentSessionProtocolVersionMajor / Minor are the HeaderCommon[8:10] bytes
-	// every golden packet here must carry. Minor 1 is the transcript that folds
-	// HeaderCommon into the body AAD; under 1.0 the flag word, header type and
-	// declared size rode outside every AEAD and were forgeable by anyone holding
-	// the peer's static public key. Consumers must reject a packet below this
-	// minor on the version rather than on an AEAD tag.
-	AgentSessionProtocolVersionMajor = 1
-	AgentSessionProtocolVersionMinor = 1
+	// AgentSessionProtocolVersionMajor / Minor are retained names for the
+	// repo-wide NHPProtocolVersion pair. Session-control packets carry the same
+	// HeaderCommon[8:10] bytes as every other NHP family, so the literals live in
+	// one place; these aliases exist only for consumers already referencing them.
+	AgentSessionProtocolVersionMajor = NHPProtocolVersionMajor
+	AgentSessionProtocolVersionMinor = NHPProtocolVersionMinor
 )
 
 const (
@@ -236,8 +239,10 @@ func validateAgentSessionKeys(keys AgentSessionKeys) error {
 	return nil
 }
 
-// validateAgentSessionPacket is the stdlib-only structural gate. The independent
-// Consumers rebuild and cryptographically authenticate every packet in their own CI.
+// validateAgentSessionPacket is the stdlib-only structural gate: it checks
+// framing, roles, encodings and the plaintext header fields, and does not
+// authenticate ciphertext. Consumers rebuild and cryptographically authenticate
+// every packet in their own CI.
 func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName string, wantType int, wantSender, wantReceiver string) error {
 	if p.HeaderName != wantName || p.HeaderType != wantType || p.SenderKey != wantSender || p.ReceiverKey != wantReceiver {
 		return fmt.Errorf("conformance: agent-session %s type or key roles drifted", name)
@@ -276,9 +281,11 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if int(word>>16) != wantType || int(word&0xffff) != len(body)+AgentSessionTagSize || fmt.Sprintf("%08x", preamble) != p.PreambleHex {
 		return fmt.Errorf("conformance: agent-session %s header type, size, or preamble drifted", name)
 	}
-	if packet[8] != AgentSessionProtocolVersionMajor || packet[9] != AgentSessionProtocolVersionMinor ||
-		binary.BigEndian.Uint16(packet[10:12]) != 0 {
-		return fmt.Errorf("conformance: agent-session %s version or flags drifted", name)
+	if err := validateNHPPacketProtocolVersion("agent-session "+name, packet); err != nil {
+		return err
+	}
+	if binary.BigEndian.Uint16(packet[10:12]) != 0 {
+		return fmt.Errorf("conformance: agent-session %s flags drifted", name)
 	}
 	counter, _ := strconv.ParseUint(p.Counter, 10, 64)
 	if binary.BigEndian.Uint64(packet[16:24]) != counter {

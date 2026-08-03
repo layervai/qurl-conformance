@@ -1241,6 +1241,246 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	}
 }
 
+// downgradeNHPPacketVersion rewrites HeaderCommon[9] of a hex-encoded NHP packet
+// to 0, i.e. back to the protocol-1.0 transcript that left the header word
+// unauthenticated. Byte 9 is hex characters 18:20.
+func downgradeNHPPacketVersion(packetHex string) string {
+	if len(packetHex) < 20 {
+		return packetHex
+	}
+	return packetHex[:18] + "00" + packetHex[20:]
+}
+
+// nhpGoldenPacketHexes returns every NHP golden packet in the repository keyed by
+// a family-qualified name, so a header rule can be asserted across all four
+// families at once rather than one family at a time.
+func nhpGoldenPacketHexes(t *testing.T) map[string]string {
+	t.Helper()
+	packets := map[string]string{}
+
+	rf, err := RelayKnockGolden()
+	if err != nil {
+		t.Fatalf("RelayKnockGolden(): %v", err)
+	}
+	packets["relay_knock.knock"] = rf.Knock.PacketHex
+	packets["relay_knock.ack"] = rf.Ack.PacketHex
+
+	reg, err := AgentRegistrationGolden()
+	if err != nil {
+		t.Fatalf("AgentRegistrationGolden(): %v", err)
+	}
+	packets["agent_registration.otp"] = reg.OTP.PacketHex
+	packets["agent_registration.reg_emailed"] = reg.RegEmailed.PacketHex
+	packets["agent_registration.reg_preissued"] = reg.RegPreissued.PacketHex
+	packets["agent_registration.rak_success"] = reg.RakSuccess.PacketHex
+	packets["agent_registration.rak_error"] = reg.RakError.PacketHex
+
+	as, err := AgentAssignmentGolden()
+	if err != nil {
+		t.Fatalf("AgentAssignmentGolden(): %v", err)
+	}
+	for name, exchange := range map[string]AgentAssignmentExchange{
+		"initial_assignment":         as.InitialAssignment,
+		"refresh_assignment":         as.RefreshAssignment,
+		"assigned_cell_registration": as.AssignedCellRegistration,
+		"registration_completion":    as.RegistrationCompletion,
+	} {
+		packets["agent_assignment."+name+".request"] = exchange.Request.PacketHex
+		packets["agent_assignment."+name+".result"] = exchange.Result.PacketHex
+	}
+	packets["agent_assignment.account_credential_otp.request"] = as.AccountCredentialOTP.Request.PacketHex
+
+	sc, err := AgentSessionControl()
+	if err != nil {
+		t.Fatalf("AgentSessionControl(): %v", err)
+	}
+	packets["agent_session.knock_request"] = sc.OverloadReknock.KnockRequest.PacketHex
+	packets["agent_session.cookie_reply"] = sc.OverloadReknock.CookieReply.PacketHex
+	packets["agent_session.reknock_request"] = sc.OverloadReknock.ReknockRequest.PacketHex
+	packets["agent_session.reknock_ack"] = sc.OverloadReknock.ACK.PacketHex
+	packets["agent_session.exit_request"] = sc.CleanExit.Request.PacketHex
+	packets["agent_session.exit_ack"] = sc.CleanExit.ACK.PacketHex
+
+	if len(packets) != 22 {
+		t.Fatalf("collected %d NHP golden packets, want 22", len(packets))
+	}
+	return packets
+}
+
+// TestNHPGoldenPacketsCarryProtocolVersion is the cross-family gate: the protocol
+// version is a repo-wide fact, so no family may drift from it independently.
+func TestNHPGoldenPacketsCarryProtocolVersion(t *testing.T) {
+	for name, packetHex := range nhpGoldenPacketHexes(t) {
+		packet, err := hex.DecodeString(packetHex)
+		if err != nil {
+			t.Fatalf("%s.packet_hex is not hex: %v", name, err)
+		}
+		if err := validateNHPPacketProtocolVersion(name, packet); err != nil {
+			t.Errorf("%v", err)
+		}
+	}
+}
+
+// TestNHPPacketProducerPinsRecordVectorProtocolVersion binds the provenance pins
+// to the bytes they claim to have produced. Nothing here can recompute a packet
+// (stdlib-only, no AEAD), but a regeneration that moves the protocol version and
+// leaves the producer revisions behind is caught: this fails until the literals
+// above those pins are moved too, which puts a reviewer in front of them.
+func TestNHPPacketProducerPinsRecordVectorProtocolVersion(t *testing.T) {
+	for name, packetHex := range nhpGoldenPacketHexes(t) {
+		packet, err := hex.DecodeString(packetHex)
+		if err != nil {
+			t.Fatalf("%s.packet_hex is not hex: %v", name, err)
+		}
+		if packet[8] != nhpPacketProducerProtocolMajor || packet[9] != nhpPacketProducerProtocolMinor {
+			t.Fatalf("%s carries protocol %d.%d but the producer pins were recorded against %d.%d; re-pin the producer revisions (see RELEASE_CHECKLIST.md)",
+				name, packet[8], packet[9], nhpPacketProducerProtocolMajor, nhpPacketProducerProtocolMinor)
+		}
+	}
+}
+
+// TestNHPParsersRejectProtocolVersionDrift proves the gate is load-bearing in
+// every family's own loader, not just in the cross-family assertion above.
+func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func(*testing.T) []byte
+		parse func([]byte) error
+	}{
+		{
+			name: "relay knock",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var rf RelayKnockFile
+				if err := json.Unmarshal(RelayKnockVectors(), &rf); err != nil {
+					t.Fatal(err)
+				}
+				rf.Knock.PacketHex = downgradeNHPPacketVersion(rf.Knock.PacketHex)
+				return mustMarshalJSON(t, rf)
+			},
+			parse: func(b []byte) error { _, err := ParseRelayKnockFile(b); return err },
+		},
+		{
+			name: "relay knock ack",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var rf RelayKnockFile
+				if err := json.Unmarshal(RelayKnockVectors(), &rf); err != nil {
+					t.Fatal(err)
+				}
+				rf.Ack.PacketHex = downgradeNHPPacketVersion(rf.Ack.PacketHex)
+				return mustMarshalJSON(t, rf)
+			},
+			parse: func(b []byte) error { _, err := ParseRelayKnockFile(b); return err },
+		},
+		{
+			name: "agent registration request",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var af AgentRegistrationFile
+				if err := json.Unmarshal(AgentRegistrationVectors(), &af); err != nil {
+					t.Fatal(err)
+				}
+				af.RegEmailed.PacketHex = downgradeNHPPacketVersion(af.RegEmailed.PacketHex)
+				return mustMarshalJSON(t, af)
+			},
+			parse: func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err },
+		},
+		{
+			name: "agent registration frozen reply",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var af AgentRegistrationFile
+				if err := json.Unmarshal(AgentRegistrationVectors(), &af); err != nil {
+					t.Fatal(err)
+				}
+				af.RakSuccess.PacketHex = downgradeNHPPacketVersion(af.RakSuccess.PacketHex)
+				return mustMarshalJSON(t, af)
+			},
+			parse: func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err },
+		},
+		{
+			name: "agent assignment request",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var doc AgentAssignmentFile
+				if err := json.Unmarshal(AgentAssignmentVectors(), &doc); err != nil {
+					t.Fatal(err)
+				}
+				doc.InitialAssignment.Request.PacketHex = downgradeNHPPacketVersion(doc.InitialAssignment.Request.PacketHex)
+				return mustMarshalJSON(t, doc)
+			},
+			parse: func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err },
+		},
+		{
+			name: "agent assignment account OTP",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var doc AgentAssignmentFile
+				if err := json.Unmarshal(AgentAssignmentVectors(), &doc); err != nil {
+					t.Fatal(err)
+				}
+				doc.AccountCredentialOTP.Request.PacketHex = downgradeNHPPacketVersion(doc.AccountCredentialOTP.Request.PacketHex)
+				return mustMarshalJSON(t, doc)
+			},
+			parse: func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err },
+		},
+		{
+			name: "agent session control",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				var af AgentSessionControlFile
+				if err := json.Unmarshal(AgentSessionControlVectors(), &af); err != nil {
+					t.Fatal(err)
+				}
+				af.OverloadReknock.ReknockRequest.PacketHex = downgradeNHPPacketVersion(af.OverloadReknock.ReknockRequest.PacketHex)
+				return mustMarshalJSON(t, af)
+			},
+			parse: func(b []byte) error { _, err := ParseAgentSessionControlFile(b); return err },
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.parse(tc.build(t))
+			if err == nil || !strings.Contains(err.Error(), "protocol version") {
+				t.Fatalf("error = %v, want protocol-version rejection", err)
+			}
+		})
+	}
+}
+
+func mustMarshalJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// TestReleaseChecklistIsReferenced keeps the verification handoff from decaying
+// back into a PR description. Removing the two crypto cross-checks moved the
+// only authentication of these bytes outside this repository, so the document
+// that inherits it has to exist and stay linked from the working notes.
+func TestReleaseChecklistIsReferenced(t *testing.T) {
+	checklist, err := os.ReadFile("RELEASE_CHECKLIST.md")
+	if err != nil {
+		t.Fatalf("release checklist: %v", err)
+	}
+	for _, referrer := range []string{"CLAUDE.md", "README.md"} {
+		body, err := os.ReadFile(referrer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(body, []byte("RELEASE_CHECKLIST.md")) {
+			t.Errorf("%s does not reference RELEASE_CHECKLIST.md", referrer)
+		}
+	}
+	if !bytes.Contains(checklist, []byte("no `require`")) {
+		t.Error("release checklist does not state that the module carries no `require`, which is why no AEAD check can live here")
+	}
+}
+
 func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -94,6 +94,9 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.OverloadReknock.KnockRequest.BodyHex = hex.EncodeToString([]byte(body))
 			af.OverloadReknock.KnockRequest.PacketHex = strings.Repeat("00", AgentSessionPacketMaxBytes+1)
 		}},
+		{"packet protocol version", "protocol version", func(af *AgentSessionControlFile) {
+			af.CleanExit.ACK.PacketHex = downgradeNHPPacketVersion(af.CleanExit.ACK.PacketHex)
+		}},
 		{"packet digest", "header_digest_hex", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ReknockRequest.HeaderDigestHex = strings.Repeat("0", 64)
 		}},
