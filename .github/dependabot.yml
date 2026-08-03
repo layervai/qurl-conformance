@@ -65,3 +65,15 @@ updates:
     labels: [dependencies, ci]
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      # Dependabot tracks each codeql-action sub-action as its own
+      # dependency, so an ungrouped bump moves `analyze` and leaves
+      # `init` behind. Those two must run the same version: `init`
+      # writes a config file stamped with its own version and `analyze`
+      # refuses to load it, failing every matrix leg with "Loaded a
+      # configuration file for version X, but running version Y".
+      # Grouping them keeps the bump atomic so the PR is green on its
+      # own instead of needing a hand-patched matching pin (see #66, #73).
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
