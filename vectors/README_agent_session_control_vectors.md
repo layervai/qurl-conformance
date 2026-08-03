@@ -26,8 +26,27 @@ The artifact contains one deterministic instance of each transition:
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
-are synthetic. The committed packets were emitted byte-for-byte by merged
-producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`.
+are synthetic. The committed packets were emitted byte-for-byte by
+`layervai/qurl-go` producer revision
+`6e4040594b67a56dabe04f5089b5837e885fee07`.
+
+## Protocol version
+
+`HeaderCommon[8:10]` carries `01 01` — NHP protocol **1.1**. Every packet in
+this artifact was regenerated for it; the 1.0 bytes this file used to carry are
+not forward-compatible and a 1.1 receiver rejects a 1.0 sender by design.
+
+1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
+as the body-seal AAD, so **editing any header field breaks the body open**.
+Under 1.0 the flag word, header type and declared payload size rode outside
+every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
+holding the peer's static *public* key can recompute. Reject a packet below
+minor 1 on the version byte, not on an AEAD tag, so the failure is explicit;
+admit a higher minor so a later compatible release cannot strand deployed
+clients.
+
+The header digest input is unchanged, and so are chain-key derivation, the body
+key, and the nonce. Only the AAD moved.
 
 ## Correlation contract
 
@@ -35,7 +54,7 @@ producer revision `2a2a3d91adcf5a7930050db3561c8e00b8340a39`.
   from the originating KNK counter. Correlate the challenge only after server
   authentication, strict body decoding, and verifying `body.trxId` equals the
   KNK counter.
-- The frozen COK carries counter 41 because the merged producer intentionally
+- The frozen COK carries counter 41 because the producer intentionally
   echoes the KNK counter for relay compatibility. Native UDP consumers must not
   depend on that producer equality: the `accept_cok_wire_counter_unconstrained`
   flow mutation proves correlation still succeeds with a different

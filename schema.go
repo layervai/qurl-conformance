@@ -317,6 +317,40 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 	return &vf, nil
 }
 
+// NHPProtocolVersionMajor / Minor are the HeaderCommon[8:10] bytes every NHP
+// golden packet in this repository carries, across all four packet families:
+// relay-knock, agent-registration, agent-assignment and agent-session. The
+// version is a repo-wide fact, not a per-family one, so a family must never
+// restate the literals.
+//
+// Minor 1 is the transcript that folds the 24-byte serialized HeaderCommon into
+// the body-seal AAD. Under 1.0 the flag word, header type and declared size rode
+// outside every AEAD and were forgeable by anyone holding the peer's static
+// public key. Consumers must reject a packet below this minor on the version
+// rather than on an AEAD tag.
+const (
+	NHPProtocolVersionMajor = 1
+	NHPProtocolVersionMinor = 1
+)
+
+// validateNHPPacketProtocolVersion asserts the version bytes a decoded NHP
+// packet carries. It deliberately says nothing about HeaderCommon[10:12]: the
+// flag word is per-family (the relay ack sets 0x0002, the Hub proof header
+// 0x0004), so each family keeps its own flag gate.
+//
+// This is a structural gate on plaintext header bytes. It does not authenticate
+// the packet — see RELEASE_CHECKLIST.md for who does.
+func validateNHPPacketProtocolVersion(name string, packet []byte) error {
+	if len(packet) < 10 {
+		return fmt.Errorf("conformance: %s is too short to carry a protocol version", name)
+	}
+	if packet[8] != NHPProtocolVersionMajor || packet[9] != NHPProtocolVersionMinor {
+		return fmt.Errorf("conformance: %s protocol version = %d.%d, want %d.%d",
+			name, packet[8], packet[9], NHPProtocolVersionMajor, NHPProtocolVersionMinor)
+	}
+	return nil
+}
+
 // RelayKnockArtifactID is the fixed identity string the relay-knock artifact's
 // top-level "artifact" field must carry. The loader enforces it so a consumer
 // that relies on "the loader rejects malformed files" cannot silently load a
@@ -406,6 +440,18 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	}
 	if rf.Ack.BodyHex == "" {
 		return nil, errors.New("conformance: relay-knock file missing ack.body_hex")
+	}
+	for _, c := range []struct {
+		name string
+		c    RelayKnockCase
+	}{{"knock", rf.Knock}, {"ack", rf.Ack}} {
+		packet, err := hex.DecodeString(c.c.PacketHex)
+		if err != nil || hex.EncodeToString(packet) != c.c.PacketHex {
+			return nil, fmt.Errorf("conformance: relay-knock %s.packet_hex is not canonical lowercase hex", c.name)
+		}
+		if err := validateNHPPacketProtocolVersion("relay-knock "+c.name+".packet_hex", packet); err != nil {
+			return nil, err
+		}
 	}
 	return &rf, nil
 }
@@ -524,6 +570,13 @@ func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
 		if c.c.BodyHex == "" {
 			return nil, fmt.Errorf("conformance: agent-registration file missing %s.body_hex", c.name)
 		}
+		packet, err := hex.DecodeString(c.c.PacketHex)
+		if err != nil || hex.EncodeToString(packet) != c.c.PacketHex {
+			return nil, fmt.Errorf("conformance: agent-registration %s.packet_hex is not canonical lowercase hex", c.name)
+		}
+		if err := validateNHPPacketProtocolVersion("agent-registration "+c.name+".packet_hex", packet); err != nil {
+			return nil, err
+		}
 	}
 	return &af, nil
 }
@@ -580,12 +633,18 @@ const (
 
 // Producer revisions for the deterministic wire and error contracts.
 const (
-	// AgentAssignmentQURLGoProducerRevision is the merged qurl-go packet-codec
-	// revision used to build and authenticate-open every assignment lifecycle
+	// AgentAssignmentQURLGoProducerRevision is the layervai/qurl-go packet-codec
+	// revision that built and authenticate-opened every assignment lifecycle
 	// packet from the artifact's exact application body. It does not claim that
 	// the revision's higher-level assignment request builder knows the current
 	// artifact schema; consumers add that support conformance-first.
-	AgentAssignmentQURLGoProducerRevision = "8a69642957030b9ce0a1b8b356246d265a9f577d"
+	//
+	// It names the protocol-1.1 codec commit on branch
+	// justin/feat/authenticate-nhp-header-aad, which is pushed and immutable but
+	// NOT yet merged. A pre-merge pin is the only value that is true today; a
+	// squash-merge will mint a different SHA, so re-pinning to the merged commit
+	// is a release-checklist item (see RELEASE_CHECKLIST.md).
+	AgentAssignmentQURLGoProducerRevision = "6e4040594b67a56dabe04f5089b5837e885fee07"
 	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
 	// the closed assignment and registration error-code taxonomy.
 	AgentAssignmentNHPProducerRevision = "9653fcb185c77629b787ad046c13c760baba88f4"
@@ -593,6 +652,23 @@ const (
 	// preserves the exact decrypted OTP RawBody alongside the independently
 	// authenticated initiator public key at the plugin boundary.
 	AgentAssignmentOTPProducerRevision = "2072546e1fc76eb76bd7e5c22d37856019ba33e7"
+)
+
+// nhpPacketProducerProtocolMajor / Minor record the protocol version the packet
+// producer pins were captured against: AgentAssignmentQURLGoProducerRevision and
+// AgentSessionControlProducerRevision claim to have emitted the golden bytes at
+// exactly this version, and a version bump changes every one of those bytes.
+//
+// They are literals on purpose. This module is stdlib-only and cannot recompute
+// a BLAKE2s/AEAD packet, so nothing here can prove a pin emitted the bytes it
+// claims. What can be enforced is that the claim and the bytes describe the same
+// protocol version: TestNHPPacketProducerPinsRecordVectorProtocolVersion reads
+// HeaderCommon[8:10] out of a golden packet in each family and fails until these
+// literals agree, so regenerating vectors at a new version cannot leave the pins
+// silently behind.
+const (
+	nhpPacketProducerProtocolMajor = 1
+	nhpPacketProducerProtocolMinor = 1
 )
 
 // Exact synthetic production-shaped fixture values.
@@ -1841,6 +1917,9 @@ func validateAgentAssignmentPacket(name string, packet AgentAssignmentPacket, wa
 	}
 	if packet.PacketHex != hex.EncodeToString(wire) {
 		return fmt.Errorf("conformance: %s.packet_hex is not canonical lowercase hex", name)
+	}
+	if err := validateNHPPacketProtocolVersion(name+".packet_hex", wire); err != nil {
+		return err
 	}
 	return nil
 }

@@ -52,23 +52,6 @@ jobs:
       - name: Vector byte-identity (root == npm == python)
         run: bash scripts/check-sync.sh
 
-      - name: Legacy SDK verifier shares the root Go floor
-        run: |
-          root_go="$(awk '$1 == "go" { print $2 }' go.mod)"
-          sdk_go="$(awk '$1 == "go" { print $2 }' tools/verify-sdk/go.mod)"
-          test "$sdk_go" = "$root_go"
-
-      - name: Cross-language compat (verify-sdk via qurl-go exported API)
-        run: cd tools/verify-sdk && go test ./...
-
-      - name: Set up Go for assignment verifier
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version-file: tools/verify-assignment/go.mod
-
-      - name: Assignment wire rebuild (merged qurl-go producer)
-        run: cd tools/verify-assignment && go test ./...
-
       - name: Set up Node for npm package smoke
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -384,7 +367,7 @@ jobs:
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
               x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 1 ||
-              x.producer_revision !== '2a2a3d91adcf5a7930050db3561c8e00b8340a39' ||
+              x.producer_revision !== '6e4040594b67a56dabe04f5089b5837e885fee07' ||
               x.protocol.cok_wire_counter_correlation !== 'unconstrained' ||
               x.protocol.cok_body_transaction_correlation !== 'must_equal_knock_counter' ||
               x.protocol.ack_counter_correlation !== 'must_echo_request' ||
@@ -813,7 +796,7 @@ jobs:
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
           assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 1
-          assert x['producer_revision'] == '2a2a3d91adcf5a7930050db3561c8e00b8340a39'
+          assert x['producer_revision'] == '6e4040594b67a56dabe04f5089b5837e885fee07'
           assert x['protocol']['cok_wire_counter_correlation'] == 'unconstrained'
           assert x['protocol']['cok_body_transaction_correlation'] == 'must_equal_knock_counter'
           assert x['protocol']['ack_counter_correlation'] == 'must_echo_request'

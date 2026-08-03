@@ -27,19 +27,6 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
 
-  - package-ecosystem: gomod
-    directory: /tools/verify-sdk
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    labels: [dependencies, go]
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      minor-and-patch:
-        update-types: [minor, patch]
-
   # JavaScript / npm package.
   - package-ecosystem: npm
     directory: /npm

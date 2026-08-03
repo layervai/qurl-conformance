@@ -214,7 +214,7 @@ gate rather than treating a successful JSON parse as conformance.
 ## Consumer behavioral gate
 
 This repository publishes and validates the language-neutral contract; it does
-not pretend that a passing `tools/verify-sdk` run exercises this new artifact.
+not pretend that a consumer's existing conformance run exercises this new artifact.
 Before any consumer relies on it for compatibility, that consumer must run the
 released artifact through its real production request serializer and reply
 interpreter and derive every declared outcome. Until that downstream gate is

@@ -120,6 +120,15 @@ from the initial-flight vector. The flow fixtures independently require the
 proof flight's authenticated body and embedded `request_nonce` to remain
 byte-identical to its own unproven flight.
 
+Because the prefix is copied from the refresh golden, it carries that packet's
+`HeaderCommon[8:10]` — NHP protocol **1.1** (`01 01`), which every packet family
+in this repository moved to together. `header_prefix_hex` and
+`expected_digest_hex` therefore changed with the version bump even though the
+digest construction did not: the digest is taken over the prefix bytes, and the
+version byte is one of them. The loader re-derives the prefix from the refresh
+request rather than trusting the stored value, so the version stays bound to the
+assignment family's own gate.
+
 The digest is unkeyed and is not peer authentication. Return-routability comes
 from possession of the opaque HMAC cookie delivered to the observed source;
 peer authentication still comes from the normal Noise static-key decrypt and

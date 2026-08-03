@@ -17,9 +17,14 @@ const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
 	// re-knock and clean-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
-	// AgentSessionControlProducerRevision is the exact merged NHP producer
-	// revision used to seal the golden packets.
-	AgentSessionControlProducerRevision = "2a2a3d91adcf5a7930050db3561c8e00b8340a39"
+	// AgentSessionControlProducerRevision is the exact producer revision that
+	// sealed the golden packets: the layervai/qurl-go protocol-1.1 codec commit
+	// on branch justin/feat/authenticate-nhp-header-aad. That branch is pushed
+	// and immutable but NOT yet merged, and a squash-merge will mint a different
+	// SHA, so re-pinning to the merged commit is a release-checklist item (see
+	// RELEASE_CHECKLIST.md). Before 1.1 this named an NHP server revision; the
+	// 1.1 bytes come from qurl-go.
+	AgentSessionControlProducerRevision = "6e4040594b67a56dabe04f5089b5837e885fee07"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2
@@ -31,6 +36,13 @@ const (
 	AgentSessionHeaderSize     = 240
 	AgentSessionTagSize        = 16
 	AgentSessionPacketMaxBytes = 4096
+
+	// AgentSessionProtocolVersionMajor / Minor are retained names for the
+	// repo-wide NHPProtocolVersion pair. Session-control packets carry the same
+	// HeaderCommon[8:10] bytes as every other NHP family, so the literals live in
+	// one place; these aliases exist only for consumers already referencing them.
+	AgentSessionProtocolVersionMajor = NHPProtocolVersionMajor
+	AgentSessionProtocolVersionMinor = NHPProtocolVersionMinor
 )
 
 const (
@@ -227,8 +239,10 @@ func validateAgentSessionKeys(keys AgentSessionKeys) error {
 	return nil
 }
 
-// validateAgentSessionPacket is the stdlib-only structural gate. The independent
-// verify-sdk gate rebuilds and cryptographically authenticates every packet.
+// validateAgentSessionPacket is the stdlib-only structural gate: it checks
+// framing, roles, encodings and the plaintext header fields, and does not
+// authenticate ciphertext. Consumers rebuild and cryptographically authenticate
+// every packet in their own CI.
 func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName string, wantType int, wantSender, wantReceiver string) error {
 	if p.HeaderName != wantName || p.HeaderType != wantType || p.SenderKey != wantSender || p.ReceiverKey != wantReceiver {
 		return fmt.Errorf("conformance: agent-session %s type or key roles drifted", name)
@@ -267,8 +281,11 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if int(word>>16) != wantType || int(word&0xffff) != len(body)+AgentSessionTagSize || fmt.Sprintf("%08x", preamble) != p.PreambleHex {
 		return fmt.Errorf("conformance: agent-session %s header type, size, or preamble drifted", name)
 	}
-	if packet[8] != 1 || packet[9] != 0 || binary.BigEndian.Uint16(packet[10:12]) != 0 {
-		return fmt.Errorf("conformance: agent-session %s version or flags drifted", name)
+	if err := validateNHPPacketProtocolVersion("agent-session "+name, packet); err != nil {
+		return err
+	}
+	if binary.BigEndian.Uint16(packet[10:12]) != 0 {
+		return fmt.Errorf("conformance: agent-session %s flags drifted", name)
 	}
 	counter, _ := strconv.ParseUint(p.Counter, 10, 64)
 	if binary.BigEndian.Uint64(packet[16:24]) != counter {
@@ -410,7 +427,7 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 	return nil
 }
 
-// classifyAgentSessionCookieBody is mirrored independently by verify-sdk; both
+// classifyAgentSessionCookieBody is mirrored independently by each consumer; both
 // classifiers must execute every closed cookie_body_cases entry in lockstep.
 func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	// Keep this raw shape pass separate from the strict typed decode below.
