@@ -31,6 +31,15 @@ const (
 	AgentSessionHeaderSize     = 240
 	AgentSessionTagSize        = 16
 	AgentSessionPacketMaxBytes = 4096
+
+	// AgentSessionProtocolVersionMajor / Minor are the HeaderCommon[8:10] bytes
+	// every golden packet here must carry. Minor 1 is the transcript that folds
+	// HeaderCommon into the body AAD; under 1.0 the flag word, header type and
+	// declared size rode outside every AEAD and were forgeable by anyone holding
+	// the peer's static public key. Consumers must reject a packet below this
+	// minor on the version rather than on an AEAD tag.
+	AgentSessionProtocolVersionMajor = 1
+	AgentSessionProtocolVersionMinor = 1
 )
 
 const (
@@ -267,7 +276,8 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if int(word>>16) != wantType || int(word&0xffff) != len(body)+AgentSessionTagSize || fmt.Sprintf("%08x", preamble) != p.PreambleHex {
 		return fmt.Errorf("conformance: agent-session %s header type, size, or preamble drifted", name)
 	}
-	if packet[8] != 1 || packet[9] != 0 || binary.BigEndian.Uint16(packet[10:12]) != 0 {
+	if packet[8] != AgentSessionProtocolVersionMajor || packet[9] != AgentSessionProtocolVersionMinor ||
+		binary.BigEndian.Uint16(packet[10:12]) != 0 {
 		return fmt.Errorf("conformance: agent-session %s version or flags drifted", name)
 	}
 	counter, _ := strconv.ParseUint(p.Counter, 10, 64)

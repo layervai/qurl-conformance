@@ -38,7 +38,11 @@ const (
 	ConnectorHubLSTCookieProofFlag         = uint16(0x0004)
 	ConnectorHubLSTCookieChallengeFlagsHex = "0000"
 	ConnectorHubLSTProofKATPurpose         = "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet"
-	connectorHubLSTProofExpectedDigest     = "7aaa44aaf8f8876973120c8870b761603b6125bbe5322bb7c242fc9ca502efe3"
+	// Recomputed for protocol 1.1: the KAT header prefix is derived from the
+	// refresh-assignment request packet, whose HeaderCommon now carries minor 1,
+	// so the digest over that prefix moves with it. Keep in lockstep with
+	// TestHubLSTCookieProofDigestKAT in the NHP reference implementation.
+	connectorHubLSTProofExpectedDigest = "394bf178250b4d78461193415e8c7f15b632b6b58a560b1ffb14f505583f0c30"
 
 	ConnectorHubLSTCookieHeaderBytes       = 240
 	ConnectorHubLSTCookieBodyAEADTagBytes  = 16
