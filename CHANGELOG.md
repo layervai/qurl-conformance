@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.12.0](https://github.com/layervai/qurl-conformance/compare/v0.11.0...v0.12.0) (2026-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* these vectors describe NHP protocol 1.1 and do not match a 1.0 implementation. Consumers must adopt the header binding before pinning this release. Release this first: no runtime consumer speaks 1.1 yet, so shipping the vectors ahead of the codecs breaks nothing.
+
+### Features
+
+* regenerate NHP golden vectors for protocol 1.1 header binding ([#71](https://github.com/layervai/qurl-conformance/issues/71)) ([a139c35](https://github.com/layervai/qurl-conformance/commit/a139c359244587b8f639c8de8df3eb29a5522dbe))
+
 ## [0.11.0](https://github.com/layervai/qurl-conformance/compare/v0.10.0...v0.11.0) (2026-08-02)
 
 
