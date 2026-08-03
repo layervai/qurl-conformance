@@ -26,9 +26,12 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   accept signature uses a random nonce, so it is not reproducible). The committed
   JSON is the artifact.
 - `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts. It
-  does not rewrite the frozen NHP packet families: agent-registration and
-  session-control packets are checked by `tools/verify-sdk`, and agent-assignment
-  packets are checked by `tools/verify-assignment` against their pinned producers.
+  does not rewrite the frozen NHP packet families.
+- This repo does NOT verify its vectors by rebuilding them with a consumer SDK.
+  Doing so made the vector artifact depend on its own consumers, and every wire
+  change deadlocked: the cross-check could not pass until a consumer spoke the
+  new protocol, and no consumer could adopt it until the vectors shipped.
+  Consumers verify themselves against the published vectors in their own CI.
 - Do not regenerate keys or signatures here; the committed key/signature bytes are
   the contract.
 - Keep the module dependency-free (stdlib only): no `require` lines in `go.mod`.

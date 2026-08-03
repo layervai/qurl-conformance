@@ -237,7 +237,7 @@ func validateAgentSessionKeys(keys AgentSessionKeys) error {
 }
 
 // validateAgentSessionPacket is the stdlib-only structural gate. The independent
-// verify-sdk gate rebuilds and cryptographically authenticates every packet.
+// Consumers rebuild and cryptographically authenticate every packet in their own CI.
 func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName string, wantType int, wantSender, wantReceiver string) error {
 	if p.HeaderName != wantName || p.HeaderType != wantType || p.SenderKey != wantSender || p.ReceiverKey != wantReceiver {
 		return fmt.Errorf("conformance: agent-session %s type or key roles drifted", name)
@@ -420,7 +420,7 @@ func validateAgentSessionACKBody(name, body string, openTime uint32, resourceID 
 	return nil
 }
 
-// classifyAgentSessionCookieBody is mirrored independently by verify-sdk; both
+// classifyAgentSessionCookieBody is mirrored independently by each consumer; both
 // classifiers must execute every closed cookie_body_cases entry in lockstep.
 func classifyAgentSessionCookieBody(body string, requestCounter uint64) string {
 	// Keep this raw shape pass separate from the strict typed decode below.
