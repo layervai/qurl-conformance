@@ -24,7 +24,7 @@ const (
 	// SHA, so re-pinning to the merged commit is a release-checklist item (see
 	// RELEASE_CHECKLIST.md). Before 1.1 this named an NHP server revision; the
 	// 1.1 bytes come from qurl-go.
-	AgentSessionControlProducerRevision = "6e4040594b67a56dabe04f5089b5837e885fee07"
+	AgentSessionControlProducerRevision = "c4729832bf29b0f356964035864707f6904b1982"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2

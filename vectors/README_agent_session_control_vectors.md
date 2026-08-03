@@ -28,7 +28,7 @@ ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets were emitted byte-for-byte by
 `layervai/qurl-go` producer revision
-`6e4040594b67a56dabe04f5089b5837e885fee07`.
+`c4729832bf29b0f356964035864707f6904b1982`.
 
 ## Protocol version
 

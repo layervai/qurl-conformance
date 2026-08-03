@@ -173,7 +173,7 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   verifies canonical lowercase hex, positive decimal transaction fields,
   canonical padded base64 endpoint keys, and each static X25519 keypair. The
   artifact pins `layervai/qurl-go` packet-codec revision
-  `6e4040594b67a56dabe04f5089b5837e885fee07`, which built and opened all nine
+  `c4729832bf29b0f356964035864707f6904b1982`, which built and opened all nine
   deterministic packets through its low-level codec. That revision
   pin does not claim the higher-level qurl-go assignment request builder already
   supports the current artifact schema; the conformance artifact intentionally
@@ -209,7 +209,7 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   `agent_session_control_vectors.json`) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and clean exit EXT -> ACK, pinned to
   `layervai/qurl-go` producer revision
-  `6e4040594b67a56dabe04f5089b5837e885fee07`. The COK wire
+  `c4729832bf29b0f356964035864707f6904b1982`. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw
