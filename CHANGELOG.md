@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/layervai/qurl-conformance/compare/v0.12.0...v0.12.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* repin the producer revision to the merged qurl-go commit ([#82](https://github.com/layervai/qurl-conformance/issues/82)) ([eb20a94](https://github.com/layervai/qurl-conformance/commit/eb20a94a8de714f18e3082390f873e520fa1c23c))
+
 ## [0.12.0](https://github.com/layervai/qurl-conformance/compare/v0.11.0...v0.12.0) (2026-08-03)
 
 
