@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2](https://github.com/layervai/qurl-conformance/compare/v0.12.1...v0.12.2) (2026-08-04)
+
+
+### Features
+
+* **vectors:** widen the knock deny errCode vocabulary ([#84](https://github.com/layervai/qurl-conformance/issues/84)) ([0919a9d](https://github.com/layervai/qurl-conformance/commit/0919a9dda77eec3d4de994b63ffa65c1b9a2976d))
+
 ## [0.12.1](https://github.com/layervai/qurl-conformance/compare/v0.12.0...v0.12.1) (2026-08-03)
 
 
