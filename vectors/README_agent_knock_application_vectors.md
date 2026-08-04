@@ -192,11 +192,16 @@ serialization with that code's producer `errMsg`:
 All deny cases share `outcome: deny` / `reject_class: server_deny`. The
 distinction between codes belongs to the consumer, which must preserve and
 surface the code (for example through a typed deny error) rather than collapse
-or reclassify it. This producer vocabulary may grow: a consumer must classify
-every canonical non-success `errCode` as an authenticated deny — including
+or reclassify it. This producer vocabulary may grow within the producer's
+decimal-digit code grammar: a consumer must classify every canonical
+(decimal-digit) non-success `errCode` as an authenticated deny — including
 codes not yet pinned here — and must never treat an unrecognized deny code as a
-malformed reply. Denial handling still precedes success-map validation, so a
-deny body legitimately carries `null` routing and admission maps.
+malformed reply. A non-success `errCode` outside the digit grammar is a
+producer-contract violation, not a deny: because a typed deny error surfaces
+its code through public error text, consumers must fail such values closed
+without echoing them, exactly as they redact other malformed producer text.
+Denial handling still precedes success-map validation, so a deny body
+legitimately carries `null` routing and admission maps.
 
 ## Consumer algorithm
 
