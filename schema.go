@@ -2617,7 +2617,11 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	}
 
 	required := []string{
-		"ack_success", "ack_success_optional_metadata", "ack_deny", "cookie_challenge",
+		"ack_success", "ack_success_optional_metadata", "ack_success_empty_err_code",
+		"ack_deny", "ack_deny_50001", "ack_deny_51002", "ack_deny_51101",
+		"ack_deny_52002", "ack_deny_52005", "ack_deny_52007", "ack_deny_52009",
+		"ack_deny_52010", "ack_deny_52011", "ack_deny_52021", "ack_deny_52025",
+		"cookie_challenge",
 		"reject_wrong_resource", "reject_missing_ac_token",
 		"reject_empty_ac_token", "reject_missing_resource_host",
 		"reject_empty_resource_host", "reject_malformed_ac_tokens_map",

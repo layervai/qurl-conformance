@@ -141,7 +141,10 @@ The ordinary success golden initializes `preActions` and maps the requested
 resource to JSON `null`, which is the producer's no-NHP_ACC shape. The optional-
 metadata success adds typed `aspToken` and `redirectUrl`; its deliberately
 different `aspToken` proves that only `acTokens[requested_res_id]` can become the
-declared admission token.
+declared admission token. `ack_success_empty_err_code` is byte-for-byte the
+ordinary success golden except its `errCode` is the empty string, pinning the
+other half of the success rule the notes have always declared: `""` and `"0"`
+are both success.
 
 | Outcome | Required handling |
 | --- | --- |
@@ -163,6 +166,42 @@ Closed `reject_class` vocabulary:
 | `unsupported_pre_access` | a successful ACK contains a non-null `preActions` value under any map key and therefore requires an unsupported NHP_ACC phase |
 | `counter` | ACK does not echo the request counter |
 | `reply_type` | a knock received neither `NHP_ACK` nor `NHP_COK` |
+
+## Deny vocabulary
+
+`ack_deny` remains the historical resource-not-found denial. The
+`ack_deny_<errCode>` cases widen coverage to the production server's legal
+knock-deny errCode vocabulary, one case per code, each in the producer's deny
+serialization with that code's producer `errMsg`:
+
+| Case | errCode | Producer meaning |
+| --- | --- | --- |
+| `ack_deny` | `52004` | failed to find resource |
+| `ack_deny_50001` | `50001` | json parse failed |
+| `ack_deny_51002` | `51002` | failed to find knock server |
+| `ack_deny_51101` | `51101` | invalid input parameter |
+| `ack_deny_52002` | `52002` | failed to find auth service provider |
+| `ack_deny_52005` | `52005` | server ac operation failed |
+| `ack_deny_52007` | `52007` | server backend auth required |
+| `ack_deny_52009` | `52009` | knock body HeaderType does not match wire HeaderType |
+| `ack_deny_52010` | `52010` | knock body HeaderType missing — upgrade agent |
+| `ack_deny_52011` | `52011` | knock HeaderType gate internal error (unknown verdict) |
+| `ack_deny_52021` | `52021` | server token persistence failed |
+| `ack_deny_52025` | `52025` | registered-agent knock runId is missing or invalid |
+
+All deny cases share `outcome: deny` / `reject_class: server_deny`. The
+distinction between codes belongs to the consumer, which must preserve and
+surface the code (for example through a typed deny error) rather than collapse
+or reclassify it. This producer vocabulary may grow within the producer's
+decimal-digit code grammar: a consumer must classify every canonical
+(decimal-digit) non-success `errCode` as an authenticated deny — including
+codes not yet pinned here — and must never treat an unrecognized deny code as a
+malformed reply. A non-success `errCode` outside the digit grammar is a
+producer-contract violation, not a deny: because a typed deny error surfaces
+its code through public error text, consumers must fail such values closed
+without echoing them, exactly as they redact other malformed producer text.
+Denial handling still precedes success-map validation, so a deny body
+legitimately carries `null` routing and admission maps.
 
 ## Consumer algorithm
 
