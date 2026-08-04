@@ -349,7 +349,12 @@ jobs:
               requests.reject_alias_run_id.native_connector.reject_class !== 'body_parse' ||
               lossyDuplicate.runId !== 'fedcba9876543210' ||
               uncheckedAlias.runID !== canonical || uncheckedAlias.runId !== undefined ||
-              k.reply_cases.length !== 25 || replies.ack_success.outcome !== 'success' ||
+              k.reply_cases.length !== 37 || replies.ack_success.outcome !== 'success' ||
+              replies.ack_success_empty_err_code.outcome !== 'success' ||
+              JSON.parse(replies.ack_success_empty_err_code.body_json).errCode !== '' ||
+              replies.ack_deny_51002.reject_class !== 'server_deny' ||
+              JSON.parse(replies.ack_deny_51002.body_json).errCode !== '51002' ||
+              JSON.parse(replies.ack_deny_52025.body_json).errCode !== '52025' ||
               JSON.parse(replies.ack_success.body_json).preActions[resource] !== null ||
               replies.ack_success.expected_ac_token !== JSON.parse(replies.ack_success.body_json).acTokens[resource] ||
               replies.ack_success.expected_resource_host !== JSON.parse(replies.ack_success.body_json).resHost[resource] ||
@@ -776,7 +781,12 @@ jobs:
           assert requests['reject_alias_run_id']['native_connector']['reject_class'] == 'body_parse'
           assert lossy_duplicate['runId'] == 'fedcba9876543210'
           assert unchecked_alias['runID'] == canonical and 'runId' not in unchecked_alias
-          assert len(k['reply_cases']) == 25 and replies['ack_success']['outcome'] == 'success'
+          assert len(k['reply_cases']) == 37 and replies['ack_success']['outcome'] == 'success'
+          assert replies['ack_success_empty_err_code']['outcome'] == 'success'
+          assert json.loads(replies['ack_success_empty_err_code']['body_json'])['errCode'] == ''
+          assert replies['ack_deny_51002']['reject_class'] == 'server_deny'
+          assert json.loads(replies['ack_deny_51002']['body_json'])['errCode'] == '51002'
+          assert json.loads(replies['ack_deny_52025']['body_json'])['errCode'] == '52025'
           success = json.loads(replies['ack_success']['body_json'])
           optional = json.loads(replies['ack_success_optional_metadata']['body_json'])
           assert success['preActions'][resource] is None

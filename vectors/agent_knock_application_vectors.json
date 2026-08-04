@@ -14,6 +14,7 @@
     "A standard successful ACK carries preActions with the requested resId mapped to null. Any non-null pre-access action under any map key requires an NHP_ACC phase and is unsupported by the native Connector profile, which MUST fail closed.",
     "A success ACK is usable only when both acTokens and resHost contain the requested resId with non-empty values. The declared expected_ac_token and expected_resource_host come only from those exact entries; aspToken, redirectUrl, agentAddr, and preActions are never alternate authorization sources.",
     "errCode is a string. Empty string and \"0\" are success; every other value is an authenticated deny and MUST be handled before success-map validation.",
+    "The deny vectors exercise the production server's legal knock-deny errCode vocabulary: 50001, 51002, 51101, 52002, 52004, 52005, 52007, 52009, 52010, 52011, 52021, and 52025. That producer vocabulary may grow; consumers MUST classify every canonical non-success errCode as an authenticated deny carrying its code, never as a malformed reply.",
     "agentAddr is corroborating server output, not the authorization signal. The per-resource acTokens entry is the authorization signal.",
     "NHP_COK is retry-later. Every other wrong reply type, a non-echoed ACK counter, malformed maps, or maps for another resource fails closed."
   ],
@@ -125,11 +126,120 @@
       "expected_resource_host": "frps.sandbox.example:7000"
     },
     {
+      "name": "ack_success_empty_err_code",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "success",
+      "expected_ac_token": "ac-token-conformance-01",
+      "expected_resource_host": "frps.sandbox.example:7000"
+    },
+    {
       "name": "ack_deny",
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
       "body_json": "{\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_50001",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"50001\",\"errMsg\":\"json parse failed\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_51002",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"51002\",\"errMsg\":\"failed to find knock server\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_51101",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"51101\",\"errMsg\":\"invalid input parameter\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52002",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52002\",\"errMsg\":\"failed to find auth service provider\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52005",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52005\",\"errMsg\":\"server ac operation failed\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52007",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52007\",\"errMsg\":\"server backend auth required\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52009",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52009\",\"errMsg\":\"knock body HeaderType does not match wire HeaderType\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52010",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52010\",\"errMsg\":\"knock body HeaderType missing — upgrade agent\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52011",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52011\",\"errMsg\":\"knock HeaderType gate internal error (unknown verdict)\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52021",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52021\",\"errMsg\":\"server token persistence failed\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "deny",
+      "reject_class": "server_deny"
+    },
+    {
+      "name": "ack_deny_52025",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"52025\",\"errMsg\":\"registered-agent knock runId is missing or invalid\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
       "outcome": "deny",
       "reject_class": "server_deny"
     },

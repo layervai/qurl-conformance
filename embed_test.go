@@ -913,7 +913,15 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 
 	wantCases := map[string]bool{
 		"ack_success": false, "ack_success_optional_metadata": false,
-		"ack_deny": false, "cookie_challenge": false,
+		"ack_success_empty_err_code": false,
+		"ack_deny":                   false,
+		"ack_deny_50001":             false, "ack_deny_51002": false,
+		"ack_deny_51101": false, "ack_deny_52002": false,
+		"ack_deny_52005": false, "ack_deny_52007": false,
+		"ack_deny_52009": false, "ack_deny_52010": false,
+		"ack_deny_52011": false, "ack_deny_52021": false,
+		"ack_deny_52025":        false,
+		"cookie_challenge":      false,
 		"reject_wrong_resource": false, "reject_missing_ac_token": false,
 		"reject_empty_ac_token": false, "reject_missing_resource_host": false,
 		"reject_empty_resource_host": false, "reject_malformed_ac_tokens_map": false,
@@ -1099,21 +1107,48 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		ACTokens:         map[string]string{resourceID: "ac-token-conformance-01"},
 		PreAccessActions: map[string]*struct{}{resourceID: nil},
 	}
-	// This shallow copy deliberately changes only scalar metadata; its shared
+	// These shallow copies deliberately change only scalar metadata; their shared
 	// routing, admission, and pre-access maps remain immutable below.
 	optionalMetadata := standard
 	optionalMetadata.AuthProviderToken = "asp-token-must-not-authorize"
 	optionalMetadata.RedirectURL = "https://redirect.example/conformance"
+	emptyErrCodeSuccess := standard
+	emptyErrCodeSuccess.ErrCode = ""
 	denied := producerACK{
 		ErrCode:   "52004",
 		ErrMsg:    "failed to find resource",
 		AgentAddr: "203.0.113.9:49152",
 	}
-	for name, ack := range map[string]producerACK{
+	// The widened deny cases carry the production server's legal knock-deny
+	// errCode vocabulary beyond the historical resource-not-found case. Each
+	// case's errCode is derived from its name so the two cannot drift.
+	widenedDenyMessages := map[string]string{
+		"ack_deny_50001": "json parse failed",
+		"ack_deny_51002": "failed to find knock server",
+		"ack_deny_51101": "invalid input parameter",
+		"ack_deny_52002": "failed to find auth service provider",
+		"ack_deny_52005": "server ac operation failed",
+		"ack_deny_52007": "server backend auth required",
+		"ack_deny_52009": "knock body HeaderType does not match wire HeaderType",
+		"ack_deny_52010": "knock body HeaderType missing — upgrade agent",
+		"ack_deny_52011": "knock HeaderType gate internal error (unknown verdict)",
+		"ack_deny_52021": "server token persistence failed",
+		"ack_deny_52025": "registered-agent knock runId is missing or invalid",
+	}
+	goldens := map[string]producerACK{
 		"ack_success":                   standard,
 		"ack_success_optional_metadata": optionalMetadata,
+		"ack_success_empty_err_code":    emptyErrCodeSuccess,
 		"ack_deny":                      denied,
-	} {
+	}
+	for name, errMsg := range widenedDenyMessages {
+		goldens[name] = producerACK{
+			ErrCode:   strings.TrimPrefix(name, "ack_deny_"),
+			ErrMsg:    errMsg,
+			AgentAddr: denied.AgentAddr,
+		}
+	}
+	for name, ack := range goldens {
 		golden, err := json.Marshal(ack)
 		if err != nil {
 			t.Fatalf("marshal %s producer ACK: %v", name, err)
@@ -1123,9 +1158,13 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		}
 	}
 
-	for _, name := range []string{"ack_success", "ack_success_optional_metadata"} {
-		if got := stringField(name, "errCode"); got != "0" {
-			t.Errorf("%s errCode = %q, want 0", name, got)
+	for name, wantErrCode := range map[string]string{
+		"ack_success":                   "0",
+		"ack_success_optional_metadata": "0",
+		"ack_success_empty_err_code":    "",
+	} {
+		if got := stringField(name, "errCode"); got != wantErrCode {
+			t.Errorf("%s errCode = %q, want %q", name, got, wantErrCode)
 		}
 		acTokens, acErr := stringMap(name, "acTokens")
 		resourceHosts, hostErr := stringMap(name, "resHost")
@@ -1156,8 +1195,13 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	if aspToken == byName["ack_success_optional_metadata"].ExpectedACToken {
 		t.Error("optional aspToken aliases expected_ac_token; vector would not catch alternate authorization")
 	}
-	if got := stringField("ack_deny", "errCode"); got == "" || got == "0" {
-		t.Errorf("ack_deny errCode = %q, want non-success code", got)
+	for _, c := range af.ReplyCases {
+		if c.Outcome != AgentKnockOutcomeDeny {
+			continue
+		}
+		if got := stringField(c.Name, "errCode"); got == "" || got == "0" {
+			t.Errorf("%s errCode = %q, want non-success code", c.Name, got)
+		}
 	}
 	if fields := body("cookie_challenge"); len(fields["cookie"]) == 0 || len(fields["trxId"]) == 0 {
 		t.Errorf("cookie_challenge body = %v, want cookie and trxId", fields)
