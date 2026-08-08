@@ -29,8 +29,10 @@ jobs:
       - name: Root module — test/vet/fmt
         run: |
           # go.mod is the root compatibility source of truth. This equality
-          # proves setup-go selected its exact patch rather than floating 1.26.x.
-          # It deliberately assumes go.mod has no toolchain directive.
+          # proves setup-go selected the exact patch named there rather than
+          # floating within that minor series — so CI exercises the declared
+          # floor itself, which is the version downstream consumers are
+          # promised. It deliberately assumes go.mod has no toolchain directive.
           expected_go="go$(awk '$1 == "go" { print $2 }' go.mod)"
           test "$(go env GOVERSION)" = "$expected_go"
           go test ./...
