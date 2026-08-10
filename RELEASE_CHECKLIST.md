@@ -77,3 +77,54 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 - [ ] Consumers bump to the published version and adopt the new wire in their
       own CI. Until each has, its conformance run is asserting against the
       previous protocol and proves nothing about this release.
+
+## Why the root package declares no `component`
+
+`release-please-config.json` gives `npm` and `python` a `component` and
+deliberately gives the root Go package none. That asymmetry is load-bearing —
+do not "tidy" it by adding `"component": "go"` back.
+
+The root package sets `include-component-in-tag: false`, because a Go module
+must be tagged `vX.Y.Z` at the module root; `go-v0.12.3` would be invisible to
+the Go proxy. Inside release-please that flag makes `getComponent()` return the
+empty string, which is what matches the *unlabeled* `<details><summary>0.12.3
+</summary>` block the root package contributes to the grouped release PR body.
+
+The trap is a second, separate accessor. When the release PR body has exactly
+one section and that section is unlabeled — which is every release driven only
+by root-path commits, since `npm/` and `python/` see no commits and get skipped
+— release-please takes its "standalone release PR" path and matches on
+`getBranchComponent()` instead. That accessor ignores `include-component-in-tag`
+and returns the configured component verbatim. It then compares that against the
+component parsed out of the *branch name*, and the grouped branch
+`release-please--branches--main` carries no component at all. So `""` vs `"go"`
+never matched, and release-please logged
+
+    PR component: undefined does not match configured component: go
+
+for all three paths, built zero releases, and exited 0.
+
+That is what happened to v0.12.3: `#88` merged, `CHANGELOG.md` and
+`.release-please-manifest.json` landed on `main`, both publish jobs skipped, no
+tag was created, and nothing failed. The tag had to be created by hand and `#88`
+relabelled `autorelease: tagged` to stop release-please aborting every
+subsequent release PR with "There are untagged, merged release PRs outstanding".
+
+With no `component` on the root package both accessors return the empty string,
+the branch-name comparison matches, and a root-only release tags itself. Tag
+names are unchanged — they are governed by `include-component-in-tag`, not by
+this field.
+
+The `linked-versions` plugin lists only `npm` and `python` for the same reason.
+That plugin filters on `getComponent()`, which is the empty string for the root
+package, so the Go module was never one of its group members — listing `"go"`
+there was always a no-op. The real contract is: `npm` and `python` move
+together, and the Go module's version tracks them on any change that touches the
+vectors (which is every wire change, since the three are byte-identical) but
+floats ahead on a release driven only by root-path commits. A manifest reading
+`".": 0.12.3` against `npm`/`python` at `0.12.2` is correct, not drift.
+
+- [ ] After any change to `release-please-config.json`, confirm the *next*
+      release actually produced a `vX.Y.Z` tag and a GitHub Release, not just a
+      merged release PR. A merged release PR with no tag is the failure mode
+      this repo has already hit once, and it is silent.
