@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.3](https://github.com/layervai/qurl-conformance/compare/v0.12.2...v0.12.3) (2026-08-10)
+
+
+### Build System
+
+* **go:** lower the module Go floor to 1.25.12 ([#86](https://github.com/layervai/qurl-conformance/issues/86)) ([6945bd1](https://github.com/layervai/qurl-conformance/commit/6945bd1d8cf90a93f919e1f24054e202cbcd8340))
+
+
+### Continuous Integration
+
+* make build and ci commits cut a release ([#87](https://github.com/layervai/qurl-conformance/issues/87)) ([f5ead68](https://github.com/layervai/qurl-conformance/commit/f5ead68bfdacb70f81a0758d1ae7843d37e25b86))
+
 ## [0.12.2](https://github.com/layervai/qurl-conformance/compare/v0.12.1...v0.12.2) (2026-08-04)
 
 
