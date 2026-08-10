@@ -125,12 +125,20 @@ floats ahead on a release driven only by root-path commits. A manifest reading
 `".": 0.12.3` against `npm`/`python` at `0.12.2` is correct, not drift.
 
 This is now enforced rather than remembered. The `verify-root-tag` job in
-`release-please.yml` fails the run when HEAD is a `chore: release` commit and no
-tag matching the manifest's root version exists. It deliberately asserts the
-outcome instead of reading release-please's own outputs — the whole bug was
-release-please believing it had nothing to release, so its outputs are not a
-trustworthy witness. Verified against all three cases: the real post-recovery
-`main` passes, the v0.12.3 shape fails, and an ordinary commit skips.
+`release-please.yml` fails the run when a release commit did not produce a
+correct root tag. It treats HEAD as a release commit on either of two signals —
+a `chore: release` subject, or a touched `.release-please-manifest.json` — so an
+edited squash title or a customized release-commit-message cannot make the gate
+silently no-op. It then requires `vX.Y.Z` for the manifest's root version to
+exist *and* to resolve to that commit, since a stale tag of the right name left
+by a partial recovery is as broken as a missing one.
+
+It asserts the outcome rather than reading release-please's own outputs: the
+whole bug was release-please believing it had nothing to release, so its outputs
+are not a trustworthy witness. Verified against five cases — the real
+post-recovery `main` passes; a missing tag fails; an edited subject with a
+touched manifest still fails rather than skipping; a tag pointing at the wrong
+commit fails; an ordinary commit skips.
 
 - [ ] If `verify-root-tag` ever goes red, do not re-run it. Create the tag and
       GitHub Release at that commit, then relabel the merged release PR

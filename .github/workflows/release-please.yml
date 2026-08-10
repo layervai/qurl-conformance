@@ -115,7 +115,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -123,15 +123,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Two independent signals, because a silent skip here would quietly
+          # reopen the exact blind spot this job exists to close. The subject is
+          # the documented default, but it is editable — a customized
+          # release-commit-message, or a squash-merge with a hand-edited title,
+          # would slip past it. A touched manifest is the harder signal: nothing
+          # but a release moves the versions release-please owns.
           subject="$(git log -1 --pretty=%s)"
-          case "$subject" in
-            "chore: release"*) ;;
-            *)
-              echo "HEAD is not a release-please release commit; nothing to verify."
-              echo "  subject: ${subject}"
-              exit 0
-              ;;
-          esac
+          changed="$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)"
+
+          is_release=false
+          case "$subject" in "chore: release"*) is_release=true ;; esac
+          case "$changed" in *".release-please-manifest.json"*) is_release=true ;; esac
+
+          if [ "$is_release" != "true" ]; then
+            echo "HEAD is not a release commit; nothing to verify."
+            echo "  subject: ${subject}"
+            exit 0
+          fi
 
           version="$(jq -r '.["."]' .release-please-manifest.json)"
           if [ -z "${version}" ] || [ "${version}" = "null" ]; then
@@ -144,9 +153,18 @@ jobs:
           # is invisible to the Go module proxy.
           tag="v${version}"
           git fetch --tags --quiet
-          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "OK: release commit for ${tag} has a matching tag."
-            exit 0
+
+          # Existence is not enough: a stale tag of the right NAME left by a
+          # partial recovery or an earlier re-run would pass while pointing at
+          # the wrong commit. Assert it resolves to the commit we just pushed.
+          if tagged="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}")"; then
+            if [ "${tagged}" = "${GITHUB_SHA}" ]; then
+              echo "OK: ${tag} exists and points at ${GITHUB_SHA}."
+              exit 0
+            fi
+            echo "::error::${tag} exists but points at ${tagged}, not this release commit (${GITHUB_SHA})."
+            echo "::error::A stale or mis-targeted tag is as broken as a missing one — consumers would resolve the wrong tree."
+            exit 1
           fi
 
           echo "::error::Release commit merged for ${tag} but no ${tag} tag exists."
