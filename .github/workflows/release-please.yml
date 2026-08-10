@@ -91,3 +91,66 @@ jobs:
           # Set PEP 740 attestation behavior explicitly rather than relying
           # on the default.
           attestations: true
+
+  # Turn the silent failure into a red run.
+  #
+  # v0.12.3 merged its release PR, wrote CHANGELOG.md and the manifest to main,
+  # created NO tag, and exited 0 — release-please could not match the root
+  # package and simply built zero releases. Nothing failed, so nothing was
+  # noticed until someone went looking for the tag. The config fix that caused
+  # it is in release-please-config.json (see RELEASE_CHECKLIST.md), but a config
+  # fix alone leaves the same failure mode reachable the next time this
+  # matching logic shifts under us.
+  #
+  # This asserts the outcome rather than the mechanism: if the commit we just
+  # pushed is release-please's own release commit, then the version the manifest
+  # now claims for the root module MUST have a matching tag. Deliberately not
+  # keyed on the action's `outputs` — the whole bug was release-please believing
+  # it had nothing to release, so its own outputs are not a trustworthy witness.
+  verify-root-tag:
+    name: Verify the root release produced a tag
+    needs: release-please
+    if: ${{ !cancelled() && needs.release-please.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Assert a release commit cut its root tag
+        run: |
+          set -euo pipefail
+
+          subject="$(git log -1 --pretty=%s)"
+          case "$subject" in
+            "chore: release"*) ;;
+            *)
+              echo "HEAD is not a release-please release commit; nothing to verify."
+              echo "  subject: ${subject}"
+              exit 0
+              ;;
+          esac
+
+          version="$(jq -r '.["."]' .release-please-manifest.json)"
+          if [ -z "${version}" ] || [ "${version}" = "null" ]; then
+            echo "::error::.release-please-manifest.json has no root (\".\") version"
+            exit 1
+          fi
+
+          # include-component-in-tag is false for the root package, so the Go
+          # module tag is a bare vX.Y.Z. That shape is load-bearing: `go-vX.Y.Z`
+          # is invisible to the Go module proxy.
+          tag="v${version}"
+          git fetch --tags --quiet
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "OK: release commit for ${tag} has a matching tag."
+            exit 0
+          fi
+
+          echo "::error::Release commit merged for ${tag} but no ${tag} tag exists."
+          echo "::error::release-please built zero releases for the root package — the exact v0.12.3 failure."
+          echo "::error::Check the release-please job log for: 'PR component: ... does not match configured component'."
+          echo "::error::Recovery: create the tag and GitHub Release at this commit, then relabel the merged release PR 'autorelease: tagged' so later release PRs stop aborting. See RELEASE_CHECKLIST.md."
+          exit 1

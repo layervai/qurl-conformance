@@ -124,7 +124,15 @@ vectors (which is every wire change, since the three are byte-identical) but
 floats ahead on a release driven only by root-path commits. A manifest reading
 `".": 0.12.3` against `npm`/`python` at `0.12.2` is correct, not drift.
 
-- [ ] After any change to `release-please-config.json`, confirm the *next*
-      release actually produced a `vX.Y.Z` tag and a GitHub Release, not just a
-      merged release PR. A merged release PR with no tag is the failure mode
-      this repo has already hit once, and it is silent.
+This is now enforced rather than remembered. The `verify-root-tag` job in
+`release-please.yml` fails the run when HEAD is a `chore: release` commit and no
+tag matching the manifest's root version exists. It deliberately asserts the
+outcome instead of reading release-please's own outputs — the whole bug was
+release-please believing it had nothing to release, so its outputs are not a
+trustworthy witness. Verified against all three cases: the real post-recovery
+`main` passes, the v0.12.3 shape fails, and an ordinary commit skips.
+
+- [ ] If `verify-root-tag` ever goes red, do not re-run it. Create the tag and
+      GitHub Release at that commit, then relabel the merged release PR
+      `autorelease: tagged` — otherwise release-please aborts every later
+      release PR with "There are untagged, merged release PRs outstanding".
