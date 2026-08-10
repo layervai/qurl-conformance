@@ -51,8 +51,14 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 ## Releases
 
 - Versioning is automated by Release Please in manifest mode (`release-please-config.json`,
-  `.release-please-manifest.json`, `.github/workflows/release-please.yml`). The Go
-  module, npm package, and Python package share one linked version.
+  `.release-please-manifest.json`, `.github/workflows/release-please.yml`). The npm
+  and Python packages share one linked version. The Go module's version tracks
+  them whenever a change touches the vectors — which is every change to the wire
+  artifact, since the three mirrors are byte-identical — but floats ahead on a
+  release driven only by root-path commits (a `build:` toolchain bump, a `ci:`
+  change), because `npm/` and `python/` have nothing to publish for those. That
+  is why `.release-please-manifest.json` can legitimately read `".": 0.12.3`
+  against `npm`/`python` at `0.12.2`; it is not drift to be "corrected".
 - Merging the release PR tags the repo and thereby releases the Go module.
 - npm/PyPI registry publishing on release is a token-gated follow-up (needs
   `NPM_TOKEN` / PyPI trusted publishing); Release Please currently automates only

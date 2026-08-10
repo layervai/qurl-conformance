@@ -91,3 +91,84 @@ jobs:
           # Set PEP 740 attestation behavior explicitly rather than relying
           # on the default.
           attestations: true
+
+  # Turn the silent failure into a red run.
+  #
+  # v0.12.3 merged its release PR, wrote CHANGELOG.md and the manifest to main,
+  # created NO tag, and exited 0 — release-please could not match the root
+  # package and simply built zero releases. Nothing failed, so nothing was
+  # noticed until someone went looking for the tag. The config fix that caused
+  # it is in release-please-config.json (see RELEASE_CHECKLIST.md), but a config
+  # fix alone leaves the same failure mode reachable the next time this
+  # matching logic shifts under us.
+  #
+  # This asserts the outcome rather than the mechanism: if the commit we just
+  # pushed is release-please's own release commit, then the version the manifest
+  # now claims for the root module MUST have a matching tag. Deliberately not
+  # keyed on the action's `outputs` — the whole bug was release-please believing
+  # it had nothing to release, so its own outputs are not a trustworthy witness.
+  verify-root-tag:
+    name: Verify the root release produced a tag
+    needs: release-please
+    if: ${{ !cancelled() && needs.release-please.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Assert a release commit cut its root tag
+        run: |
+          set -euo pipefail
+
+          # Two independent signals, because a silent skip here would quietly
+          # reopen the exact blind spot this job exists to close. The subject is
+          # the documented default, but it is editable — a customized
+          # release-commit-message, or a squash-merge with a hand-edited title,
+          # would slip past it. A touched manifest is the harder signal: nothing
+          # but a release moves the versions release-please owns.
+          subject="$(git log -1 --pretty=%s)"
+          changed="$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)"
+
+          is_release=false
+          case "$subject" in "chore: release"*) is_release=true ;; esac
+          case "$changed" in *".release-please-manifest.json"*) is_release=true ;; esac
+
+          if [ "$is_release" != "true" ]; then
+            echo "HEAD is not a release commit; nothing to verify."
+            echo "  subject: ${subject}"
+            exit 0
+          fi
+
+          version="$(jq -r '.["."]' .release-please-manifest.json)"
+          if [ -z "${version}" ] || [ "${version}" = "null" ]; then
+            echo "::error::.release-please-manifest.json has no root (\".\") version"
+            exit 1
+          fi
+
+          # include-component-in-tag is false for the root package, so the Go
+          # module tag is a bare vX.Y.Z. That shape is load-bearing: `go-vX.Y.Z`
+          # is invisible to the Go module proxy.
+          tag="v${version}"
+          git fetch --tags --quiet
+
+          # Existence is not enough: a stale tag of the right NAME left by a
+          # partial recovery or an earlier re-run would pass while pointing at
+          # the wrong commit. Assert it resolves to the commit we just pushed.
+          if tagged="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}")"; then
+            if [ "${tagged}" = "${GITHUB_SHA}" ]; then
+              echo "OK: ${tag} exists and points at ${GITHUB_SHA}."
+              exit 0
+            fi
+            echo "::error::${tag} exists but points at ${tagged}, not this release commit (${GITHUB_SHA})."
+            echo "::error::A stale or mis-targeted tag is as broken as a missing one — consumers would resolve the wrong tree."
+            exit 1
+          fi
+
+          echo "::error::Release commit merged for ${tag} but no ${tag} tag exists."
+          echo "::error::release-please built zero releases for the root package — the exact v0.12.3 failure."
+          echo "::error::Check the release-please job log for: 'PR component: ... does not match configured component'."
+          echo "::error::Recovery: create the tag and GitHub Release at this commit, then relabel the merged release PR 'autorelease: tagged' so later release PRs stop aborting. See RELEASE_CHECKLIST.md."
+          exit 1

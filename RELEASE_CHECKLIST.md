@@ -77,3 +77,70 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 - [ ] Consumers bump to the published version and adopt the new wire in their
       own CI. Until each has, its conformance run is asserting against the
       previous protocol and proves nothing about this release.
+
+## Why the root package declares no `component`
+
+`release-please-config.json` gives `npm` and `python` a `component` and
+deliberately gives the root Go package none. That asymmetry is load-bearing —
+do not "tidy" it by adding `"component": "go"` back.
+
+The root package sets `include-component-in-tag: false`, because a Go module
+must be tagged `vX.Y.Z` at the module root; `go-v0.12.3` would be invisible to
+the Go proxy. Inside release-please that flag makes `getComponent()` return the
+empty string, which is what matches the *unlabeled* `<details><summary>0.12.3
+</summary>` block the root package contributes to the grouped release PR body.
+
+The trap is a second, separate accessor. When the release PR body has exactly
+one section and that section is unlabeled — which is every release driven only
+by root-path commits, since `npm/` and `python/` see no commits and get skipped
+— release-please takes its "standalone release PR" path and matches on
+`getBranchComponent()` instead. That accessor ignores `include-component-in-tag`
+and returns the configured component verbatim. It then compares that against the
+component parsed out of the *branch name*, and the grouped branch
+`release-please--branches--main` carries no component at all. So `""` vs `"go"`
+never matched, and release-please logged
+
+    PR component: undefined does not match configured component: go
+
+for all three paths, built zero releases, and exited 0.
+
+That is what happened to v0.12.3: `#88` merged, `CHANGELOG.md` and
+`.release-please-manifest.json` landed on `main`, both publish jobs skipped, no
+tag was created, and nothing failed. The tag had to be created by hand and `#88`
+relabelled `autorelease: tagged` to stop release-please aborting every
+subsequent release PR with "There are untagged, merged release PRs outstanding".
+
+With no `component` on the root package both accessors return the empty string,
+the branch-name comparison matches, and a root-only release tags itself. Tag
+names are unchanged — they are governed by `include-component-in-tag`, not by
+this field.
+
+The `linked-versions` plugin lists only `npm` and `python` for the same reason.
+That plugin filters on `getComponent()`, which is the empty string for the root
+package, so the Go module was never one of its group members — listing `"go"`
+there was always a no-op. The real contract is: `npm` and `python` move
+together, and the Go module's version tracks them on any change that touches the
+vectors (which is every wire change, since the three are byte-identical) but
+floats ahead on a release driven only by root-path commits. A manifest reading
+`".": 0.12.3` against `npm`/`python` at `0.12.2` is correct, not drift.
+
+This is now enforced rather than remembered. The `verify-root-tag` job in
+`release-please.yml` fails the run when a release commit did not produce a
+correct root tag. It treats HEAD as a release commit on either of two signals —
+a `chore: release` subject, or a touched `.release-please-manifest.json` — so an
+edited squash title or a customized release-commit-message cannot make the gate
+silently no-op. It then requires `vX.Y.Z` for the manifest's root version to
+exist *and* to resolve to that commit, since a stale tag of the right name left
+by a partial recovery is as broken as a missing one.
+
+It asserts the outcome rather than reading release-please's own outputs: the
+whole bug was release-please believing it had nothing to release, so its outputs
+are not a trustworthy witness. Verified against five cases — the real
+post-recovery `main` passes; a missing tag fails; an edited subject with a
+touched manifest still fails rather than skipping; a tag pointing at the wrong
+commit fails; an ordinary commit skips.
+
+- [ ] If `verify-root-tag` ever goes red, do not re-run it. Create the tag and
+      GitHub Release at that commit, then relabel the merged release PR
+      `autorelease: tagged` — otherwise release-please aborts every later
+      release PR with "There are untagged, merged release PRs outstanding".

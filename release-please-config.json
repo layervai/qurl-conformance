@@ -18,10 +18,10 @@
     { "type": "chore", "section": "Miscellaneous Chores", "hidden": true }
   ],
   "plugins": [
-    { "type": "linked-versions", "groupName": "qurl-conformance", "components": ["go", "npm", "python"] }
+    { "type": "linked-versions", "groupName": "qurl-conformance", "components": ["npm", "python"] }
   ],
   "packages": {
-    ".": { "release-type": "go", "component": "go", "include-component-in-tag": false },
+    ".": { "release-type": "go", "include-component-in-tag": false },
     "npm": { "release-type": "node", "component": "npm" },
     "python": { "release-type": "python", "component": "python" }
   }
