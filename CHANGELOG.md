@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/layervai/qurl-conformance/compare/v0.12.3...v0.12.4) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ci:** let a root-only release actually cut its tag ([#89](https://github.com/layervai/qurl-conformance/issues/89)) ([3def404](https://github.com/layervai/qurl-conformance/commit/3def404d2fc2af348031ec8efb169ec847a7f38b))
+
 ## [0.12.3](https://github.com/layervai/qurl-conformance/compare/v0.12.2...v0.12.3) (2026-08-10)
 
 
