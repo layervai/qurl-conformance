@@ -32,7 +32,11 @@ func TestEmbeddedCRIDV1Loads(t *testing.T) {
 		if err != nil {
 			t.Fatalf("producer %q der: %v", c.Name, err)
 		}
-		digest, encoded, crc, crid := deriveCRIDV1(fixture.version, der, CRIDV1FullDigestLength)
+		digestLength, ok := cridV1RegistryDigestLength(fixture.version)
+		if !ok {
+			t.Fatalf("producer %q uses unregistered version %#02x", c.Name, fixture.version)
+		}
+		digest, encoded, crc, crid := deriveCRIDV1(fixture.version, der, digestLength)
 		if hex.EncodeToString(digest[:]) != c.DigestHex || hex.EncodeToString(encoded) != c.PayloadHex || hex.EncodeToString(crc) != c.CRCHex || crid != c.ExpectedCRID {
 			t.Errorf("producer %q does not re-derive: crid %q want %q", c.Name, crid, c.ExpectedCRID)
 		}
@@ -197,6 +201,12 @@ func TestParseCRIDV1FileFailsClosed(t *testing.T) {
 	t.Run("contract checksum polynomial", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(cf *CRIDV1File) { cf.Contract.ChecksumPolynomialHex = "04c11db7" }), "contract")
 	})
+	t.Run("contract full crid length", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(cf *CRIDV1File) { cf.Contract.FullCRIDLength = 59 }), "contract")
+	})
+	t.Run("contract domain separator", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(cf *CRIDV1File) { cf.Contract.DomainSeparatorHex = "01" }), "contract")
+	})
 	t.Run("registry environment", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(cf *CRIDV1File) { cf.Versions[0].Environment = CRIDV1EnvironmentTest }), "version registry")
 	})
@@ -318,4 +328,35 @@ func TestParseCRIDV1FileFailsClosed(t *testing.T) {
 	t.Run("missing key match case", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(cf *CRIDV1File) { cf.KeyMatchCases = cf.KeyMatchCases[:len(cf.KeyMatchCases)-1] }), "count")
 	})
+}
+
+// TestDeriveCRIDV1UnknownVersionFixturesReDerive ties the two unknown-version
+// crafted fixtures back to the reference derivation inside the repo: both were
+// derived from the resource_key_qv2 DER at version 0x7f — the truncated one at
+// the 24-byte digest width — so the otherwise-unexercised truncated derivation
+// branch is pinned against a committed golden rather than only re-checked by
+// the local gate.
+func TestDeriveCRIDV1UnknownVersionFixturesReDerive(t *testing.T) {
+	der, err := base64.RawURLEncoding.Strict().DecodeString(cridV1ResourceKeyQV2B64URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name         string
+		digestLength int
+		want         string
+	}{
+		{name: "full", digestLength: CRIDV1FullDigestLength, want: cridV1UnknownVersionFullCRID},
+		{name: "truncated", digestLength: CRIDV1TruncatedDigestLength, want: cridV1UnknownVersionTruncCRID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, _, crid := deriveCRIDV1(0x7f, der, tc.digestLength)
+			if crid != tc.want {
+				t.Fatalf("deriveCRIDV1(0x7f, qv2, %d) = %q, want the pinned fixture %q", tc.digestLength, crid, tc.want)
+			}
+			if outcome, rejectClass := deriveCRIDV1ValueExpectation(crid); outcome != ExpectAccept || rejectClass != "" {
+				t.Fatalf("re-derived fixture fails its own local gate: %q/%q", outcome, rejectClass)
+			}
+		})
+	}
 }

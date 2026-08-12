@@ -335,7 +335,11 @@ func validateCRIDV1ProducerCases(cases []CRIDV1ProducerCase) error {
 		if err != nil {
 			return fmt.Errorf("conformance: CRID v1 producer case %q der_spki_b64url: %w", c.Name, err)
 		}
-		digest, encoded, crc, crid := deriveCRIDV1(fixture.version, der, CRIDV1FullDigestLength)
+		digestLength, ok := cridV1RegistryDigestLength(fixture.version)
+		if !ok {
+			return fmt.Errorf("conformance: CRID v1 producer case %q uses unregistered version %#02x", c.Name, fixture.version)
+		}
+		digest, encoded, crc, crid := deriveCRIDV1(fixture.version, der, digestLength)
 		if c.DigestHex != hex.EncodeToString(digest[:]) {
 			return fmt.Errorf("conformance: CRID v1 producer case %q digest_hex does not re-derive", c.Name)
 		}
@@ -438,6 +442,23 @@ func validateCRIDV1KeyMatchCases(cases []CRIDV1KeyMatchCase) error {
 		}
 	}
 	return nil
+}
+
+// cridV1RegistryDigestLength returns the digest width the version registry
+// pins for a version byte, so producer validation derives at the registered
+// width rather than assuming the full-digest shape — correct by construction
+// if a reserved truncated version ever gains a producer fixture.
+func cridV1RegistryDigestLength(version byte) (int, bool) {
+	for _, row := range cridV1VersionRegistry {
+		rowVersion, err := cridV1DecodeVersionHex(row.VersionHex)
+		if err != nil {
+			continue
+		}
+		if rowVersion == version {
+			return row.DigestLength, true
+		}
+	}
+	return 0, false
 }
 
 // deriveCRIDV1 derives a CRID from a version byte and DER SubjectPublicKeyInfo
