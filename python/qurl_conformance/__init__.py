@@ -70,3 +70,8 @@ def connector_hub_lst_cookie_vectors():
 def agent_credential_recovery_vectors():
     """Return the parsed agent_credential_recovery_v1_vectors.json."""
     return _load("agent_credential_recovery_v1_vectors.json")
+
+
+def crid_v1_vectors():
+    """Return the parsed crid_v1_vectors.json."""
+    return _load("crid_v1_vectors.json")

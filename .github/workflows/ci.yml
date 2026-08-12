@@ -76,6 +76,7 @@ jobs:
           const h = c.connectorHubRequestIdVectors();
           const hc = c.connectorHubLstCookieVectors();
           const cr = c.agentCredentialRecoveryVectors();
+          const cd = c.cridV1Vectors();
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
@@ -132,6 +133,38 @@ jobs:
               .update(preimage).digest();
             return cookie.toString('hex') === vector.cookie_hex && cookie.toString('base64') === vector.cookie_b64;
           };
+          const cridCrc32c = buf => {
+            let crc = 0xffffffff;
+            for (const byte of buf) {
+              crc ^= byte;
+              for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0x82f63b78 & -(crc & 1));
+            }
+            return (crc ^ 0xffffffff) >>> 0;
+          };
+          const cridBase32 = buf => {
+            let bits = 0, value = 0, out = '';
+            for (const byte of buf) {
+              value = (value << 8) | byte;
+              bits += 8;
+              while (bits >= 5) { out += cd.contract.alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+            }
+            return bits ? out + cd.contract.alphabet[(value << (5 - bits)) & 31] : out;
+          };
+          const deriveCrid = vector => {
+            const der = Buffer.from(vector.der_spki_b64url, 'base64url');
+            const digest = crypto.createHash('sha256')
+              .update(Buffer.concat([Buffer.from(cd.contract.domain_separation_prefix, 'ascii'), Buffer.from([0]), der]))
+              .digest();
+            if (digest.toString('hex') !== vector.digest_hex) return false;
+            const payload = Buffer.concat([Buffer.from(vector.version_byte, 'hex'), digest]);
+            const crc = Buffer.alloc(4);
+            crc.writeUInt32BE(cridCrc32c(payload));
+            if (crc.toString('hex') !== vector.crc_hex) return false;
+            const encoded = Buffer.concat([payload, crc]);
+            if (encoded.toString('hex') !== vector.payload_hex) return false;
+            return cridBase32(encoded) === vector.expected_crid;
+          };
+          const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
           const recoveryCookieKat = hc.cookie_kats.find(v => v.name === 'ipv4');
@@ -498,6 +531,21 @@ jobs:
               cr.private_operations.CompleteCredentialRecovery.public_mapping_cases.length !== 7 ||
               cr.fixtures.recovery_credential === cr.fixtures.device_api_key_candidate ||
               cr.public_exchanges.assigned_cell_complete_recovery.success_body_json.includes(cr.fixtures.device_api_key_candidate) ||
+              cd.artifact !== 'qurl-crid-v1-vectors' || cd.schema_version !== 1 ||
+              cd.contract.checksum_polynomial_hex !== '1edc6f41' ||
+              cd.contract.alphabet !== 'abcdefghijklmnopqrstuvwxyz234567' ||
+              cd.versions.length !== 4 || cd.producer_cases.length !== 6 ||
+              cd.consumer_value_cases.length !== 16 || cd.version_cases.length !== 4 ||
+              cd.key_match_cases.length !== 4 ||
+              cd.producer_cases.some(v => !deriveCrid(v)) ||
+              cd.producer_cases.some(v => v.expected_crid.length !== cd.contract.full_crid_length ||
+                v.expected_crid[0] !== (v.environment === 'test' ? 'q' : 'a') ||
+                !['a', 'q'].includes(v.expected_crid[59])) ||
+              cridValues.accept_unknown_version_full.outcome !== 'accept' ||
+              cridValues.accept_unknown_version_truncated.value.length !== cd.contract.truncated_crid_length ||
+              cridValues.reject_version_zero.reject_class !== 'version' ||
+              cridValues.reject_trailing_bits.reject_class !== 'non_canonical' ||
+              cridValues.reject_checksum.reject_class !== 'checksum' ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -535,6 +583,7 @@ jobs:
           h = q.connector_hub_request_id_vectors()
           hc = q.connector_hub_lst_cookie_vectors()
           cr = q.agent_credential_recovery_vectors()
+          cd = q.crid_v1_vectors()
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
           def derive_hub_request_id(vector):
@@ -565,6 +614,26 @@ jobs:
                   return False
               cookie = hmac.new(bytes.fromhex(vector['signing_key_hex']), preimage, hashlib.sha256).digest()
               return cookie.hex() == vector['cookie_hex'] and base64.b64encode(cookie).decode('ascii') == vector['cookie_b64']
+          def crid_crc32c(data):
+              crc = 0xffffffff
+              for byte in data:
+                  crc ^= byte
+                  for _ in range(8):
+                      crc = (crc >> 1) ^ (0x82f63b78 * (crc & 1))
+              return crc ^ 0xffffffff
+          def derive_crid(vector):
+              der = base64.urlsafe_b64decode(vector['der_spki_b64url'] + '=' * (-len(vector['der_spki_b64url']) % 4))
+              digest = hashlib.sha256(cd['contract']['domain_separation_prefix'].encode('ascii') + b'\0' + der).digest()
+              if digest.hex() != vector['digest_hex']:
+                  return False
+              payload = bytes.fromhex(vector['version_byte']) + digest
+              crc = struct.pack('>I', crid_crc32c(payload))
+              if crc.hex() != vector['crc_hex']:
+                  return False
+              encoded = payload + crc
+              if encoded.hex() != vector['payload_hex']:
+                  return False
+              return base64.b32encode(encoded).decode('ascii').rstrip('=').lower() == vector['expected_crid']
           authority_requests = {
               name: json.loads(operation['request_golden']['body_json'])
               for name, operation in u['operations'].items()
@@ -945,6 +1014,25 @@ jobs:
           assert len(cr['private_operations']['CompleteCredentialRecovery']['public_mapping_cases']) == 7
           assert cr['fixtures']['recovery_credential'] != cr['fixtures']['device_api_key_candidate']
           assert cr['fixtures']['device_api_key_candidate'] not in cr['public_exchanges']['assigned_cell_complete_recovery']['success_body_json']
+          assert cd['artifact'] == 'qurl-crid-v1-vectors' and cd['schema_version'] == 1
+          assert cd['contract']['checksum_polynomial_hex'] == '1edc6f41'
+          assert cd['contract']['alphabet'] == 'abcdefghijklmnopqrstuvwxyz234567'
+          assert len(cd['versions']) == 4 and len(cd['producer_cases']) == 6
+          assert len(cd['consumer_value_cases']) == 16 and len(cd['version_cases']) == 4
+          assert len(cd['key_match_cases']) == 4
+          assert all(derive_crid(v) for v in cd['producer_cases'])
+          assert all(
+              len(v['expected_crid']) == cd['contract']['full_crid_length']
+              and v['expected_crid'][0] == ('q' if v['environment'] == 'test' else 'a')
+              and v['expected_crid'][59] in 'aq'
+              for v in cd['producer_cases']
+          )
+          crid_values = {v['name']: v for v in cd['consumer_value_cases']}
+          assert crid_values['accept_unknown_version_full']['outcome'] == 'accept'
+          assert len(crid_values['accept_unknown_version_truncated']['value']) == cd['contract']['truncated_crid_length']
+          assert crid_values['reject_version_zero']['reject_class'] == 'version'
+          assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
+          assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           print('py ok')
           PY
 

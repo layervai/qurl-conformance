@@ -6,8 +6,9 @@ against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, private Connector Authority invocations, private
-Connector Hub replay identifiers, Hub LST return-routability cookies, and
-same-agent device-credential recovery decoupled by layer.
+Connector Hub replay identifiers, Hub LST return-routability cookies,
+same-agent device-credential recovery, and CRID v1 resource identifiers
+decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -41,6 +42,8 @@ trust.
 | `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
 | `vectors/agent_credential_recovery_v1_vectors.json` | UDP-only same-agent device-credential recovery public/private bodies, grant bindings, exact replay, recovery horizon, and closed errors |
 | `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
+| `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
+| `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -62,6 +65,7 @@ ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private aut
 hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
+cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -80,7 +84,7 @@ schema and vocabulary.
 
 ## Scope
 
-This module hosts twelve artifact families, each under its own `artifact` id:
+This module hosts thirteen artifact families, each under its own `artifact` id:
 
 - **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
@@ -312,6 +316,17 @@ This module hosts twelve artifact families, each under its own `artifact` id:
   grant bindings, no-takeover/no-placement-hint policy, exact-candidate replay,
   per-episode immutable 90-day horizon, and closed `524xx` outcomes. See
   `vectors/README_agent_credential_recovery_v1_vectors.md`.
+- **CRID v1** (`qurl-crid-v1-vectors`, `crid_v1_vectors.json`) — exact
+  derivation of the Cryptographic Resource ID from a DER
+  `SubjectPublicKeyInfo` (domain-separated SHA-256, big-endian CRC32C,
+  lowercase unpadded RFC 4648 base32), the closed version-byte registry with
+  its environment bit, the local validation gate with its five-class reject
+  vocabulary, and the delivered-key match rule. The gate is local-only:
+  `accept` means forward to the authoritative validator, unknown version
+  bytes are forwarded rather than rejected, and a delivered public key is
+  used only when its re-derived CRID equals the held CRID. This family is
+  fully stdlib-derivable, so the strict Go loader re-derives every golden
+  from the DER key bytes. See `vectors/README_crid_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via

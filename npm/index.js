@@ -18,4 +18,5 @@ module.exports = {
   connectorHubRequestIdVectors: () => load("connector_hub_request_id_v1_vectors.json"),
   connectorHubLstCookieVectors: () => load("connector_hub_lst_cookie_v1_vectors.json"),
   agentCredentialRecoveryVectors: () => load("agent_credential_recovery_v1_vectors.json"),
+  cridV1Vectors: () => load("crid_v1_vectors.json"),
 };
