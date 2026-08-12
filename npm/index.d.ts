@@ -11,3 +11,4 @@ export declare function connectorAuthorityLambdaVectors(): unknown;
 export declare function connectorHubRequestIdVectors(): unknown;
 export declare function connectorHubLstCookieVectors(): unknown;
 export declare function agentCredentialRecoveryVectors(): unknown;
+export declare function cridV1Vectors(): unknown;
