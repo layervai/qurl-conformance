@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.3](https://github.com/layervai/qurl-conformance/compare/npm-v0.12.2...npm-v0.12.3) (2026-08-12)
+
+
+### Features
+
+* add CRID v1 derivation and validation conformance vectors ([#92](https://github.com/layervai/qurl-conformance/issues/92)) ([501bb3a](https://github.com/layervai/qurl-conformance/commit/501bb3a62923f0281c7642b516746cb2cb4d66f8))
+
 ## [0.12.2](https://github.com/layervai/qurl-conformance/compare/npm-v0.12.1...npm-v0.12.2) (2026-08-04)
 
 
