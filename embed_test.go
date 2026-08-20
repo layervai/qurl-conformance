@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"slices"
@@ -20,6 +21,7 @@ var wantClasses = []string{
 	"secret_parse",
 	"strict_base64",
 	"fragment",
+	"transport",
 	"relay_allowlist",
 	"server_id",
 }
@@ -33,11 +35,11 @@ func TestEmbeddedConformanceFileLoads(t *testing.T) {
 	if cf.Artifact != ConformanceArtifactID {
 		t.Errorf("artifact = %q, want %q", cf.Artifact, ConformanceArtifactID)
 	}
-	if cf.SchemaVersion == 0 {
-		t.Errorf("schema_version = 0, want non-zero")
+	if cf.SchemaVersion != ConformanceSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", cf.SchemaVersion, ConformanceSchemaVersion)
 	}
 
-	// All six classes must be present.
+	// The class list is closed so an unhandled protocol surface fails loudly.
 	if got, want := len(cf.Classes), len(wantClasses); got != want {
 		got := classNames(cf)
 		t.Errorf("class count = %d, want %d; got classes %v", len(cf.Classes), want, got)
@@ -58,6 +60,244 @@ func TestEmbeddedConformanceFileLoads(t *testing.T) {
 			t.Errorf("class %q has empty input", name)
 		}
 	}
+}
+
+func TestEmbeddedTransportContractAndVectors(t *testing.T) {
+	cf, err := ConformanceVectors()
+	if err != nil {
+		t.Fatalf("ConformanceVectors(): %v", err)
+	}
+	tc := cf.TransportContract
+	transportClass := cf.Classes["transport"]
+	if transportClass.Input != "transport_fragment" {
+		t.Fatalf("transport input = %q, want transport_fragment", transportClass.Input)
+	}
+
+	wantNames := []string{
+		"accept_valid_qv2_round_trip",
+		"accept_minimum_nonempty_fields",
+		"accept_exact_component_boundaries",
+		"accept_all_field_maxima",
+		"accept_equal_width_reordered_chunks_preserve_presented_order",
+		"accept_truncated_final_signature_preserves_presented_bytes",
+		"reject_legacy_qv2_outer_transport",
+		"reject_unknown_transport_version",
+		"reject_wrong_case_prefix",
+		"reject_zero_claims_count",
+		"reject_zero_secret_count",
+		"reject_zero_signature_count",
+		"reject_leading_zero_count",
+		"reject_plus_signed_count",
+		"reject_negative_count",
+		"reject_whitespace_count",
+		"reject_nondecimal_count",
+		"reject_empty_count",
+		"reject_oversized_count_token",
+		"reject_claims_count_above_maximum",
+		"reject_secret_count_above_maximum",
+		"reject_signature_count_above_maximum",
+		"reject_truncated_missing_final_chunk",
+		"reject_extra_chunk",
+		"reject_empty_claims_chunk",
+		"reject_empty_secret_chunk",
+		"reject_empty_signature_chunk",
+		"reject_short_nonfinal_claims_chunk",
+		"reject_short_nonfinal_secret_chunk",
+		"reject_chunk_above_component_maximum",
+		"reject_final_chunk_above_component_maximum",
+		"reject_claims_alphabet",
+		"reject_secret_alphabet",
+		"reject_signature_alphabet",
+		"reject_claims_field_above_maximum",
+		"reject_secret_field_above_maximum",
+		"reject_signature_field_above_maximum",
+		"reject_total_transport_above_maximum",
+		"reject_reordered_count_tokens",
+	}
+	gotNames := make([]string, 0, len(transportClass.Vectors))
+	byName := make(map[string]ConformanceVector, len(transportClass.Vectors))
+	for _, v := range transportClass.Vectors {
+		gotNames = append(gotNames, v.Name)
+		if _, duplicate := byName[v.Name]; duplicate {
+			t.Fatalf("duplicate transport vector name %q", v.Name)
+		}
+		byName[v.Name] = v
+
+		gotCanonical, decodeErr := decodeConformanceTransport(tc, v.TransportFragment)
+		switch v.Expect {
+		case ExpectAccept:
+			if decodeErr != nil {
+				t.Errorf("transport vector %q: decode rejected accept input: %v", v.Name, decodeErr)
+			}
+			if v.RejectClass != "" {
+				t.Errorf("transport vector %q: accept has reject_class %q", v.Name, v.RejectClass)
+			}
+			if v.CanonicalFragment == "" {
+				t.Errorf("transport vector %q: accept has empty canonical_fragment", v.Name)
+			}
+			if gotCanonical != v.CanonicalFragment {
+				t.Errorf("transport vector %q: reconstruction mismatch", v.Name)
+			}
+			for i, component := range strings.Split(v.TransportFragment, ".") {
+				if len(component) > tc.ComponentMax {
+					t.Errorf("transport vector %q: component %d length = %d, exceeds Apple-safe maximum %d", v.Name, i, len(component), tc.ComponentMax)
+				}
+			}
+		case ExpectReject:
+			if decodeErr == nil {
+				t.Errorf("transport vector %q: decoder accepted reject input as %q", v.Name, gotCanonical)
+			}
+			if v.RejectClass != RejectClassTransport {
+				t.Errorf("transport vector %q: reject_class = %q, want %q", v.Name, v.RejectClass, RejectClassTransport)
+			}
+			if v.CanonicalFragment != "" {
+				t.Errorf("transport vector %q: reject carries canonical_fragment", v.Name)
+			}
+		default:
+			t.Errorf("transport vector %q: expect = %q, want accept|reject", v.Name, v.Expect)
+		}
+	}
+	if !slices.Equal(gotNames, wantNames) {
+		t.Errorf("transport vector names/order drifted:\n got %v\nwant %v", gotNames, wantNames)
+	}
+
+	maxVector := byName["accept_all_field_maxima"]
+	if got, want := len(maxVector.TransportFragment), tc.MaxTransportLength; got != want {
+		t.Errorf("maximum transport length = %d, want %d", got, want)
+	}
+	realVector := byName["accept_valid_qv2_round_trip"]
+	fragmentVector := cf.Classes["fragment"].Vectors[0]
+	if realVector.CanonicalFragment != fragmentVector.Fragment {
+		t.Error("valid qv2t1 round trip does not reconstruct the canonical fragment accept fixture")
+	}
+}
+
+func TestParseConformanceFileRejectsTransportContractDrift(t *testing.T) {
+	var doc map[string]any
+	if err := json.Unmarshal(QV2Vectors(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	contract := doc["transport_contract"].(map[string]any)
+	contract["component_max"] = float64(241)
+	b, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseConformanceFile(b); err == nil || !strings.Contains(err.Error(), "transport contract constants drifted") {
+		t.Fatalf("ParseConformanceFile() error = %v, want transport contract drift rejection", err)
+	}
+}
+
+func TestParseConformanceFileRejectsMalformedTransportClass(t *testing.T) {
+	mutate := func(t *testing.T, fn func(map[string]any)) []byte {
+		t.Helper()
+		var doc map[string]any
+		if err := json.Unmarshal(QV2Vectors(), &doc); err != nil {
+			t.Fatal(err)
+		}
+		fn(doc)
+		b, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	t.Run("missing class", func(t *testing.T) {
+		b := mutate(t, func(doc map[string]any) {
+			delete(doc["classes"].(map[string]any), "transport")
+		})
+		if _, err := ParseConformanceFile(b); err == nil || !strings.Contains(err.Error(), "missing transport class") {
+			t.Fatalf("ParseConformanceFile() error = %v, want missing transport class rejection", err)
+		}
+	})
+
+	t.Run("accept missing canonical output", func(t *testing.T) {
+		b := mutate(t, func(doc map[string]any) {
+			transportClass := doc["classes"].(map[string]any)["transport"].(map[string]any)
+			accept := transportClass["vectors"].([]any)[0].(map[string]any)
+			delete(accept, "canonical_fragment")
+		})
+		if _, err := ParseConformanceFile(b); err == nil || !strings.Contains(err.Error(), "malformed accept transport vector") {
+			t.Fatalf("ParseConformanceFile() error = %v, want malformed transport vector rejection", err)
+		}
+	})
+}
+
+// decodeConformanceTransport is an artifact-integrity check, not a consumer
+// implementation. Consumers still must run these vectors through their own real
+// decoder. Keeping this structural check here catches transcription mistakes in
+// the committed JSON and proves every accept component stays at or below 240.
+func decodeConformanceTransport(tc ConformanceTransportContract, body string) (string, error) {
+	if len(body) > tc.MaxTransportLength {
+		return "", fmt.Errorf("transport length %d exceeds %d", len(body), tc.MaxTransportLength)
+	}
+	parts := strings.Split(body, ".")
+	if len(parts) < 4 || parts[0] != tc.Prefix {
+		return "", fmt.Errorf("invalid prefix or header")
+	}
+	counts := make([]int, 3)
+	maxCounts := []int{tc.Fields.Claims.MaxChunks, tc.Fields.Secret.MaxChunks, tc.Fields.Signature.MaxChunks}
+	for i := range counts {
+		count, err := parseConformanceTransportCount(parts[i+1], maxCounts[i])
+		if err != nil {
+			return "", err
+		}
+		counts[i] = count
+	}
+	if len(parts) != 4+counts[0]+counts[1]+counts[2] {
+		return "", fmt.Errorf("part count mismatch")
+	}
+
+	fieldBounds := []ConformanceTransportField{tc.Fields.Claims, tc.Fields.Secret, tc.Fields.Signature}
+	fields := make([]string, 3)
+	part := 4
+	for fieldIndex, count := range counts {
+		fieldChunks := parts[part : part+count]
+		part += count
+		fieldLen := 0
+		for chunkIndex, chunk := range fieldChunks {
+			if len(chunk) == 0 || len(chunk) > tc.ComponentMax {
+				return "", fmt.Errorf("invalid chunk length")
+			}
+			if chunkIndex < len(fieldChunks)-1 && len(chunk) != tc.ComponentMax {
+				return "", fmt.Errorf("non-final chunk is not full width")
+			}
+			for i := 0; i < len(chunk); i++ {
+				if !isConformanceBase64URLByte(chunk[i]) {
+					return "", fmt.Errorf("invalid chunk alphabet")
+				}
+			}
+			fieldLen += len(chunk)
+		}
+		if fieldLen > fieldBounds[fieldIndex].MaxEncodedLength {
+			return "", fmt.Errorf("reconstructed field too long")
+		}
+		fields[fieldIndex] = strings.Join(fieldChunks, "")
+	}
+	return tc.CanonicalPrefix + "." + strings.Join(fields, "."), nil
+}
+
+func parseConformanceTransportCount(token string, max int) (int, error) {
+	if token == "" || token == "0" || token[0] == '0' {
+		return 0, fmt.Errorf("non-canonical count")
+	}
+	value := 0
+	for i := 0; i < len(token); i++ {
+		if token[i] < '0' || token[i] > '9' {
+			return 0, fmt.Errorf("non-decimal count")
+		}
+		digit := int(token[i] - '0')
+		if value > max/10 || value == max/10 && digit > max%10 {
+			return 0, fmt.Errorf("count exceeds maximum")
+		}
+		value = value*10 + digit
+	}
+	return value, nil
+}
+
+func isConformanceBase64URLByte(b byte) bool {
+	return b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b == '-' || b == '_'
 }
 
 func TestEmbeddedSignatureClassWellFormed(t *testing.T) {

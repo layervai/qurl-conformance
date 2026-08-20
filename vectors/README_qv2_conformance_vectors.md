@@ -5,9 +5,10 @@ artifacts define local vocabularies in their own guides; see, for example,
 [`README_agent_api_key_id_vectors.md`](README_agent_api_key_id_vectors.md).
 
 `qv2_conformance_vectors.json` is the **protocol-versioned, language-agnostic**
-wire-truth for the qURL v2 *verify* path. Every qURL v2 verifier implementation
-re-runs the **same bytes** against its **own** implementation, in whatever
-language it is written.
+wire-truth for the qURL v2 read path: the share-safe outer URL transport and the
+unchanged inner verify path. Every qURL v2 reader implementation re-runs the
+**same bytes** against its **own** implementation, in whatever language it is
+written.
 
 A consumer feeds each class's input through its **real** parser/validator and
 asserts the declared `expect` (and, where the class pins it, `reject_class`). The
@@ -19,7 +20,7 @@ vocabulary + class-to-entry-point map. The artifacts in this directory are:
 
 | Artifact | Role |
 | --- | --- |
-| `qv2_conformance_vectors.json` | the conformance classes (claims/secret parse, strict base64url, fragment shape, relay allowlist, server-id) |
+| `qv2_conformance_vectors.json` | the conformance classes (qv2t1 outer transport, claims/secret parse, strict base64url, canonical fragment shape, relay allowlist, server-id) |
 | `issuer_signature_vectors.json` | the issuer-signature golden vectors the signature class composes by reference |
 | `relay_knock_golden.json` | the relay-knock Noise-handshake golden packets (artifact `qurl-relay-knock-golden-vectors`), a separate layer (see below) |
 | `agent_registration_golden.json` | the NHP agent-registration OTP/REG/RAK Noise-handshake golden packets (artifact `qurl-agent-registration-golden-vectors`), a separate layer (see below) |
@@ -33,24 +34,25 @@ There are several would-be sources of truth for "what a qURL v2 verifier must
 accept/reject": each implementation's own tests, and the signature golden file.
 The signature golden file (`issuer_signature_vectors.json`) pins the signature
 bytes once. This artifact extends that single-source pattern to the **rest** of
-the verify path (claims/secret parse, strict base64url, fragment shape, relay
-allowlist, server-id derivation) so the same divergence-proof exists for every
-layer, not just signatures — and composes the signature class **by reference**
-instead of copying its bytes a second time.
+the read path (qv2t1 transport, claims/secret parse, strict base64url, canonical
+fragment shape, relay allowlist, server-id derivation) so the same
+divergence-proof exists for every layer, not just signatures — and composes the
+signature class **by reference** instead of copying its bytes a second time.
 
 ---
 
-## Schema (`schema_version: 1`)
+## Schema (`schema_version: 2`)
 
 Top-level document:
 
 ```jsonc
 {
   "artifact": "qurl-v2-conformance-vectors",   // fixed id; consumers assert it
-  "schema_version": 1,                          // bump on any breaking shape change
+  "schema_version": 2,                          // qv2t1 contract + transport class
   "description": "...",                          // human prose
   "source_of_truth": "layervai/qurl-conformance",
   "notes": [ "..." ],
+  "transport_contract": { ... },               // exact qv2t1 grammar and bounds
   "signature_class": { ... },                   // COMPOSED, see below
   "classes": { "<class_name>": { ... }, ... }
 }
@@ -75,8 +77,10 @@ Each `vector`:
   "expect": "accept" | "reject",
   "reject_class": "parse",          // REQUIRED on reject, ABSENT on accept (see vocabulary)
   "reason": "human explanation",
-  // ...plus exactly the input field(s) this class consumes (claims_json, secret_json,
-  //    value_b64, fragment, entries+url, or cell_public_key_b64+server_id).
+  // ...plus exactly the input field(s) this class consumes (transport_fragment,
+  //    claims_json, secret_json, value_b64, fragment, entries+url, or
+  //    cell_public_key_b64+server_id). An accepted transport vector also carries
+  //    canonical_fragment as its exact expected output.
 }
 ```
 
@@ -93,12 +97,77 @@ stored fault survives all the way to the code under test:
   for the wrong reason.)
 - **`value_b64`** — the base64url string VERBATIM; the fault is in the encoding
   layer, fed to the strict base64url decoder.
-- **`fragment`** — a full fragment body fed to the fragment parser, which pins
-  wire SHAPE and strict-parses the parts but does **not** verify the signature.
+- **`transport_fragment` (+ `canonical_fragment` on accept)** — an outer URL
+  fragment body without the leading `#`, fed to the qv2t1 decoder. An accept
+  must reproduce `canonical_fragment` byte-for-byte. A reject omits the output.
+- **`fragment`** — a canonical inner qv2 fragment body fed to the fragment
+  parser, which pins wire SHAPE and strict-parses the parts but does **not**
+  verify the signature.
 - **`entries` + `url`** — fed to the relay-URL validator against an allowlist
   built from `entries`.
 - **`cell_public_key_b64` (+ `server_id`)** — the consumer DECODES the key and
   RE-FINGERPRINTS it, asserting the result equals the pinned `server_id`.
+
+---
+
+## Share-safe qv2t1 transport
+
+The only public URL-fragment grammar is:
+
+```text
+qv2t1.<claimsCount>.<secretCount>.<sigCount>.<claims chunks...>.<secret chunks...>.<sig chunks...>
+```
+
+The transport is framing, not a new cryptographic version. It reconstructs the
+exact canonical inner body:
+
+```text
+qv2.<claims>.<secret>.<sig>
+```
+
+Then the existing qv2 parser and signature verifier process that body. A decoder
+must not decode and re-encode base64url, parse or reserialize JSON, reorder
+chunks, or otherwise change any inner bytes.
+
+The structured `transport_contract` pins these constants:
+
+| Value | Contract |
+| --- | --- |
+| Prefix | literal, case-sensitive `qv2t1` |
+| Canonical inner prefix | literal, case-sensitive `qv2` |
+| Data component size | 1–240 base64url characters (`A-Z a-z 0-9 - _`) |
+| Claims | at most 6,144 encoded characters / 26 chunks |
+| Secret | at most 512 encoded characters / 3 chunks |
+| Signature | at most 128 encoded characters / 1 chunk |
+| Total outer body | at most 6,826 characters |
+
+Each count is canonical positive ASCII decimal: no zero, sign, whitespace,
+leading zero, or non-digit. The three declared counts determine the exact total
+part count; extra and missing parts both reject. Within each field, every
+non-final chunk is exactly 240 characters and the final chunk is 1–240. These
+rules give one canonical split for a given inner field and ensure every
+dot-delimited component is at most 240 characters.
+
+The decoder order is security-relevant:
+
+1. Reject `len(body) > 6826` **before** splitting or allocating from counts.
+2. Split on `.` and require the exact `qv2t1` prefix plus three count tokens.
+3. Parse each canonical count while enforcing 26 / 3 / 1 before using it.
+4. Require exactly `4 + claimsCount + secretCount + sigCount` parts.
+5. Validate each chunk's size, canonical width, and base64url alphabet; enforce
+   each reconstructed field's encoded-size cap.
+6. Join chunks in presented order and return the byte-exact canonical qv2 body.
+7. Pass that output to the unchanged qv2 fragment parser and verifier.
+
+Legacy `qv2...` is **not** accepted as an outer transport. It appears only as
+the decoder's internal output. Unknown transport versions fail closed.
+
+Transport framing cannot detect a swap between two equal-width chunks or bytes
+removed from a still-nonempty final chunk. The vectors therefore require exact
+reconstruction for those inputs; the unchanged qv2 JSON, signature-length, and
+signature-verification gates reject the resulting tampered inner body. Removing
+an entire declared chunk is a transport error because the part count no longer
+matches.
 
 ---
 
@@ -111,6 +180,7 @@ stored fault survives all the way to the code under test:
 | `secret_parse` | strict secret parse | strict-parses to a `Secret` | `parse` / `key_length` |
 | `strict_base64` | strict base64url decode | decodes | `encoding` |
 | `fragment` | fragment shape parse | parses (shape only) | `fragment` |
+| `transport` | qv2t1 decode | reconstructs exact canonical qv2 body | `transport` |
 | `relay_allowlist` | relay-URL validation against allowlist | URL allowed | `relay_url` |
 | `server_id` | public-key fingerprint of decoded `cell_public_key_b64` | recompute == `server_id` | *(none — recompute-equality, accept-only)* |
 
@@ -134,6 +204,7 @@ sentinels for them.
 | `encoding` | base64url encoding-layer rejection | `strict_base64` |
 | `key_length` | decoded key has the wrong byte length | `secret_parse` only (see note) |
 | `fragment` | fragment wire-shape rejection | `fragment` |
+| `transport` | qv2t1 prefix/count/chunk/size/alphabet framing rejection | `transport` |
 | `relay_url` | `relay_url` HTTPS/allowlist rejection | `relay_allowlist` |
 | `high_s` | signature is not low-S normalized | `signature` (in the composed file's `reject_class`) |
 | `wrong_length` | signature is not exactly 64 bytes (raw r\|\|s) | `signature` (in the composed file's `reject_class`) |

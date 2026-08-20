@@ -65,6 +65,7 @@ jobs:
           const crypto = require('node:crypto');
           const net = require('node:net');
           const c = require('./npm');
+          const qv2 = c.qv2Vectors();
           const r = c.relayKnockVectors();
           const a = c.agentRegistrationVectors();
           const s = c.agentAssignmentVectors();
@@ -267,7 +268,10 @@ jobs:
             x.clean_exit.request,
             x.clean_exit.ack,
           ];
-          if (!c.qv2Vectors().classes || !c.issuerSignatureVectors().issuer ||
+          if (qv2.schema_version !== 2 || qv2.transport_contract.prefix !== 'qv2t1' ||
+              qv2.transport_contract.component_max !== 240 ||
+              qv2.transport_contract.max_transport_length !== 6826 ||
+              qv2.classes.transport.vectors.length !== 39 || !c.issuerSignatureVectors().issuer ||
               !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
               s.schema_version !== 4 || s.initial_assignment.request.header_type !== 5 ||
               !nonceIsCanonical32(assignmentInitialRequest.usrData.request_nonce) ||
@@ -572,6 +576,7 @@ jobs:
           sys.path.insert(0, '.')
           import qurl_conformance as q
 
+          qv2 = q.qv2_vectors()
           r = q.relay_knock_vectors()
           a = q.agent_registration_vectors()
           s = q.agent_assignment_vectors()
@@ -675,7 +680,12 @@ jobs:
           # duplicate keys collapse last-wins and aliases remain unchecked.
           lossy_duplicate = json.loads(requests['reject_duplicate_run_id']['body_json'])
           unchecked_alias = json.loads(requests['reject_alias_run_id']['body_json'])
-          assert q.qv2_vectors()['classes'] and q.issuer_signature_vectors()['issuer']
+          assert qv2['schema_version'] == 2
+          assert qv2['transport_contract']['prefix'] == 'qv2t1'
+          assert qv2['transport_contract']['component_max'] == 240
+          assert qv2['transport_contract']['max_transport_length'] == 6826
+          assert len(qv2['classes']['transport']['vectors']) == 39
+          assert q.issuer_signature_vectors()['issuer']
           assert r['knock']['packet_hex'] and r['ack']['packet_hex']
           assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
           assert s['schema_version'] == 4
