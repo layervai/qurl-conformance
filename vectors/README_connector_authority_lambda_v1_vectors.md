@@ -1,7 +1,7 @@
 # Connector Authority Lambda v1 vectors
 
 `connector_authority_lambda_v1_vectors.json` freezes the private synchronous
-contract for five separately permissioned Connector Authority Lambda operations
+contract for six separately permissioned Connector Authority Lambda operations
 called by authenticated NHP workers and one sandbox-only attended-proof
 operation. These bodies are not a public API and never travel between an SDK
 and LayerV. Native SDK traffic remains NHP over UDP.
@@ -34,6 +34,19 @@ credential nor caller-selected authority, never appears in authority
 responses or public NHP bodies, and is rejected by all three cell operations.
 The exact private derivation and substitution KATs live in
 `connector_hub_request_id_v1_vectors.json`.
+
+`ResolveConnectorResource` instead requires a canonical `cell_request_id`
+derived by the authenticated assigned-cell worker. It is lowercase SHA-256 hex
+over the domain `layerv:qurl:connector-resource-request-id:v1`, a zero byte,
+then tagged length-prefixed environment, authenticated peer raw bytes, and the
+decoded public request nonce. The exact framing and KAT are frozen in
+`connector_resource_lst_v1_vectors.json`. The request replay fingerprint covers
+version, agent id, peer key, connector id, and the optional expected resource
+id. Exact replay returns the byte-identical first response; changed semantics
+return `invalid_request` before mutation; a fresh nonce reauthorizes. An
+`expected_resource_id` is read-only continuity: only the same active resource
+may succeed, while absent, revoked, tombstoned, or different state returns
+`resource_identity_conflict` without creating or reclaiming a resource.
 
 The attended controller also supplies a canonical `hub_request_id` to
 `MutateProofAgent` as its replay key. Its `grant_correlation_id` is the exact
@@ -106,8 +119,11 @@ Every response is exactly one of:
 {"version":1,"error":{"code":"..."}}
 ```
 
-Only `IssueRegistrationOTP/rate_limited` adds `retry_after_seconds`, and that
-value must be a positive integer. No other success or error may add fields.
+`IssueRegistrationOTP/rate_limited` and
+`ResolveConnectorResource/rate_limited` require positive
+`retry_after_seconds`. `ResolveConnectorResource/unavailable` may optionally
+carry a positive value. The Connector-resource maximum is 3,600 seconds. Every
+other success or error forbids additional fields.
 
 ## Closed operations
 
@@ -118,6 +134,7 @@ value must be a positive integer. No other success or error may add fields.
 | `IssueRegistrationOTP` | `assignment_ticket`, credential key id and secret, peer key, agent id, observed source address | `{}` | `invalid_request`, `rejected`, `email_unavailable`, `rate_limited`, `send_failed`, `unavailable` |
 | `ActivateRegistration` | `assignment_ticket`, credential key id, registration credential, peer key, agent id, hostname, agent version | `{}` | `invalid_request`, `credential_rejected`, `ticket_invalid`, `not_yet_valid`, `ticket_expired`, `identity_conflict`, `quota`, `reenrollment_required`, `unavailable` |
 | `CompleteRegistration` | peer key, agent id, device API key | `device_api_key_id` only | `invalid_request`, `identity_rejected`, `quota`, `conflict`, `unavailable` |
+| `ResolveConnectorResource` | cell request id, agent id, authenticated peer key, connector id, optional expected resource id | exact resource, routing, knock, optional CRID, and `found_existing` result | `invalid_request`, `identity_rejected`, `entitlement_denied`, `resource_identity_conflict`, `quota`, `rate_limited`, `unavailable` |
 | `MutateProofAgent` | replay id, mutation, proof agent id, grant correlation id, and mutation-specific fields | strict result union described below | `invalid_request`, `identity_rejected`, `directive_absent`, `directive_expired`, `reassignment_in_progress`, `unavailable` |
 
 `MutateProofAgent` is a proof-controller operation, not an NHP worker
@@ -174,6 +191,11 @@ hostname.
 
 - `authority_response` maps a validated private success or semantic error;
 - `nhp_preinvoke` maps a worker admission decision made before invocation.
+
+`ResolveConnectorResource` maps to the dedicated post-registration
+`connector_resource` v1 `NHP_LRT` profile. The public success preserves
+`found_existing` and the exact authenticated resource object; there is no HTTP
+fallback or hostname-derived placement.
 
 `MutateProofAgent.public_mapping_cases` is exactly empty. The operation is
 invoked only through its sandbox proof alias and must not enter an NHP

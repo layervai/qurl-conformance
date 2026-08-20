@@ -74,6 +74,7 @@ jobs:
           const i = c.agentApiKeyIdVectors();
           const t = c.assignmentTicketVectors();
           const u = c.connectorAuthorityLambdaVectors();
+          const rr = c.connectorResourceLstV1Vectors();
           const h = c.connectorHubRequestIdVectors();
           const hc = c.connectorHubLstCookieVectors();
           const cr = c.agentCredentialRecoveryVectors();
@@ -96,6 +97,17 @@ jobs:
             ]);
             if (preimage.toString('hex') !== vector.preimage_hex) return false;
             return crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
+          };
+          const deriveConnectorResourceRequestId = () => {
+            const peer = Buffer.from(rr.fixtures.authenticated_peer_public_key_b64, 'base64');
+            const nonce = Buffer.from(rr.fixtures.create_request_nonce, 'base64url');
+            const preimage = Buffer.concat([
+              Buffer.from(`${u.protocol.cell_request_id_domain}\0`, 'ascii'),
+              hubFrame(1, Buffer.from(u.fixtures.environment, 'ascii')),
+              hubFrame(2, peer),
+              hubFrame(3, nonce),
+            ]);
+            return crypto.createHash('sha256').update(preimage).digest('hex');
           };
           const rawHubCookieIp = source => {
             const unmapped = source.startsWith('::ffff:') ? source.slice(7) : source;
@@ -173,7 +185,7 @@ jobs:
             Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
           );
           const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent'];
-          const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration'];
+          const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration', 'ResolveConnectorResource'];
           // Keep proof-mutation assertions in lockstep with the Python package
           // smoke below; the deliberate re-encoding catches consumer drift.
           const proofMutationRejectNames = new Set(['reject_unknown_field', 'reject_wrong_type', 'reject_missing_field']);
@@ -183,6 +195,9 @@ jobs:
               .map(v => [v.name, JSON.parse(v.body_json)])
           );
           const proofMutationReplay = u.operations.MutateProofAgent.replay_contract;
+          const resourceReplay = u.operations.ResolveConnectorResource.resource_replay_contract;
+          const resourceSuccess = JSON.parse(rr.success_exchanges[0].result.body_json).list;
+          const resourceAuthoritySuccess = JSON.parse(u.operations.ResolveConnectorResource.success_golden.body_json).result;
           const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
           const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
           const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
@@ -439,10 +454,12 @@ jobs:
               t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
               t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
               t.contract.credential_kinds.includes('tunnel_bootstrap') ||
-              u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 1 ||
-              Object.keys(u.operations).length !== 6 ||
+              u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 2 ||
+              Object.keys(u.operations).length !== 7 ||
               u.protocol.max_assignment_ticket_ascii_bytes !== t.contract.max_ticket_ascii_bytes ||
               u.protocol.hub_request_id_format !== 'lowercase_sha256_hex' ||
+              u.protocol.cell_request_id_domain !== 'layerv:qurl:connector-resource-request-id:v1' ||
+              deriveConnectorResourceRequestId() !== u.fixtures.cell_request_id ||
               !/^[0-9a-f]{64}$/.test(u.fixtures.hub_request_id) ||
               globalAuthorityOperations.some(name => authorityRequests[name].hub_request_id !== u.fixtures.hub_request_id) ||
               cellAuthorityOperations.some(name => Object.hasOwn(authorityRequests[name], 'hub_request_id')) ||
@@ -476,6 +493,20 @@ jobs:
               proofMutationReplay.commit_rule !== 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic' ||
               proofMutationReplay.pending_move_resume_rule !== 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window' ||
               proofMutationReplay.expired_id_outcome !== 'expired_first_seen_or_terminal_unavailable_without_mutation' ||
+              resourceReplay.expected_resource_id_outcome !== 'read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim' ||
+              resourceReplay.exact_replay_outcome !== 'byte_identical_first_response_including_found_existing' ||
+              rr.artifact !== 'qurl-connector-resource-lst-v1-vectors' || rr.schema_version !== 1 ||
+              rr.contract.query !== 'connector_resource' || rr.contract.http_fallback_allowed !== false ||
+              rr.contract.one_resource_per_exchange !== true || rr.contract.real_seal_proof_owner !== 'NHP_reference_codec_integration_test' ||
+              rr.success_exchanges.length !== 3 || rr.replay_cases.length !== 3 ||
+              rr.request_cases.length !== 19 || rr.result_reject_cases.length !== 20 ||
+              rr.error_cases.length !== 8 || rr.error_reject_cases.length !== 14 ||
+              rr.size_cases.length !== 4 ||
+              rr.size_cases.some(v => v.outcome === 'accept' && v.size_budget_bytes > rr.contract.max_packet_bytes) ||
+              Object.entries(resourceAuthoritySuccess).some(([key, value]) => resourceSuccess[key] !== value) ||
+              resourceSuccess.query !== 'connector_resource' || resourceSuccess.version !== 1 ||
+              resourceSuccess.found_existing !== false ||
+              JSON.parse(rr.success_exchanges[1].result.body_json).list.found_existing !== true ||
               Object.entries(u.operations).some(([name, operation]) =>
                 name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
               proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
@@ -585,6 +616,7 @@ jobs:
           i = q.agent_api_key_id_vectors()
           t = q.assignment_ticket_vectors()
           u = q.connector_authority_lambda_vectors()
+          rr = q.connector_resource_lst_v1_vectors()
           h = q.connector_hub_request_id_vectors()
           hc = q.connector_hub_lst_cookie_vectors()
           cr = q.agent_credential_recovery_vectors()
@@ -602,6 +634,17 @@ jobs:
                   hub_frame(4, nonce),
               ))
               return preimage.hex() == vector['preimage_hex'] and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
+          def derive_connector_resource_request_id():
+              peer = base64.b64decode(rr['fixtures']['authenticated_peer_public_key_b64'], validate=True)
+              nonce_value = rr['fixtures']['create_request_nonce']
+              nonce = base64.urlsafe_b64decode(nonce_value + '=' * (-len(nonce_value) % 4))
+              preimage = b''.join((
+                  u['protocol']['cell_request_id_domain'].encode('ascii'), b'\0',
+                  hub_frame(1, u['fixtures']['environment'].encode('ascii')),
+                  hub_frame(2, peer),
+                  hub_frame(3, nonce),
+              ))
+              return hashlib.sha256(preimage).hexdigest()
           def derive_hub_lst_cookie(vector):
               address = ipaddress.ip_address(vector['source_ip'])
               if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
@@ -644,7 +687,7 @@ jobs:
               for name, operation in u['operations'].items()
           }
           global_authority_operations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent']
-          cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration']
+          cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration', 'ResolveConnectorResource']
           # Keep proof-mutation assertions in lockstep with the JavaScript
           # package smoke above; the deliberate re-encoding catches consumer drift.
           proof_mutation_rejects = {
@@ -653,6 +696,9 @@ jobs:
               if value['name'] in {'reject_unknown_field', 'reject_wrong_type', 'reject_missing_field'}
           }
           proof_mutation_replay = u['operations']['MutateProofAgent']['replay_contract']
+          resource_replay = u['operations']['ResolveConnectorResource']['resource_replay_contract']
+          resource_success = json.loads(rr['success_exchanges'][0]['result']['body_json'])['list']
+          resource_authority_success = json.loads(u['operations']['ResolveConnectorResource']['success_golden']['body_json'])['result']
           activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
           replies = {v['name']: v for v in k['reply_cases']}
           requests = {v['name']: v for v in k['request_cases']}
@@ -916,10 +962,12 @@ jobs:
           assert t['golden']['lrt_body_bytes'] <= t['contract']['nhp_body_max_bytes']
           assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
           assert 'tunnel_bootstrap' not in t['contract']['credential_kinds']
-          assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 1
-          assert len(u['operations']) == 6
+          assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 2
+          assert len(u['operations']) == 7
           assert u['protocol']['max_assignment_ticket_ascii_bytes'] == t['contract']['max_ticket_ascii_bytes']
           assert u['protocol']['hub_request_id_format'] == 'lowercase_sha256_hex'
+          assert u['protocol']['cell_request_id_domain'] == 'layerv:qurl:connector-resource-request-id:v1'
+          assert derive_connector_resource_request_id() == u['fixtures']['cell_request_id']
           assert re.fullmatch(r'[0-9a-f]{64}', u['fixtures']['hub_request_id'])
           assert all(authority_requests[name]['hub_request_id'] == u['fixtures']['hub_request_id'] for name in global_authority_operations)
           assert all('hub_request_id' not in authority_requests[name] for name in cell_authority_operations)
@@ -947,6 +995,23 @@ jobs:
               'pending_move_resume_rule': 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window',
               'expired_id_outcome': 'expired_first_seen_or_terminal_unavailable_without_mutation',
           }
+          assert resource_replay['expected_resource_id_outcome'] == 'read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim'
+          assert resource_replay['exact_replay_outcome'] == 'byte_identical_first_response_including_found_existing'
+          assert rr['artifact'] == 'qurl-connector-resource-lst-v1-vectors' and rr['schema_version'] == 1
+          assert rr['contract']['query'] == 'connector_resource'
+          assert rr['contract']['http_fallback_allowed'] is False
+          assert rr['contract']['one_resource_per_exchange'] is True
+          assert rr['contract']['real_seal_proof_owner'] == 'NHP_reference_codec_integration_test'
+          assert len(rr['success_exchanges']) == 3 and len(rr['replay_cases']) == 3
+          assert len(rr['request_cases']) == 19 and len(rr['result_reject_cases']) == 20
+          assert len(rr['error_cases']) == 8 and len(rr['error_reject_cases']) == 14
+          assert len(rr['size_cases']) == 4
+          assert all(v['size_budget_bytes'] <= rr['contract']['max_packet_bytes'] for v in rr['size_cases'] if v['outcome'] == 'accept')
+          assert next(v for v in rr['size_cases'] if v['outcome'] == 'reject')['body_bytes'] == rr['contract']['max_plaintext_body_bytes'] + 1
+          assert {key: resource_success[key] for key in resource_authority_success} == resource_authority_success
+          assert resource_success['query'] == 'connector_resource' and resource_success['version'] == 1
+          assert resource_success['found_existing'] is False
+          assert json.loads(rr['success_exchanges'][1]['result']['body_json'])['list']['found_existing'] is True
           assert all(
               'replay_contract' not in operation
               for name, operation in u['operations'].items()

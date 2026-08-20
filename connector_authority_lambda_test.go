@@ -16,8 +16,8 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	if file.Artifact != ConnectorAuthorityLambdaArtifactID || file.SchemaVersion != ConnectorAuthorityLambdaSchemaVersion {
 		t.Fatalf("identity = %q/v%d, want %q/v%d", file.Artifact, file.SchemaVersion, ConnectorAuthorityLambdaArtifactID, ConnectorAuthorityLambdaSchemaVersion)
 	}
-	if len(file.Operations) != 6 {
-		t.Fatalf("operation count = %d, want 6", len(file.Operations))
+	if len(file.Operations) != len(connectorAuthorityOperationNames) {
+		t.Fatalf("operation count = %d, want %d", len(file.Operations), len(connectorAuthorityOperationNames))
 	}
 	for _, operation := range connectorAuthorityOperationNames {
 		op := file.Operations[operation]
@@ -44,6 +44,75 @@ func TestOpenConnectorAuthorityLambdaArtifact(t *testing.T) {
 	}
 }
 
+func TestConnectorAuthorityResolveConnectorResourceContract(t *testing.T) {
+	file, err := ConnectorAuthorityLambda()
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := file.Operations[ConnectorAuthorityOperationResolveConnectorResource]
+	if ConnectorAuthorityOperationResolveConnectorResource != ConnectorResourceLSTV1AuthorityOperation || op.ResourceReplayContract == nil || op.ReplayContract != nil {
+		t.Fatalf("operation/replay contract drift: %+v", op.ResourceReplayContract)
+	}
+	if !strings.Contains(op.ResourceReplayContract.ExpectedResourceIDOutcome, "never_create_or_reclaim") {
+		t.Fatalf("expected_resource_id continuity rule = %q", op.ResourceReplayContract.ExpectedResourceIDOutcome)
+	}
+
+	var initial ConnectorAuthorityResolveConnectorResourceRequest
+	if err := json.Unmarshal([]byte(op.RequestGolden.BodyJSON), &initial); err != nil {
+		t.Fatal(err)
+	}
+	if initial.ExpectedResourceID != nil || initial.CellRequestID != file.Fixtures.CellRequestID || initial.ConnectorID != file.Fixtures.ConnectorID {
+		t.Fatalf("initial request drift: %+v", initial)
+	}
+	var continuity ConnectorAuthorityResolveConnectorResourceRequest
+	if err := json.Unmarshal([]byte(op.AdditionalRequestGoldens[0].BodyJSON), &continuity); err != nil {
+		t.Fatal(err)
+	}
+	if continuity.ExpectedResourceID == nil || *continuity.ExpectedResourceID != file.Fixtures.ConnectorResourceID {
+		t.Fatalf("continuity request drift: %+v", continuity)
+	}
+
+	var fresh connectorAuthorityResponseEnvelope
+	if err := json.Unmarshal([]byte(op.SuccessGolden.BodyJSON), &fresh); err != nil {
+		t.Fatal(err)
+	}
+	var existing connectorAuthorityResponseEnvelope
+	if err := json.Unmarshal([]byte(op.AdditionalSuccessGoldens[0].BodyJSON), &existing); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(fresh.Result, existing.Result) || !bytes.Contains(fresh.Result, []byte(`"found_existing":false`)) || !bytes.Contains(existing.Result, []byte(`"found_existing":true`)) {
+		t.Fatal("fresh/existing exact outcomes do not preserve found_existing")
+	}
+
+	for _, body := range []string{
+		`{"version":1,"error":{"code":"unavailable"}}`,
+		`{"version":1,"error":{"code":"unavailable","retry_after_seconds":5}}`,
+		`{"version":1,"error":{"code":"rate_limited","retry_after_seconds":60}}`,
+	} {
+		if _, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationResolveConnectorResource, []byte(body)); err != nil {
+			t.Fatalf("valid retry response rejected: %v", err)
+		}
+	}
+	for _, body := range []string{
+		`{"version":1,"error":{"code":"rate_limited"}}`,
+		`{"version":1,"error":{"code":"quota","retry_after_seconds":5}}`,
+		`{"version":1,"error":{"code":"unavailable","retry_after_seconds":3601}}`,
+	} {
+		if _, err := validateConnectorAuthorityResponse(ConnectorAuthorityOperationResolveConnectorResource, []byte(body)); err == nil {
+			t.Fatalf("invalid retry response accepted: %s", body)
+		}
+	}
+
+	public := op.PublicMappingCases[0].NHPBodyJSON
+	request, err := ParseConnectorResourceLSTV1RequestBody([]byte(`{"usrId":"agent-conform","devId":"agent-conform","aspId":"agent","usrData":{"query":"connector_resource","version":1,"request_nonce":"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8","connector_id":"prod-dashboard"}}`), file.Fixtures.AgentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := ParseConnectorResourceLSTV1ResultBody([]byte(public), request); err != nil || result.List == nil || result.List.FoundExisting {
+		t.Fatalf("private-to-public success mapping rejected: result=%+v err=%v", result, err)
+	}
+}
+
 func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
@@ -59,6 +128,7 @@ func TestConnectorAuthorityMutateProofAgentContract(t *testing.T) {
 	if err := validateConnectorAuthorityReplayContract(
 		ConnectorAuthorityOperationMutateProofAgent,
 		operation.ReplayContract,
+		operation.ResourceReplayContract,
 	); err != nil {
 		t.Fatalf("proof replay contract: %v", err)
 	}
