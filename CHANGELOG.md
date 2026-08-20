@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.6](https://github.com/layervai/qurl-conformance/compare/v0.12.5...v0.12.6) (2026-08-20)
+
+
+### Features
+
+* **vectors:** add qv2 share-safe transport contract ([#94](https://github.com/layervai/qurl-conformance/issues/94)) ([d420f25](https://github.com/layervai/qurl-conformance/commit/d420f25f5417b717fe1029860e3621c03dc656b0))
+
 ## [0.12.5](https://github.com/layervai/qurl-conformance/compare/v0.12.4...v0.12.5) (2026-08-12)
 
 
