@@ -1,7 +1,7 @@
 {
   "artifact": "qurl-connector-authority-lambda-v1-vectors",
-  "schema_version": 1,
-  "description": "Strict private synchronous invocation contract for five separately permissioned Connector Authority Lambda operations called by authenticated NHP workers plus the sandbox-only attended-proof MutateProofAgent control; global assignment and proof-control requests carry replay ids, while public SDK traffic remains NHP over UDP. MutateProofAgent has no public NHP mapping and must never enter a production dispatch table or numeric-code mapping. Public assignment code 52203 remains reserved by agent_assignment_golden.json but is intentionally unproduced here: ordinary IssueAssignment and RefreshAssignment do not mutate assignments, while ActivateRegistration atomically enforces owner quota and maps it to RAK 52112.",
+  "schema_version": 2,
+  "description": "Strict private synchronous invocation contract for six separately permissioned Connector Authority Lambda operations called by authenticated NHP workers plus the sandbox-only attended-proof MutateProofAgent control; global assignment, Connector-resource, and proof-control requests carry replay ids, while public SDK traffic remains NHP over UDP. MutateProofAgent has no public NHP mapping and must never enter a production dispatch table or numeric-code mapping. Public assignment code 52203 remains reserved by agent_assignment_golden.json but is intentionally unproduced here: ordinary IssueAssignment and RefreshAssignment do not mutate assignments, while ActivateRegistration atomically enforces owner quota and maps it to RAK 52112.",
   "protocol": {
     "request_version": 1,
     "max_request_bytes": 4096,
@@ -9,12 +9,23 @@
     "max_assignment_ticket_ascii_bytes": 2304,
     "timestamp_format": "RFC3339_UTC_WHOLE_SECONDS",
     "hub_request_id_format": "lowercase_sha256_hex",
-    "response_rule": "exactly_one_of_result_or_error"
+    "response_rule": "exactly_one_of_result_or_error",
+    "cell_request_id_format": "lowercase_sha256_hex",
+    "cell_request_id_domain": "layerv:qurl:connector-resource-request-id:v1",
+    "cell_request_id_framing": "domain_then_00_then_u8_tag_u16be_length_value_for_environment_peer_nonce"
   },
   "fixtures": {
     "agent_id": "agent-conform",
     "authenticated_peer_public_key_b64": "AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=",
     "hub_request_id": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    "environment": "sandbox",
+    "connector_request_nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+    "cell_request_id": "57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a",
+    "connector_id": "prod-dashboard",
+    "connector_resource_id": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ",
+    "connector_routing_id": "c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda",
+    "knock_resource_id": "connector-conformance-01",
+    "connector_crid": "ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha",
     "credential": "lv_live_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
     "assignment_ticket": "conformance-account-assignment-ticket-0001",
     "credential_key_id": "key_A1b2C3d4E5f6",
@@ -312,6 +323,94 @@
         {"name": "quota", "mapping_source": "authority_response", "private_outcome": "quota", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52302\",\"errMsg\":\"device credential quota exceeded\"}", "recovery_action": "none"},
         {"name": "conflict", "mapping_source": "authority_response", "private_outcome": "conflict", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"conflict\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52303\",\"errMsg\":\"different device credential candidate already recorded\"}", "recovery_action": "none"},
         {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52300\",\"errMsg\":\"completion temporarily unavailable\",\"retryAfterSeconds\":5}", "recovery_action": "none"}
+      ]
+    },
+    "ResolveConnectorResource": {
+      "resource_replay_contract": {
+        "request_id_derivation": "domain_separated_sha256_over_environment_authenticated_peer_and_decoded_public_nonce",
+        "fingerprint_fields": [
+          "version",
+          "agent_id",
+          "authenticated_peer_public_key_b64",
+          "connector_id",
+          "expected_resource_id_if_present"
+        ],
+        "exact_replay_outcome": "byte_identical_first_response_including_found_existing",
+        "changed_replay_outcome": "invalid_request_before_authority_mutation",
+        "fresh_nonce_outcome": "reauthorize_and_report_current_found_existing",
+        "expected_resource_id_outcome": "read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim"
+      },
+      "request_golden": {
+        "name": "accept_request",
+        "body_json": "{\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}"
+      },
+      "additional_request_goldens": [
+        {
+          "name": "accept_continuity_request",
+          "body_json": "{\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\",\"expected_resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\"}"
+        }
+      ],
+      "success_golden": {
+        "name": "accept_success",
+        "body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"connector_id\":\"prod-dashboard\",\"resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\",\"connector_routing_id\":\"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda\",\"knock_resource_id\":\"connector-conformance-01\",\"crid\":\"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha\",\"found_existing\":false}}"
+      },
+      "additional_success_goldens": [
+        {
+          "name": "accept_existing_success",
+          "body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"connector_id\":\"prod-dashboard\",\"resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\",\"connector_routing_id\":\"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda\",\"knock_resource_id\":\"connector-conformance-01\",\"crid\":\"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha\",\"found_existing\":true}}"
+        },
+        {
+          "name": "accept_without_crid_success",
+          "body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"connector_id\":\"prod-dashboard\",\"resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\",\"connector_routing_id\":\"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda\",\"knock_resource_id\":\"connector-conformance-01\",\"found_existing\":true}}"
+        }
+      ],
+      "semantic_errors": [
+        {"code": "invalid_request", "body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}"},
+        {"code": "identity_rejected", "body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}"},
+        {"code": "entitlement_denied", "body_json": "{\"version\":1,\"error\":{\"code\":\"entitlement_denied\"}}"},
+        {"code": "resource_identity_conflict", "body_json": "{\"version\":1,\"error\":{\"code\":\"resource_identity_conflict\"}}"},
+        {"code": "quota", "body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}"},
+        {"code": "rate_limited", "body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\",\"retry_after_seconds\":60}}"},
+        {"code": "unavailable", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}"}
+      ],
+      "request_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"Cell_Request_ID\":\"smuggled\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\",\"owner_id\":\"attacker\"}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"cell_request_id\":null,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":1,\"cell_request_id\":[],\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"cell_request_id\":\"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a\",\"agent_id\":\"agent-conform\",\"authenticated_peer_public_key_b64\":\"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=\",\"connector_id\":\"prod-dashboard\"}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "response_producer_rejects": [
+        {"name": "reject_duplicate_field", "body_json": "{\"version\":1,\"version\":1,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "duplicate_key"},
+        {"name": "reject_case_alias", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"Code\":\"invalid_request\"}}", "outcome": "reject", "reject_class": "case_alias"},
+        {"name": "reject_unknown_field", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"},\"future\":true}", "outcome": "reject", "reject_class": "unknown_field"},
+        {"name": "reject_null_field", "body_json": "{\"version\":1,\"result\":null}", "outcome": "reject", "reject_class": "null_field"},
+        {"name": "reject_wrong_type", "body_json": "{\"version\":\"1\",\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "wrong_type"},
+        {"name": "reject_missing_field", "body_json": "{\"version\":1,\"error\":{}}", "outcome": "reject", "reject_class": "missing_field"},
+        {"name": "reject_trailing_data", "body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\"}}{}", "outcome": "reject", "reject_class": "trailing_data"},
+        {"name": "reject_nonlexical_version", "body_json": "{\"version\":1.0,\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "version_encoding"},
+        {"name": "reject_non_object", "body_json": "[]", "outcome": "reject", "reject_class": "non_object"},
+        {"name": "reject_both_result_and_error", "body_json": "{\"version\":1,\"result\":{},\"error\":{\"code\":\"unavailable\"}}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_neither_result_nor_error", "body_json": "{\"version\":1}", "outcome": "reject", "reject_class": "response_xor"},
+        {"name": "reject_unknown_error_code", "body_json": "{\"version\":1,\"error\":{\"code\":\"future_error\"}}", "outcome": "reject", "reject_class": "unknown_error_code"},
+        {"name": "reject_retry_after_policy", "body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\"}}", "outcome": "reject", "reject_class": "retry_after_policy"},
+        {"name": "reject_invalid_result", "body_json": "{\"version\":1,\"result\":{}}", "outcome": "reject", "reject_class": "invalid_result"},
+        {"name": "reject_oversize", "body_fill_byte_hex": "20", "derived_body_bytes": 4097, "outcome": "reject", "reject_class": "oversize"}
+      ],
+      "public_mapping_cases": [
+        {"name": "success", "mapping_source": "authority_response", "private_outcome": "success", "private_response_body_json": "{\"version\":1,\"result\":{\"agent_id\":\"agent-conform\",\"connector_id\":\"prod-dashboard\",\"resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\",\"connector_routing_id\":\"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda\",\"knock_resource_id\":\"connector-conformance-01\",\"crid\":\"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha\",\"found_existing\":false}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"0\",\"list\":{\"query\":\"connector_resource\",\"version\":1,\"agent_id\":\"agent-conform\",\"connector_id\":\"prod-dashboard\",\"resource_id\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ\",\"connector_routing_id\":\"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda\",\"knock_resource_id\":\"connector-conformance-01\",\"crid\":\"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha\",\"found_existing\":false}}", "recovery_action": "none"},
+        {"name": "invalid_request", "mapping_source": "authority_response", "private_outcome": "invalid_request", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"invalid_request\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52506\",\"errMsg\":\"invalid connector resource request\"}", "recovery_action": "none"},
+        {"name": "identity_rejected", "mapping_source": "authority_response", "private_outcome": "identity_rejected", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"identity_rejected\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52501\",\"errMsg\":\"connector resource identity rejected\"}", "recovery_action": "none"},
+        {"name": "entitlement_denied", "mapping_source": "authority_response", "private_outcome": "entitlement_denied", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"entitlement_denied\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52502\",\"errMsg\":\"connector resource entitlement denied\"}", "recovery_action": "none"},
+        {"name": "resource_identity_conflict", "mapping_source": "authority_response", "private_outcome": "resource_identity_conflict", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"resource_identity_conflict\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52503\",\"errMsg\":\"connector resource identity conflict\"}", "recovery_action": "none"},
+        {"name": "quota", "mapping_source": "authority_response", "private_outcome": "quota", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"quota\"}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52504\",\"errMsg\":\"connector resource quota exceeded\"}", "recovery_action": "none"},
+        {"name": "rate_limited", "mapping_source": "authority_response", "private_outcome": "rate_limited", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"rate_limited\",\"retry_after_seconds\":60}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52505\",\"errMsg\":\"connector resource rate limited\",\"retryAfterSeconds\":60}", "recovery_action": "none"},
+        {"name": "unavailable", "mapping_source": "authority_response", "private_outcome": "unavailable", "private_response_body_json": "{\"version\":1,\"error\":{\"code\":\"unavailable\",\"retry_after_seconds\":5}}", "nhp_action": "emit_lrt", "nhp_body_json": "{\"errCode\":\"52500\",\"errMsg\":\"connector resource temporarily unavailable\",\"retryAfterSeconds\":5}", "recovery_action": "none"}
       ]
     },
     "MutateProofAgent": {

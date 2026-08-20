@@ -34,8 +34,10 @@ trust.
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
-| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for five NHP runtime Authority operations plus the sandbox-only attended-proof mutation control and the runtime operations' NHP public mappings |
+| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for six NHP runtime Authority operations plus the sandbox-only attended-proof mutation control and the runtime operations' NHP public mappings |
 | `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
+| `vectors/connector_resource_lst_v1_vectors.json` | registered-agent `connector_resource` v1 NHP_LST/NHP_LRT application bodies, continuity/replay rules, strict errors, and conservative unfragmented size fixtures |
+| `vectors/README_connector_resource_lst_v1_vectors.md` | public request/result schema, identity binding, request-ID derivation, retry grammar, size boundary, and consumer algorithm |
 | `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
 | `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
 | `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, closed initial/refresh flows, allowlisted additive profiles, amplification bounds, and rejects |
@@ -62,6 +64,7 @@ sc, err := conformance.AgentSessionControl()        // strict-parsed RKN/EXT ful
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
 ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
+rr, err := conformance.ConnectorResourceLSTV1()      // strict-parsed Connector resource LST/LRT artifact
 hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
@@ -86,7 +89,7 @@ typed consumers must update their loader for `transport_contract` and the
 
 ## Scope
 
-This module hosts fourteen artifacts across thirteen protocol families. Each
+This module hosts fifteen artifacts across fourteen protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -243,12 +246,28 @@ artifact has its own `artifact` id:
   existing-assignment fences, NHP size budget, and closed reject suites. NHP
   carries this ticket opaquely. See
   `vectors/README_assignment_ticket_v1_vectors.md`.
+- **Connector resource discovery LST/LRT v1**
+  (`qurl-connector-resource-lst-v1-vectors`,
+  `connector_resource_lst_v1_vectors.json`) — a dedicated post-registration
+  `connector_resource` v1 exchange over standard NHP_LST/NHP_LRT. The
+  authenticated peer binds exact `usrId=devId=agent_id`; owner and entitlement
+  remain server-side. One request resolves one connector and returns exact
+  resource, routing, knock, optional CRID, and `found_existing` values. The
+  optional `expected_resource_id` is read-only fail-closed continuity: only the
+  same active resource succeeds; absent, revoked, tombstoned, or different
+  state returns terminal 52503 without creating or reclaiming a replacement.
+  Replay preserves the byte-identical first result, while a fresh nonce
+  reauthorizes. The artifact freezes strict 52500-52506 errors and conservative
+  pre-seal size budgets; the NHP reference integration owns the real sealed
+  1,232-byte proof. No HTTP fallback or hostname-derived placement is allowed.
+  See `vectors/README_connector_resource_lst_v1_vectors.md`.
 - **Private Connector Authority Lambda v1**
   (`qurl-connector-authority-lambda-v1-vectors`,
-  `connector_authority_lambda_v1_vectors.json`) — six distinct strict request
+  `connector_authority_lambda_v1_vectors.json`) — seven distinct strict request
   schemas for `IssueAssignment`, `RefreshAssignment`,
   `IssueRegistrationOTP`, `ActivateRegistration`, and
-  `CompleteRegistration`, plus the sandbox-only attended-controller
+  `CompleteRegistration`, the post-registration `ResolveConnectorResource`,
+  plus the sandbox-only attended-controller
   `MutateProofAgent` control. There is no generic operation selector. NHP
   runtime callers cannot supply environment, cell, owner, or assignment
   generation; only the separately permissioned proof operation accepts its
@@ -269,7 +288,9 @@ artifact has its own `artifact` id:
   therefore a new id. Cell operations reject the field, and it never appears
   in a public NHP body or authority response. Each response is exactly
   `{version,result}` or `{version,error}` under a 4,096-byte
-  cap; only OTP `rate_limited` may carry a positive `retry_after_seconds`.
+  cap. OTP and Connector-resource `rate_limited` require positive
+  `retry_after_seconds`; Connector-resource `unavailable` permits an optional
+  positive delay bounded at 3,600 seconds.
   Private-to-NHP cases freeze whether the worker emits LRT, emits RAK, follows
   OTP's normal no-application-reply protocol, or deliberately drops an
   activation reply. In particular, activation `unavailable` is deliberately

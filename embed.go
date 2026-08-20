@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -19,6 +19,7 @@ const (
 	agentAPIKeyIDName           = "vectors/agent_api_key_id_vectors.json"
 	assignmentTicketName        = "vectors/assignment_ticket_v1_vectors.json"
 	connectorAuthorityName      = "vectors/connector_authority_lambda_v1_vectors.json"
+	connectorResourceLSTV1Name  = "vectors/connector_resource_lst_v1_vectors.json"
 	connectorHubRequestIDName   = "vectors/connector_hub_request_id_v1_vectors.json"
 	connectorHubLSTCookieName   = "vectors/connector_hub_lst_cookie_v1_vectors.json"
 	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
@@ -140,6 +141,16 @@ func ConnectorAuthorityLambdaVectors() []byte {
 	return b
 }
 
+// ConnectorResourceLSTV1Vectors returns the exact registered-agent NHP_LST and
+// NHP_LRT application bodies for resolving one Connector resource.
+func ConnectorResourceLSTV1Vectors() []byte {
+	b, err := vectorsFS.ReadFile(connectorResourceLSTV1Name)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorResourceLSTV1Name, err))
+	}
+	return b
+}
+
 // ConnectorHubRequestIDVectors returns the private Hub replay-key derivation
 // KAT shared by Hub worker implementations.
 func ConnectorHubRequestIDVectors() []byte {
@@ -207,6 +218,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(assignmentTicketName)
 	case connectorAuthorityName, "connector_authority_lambda_v1_vectors.json":
 		return vectorsFS.ReadFile(connectorAuthorityName)
+	case connectorResourceLSTV1Name, "connector_resource_lst_v1_vectors.json":
+		return vectorsFS.ReadFile(connectorResourceLSTV1Name)
 	case connectorHubRequestIDName, "connector_hub_request_id_v1_vectors.json":
 		return vectorsFS.ReadFile(connectorHubRequestIDName)
 	case connectorHubLSTCookieName, "connector_hub_lst_cookie_v1_vectors.json":
@@ -279,6 +292,12 @@ func AssignmentTicket() (*AssignmentTicketFile, error) {
 // artifact shared by NHP workers and Connector Authority handlers.
 func ConnectorAuthorityLambda() (*ConnectorAuthorityLambdaFile, error) {
 	return ParseConnectorAuthorityLambdaFile(ConnectorAuthorityLambdaVectors())
+}
+
+// ConnectorResourceLSTV1 strictly parses the registered-agent Connector
+// resource-discovery application contract.
+func ConnectorResourceLSTV1() (*ConnectorResourceLSTV1File, error) {
+	return ParseConnectorResourceLSTV1File(ConnectorResourceLSTV1Vectors())
 }
 
 // ConnectorHubRequestID strictly parses the embedded private Hub replay-key

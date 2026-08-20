@@ -57,6 +57,11 @@ def connector_authority_lambda_vectors():
     return _load("connector_authority_lambda_v1_vectors.json")
 
 
+def connector_resource_lst_v1_vectors():
+    """Return the parsed connector_resource_lst_v1_vectors.json."""
+    return _load("connector_resource_lst_v1_vectors.json")
+
+
 def connector_hub_request_id_vectors():
     """Return the parsed connector_hub_request_id_v1_vectors.json."""
     return _load("connector_hub_request_id_v1_vectors.json")

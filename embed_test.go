@@ -1781,6 +1781,7 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 		{"agent knock application", AgentKnockApplicationVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentKnockApplicationFile(b); return err }},
 		{"agent session control", AgentSessionControlVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentSessionControlFile(b); return err }},
 		{"agent API-key ID", AgentAPIKeyIDVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAPIKeyIDFile(b); return err }},
+		{"Connector resource LST v1", ConnectorResourceLSTV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseConnectorResourceLSTV1File(b); return err }},
 		{"CRID v1", CRIDV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseCRIDV1File(b); return err }},
 	}
 	for _, tc := range tests {
@@ -2150,6 +2151,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/agent_session_control_vectors.json",
 		"agent_api_key_id_vectors.json",
 		"vectors/agent_api_key_id_vectors.json",
+		"connector_resource_lst_v1_vectors.json",
+		"vectors/connector_resource_lst_v1_vectors.json",
 		"crid_v1_vectors.json",
 		"vectors/crid_v1_vectors.json",
 	} {

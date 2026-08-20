@@ -25,7 +25,7 @@ const (
 	ConnectorAuthorityLambdaArtifactID = "qurl-connector-authority-lambda-v1-vectors"
 	// ConnectorAuthorityLambdaSchemaVersion is the only artifact schema accepted
 	// by this release.
-	ConnectorAuthorityLambdaSchemaVersion = 1
+	ConnectorAuthorityLambdaSchemaVersion = 2
 
 	ConnectorAuthorityLambdaRequestVersion   = 1
 	ConnectorAuthorityLambdaMaxRequestBytes  = 4096
@@ -47,12 +47,13 @@ const (
 	ConnectorAuthorityProofMutationPendingMoveResumeRule  = "accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window"
 	ConnectorAuthorityProofMutationExpiredIDOutcome       = "expired_first_seen_or_terminal_unavailable_without_mutation"
 
-	ConnectorAuthorityOperationIssueAssignment      = "IssueAssignment"
-	ConnectorAuthorityOperationRefreshAssignment    = "RefreshAssignment"
-	ConnectorAuthorityOperationIssueRegistrationOTP = "IssueRegistrationOTP"
-	ConnectorAuthorityOperationActivateRegistration = "ActivateRegistration"
-	ConnectorAuthorityOperationCompleteRegistration = "CompleteRegistration"
-	ConnectorAuthorityOperationMutateProofAgent     = "MutateProofAgent"
+	ConnectorAuthorityOperationIssueAssignment          = "IssueAssignment"
+	ConnectorAuthorityOperationRefreshAssignment        = "RefreshAssignment"
+	ConnectorAuthorityOperationIssueRegistrationOTP     = "IssueRegistrationOTP"
+	ConnectorAuthorityOperationActivateRegistration     = "ActivateRegistration"
+	ConnectorAuthorityOperationCompleteRegistration     = "CompleteRegistration"
+	ConnectorAuthorityOperationResolveConnectorResource = "ResolveConnectorResource"
+	ConnectorAuthorityOperationMutateProofAgent         = "MutateProofAgent"
 
 	ConnectorAuthorityMappingSourceResponse  = "authority_response"
 	ConnectorAuthorityMappingSourcePreInvoke = "nhp_preinvoke"
@@ -70,6 +71,7 @@ var connectorAuthorityOperationNames = []string{
 	ConnectorAuthorityOperationIssueRegistrationOTP,
 	ConnectorAuthorityOperationActivateRegistration,
 	ConnectorAuthorityOperationCompleteRegistration,
+	ConnectorAuthorityOperationResolveConnectorResource,
 	ConnectorAuthorityOperationMutateProofAgent,
 }
 
@@ -108,6 +110,9 @@ type ConnectorAuthorityLambdaProtocol struct {
 	TimestampFormat               string `json:"timestamp_format"`
 	HubRequestIDFormat            string `json:"hub_request_id_format"`
 	ResponseRule                  string `json:"response_rule"`
+	CellRequestIDFormat           string `json:"cell_request_id_format"`
+	CellRequestIDDomain           string `json:"cell_request_id_domain"`
+	CellRequestIDFraming          string `json:"cell_request_id_framing"`
 }
 
 // ConnectorAuthorityLambdaFixtures are synthetic, non-production values used
@@ -143,12 +148,21 @@ type ConnectorAuthorityLambdaFixtures struct {
 	ProofNewGeneration            int64  `json:"proof_new_assignment_generation"`
 	ProofLeaseExpiresAt           string `json:"proof_lease_expires_at"`
 	ProofMutatedAt                string `json:"proof_mutated_at"`
+	Environment                   string `json:"environment"`
+	ConnectorRequestNonce         string `json:"connector_request_nonce"`
+	CellRequestID                 string `json:"cell_request_id"`
+	ConnectorID                   string `json:"connector_id"`
+	ConnectorResourceID           string `json:"connector_resource_id"`
+	ConnectorRoutingID            string `json:"connector_routing_id"`
+	KnockResourceID               string `json:"knock_resource_id"`
+	ConnectorCRID                 string `json:"connector_crid"`
 }
 
 // ConnectorAuthorityLambdaOperation is one separately permissioned function's
 // complete request, response, reject, and public-mapping contract.
 type ConnectorAuthorityLambdaOperation struct {
 	ReplayContract           *ConnectorAuthorityProofMutationReplayContract `json:"replay_contract,omitempty"`
+	ResourceReplayContract   *ConnectorAuthorityResourceReplayContract      `json:"resource_replay_contract,omitempty"`
 	RequestGolden            ConnectorAuthorityLambdaBodyCase               `json:"request_golden"`
 	AdditionalRequestGoldens []ConnectorAuthorityLambdaBodyCase             `json:"additional_request_goldens,omitempty"`
 	SuccessGolden            ConnectorAuthorityLambdaBodyCase               `json:"success_golden"`
@@ -159,10 +173,22 @@ type ConnectorAuthorityLambdaOperation struct {
 	PublicMappingCases       []ConnectorAuthorityPublicMapping              `json:"public_mapping_cases"`
 }
 
+// ConnectorAuthorityResourceReplayContract freezes the idempotency and
+// continuity semantics of the Connector resource ensure/read operation.
+type ConnectorAuthorityResourceReplayContract struct {
+	RequestIDDerivation       string   `json:"request_id_derivation"`
+	FingerprintFields         []string `json:"fingerprint_fields"`
+	ExactReplayOutcome        string   `json:"exact_replay_outcome"`
+	ChangedReplayOutcome      string   `json:"changed_replay_outcome"`
+	FreshNonceOutcome         string   `json:"fresh_nonce_outcome"`
+	ExpectedResourceIDOutcome string   `json:"expected_resource_id_outcome"`
+}
+
 // ConnectorAuthorityProofMutationReplayContract freezes the behavioral
 // meaning of MutateProofAgent's private hub_request_id. It is deliberately
-// absent from the five runtime operations, whose replay contracts are owned by
-// their existing operation-specific artifacts and services.
+// absent from the runtime operations. ResolveConnectorResource has the
+// separate resource replay contract above; other runtime replay contracts are
+// owned by their existing operation-specific artifacts and services.
 type ConnectorAuthorityProofMutationReplayContract struct {
 	LogicalLifetimeSeconds int      `json:"logical_lifetime_seconds"`
 	TombstoneSeconds       int      `json:"tombstone_seconds_after_logical_expiry"`
@@ -261,6 +287,18 @@ type ConnectorAuthorityCompleteRegistrationRequest struct {
 	DeviceAPIKey                  string `json:"device_api_key"`
 }
 
+// ConnectorAuthorityResolveConnectorResourceRequest is the private assigned-
+// cell invocation. Environment and the public nonce are deliberately absent:
+// the cell derives CellRequestID from them plus the authenticated peer.
+type ConnectorAuthorityResolveConnectorResourceRequest struct {
+	Version                       int     `json:"version"`
+	CellRequestID                 string  `json:"cell_request_id"`
+	AgentID                       string  `json:"agent_id"`
+	AuthenticatedPeerPublicKeyB64 string  `json:"authenticated_peer_public_key_b64"`
+	ConnectorID                   string  `json:"connector_id"`
+	ExpectedResourceID            *string `json:"expected_resource_id,omitempty"`
+}
+
 // ConnectorAuthorityMutateProofAgentRequest is the sandbox-only attended-proof
 // control request. Its final three members form a closed union selected by
 // Mutation: arm requires all three, move requires only TargetCellID, and
@@ -313,6 +351,16 @@ type ConnectorAuthorityRefreshAssignmentResult struct {
 
 type ConnectorAuthorityCompleteRegistrationResult struct {
 	DeviceAPIKeyID string `json:"device_api_key_id"`
+}
+
+type ConnectorAuthorityResolveConnectorResourceResult struct {
+	AgentID            string  `json:"agent_id"`
+	ConnectorID        string  `json:"connector_id"`
+	ResourceID         string  `json:"resource_id"`
+	ConnectorRoutingID string  `json:"connector_routing_id"`
+	KnockResourceID    string  `json:"knock_resource_id"`
+	CRID               *string `json:"crid,omitempty"`
+	FoundExisting      bool    `json:"found_existing"`
 }
 
 type ConnectorAuthorityMutateProofAgentArmResult struct {
@@ -376,9 +424,12 @@ func ParseConnectorAuthorityLambdaFile(data []byte) (*ConnectorAuthorityLambdaFi
 	wantProtocol := ConnectorAuthorityLambdaProtocol{
 		RequestVersion: ConnectorAuthorityLambdaRequestVersion, MaxRequestBytes: ConnectorAuthorityLambdaMaxRequestBytes,
 		MaxResponseBytes: ConnectorAuthorityLambdaMaxResponseBytes, MaxAssignmentTicketASCIIBytes: ConnectorAuthorityLambdaMaxAssignmentTicketASCIIBytes,
-		TimestampFormat:    ConnectorAuthorityLambdaTimestampFormat,
-		HubRequestIDFormat: ConnectorAuthorityLambdaHubRequestIDFormat,
-		ResponseRule:       ConnectorAuthorityLambdaResponseRule,
+		TimestampFormat:      ConnectorAuthorityLambdaTimestampFormat,
+		HubRequestIDFormat:   ConnectorAuthorityLambdaHubRequestIDFormat,
+		ResponseRule:         ConnectorAuthorityLambdaResponseRule,
+		CellRequestIDFormat:  "lowercase_sha256_hex",
+		CellRequestIDDomain:  ConnectorResourceLSTV1CellRequestIDDomain,
+		CellRequestIDFraming: "domain_then_00_then_u8_tag_u16be_length_value_for_environment_peer_nonce",
 	}
 	if file.Protocol != wantProtocol {
 		return nil, fmt.Errorf("conformance: Connector Authority Lambda protocol = %+v, want %+v", file.Protocol, wantProtocol)
@@ -469,11 +520,29 @@ func validateConnectorAuthorityFixtures(f ConnectorAuthorityLambdaFixtures) erro
 	if !proofMutation.Before(proofLease) {
 		return errors.New("conformance: Connector Authority proof fixture mutation time must precede lease expiry")
 	}
+	if !connectorResourceLSTV1EnvironmentPattern.MatchString(f.Environment) ||
+		ValidateConnectorResourceLSTV1Nonce(f.ConnectorRequestNonce) != nil ||
+		ValidateConnectorResourceLSTV1CellRequestID(f.CellRequestID) != nil ||
+		!ValidateConnectorResourceLSTV1ConnectorID(f.ConnectorID) ||
+		ValidateConnectorResourceLSTV1ResourceID(f.ConnectorResourceID) != nil ||
+		ValidateConnectorResourceLSTV1RoutingID(f.ConnectorRoutingID) != nil ||
+		ValidateConnectorResourceLSTV1KnockResourceID(f.KnockResourceID) != nil {
+		return errors.New("conformance: Connector Authority Connector-resource fixture metadata is invalid")
+	}
+	peer, _ := base64.StdEncoding.Strict().DecodeString(f.AuthenticatedPeerPublicKeyB64)
+	nonce, _ := base64.RawURLEncoding.Strict().DecodeString(f.ConnectorRequestNonce)
+	derivedCellRequestID, err := DeriveConnectorResourceLSTV1CellRequestID(f.Environment, peer, nonce)
+	if err != nil || derivedCellRequestID != f.CellRequestID {
+		return errors.New("conformance: Connector Authority cell_request_id fixture does not re-derive")
+	}
+	if outcome, err := deriveCRIDV1KeyMatchExpectation(f.ConnectorCRID, f.ConnectorResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
+		return errors.New("conformance: Connector Authority Connector-resource CRID does not match resource_id")
+	}
 	return nil
 }
 
 func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
-	if err := validateConnectorAuthorityReplayContract(name, op.ReplayContract); err != nil {
+	if err := validateConnectorAuthorityReplayContract(name, op.ReplayContract, op.ResourceReplayContract); err != nil {
 		return err
 	}
 	if op.RequestGolden.Name != "accept_request" || op.SuccessGolden.Name != "accept_success" {
@@ -512,7 +581,23 @@ func validateConnectorAuthorityOperation(name string, op ConnectorAuthorityLambd
 func validateConnectorAuthorityReplayContract(
 	operation string,
 	contract *ConnectorAuthorityProofMutationReplayContract,
+	resourceContract *ConnectorAuthorityResourceReplayContract,
 ) error {
+	if operation == ConnectorAuthorityOperationResolveConnectorResource {
+		if contract != nil || resourceContract == nil ||
+			resourceContract.RequestIDDerivation != "domain_separated_sha256_over_environment_authenticated_peer_and_decoded_public_nonce" ||
+			!slices.Equal(resourceContract.FingerprintFields, []string{"version", "agent_id", "authenticated_peer_public_key_b64", "connector_id", "expected_resource_id_if_present"}) ||
+			resourceContract.ExactReplayOutcome != "byte_identical_first_response_including_found_existing" ||
+			resourceContract.ChangedReplayOutcome != "invalid_request_before_authority_mutation" ||
+			resourceContract.FreshNonceOutcome != "reauthorize_and_report_current_found_existing" ||
+			resourceContract.ExpectedResourceIDOutcome != "read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim" {
+			return errors.New("conformance: Connector Authority ResolveConnectorResource replay contract is not canonical")
+		}
+		return nil
+	}
+	if resourceContract != nil {
+		return fmt.Errorf("conformance: Connector Authority %s has an unexpected resource replay contract", operation)
+	}
 	if operation != ConnectorAuthorityOperationMutateProofAgent {
 		if contract != nil {
 			return fmt.Errorf("conformance: Connector Authority %s has an unexpected proof replay contract", operation)
@@ -548,6 +633,33 @@ func connectorAuthorityProofMutationFingerprintFields() []string {
 }
 
 func validateConnectorAuthorityAdditionalGoldens(operation string, op ConnectorAuthorityLambdaOperation, f ConnectorAuthorityLambdaFixtures) error {
+	if operation == ConnectorAuthorityOperationResolveConnectorResource {
+		if len(op.AdditionalRequestGoldens) != 1 || len(op.AdditionalSuccessGoldens) != 2 ||
+			op.AdditionalRequestGoldens[0].Name != "accept_continuity_request" ||
+			op.AdditionalSuccessGoldens[0].Name != "accept_existing_success" ||
+			op.AdditionalSuccessGoldens[1].Name != "accept_without_crid_success" {
+			return errors.New("conformance: Connector Authority ResolveConnectorResource additional golden shape is not canonical")
+		}
+		wantRequest, err := connectorAuthorityResolveConnectorResourceGoldenRequest(f, true)
+		if err != nil || op.AdditionalRequestGoldens[0].BodyJSON != wantRequest || validateConnectorAuthorityRequest(operation, []byte(wantRequest)) != nil {
+			return errors.New("conformance: Connector Authority ResolveConnectorResource continuity request golden is not canonical")
+		}
+		wantSuccess, err := connectorAuthorityResolveConnectorResourceGoldenSuccess(f, true, true)
+		if err != nil || op.AdditionalSuccessGoldens[0].BodyJSON != wantSuccess {
+			return errors.New("conformance: Connector Authority ResolveConnectorResource existing success golden is not canonical")
+		}
+		if outcome, err := validateConnectorAuthorityResponse(operation, []byte(wantSuccess)); err != nil || outcome != "success" {
+			return fmt.Errorf("conformance: Connector Authority ResolveConnectorResource existing success golden: outcome=%q err=%v", outcome, err)
+		}
+		wantNoCRID, err := connectorAuthorityResolveConnectorResourceGoldenSuccess(f, true, false)
+		if err != nil || op.AdditionalSuccessGoldens[1].BodyJSON != wantNoCRID {
+			return errors.New("conformance: Connector Authority ResolveConnectorResource no-CRID success golden is not canonical")
+		}
+		if outcome, err := validateConnectorAuthorityResponse(operation, []byte(wantNoCRID)); err != nil || outcome != "success" {
+			return fmt.Errorf("conformance: Connector Authority ResolveConnectorResource no-CRID success golden: outcome=%q err=%v", outcome, err)
+		}
+		return nil
+	}
 	if operation != ConnectorAuthorityOperationMutateProofAgent {
 		if len(op.AdditionalRequestGoldens) != 0 || len(op.AdditionalSuccessGoldens) != 0 {
 			return fmt.Errorf("conformance: Connector Authority %s has unexpected additional goldens", operation)
@@ -656,6 +768,19 @@ func validateConnectorAuthorityRequest(operation string, data []byte) error {
 			!connectorAuthorityAgentIDPattern.MatchString(request.AgentID) || !isConnectorAuthorityAPIKey(request.DeviceAPIKey) {
 			return errors.New("invalid CompleteRegistration request semantics")
 		}
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		var request ConnectorAuthorityResolveConnectorResourceRequest
+		if err := strictDecodeArtifact(data, &request); err != nil {
+			return err
+		}
+		if request.Version != 1 || ValidateConnectorResourceLSTV1CellRequestID(request.CellRequestID) != nil ||
+			!ValidateConnectorResourceLSTV1AgentID(request.AgentID) || validateConnectorAuthorityX25519KeyEncoding(request.AuthenticatedPeerPublicKeyB64) != nil ||
+			!ValidateConnectorResourceLSTV1ConnectorID(request.ConnectorID) {
+			return errors.New("invalid ResolveConnectorResource request semantics")
+		}
+		if request.ExpectedResourceID != nil && ValidateConnectorResourceLSTV1ResourceID(*request.ExpectedResourceID) != nil {
+			return errors.New("invalid ResolveConnectorResource expected_resource_id")
+		}
 	case ConnectorAuthorityOperationMutateProofAgent:
 		var request ConnectorAuthorityMutateProofAgentRequest
 		if err := strictDecodeArtifact(data, &request); err != nil {
@@ -696,6 +821,17 @@ func requireConnectorAuthorityRequestMembers(operation string, data []byte) erro
 	if operation == ConnectorAuthorityOperationMutateProofAgent {
 		return requireConnectorAuthorityMutateProofAgentRequestMembers(data)
 	}
+	if operation == ConnectorAuthorityOperationResolveConnectorResource {
+		required, _ := connectorAuthorityRequestMembers(operation)
+		allowed := append(slices.Clone(required), "expected_resource_id")
+		object, err := validateConnectorAuthorityExactObject(data, required, allowed)
+		if err == nil {
+			if raw, present := object["expected_resource_id"]; present && string(raw) == "null" {
+				return errors.New("expected_resource_id must not be null")
+			}
+		}
+		return err
+	}
 	required, err := connectorAuthorityRequestMembers(operation)
 	if err != nil {
 		return err
@@ -716,6 +852,8 @@ func connectorAuthorityRequestMembers(operation string) ([]string, error) {
 		return []string{"version", "assignment_ticket", "credential_key_id", "registration_credential", "authenticated_peer_public_key_b64", "agent_id", "hostname", "agent_version"}, nil
 	case ConnectorAuthorityOperationCompleteRegistration:
 		return []string{"version", "authenticated_peer_public_key_b64", "agent_id", "device_api_key"}, nil
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		return []string{"version", "cell_request_id", "agent_id", "authenticated_peer_public_key_b64", "connector_id"}, nil
 	case ConnectorAuthorityOperationMutateProofAgent:
 		return slices.Clone(connectorAuthorityMutateProofAgentRequestMembers), nil
 	default:
@@ -850,8 +988,11 @@ func validateConnectorAuthorityResponse(operation string, data []byte) (string, 
 		if responseError.RetryAfterSeconds == nil || *responseError.RetryAfterSeconds < 1 {
 			return "", errors.New("rate_limited requires positive retry_after_seconds")
 		}
-	} else if responseError.RetryAfterSeconds != nil {
+	} else if responseError.RetryAfterSeconds != nil && !connectorAuthorityAllowsRetryAfter(operation, responseError.Code) {
 		return "", errors.New("retry_after_seconds is forbidden for this error")
+	}
+	if responseError.RetryAfterSeconds != nil && (*responseError.RetryAfterSeconds < 1 || (operation == ConnectorAuthorityOperationResolveConnectorResource && *responseError.RetryAfterSeconds > ConnectorResourceLSTV1MaxRetryAfterSeconds)) {
+		return "", errors.New("retry_after_seconds is outside the permitted range")
 	}
 	return responseError.Code, nil
 }
@@ -923,6 +1064,32 @@ func validateConnectorAuthorityResult(operation string, raw []byte) error {
 		}
 		if !isCanonicalAgentAPIKeyID(result.DeviceAPIKeyID) {
 			return errors.New("invalid CompleteRegistration device_api_key_id")
+		}
+		return nil
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		object, err := validateConnectorAuthorityExactObject(raw,
+			[]string{"agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id", "found_existing"},
+			[]string{"agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id", "crid", "found_existing"})
+		if err != nil {
+			return err
+		}
+		if rawCRID, present := object["crid"]; present && string(rawCRID) == "null" {
+			return errors.New("crid must not be null")
+		}
+		var result ConnectorAuthorityResolveConnectorResourceResult
+		if err := strictDecodeArtifact(raw, &result); err != nil {
+			return err
+		}
+		if !ValidateConnectorResourceLSTV1AgentID(result.AgentID) || !ValidateConnectorResourceLSTV1ConnectorID(result.ConnectorID) ||
+			ValidateConnectorResourceLSTV1ResourceID(result.ResourceID) != nil || ValidateConnectorResourceLSTV1RoutingID(result.ConnectorRoutingID) != nil ||
+			ValidateConnectorResourceLSTV1KnockResourceID(result.KnockResourceID) != nil || result.ResourceID == result.KnockResourceID || result.ConnectorRoutingID == result.KnockResourceID {
+			return errors.New("invalid ResolveConnectorResource result semantics")
+		}
+		if result.CRID != nil {
+			outcome, matchErr := deriveCRIDV1KeyMatchExpectation(*result.CRID, result.ResourceID)
+			if matchErr != nil || outcome != CRIDV1OutcomeMatch {
+				return errors.New("invalid ResolveConnectorResource CRID binding")
+			}
 		}
 		return nil
 	case ConnectorAuthorityOperationMutateProofAgent:
@@ -1095,6 +1262,8 @@ func connectorAuthorityGoldenRequest(operation string, f ConnectorAuthorityLambd
 		value = ConnectorAuthorityCompleteRegistrationRequest{
 			Version: 1, AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64, AgentID: f.AgentID, DeviceAPIKey: f.DeviceAPIKey,
 		}
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		return connectorAuthorityResolveConnectorResourceGoldenRequest(f, false)
 	case ConnectorAuthorityOperationMutateProofAgent:
 		return connectorAuthorityMutateProofAgentGoldenRequest("move", f)
 	default:
@@ -1133,10 +1302,36 @@ func connectorAuthorityGoldenSuccess(operation string, f ConnectorAuthorityLambd
 		result = struct{}{}
 	case ConnectorAuthorityOperationCompleteRegistration:
 		result = ConnectorAuthorityCompleteRegistrationResult{DeviceAPIKeyID: f.DeviceAPIKeyID}
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		return connectorAuthorityResolveConnectorResourceGoldenSuccess(f, false, true)
 	case ConnectorAuthorityOperationMutateProofAgent:
 		return connectorAuthorityMutateProofAgentGoldenSuccess("move", f)
 	default:
 		return "", fmt.Errorf("unknown operation %q", operation)
+	}
+	return marshalConnectorAuthorityResponse(result, nil)
+}
+
+func connectorAuthorityResolveConnectorResourceGoldenRequest(f ConnectorAuthorityLambdaFixtures, continuity bool) (string, error) {
+	request := ConnectorAuthorityResolveConnectorResourceRequest{
+		Version: 1, CellRequestID: f.CellRequestID, AgentID: f.AgentID,
+		AuthenticatedPeerPublicKeyB64: f.AuthenticatedPeerPublicKeyB64, ConnectorID: f.ConnectorID,
+	}
+	if continuity {
+		request.ExpectedResourceID = &f.ConnectorResourceID
+	}
+	encoded, err := json.Marshal(request)
+	return string(encoded), err
+}
+
+func connectorAuthorityResolveConnectorResourceGoldenSuccess(f ConnectorAuthorityLambdaFixtures, foundExisting, includeCRID bool) (string, error) {
+	result := ConnectorAuthorityResolveConnectorResourceResult{
+		AgentID: f.AgentID, ConnectorID: f.ConnectorID, ResourceID: f.ConnectorResourceID,
+		ConnectorRoutingID: f.ConnectorRoutingID, KnockResourceID: f.KnockResourceID,
+		FoundExisting: foundExisting,
+	}
+	if includeCRID {
+		result.CRID = &f.ConnectorCRID
 	}
 	return marshalConnectorAuthorityResponse(result, nil)
 }
@@ -1212,6 +1407,8 @@ func connectorAuthoritySemanticCodes(operation string) []string {
 		return []string{"invalid_request", "credential_rejected", "ticket_invalid", "not_yet_valid", "ticket_expired", "identity_conflict", "quota", "reenrollment_required", "unavailable"}
 	case ConnectorAuthorityOperationCompleteRegistration:
 		return []string{"invalid_request", "identity_rejected", "quota", "conflict", "unavailable"}
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		return []string{"invalid_request", "identity_rejected", "entitlement_denied", "resource_identity_conflict", "quota", "rate_limited", "unavailable"}
 	case ConnectorAuthorityOperationMutateProofAgent:
 		return []string{"invalid_request", "identity_rejected", "directive_absent", "directive_expired", "reassignment_in_progress", "unavailable"}
 	default:
@@ -1228,7 +1425,11 @@ func connectorAuthorityErrorAllowed(operation, code string) bool {
 // pair and forbidden for every other error, so all validators derive the rule
 // from here rather than repeating the literal pair.
 func connectorAuthorityRequiresRetryAfter(operation, code string) bool {
-	return operation == ConnectorAuthorityOperationIssueRegistrationOTP && code == "rate_limited"
+	return (operation == ConnectorAuthorityOperationIssueRegistrationOTP || operation == ConnectorAuthorityOperationResolveConnectorResource) && code == "rate_limited"
+}
+
+func connectorAuthorityAllowsRetryAfter(operation, code string) bool {
+	return connectorAuthorityRequiresRetryAfter(operation, code) || (operation == ConnectorAuthorityOperationResolveConnectorResource && code == "unavailable")
 }
 
 func validateConnectorAuthoritySemanticErrors(operation string, cases []ConnectorAuthorityLambdaErrorCase) error {
@@ -1244,6 +1445,9 @@ func validateConnectorAuthoritySemanticErrors(operation string, cases []Connecto
 		var retryAfter *int64
 		if connectorAuthorityRequiresRetryAfter(operation, code) {
 			value := int64(60)
+			retryAfter = &value
+		} else if operation == ConnectorAuthorityOperationResolveConnectorResource && code == "unavailable" {
+			value := int64(5)
 			retryAfter = &value
 		}
 		wantBody, err := marshalConnectorAuthorityResponse(nil, &connectorAuthorityError{Code: code, RetryAfterSeconds: retryAfter})
@@ -1353,6 +1557,8 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 	allowed := required
 	if operation == ConnectorAuthorityOperationMutateProofAgent {
 		allowed = append(slices.Clone(required), connectorAuthorityMutateProofAgentAllConditionalMembers()...)
+	} else if operation == ConnectorAuthorityOperationResolveConnectorResource {
+		allowed = append(slices.Clone(required), "expected_resource_id")
 	}
 	if class := classifyConnectorAuthorityObjectFields(object, required, allowed); class != "" {
 		return class
@@ -1375,6 +1581,16 @@ func classifyConnectorAuthorityRequestReject(operation string, data []byte) stri
 		required = conditionalRequired
 		if class := classifyConnectorAuthorityObjectFields(object, required, required); class != "" {
 			return class
+		}
+	}
+	if operation == ConnectorAuthorityOperationResolveConnectorResource {
+		if raw, present := object["expected_resource_id"]; present {
+			if string(raw) == "null" {
+				return "null_field"
+			}
+			if len(raw) == 0 || raw[0] != '"' {
+				return "wrong_type"
+			}
 		}
 	}
 	for _, name := range required[1:] {
@@ -1442,7 +1658,8 @@ func classifyConnectorAuthorityResponseReject(operation string, data []byte) str
 			return "null_field"
 		}
 		var seconds int64
-		if err := json.Unmarshal(retry, &seconds); err != nil || !connectorAuthorityRequiresRetryAfter(operation, code) || seconds < 1 {
+		if err := json.Unmarshal(retry, &seconds); err != nil || !connectorAuthorityAllowsRetryAfter(operation, code) || seconds < 1 ||
+			(operation == ConnectorAuthorityOperationResolveConnectorResource && seconds > ConnectorResourceLSTV1MaxRetryAfterSeconds) {
 			return "retry_after_policy"
 		}
 	} else if connectorAuthorityRequiresRetryAfter(operation, code) {
@@ -1691,6 +1908,28 @@ func connectorAuthorityExpectedPublicMapping(operation, outcome string, f Connec
 		default:
 			err = fmt.Errorf("conformance: unknown CompleteRegistration mapping %q", outcome)
 		}
+	case ConnectorAuthorityOperationResolveConnectorResource:
+		action = ConnectorAuthorityNHPActionEmitLRT
+		switch outcome {
+		case "success":
+			body, err = connectorAuthorityPublicConnectorResourceSuccess(f, false)
+		case "invalid_request":
+			body = `{"errCode":"52506","errMsg":"invalid connector resource request"}`
+		case "identity_rejected":
+			body = `{"errCode":"52501","errMsg":"connector resource identity rejected"}`
+		case "entitlement_denied":
+			body = `{"errCode":"52502","errMsg":"connector resource entitlement denied"}`
+		case "resource_identity_conflict":
+			body = `{"errCode":"52503","errMsg":"connector resource identity conflict"}`
+		case "quota":
+			body = `{"errCode":"52504","errMsg":"connector resource quota exceeded"}`
+		case "rate_limited":
+			body = `{"errCode":"52505","errMsg":"connector resource rate limited","retryAfterSeconds":60}`
+		case "unavailable":
+			body = `{"errCode":"52500","errMsg":"connector resource temporarily unavailable","retryAfterSeconds":5}`
+		default:
+			err = fmt.Errorf("conformance: unknown ResolveConnectorResource mapping %q", outcome)
+		}
 	default:
 		err = fmt.Errorf("conformance: unknown operation %q", operation)
 	}
@@ -1742,6 +1981,23 @@ func connectorAuthorityPublicAssignmentSuccess(mode string, f ConnectorAuthority
 		}
 	default:
 		return "", fmt.Errorf("unknown assignment mode %q", mode)
+	}
+	encoded, err := json.Marshal(publicBody)
+	return string(encoded), err
+}
+
+func connectorAuthorityPublicConnectorResourceSuccess(f ConnectorAuthorityLambdaFixtures, foundExisting bool) (string, error) {
+	publicBody := struct {
+		ErrCode string                                `json:"errCode"`
+		List    connectorResourceLSTV1SuccessListWire `json:"list"`
+	}{
+		ErrCode: "0",
+		List: connectorResourceLSTV1SuccessListWire{
+			Query: ConnectorResourceLSTV1Query, Version: ConnectorResourceLSTV1Version,
+			AgentID: f.AgentID, ConnectorID: f.ConnectorID, ResourceID: f.ConnectorResourceID,
+			ConnectorRoutingID: f.ConnectorRoutingID, KnockResourceID: f.KnockResourceID,
+			CRID: &f.ConnectorCRID, FoundExisting: foundExisting,
+		},
 	}
 	encoded, err := json.Marshal(publicBody)
 	return string(encoded), err
