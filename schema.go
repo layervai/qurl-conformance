@@ -8,8 +8,9 @@
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
-//     issuer_signature_vectors.json): the claims/secret/base64/fragment/relay/
-//     server-id classes and the issuer-signature golden bytes.
+//     issuer_signature_vectors.json): the share-safe outer transport,
+//     claims/secret/base64/canonical-fragment/relay/server-id classes, and the
+//     issuer-signature golden bytes.
 //   - The relay/NHP-handshake golden packets (relay_knock_golden.json): the
 //     deterministic relay-knock packet plus a frozen, server-sealed ack reply
 //     for the Noise handshake layer, which the qURL verify path does not import.
@@ -81,10 +82,10 @@ const (
 
 // reject_class vocabulary. These constants are the fixed cross-language vocabulary
 // the README pins, so every consumer can switch on a closed, known set. They are
-// pinned precisely only where the class is about the distinction (signature
-// high_s vs wrong_length; encoding; key_length); JSON-schema faults use the coarse
-// "parse" because a conformant verifier may surface any of several internal
-// sentinels for them.
+// pinned precisely only where the class is about the distinction (transport;
+// signature high_s vs wrong_length; encoding; key_length); JSON-schema faults
+// use the coarse "parse" because a conformant verifier may surface any of
+// several internal sentinels for them.
 const (
 	// RejectClassParse is the coarse class for a JSON-schema violation (duplicate
 	// key, unknown field, null, wrong type, missing required, out-of-range/ordering).
@@ -95,6 +96,8 @@ const (
 	RejectClassKeyLength = "key_length"
 	// RejectClassFragment is a fragment wire-shape rejection.
 	RejectClassFragment = "fragment"
+	// RejectClassTransport is a qv2t1 outer transport framing rejection.
+	RejectClassTransport = "transport"
 	// RejectClassRelayURL is a relay_url HTTPS/allowlist rejection.
 	RejectClassRelayURL = "relay_url"
 	// RejectClassTamper is the signature-class payload-tamper rejection: a valid
@@ -129,15 +132,48 @@ const (
 // these structs. A consumer in another language should assert the same id.
 const ConformanceArtifactID = "qurl-v2-conformance-vectors"
 
+// ConformanceSchemaVersion is the exact qURL v2 artifact schema understood by
+// this package. Version 2 adds the mandatory qv2t1 outer transport contract and
+// its behavioral vector class.
+const ConformanceSchemaVersion = 2
+
 // ConformanceFile is the top-level conformance artifact document.
 type ConformanceFile struct {
-	Artifact       string                      `json:"artifact"`
-	SchemaVersion  int                         `json:"schema_version"`
-	Description    string                      `json:"description"`
-	SourceOfTruth  string                      `json:"source_of_truth"`
-	Notes          []string                    `json:"notes"`
-	SignatureClass ConformanceSignatureClass   `json:"signature_class"`
-	Classes        map[string]ConformanceClass `json:"classes"`
+	Artifact          string                       `json:"artifact"`
+	SchemaVersion     int                          `json:"schema_version"`
+	Description       string                       `json:"description"`
+	SourceOfTruth     string                       `json:"source_of_truth"`
+	Notes             []string                     `json:"notes"`
+	TransportContract ConformanceTransportContract `json:"transport_contract"`
+	SignatureClass    ConformanceSignatureClass    `json:"signature_class"`
+	Classes           map[string]ConformanceClass  `json:"classes"`
+}
+
+// ConformanceTransportContract pins the non-cryptographic qv2t1 envelope used
+// in URL fragments. It chunks the three exact qv2 base64url fields so no URL
+// dot-component exceeds ComponentMax, then reconstructs the byte-identical qv2
+// canonical fragment before the existing security parser runs.
+type ConformanceTransportContract struct {
+	Prefix             string                     `json:"prefix"`
+	CanonicalPrefix    string                     `json:"canonical_prefix"`
+	ComponentMax       int                        `json:"component_max"`
+	MaxTransportLength int                        `json:"max_transport_length"`
+	Fields             ConformanceTransportFields `json:"fields"`
+}
+
+// ConformanceTransportFields records the fixed field order and independent
+// encoded-size/count bounds. Struct fields keep this closed under strict JSON
+// parsing; consumers must not accept a fourth field or reorder these three.
+type ConformanceTransportFields struct {
+	Claims    ConformanceTransportField `json:"claims"`
+	Secret    ConformanceTransportField `json:"secret"`
+	Signature ConformanceTransportField `json:"signature"`
+}
+
+// ConformanceTransportField is one reconstructed qv2 base64url field's bound.
+type ConformanceTransportField struct {
+	MaxEncodedLength int `json:"max_encoded_length"`
+	MaxChunks        int `json:"max_chunks"`
 }
 
 // ConformanceSignatureClass records that the signature class is composed from a
@@ -198,6 +234,12 @@ type ConformanceVector struct {
 
 	// fragment: a full fragment body.
 	Fragment string `json:"fragment"`
+
+	// transport: a qv2t1 outer fragment body and, on accept vectors, the exact
+	// canonical qv2 fragment body it must reconstruct. Reject vectors omit the
+	// canonical output.
+	TransportFragment string `json:"transport_fragment"`
+	CanonicalFragment string `json:"canonical_fragment"`
 
 	// relay_allowlist: the allowlist entries and the URL to validate.
 	Entries []string `json:"entries"`
@@ -278,13 +320,67 @@ func ParseConformanceFile(data []byte) (*ConformanceFile, error) {
 	if cf.Artifact != ConformanceArtifactID {
 		return nil, fmt.Errorf("conformance: conformance file has artifact %q, want %q", cf.Artifact, ConformanceArtifactID)
 	}
-	if cf.SchemaVersion == 0 {
-		return nil, fmt.Errorf("conformance: conformance file missing schema_version")
+	if cf.SchemaVersion != ConformanceSchemaVersion {
+		return nil, fmt.Errorf("conformance: conformance file has schema_version %d, want %d", cf.SchemaVersion, ConformanceSchemaVersion)
 	}
 	if len(cf.Classes) == 0 {
 		return nil, fmt.Errorf("conformance: conformance file has no classes")
 	}
+	if err := validateConformanceTransportContract(cf.TransportContract); err != nil {
+		return nil, err
+	}
+	transportClass, ok := cf.Classes["transport"]
+	if !ok {
+		return nil, fmt.Errorf("conformance: conformance file is missing transport class")
+	}
+	if err := validateConformanceTransportClass(transportClass); err != nil {
+		return nil, err
+	}
 	return &cf, nil
+}
+
+func validateConformanceTransportContract(tc ConformanceTransportContract) error {
+	if tc.Prefix != "qv2t1" || tc.CanonicalPrefix != "qv2" || tc.ComponentMax != 240 || tc.MaxTransportLength != 6826 {
+		return fmt.Errorf("conformance: transport contract constants drifted: prefix=%q canonical_prefix=%q component_max=%d max_transport_length=%d", tc.Prefix, tc.CanonicalPrefix, tc.ComponentMax, tc.MaxTransportLength)
+	}
+	want := ConformanceTransportFields{
+		Claims:    ConformanceTransportField{MaxEncodedLength: 6144, MaxChunks: 26},
+		Secret:    ConformanceTransportField{MaxEncodedLength: 512, MaxChunks: 3},
+		Signature: ConformanceTransportField{MaxEncodedLength: 128, MaxChunks: 1},
+	}
+	if tc.Fields != want {
+		return fmt.Errorf("conformance: transport field bounds drifted: got %+v want %+v", tc.Fields, want)
+	}
+	return nil
+}
+
+func validateConformanceTransportClass(class ConformanceClass) error {
+	if class.EntryPoint == "" || class.Input != "transport_fragment" || len(class.Vectors) == 0 {
+		return fmt.Errorf("conformance: malformed transport class header")
+	}
+	seen := make(map[string]struct{}, len(class.Vectors))
+	for _, v := range class.Vectors {
+		if v.Name == "" || v.Reason == "" || v.TransportFragment == "" {
+			return fmt.Errorf("conformance: malformed transport vector %q", v.Name)
+		}
+		if _, ok := seen[v.Name]; ok {
+			return fmt.Errorf("conformance: duplicate transport vector %q", v.Name)
+		}
+		seen[v.Name] = struct{}{}
+		switch v.Expect {
+		case ExpectAccept:
+			if v.RejectClass != "" || v.CanonicalFragment == "" {
+				return fmt.Errorf("conformance: malformed accept transport vector %q", v.Name)
+			}
+		case ExpectReject:
+			if v.RejectClass != RejectClassTransport || v.CanonicalFragment != "" {
+				return fmt.Errorf("conformance: malformed reject transport vector %q", v.Name)
+			}
+		default:
+			return fmt.Errorf("conformance: transport vector %q has expect %q, want accept|reject", v.Name, v.Expect)
+		}
+	}
+	return nil
 }
 
 // ParseVectorFile strictly parses an issuer-signature vector file from raw bytes.

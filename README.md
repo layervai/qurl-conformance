@@ -21,7 +21,7 @@ trust.
 
 | Path | What it is |
 | --- | --- |
-| `vectors/qv2_conformance_vectors.json` | the conformance classes: claims/secret parse, strict base64url, fragment shape, relay allowlist, server-id, and the composed signature class |
+| `vectors/qv2_conformance_vectors.json` | the conformance classes: share-safe qv2t1 outer transport, claims/secret parse, strict base64url, canonical fragment shape, relay allowlist, server-id, and the composed signature class |
 | `vectors/issuer_signature_vectors.json` | the issuer-signature golden vectors (P-256 raw r\|\|s low-S) the signature class composes by reference |
 | `vectors/relay_knock_golden.json` | the relay/NHP-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s): a deterministic knock packet plus a frozen, server-sealed ack reply (see Scope) |
 | `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
@@ -80,15 +80,21 @@ verbatim (same bytes, no reformatting), load them with a strict JSON reader that
 rejects duplicate keys and unknown fields, route each class's input to your real
 entry point, and assert the declared outcome. Treat a missing fixture as a hard
 failure, not a skip. See `vectors/README_qv2_conformance_vectors.md` for the full
-schema and vocabulary.
+schema and vocabulary. qURL v2 schema version 2 is a deliberate breaking shape:
+typed consumers must update their loader for `transport_contract` and the
+`transport` class before adopting this release.
 
 ## Scope
 
-This module hosts thirteen artifact families, each under its own `artifact` id:
+This module hosts fourteen artifacts across thirteen protocol families. Each
+artifact has its own `artifact` id:
 
-- **qURL v2 verify path** (`qurl-v2-conformance-vectors`, composing the
-  issuer-signature golden bytes) — the claims/secret/base64/fragment/relay/
-  server-id classes described above.
+- **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
+  issuer-signature golden bytes) — the share-safe qv2t1 outer transport and the
+  claims/secret/base64/canonical-fragment/relay/server-id classes described
+  above. The outer transport splits every data component at 240 characters and
+  reconstructs the exact unchanged qv2 security fragment before parsing and
+  verification. Legacy qv2 is not an accepted outer URL format.
 - **Relay/NHP handshake** (`qurl-relay-knock-golden-vectors`,
   `relay_knock_golden.json`) — the Noise-handshake golden packets, kept in a
   separate artifact because the qURL verify path does not import the handshake
