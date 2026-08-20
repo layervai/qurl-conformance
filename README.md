@@ -80,11 +80,14 @@ verbatim (same bytes, no reformatting), load them with a strict JSON reader that
 rejects duplicate keys and unknown fields, route each class's input to your real
 entry point, and assert the declared outcome. Treat a missing fixture as a hard
 failure, not a skip. See `vectors/README_qv2_conformance_vectors.md` for the full
-schema and vocabulary.
+schema and vocabulary. qURL v2 schema version 2 is a deliberate breaking shape:
+typed consumers must update their loader for `transport_contract` and the
+`transport` class before adopting this release.
 
 ## Scope
 
-This module hosts thirteen artifact families, each under its own `artifact` id:
+This module hosts fourteen artifacts across thirteen protocol families. Each
+artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
   issuer-signature golden bytes) — the share-safe qv2t1 outer transport and the

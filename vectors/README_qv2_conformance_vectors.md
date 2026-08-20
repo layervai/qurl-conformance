@@ -43,6 +43,11 @@ signature class **by reference** instead of copying its bytes a second time.
 
 ## Schema (`schema_version: 2`)
 
+Schema version 2 is a deliberate breaking shape. Strict typed consumers must
+update their loader for `transport_contract` and the `transport` class before
+adopting this release; treating those fields as optional would silently remove
+the share-safe transport gate.
+
 Top-level document:
 
 ```jsonc
