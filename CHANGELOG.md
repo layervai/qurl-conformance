@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.0](https://github.com/layervai/qurl-conformance/compare/v0.12.6...v0.13.0) (2026-08-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* define Connector resource NHP contract
+
+### Features
+
+* define Connector resource NHP contract ([daba318](https://github.com/layervai/qurl-conformance/commit/daba31877fb69562885f2aa8799f6b7e1d909c61))
+
+
+### Bug Fixes
+
+* **ci:** restore credential-free Claude review origin ([#99](https://github.com/layervai/qurl-conformance/issues/99)) ([64c3e44](https://github.com/layervai/qurl-conformance/commit/64c3e44bbc2a58acf280cc7edfbc57323bdecf07))
+
 ## [0.12.6](https://github.com/layervai/qurl-conformance/compare/v0.12.5...v0.12.6) (2026-08-20)
 
 

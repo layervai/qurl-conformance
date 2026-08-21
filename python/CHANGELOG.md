@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.0](https://github.com/layervai/qurl-conformance/compare/python-v0.12.4...python-v0.13.0) (2026-08-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* define Connector resource NHP contract
+
+### Features
+
+* define Connector resource NHP contract ([daba318](https://github.com/layervai/qurl-conformance/commit/daba31877fb69562885f2aa8799f6b7e1d909c61))
+
 ## [0.12.4](https://github.com/layervai/qurl-conformance/compare/python-v0.12.3...python-v0.12.4) (2026-08-20)
 
 
