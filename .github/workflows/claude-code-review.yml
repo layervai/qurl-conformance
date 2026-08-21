@@ -134,8 +134,10 @@ jobs:
           steps.review_origin.outputs.ready == 'true'
         # v1.0.180 contains upstream #1496: a terminal SDK result with
         # `subtype: success` plus `is_error: true` fails instead of producing a
-        # false-green review check.
-        uses: anthropics/claude-code-action@1623c36729ac1cd5895198cded705a287de7db79 # v1.0.187
+        # false-green review check. Keep the audited v1.0.183 pin: v1.0.187
+        # rewrites the credential-free local origin even in API-signing mode,
+        # which the terminal snapshot guard correctly rejects.
+        uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1.0.183
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
