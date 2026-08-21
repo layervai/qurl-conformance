@@ -3168,15 +3168,20 @@ func validateAgentKnockSessionEnvelope(body []byte) (uint64, uint32, string, err
 		if sessionPresent {
 			return 0, 0, AgentKnockRejectSessionID, errors.New("denied ACK contains sessId")
 		}
-		return 0, 0, "", nil
-	}
-	if !sessionPresent {
-		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK omits sessId")
 	}
 	var openTime uint32
 	rawOpenTime, ok := fields["opnTime"]
 	if !ok || json.Unmarshal(rawOpenTime, &openTime) != nil {
-		return 0, 0, AgentKnockRejectBodyParse, errors.New("successful ACK opnTime is not a uint32")
+		return 0, 0, AgentKnockRejectBodyParse, errors.New("ACK opnTime is missing or is not a uint32")
+	}
+	if errCode != "" && errCode != "0" {
+		if openTime != 0 {
+			return 0, 0, AgentKnockRejectBodyParse, errors.New("denied ACK opnTime is not zero")
+		}
+		return 0, 0, "", nil
+	}
+	if !sessionPresent {
+		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK omits sessId")
 	}
 	if openTime == 0 {
 		return 0, 0, AgentKnockRejectSessionLifetime, errors.New("successful ACK opnTime is outside the positive uint32 range")

@@ -92,9 +92,12 @@ ACK producer envelope. Consumers must accept the standard exact-resource
 rejecting unknown or duplicate fields, trailing data, null/non-object bodies,
 wrong field types, and every non-null pre-access action on a successful ACK.
 In addition, success requires a present nonzero canonical JSON uint64 `sessId`
-and positive uint32 `opnTime`; denied ACKs must omit `sessId` entirely. Inspect
-present exact top-level `sessId` occurrences before generic closed-shape
-decoding: any denied-ACK presence, duplicates, wrong JSON types, noncanonical
+and positive uint32 `opnTime`; denied ACKs must omit `sessId` entirely and carry
+the producer's typed uint32 `opnTime: 0` denial value. A missing, wrong-type,
+overflowing, or nonzero denial `opnTime` is `body_parse`, not `server_deny` or
+`session_lifetime`. Inspect present exact top-level `sessId` occurrences before
+generic closed-shape decoding: any denied-ACK presence, duplicates, wrong JSON
+types, noncanonical
 valid JSON numbers, zero, and overflow reject as `session_id`, even if another
 field would independently reject as `body_parse`. A well-formed successful ACK
 that omits `sessId` also rejects as `session_id`; when an ordinary structural
@@ -237,10 +240,10 @@ Consumers must derive each declared outcome through their production paths:
    and an echoed request counter before trusting its body.
 4. Strictly decode one ACK object with the complete field vocabulary above.
    Reject duplicate/unknown fields, a second/trailing value, null/non-object
-   bodies, and wrong types. `opnTime` is an unsigned 32-bit JSON number;
-   `agentAddr`, `aspToken`, and `redirectUrl` are strings (the latter two are
-   optional); `preActions` is an optional object whose values preserve
-   null-vs-non-null.
+   bodies, and wrong types. `opnTime` is an unsigned 32-bit JSON number; denied
+   ACKs require its exact zero value. `agentAddr`, `aspToken`, and `redirectUrl`
+   are strings (the latter two are optional); `preActions` is an optional object
+   whose values preserve null-vs-non-null.
 5. Evaluate `errCode` before map validation. Empty string and `"0"` mean
    success; any other string is an authenticated deny.
 6. On success, accept absent/empty/all-null `preActions`. Reject
