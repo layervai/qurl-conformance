@@ -1,6 +1,6 @@
 {
   "artifact": "qurl-agent-knock-application-vectors",
-  "schema_version": 3,
+  "schema_version": 4,
   "description": "Application-body request-policy and reply-disposition vectors for a registered agent NHP knock. These vectors begin after Noise decryption and do not duplicate packet bytes.",
   "source_of_truth": "github.com/layervai/qurl-conformance",
   "notes": [
@@ -10,7 +10,7 @@
     "resId is the placement-neutral NHP knock_resource_id used for admission and ACK lookup, not the public-key management resource_id.",
     "The generic protocol parser accepts an omitted or empty runId for non-Connector callers but rejects malformed non-empty values. The native qURL Connector entry point additionally rejects omitted and empty values.",
     "Every request parser rejects duplicate keys and unknown alias spellings before applying RunID policy.",
-    "The ACK body is the current producer envelope: errCode, optional errMsg, resHost, opnTime, optional aspToken, agentAddr, acTokens, optional preActions, and optional redirectUrl, in producer serialization order.",
+    "A successful ACK carries the server-assigned nonzero uint64 sessId first, then errCode, optional errMsg, resHost, positive uint32 opnTime, optional aspToken, agentAddr, acTokens, optional preActions, and optional redirectUrl, in producer serialization order. A denied ACK MUST omit sessId.",
     "A standard successful ACK carries preActions with the requested resId mapped to null. Any non-null pre-access action under any map key requires an NHP_ACC phase and is unsupported by the native Connector profile, which MUST fail closed.",
     "A success ACK is usable only when both acTokens and resHost contain the requested resId with non-empty values. The declared expected_ac_token and expected_resource_host come only from those exact entries; aspToken, redirectUrl, agentAddr, and preActions are never alternate authorization sources.",
     "errCode is a string. Empty string and \"0\" are success; every other value is an authenticated deny and MUST be handled before success-map validation.",
@@ -110,30 +110,48 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "success",
       "expected_ac_token": "ac-token-conformance-01",
-      "expected_resource_host": "frps.sandbox.example:7000"
+      "expected_resource_host": "frps.sandbox.example:7000",
+      "expected_session_id": "72623859790382856",
+      "expected_open_time": 900
     },
     {
       "name": "ack_success_optional_metadata",
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"aspToken\":\"asp-token-must-not-authorize\",\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"redirectUrl\":\"https://redirect.example/conformance\"}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"aspToken\":\"asp-token-must-not-authorize\",\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"redirectUrl\":\"https://redirect.example/conformance\"}",
       "outcome": "success",
       "expected_ac_token": "ac-token-conformance-01",
-      "expected_resource_host": "frps.sandbox.example:7000"
+      "expected_resource_host": "frps.sandbox.example:7000",
+      "expected_session_id": "72623859790382856",
+      "expected_open_time": 900
     },
     {
       "name": "ack_success_empty_err_code",
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "success",
       "expected_ac_token": "ac-token-conformance-01",
-      "expected_resource_host": "frps.sandbox.example:7000"
+      "expected_resource_host": "frps.sandbox.example:7000",
+      "expected_session_id": "72623859790382856",
+      "expected_open_time": 900
+    },
+    {
+      "name": "ack_success_max_open_time",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":18446744073709551615,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":4294967295,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "success",
+      "expected_ac_token": "ac-token-conformance-01",
+      "expected_resource_host": "frps.sandbox.example:7000",
+      "expected_session_id": "18446744073709551615",
+      "expected_open_time": 4294967295
     },
     {
       "name": "ack_deny",
@@ -257,7 +275,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-other-01\":\"frps.other.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-other-01\":\"ac-token-other-01\"},\"preActions\":{\"connector-other-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-other-01\":\"frps.other.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-other-01\":\"ac-token-other-01\"},\"preActions\":{\"connector-other-01\":null}}",
       "outcome": "reject",
       "reject_class": "wrong_resource"
     },
@@ -266,7 +284,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "missing_token"
     },
@@ -275,7 +293,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "missing_token"
     },
@@ -284,7 +302,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "missing_host"
     },
@@ -293,7 +311,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "missing_host"
     },
@@ -302,7 +320,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":[],\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":[],\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -311,7 +329,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":[],\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":[],\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -320,7 +338,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":{\"acIp\":\"198.51.100.7\",\"acPort\":\"443\",\"acPubKey\":\"synthetic-public-key\",\"acToken\":\"synthetic-pre-access-token\",\"acCipherScheme\":1}}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":{\"acIp\":\"198.51.100.7\",\"acPort\":\"443\",\"acPubKey\":\"synthetic-public-key\",\"acToken\":\"synthetic-pre-access-token\",\"acCipherScheme\":1}}}",
       "outcome": "reject",
       "reject_class": "unsupported_pre_access"
     },
@@ -329,7 +347,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null,\"connector-other-01\":{\"acIp\":\"198.51.100.8\",\"acPort\":\"8443\",\"acPubKey\":\"synthetic-other-public-key\",\"acToken\":\"synthetic-other-pre-access-token\",\"acCipherScheme\":1}}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null,\"connector-other-01\":{\"acIp\":\"198.51.100.8\",\"acPort\":\"8443\",\"acPubKey\":\"synthetic-other-public-key\",\"acToken\":\"synthetic-other-pre-access-token\",\"acCipherScheme\":1}}}",
       "outcome": "reject",
       "reject_class": "unsupported_pre_access"
     },
@@ -338,7 +356,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":[]}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":[]}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -347,7 +365,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"aspToken\":7,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"aspToken\":7,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -356,7 +374,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"redirectUrl\":[]}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"redirectUrl\":[]}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -365,7 +383,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":\"900\",\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":\"900\",\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -374,16 +392,151 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":7,\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":7,\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
+    },
+    {
+      "name": "reject_success_missing_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_zero_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":0,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_null_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":null,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_negative_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":-1,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_string_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":\"72623859790382856\",\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_fraction_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":1.5,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_exponent_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":1e3,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_overflow_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":18446744073709551616,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_duplicate_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":72623859790382856,\"sessId\":1,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_success_zero_open_time",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "outcome": "reject",
+      "reject_class": "session_lifetime"
+    },
+    {
+      "name": "reject_deny_zero_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":0,\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_deny_nonzero_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_deny_null_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":null,\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_deny_string_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":\"0\",\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "reject",
+      "reject_class": "session_id"
+    },
+    {
+      "name": "reject_deny_duplicate_session_id",
+      "reply_type": 2,
+      "request_counter": "42",
+      "reply_counter": "42",
+      "body_json": "{\"sessId\":0,\"sessId\":1,\"errCode\":\"52004\",\"errMsg\":\"failed to find resource\",\"resHost\":null,\"opnTime\":0,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":null}",
+      "outcome": "reject",
+      "reject_class": "session_id"
     },
     {
       "name": "reject_unknown_ack_field",
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"futureField\":true}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null},\"futureField\":true}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -392,7 +545,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"errCode\":\"52004\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"errCode\":\"52004\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -401,7 +554,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}{}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}{}",
       "outcome": "reject",
       "reject_class": "body_parse"
     },
@@ -428,7 +581,7 @@
       "reply_type": 2,
       "request_counter": "42",
       "reply_counter": "43",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "counter"
     },
@@ -437,7 +590,7 @@
       "reply_type": 14,
       "request_counter": "42",
       "reply_counter": "42",
-      "body_json": "{\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "outcome": "reject",
       "reject_class": "reply_type"
     }
