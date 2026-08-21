@@ -170,10 +170,6 @@ func ParseAgentSessionControlFile(data []byte) (*AgentSessionControlFile, error)
 	if err := validateAgentSessionKeys(f.Keys); err != nil {
 		return nil, err
 	}
-	if f.CleanExit.Request.BodyJSON != "" || f.CleanExit.Request.BodyHex != "" {
-		return nil, errors.New("conformance: agent-session EXT must have an empty body")
-	}
-
 	packets := []struct {
 		name, headerName, sender, receiver string
 		headerType                         int

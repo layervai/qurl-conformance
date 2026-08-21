@@ -227,7 +227,10 @@ artifact has its own `artifact` id:
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw
   cookie bytes. The RKN ACK counter echoes RKN and the successful ACK carries
-  a nonzero server-assigned uint64 session ID. EXT is bodyless, receives no
+  a nonzero server-assigned uint64 session ID. Its raw JSON `sessId` number can
+  exceed JavaScript's safe-integer range, so JavaScript consumers must parse it
+  losslessly into `BigInt` rather than pass it through an ordinary
+  `JSON.parse` number. EXT is bodyless, receives no
   response, and closes all sessions for its authenticated agent identity. The
   artifact freezes both static X25519 identities, every
   deterministic ephemeral key, body byte, header digest, and packet byte, plus

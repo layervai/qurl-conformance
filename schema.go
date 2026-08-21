@@ -3058,7 +3058,9 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
 	}
 	// Expected-result presence is a pure function of success-ness: required on
-	// success, forbidden on every other outcome.
+	// success, forbidden on every other outcome. ExpectedOpenTime uses zero as
+	// its omission sentinel because a successful NHP ACK lifetime is separately
+	// required to be nonzero by validateAgentKnockSessionEnvelope.
 	if c.Outcome == AgentKnockOutcomeSuccess && (c.ExpectedACToken == "" || c.ExpectedResourceHost == "" || c.ExpectedSessionID == "" || c.ExpectedOpenTime == 0) {
 		return fmt.Errorf("conformance: success agent-knock reply case %q must carry a non-empty expected result", c.Name)
 	}

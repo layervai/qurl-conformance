@@ -59,7 +59,9 @@ key, and the nonce. Only the AAD moved.
   flow mutation confirms correlation still succeeds with a different
   authenticated outer counter.
 - The RKN ACK counter must equal the RKN request counter.
-- A successful ACK must carry a nonzero server-assigned uint64 `sessId`.
+- A successful ACK must carry a nonzero server-assigned uint64 `sessId`. The raw
+  JSON number can exceed JavaScript's safe-integer range; parse it losslessly
+  into `BigInt`, never through an ordinary `JSON.parse` number.
 - Each successful ACK's `resHost`, `acTokens`, and `preActions` map must contain
   exactly one entry keyed by the session `resId`. This single-resource shape is
   validated before the byte-canonical producer-JSON check.

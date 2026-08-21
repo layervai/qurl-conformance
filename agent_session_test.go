@@ -111,7 +111,7 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.OverloadReknock.ReknockRequest.BodyJSON = strings.Replace(af.OverloadReknock.ReknockRequest.BodyJSON, "0123456789abcdef", "fedcba9876543210", 1)
 			af.OverloadReknock.ReknockRequest.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ReknockRequest.BodyJSON))
 		}},
-		{"exit body", "EXT must have an empty body", func(af *AgentSessionControlFile) {
+		{"exit body", "packet size is inconsistent with body", func(af *AgentSessionControlFile) {
 			af.CleanExit.Request.BodyJSON = `{}`
 			af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
 		}},
@@ -163,6 +163,18 @@ func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
 	af.OverloadReknock.CookieReply.Counter = "18446744073709551615"
 	if err := validateAgentSessionFlowBindings(af); err != nil {
 		t.Fatalf("different authenticated COK wire counter must not affect body transaction correlation: %v", err)
+	}
+}
+
+func TestAgentSessionFlowBindingsRejectBodyfulExit(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.CleanExit.Request.BodyJSON = `{}`
+	af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "EXT must have an empty body") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want bodyless EXT rejection", err)
 	}
 }
 
