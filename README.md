@@ -212,10 +212,12 @@ artifact has its own `artifact` id:
   `preActions: null`; any non-null action requires NHP_ACC and fails closed until
   that phase is implemented. Optional `aspToken` / `redirectUrl` metadata never
   replaces the requested resource's `acTokens` / `resHost` authorization result.
-  ACK consumers inspect raw `sessId` occurrences before generic body decoding:
-  every presence, shape, type, range, or duplicate violation is `session_id`
-  and takes precedence over an independent `body_parse` defect; duplicates of
-  other fields remain `body_parse`.
+  ACK consumers inspect present raw `sessId` occurrences before generic body
+  decoding: shape, type, range, and duplicate violations are `session_id` and
+  take precedence over an independent `body_parse` defect. A well-formed
+  successful ACK that omits `sessId` is also `session_id`; an ordinary
+  structural defect that prevents establishing a successful ACK remains
+  `body_parse`, as do duplicates of other fields.
   It contains no Noise packets or key material; consumers compose it with their
   real body serializer, request-policy gates, reply parser, and transport
   correlation gates. Its `resId` semantic is the placement-neutral NHP

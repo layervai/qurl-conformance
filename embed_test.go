@@ -1561,6 +1561,7 @@ func TestAgentKnockSessionEnvelopeContract(t *testing.T) {
 		{name: "string lifetime is structural", body: `{"sessId":1,"errCode":"0","opnTime":"900"}`, wantClass: AgentKnockRejectBodyParse},
 		{name: "overflow lifetime is structural", body: `{"sessId":1,"errCode":"0","opnTime":4294967296}`, wantClass: AgentKnockRejectBodyParse},
 		{name: "missing session", body: `{"errCode":"0","opnTime":900}`, wantClass: AgentKnockRejectSessionID},
+		{name: "missing session with duplicate ordinary field is structural", body: `{"errCode":"0","errCode":"0","opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
 		{name: "deny omits session", body: `{"errCode":"52004","opnTime":0}`},
 		{name: "deny contains zero session", body: `{"sessId":0,"errCode":"52004","opnTime":0}`, wantClass: AgentKnockRejectSessionID},
 		{name: "deny contains nonzero session", body: `{"sessId":1,"errCode":"52004","opnTime":0}`, wantClass: AgentKnockRejectSessionID},
