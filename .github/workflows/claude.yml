@@ -314,7 +314,8 @@ jobs:
         # v1.0.140/141 issue-comment crash. Do not move to v1.0.187: it rewrites
         # the credential-free local origin even in API-signing mode, which the
         # terminal snapshot guard correctly rejects. Re-audit and advance once
-        # an upstream release restores origin compatibility.
+        # an upstream release restores origin compatibility. Evidence:
+        # qurl-conformance#98 runs 32534585579 and 32535437700.
         uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1.0.183
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
