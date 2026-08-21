@@ -149,7 +149,7 @@
       "stage": "reknock_request"
     },
     {
-      "mutation": "wire_type_1_body_type_16",
+      "mutation": "wire_type_1_instead_of_ext",
       "name": "reject_exit_wire_type_knk",
       "outcome": "reject",
       "reject_class": "header_type",
