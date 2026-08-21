@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Keep the two secrets-bearing Claude workflows on one audited dependency."""
+"""Keep the two secrets-bearing Claude workflows on one audited dependency.
+
+This gate detects drift; it does not choose which revision is approved. Revision
+changes still require the upstream audit recorded beside each workflow pin.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +17,9 @@ WORKFLOWS = (
     ROOT / ".github/workflows/claude-code-review.yml",
     ROOT / ".github/workflows/claude.yml",
 )
+# Fail closed unless both dependencies retain the canonical single-line YAML
+# spelling. That keeps the check dependency-free and makes formatting changes
+# an explicit review event instead of silently weakening extraction.
 ACTION_PATTERN = re.compile(
     r"^\s*uses:\s*anthropics/claude-code-action@([0-9a-f]{40})\s+#\s+(\S+)\s*$",
     re.MULTILINE,
