@@ -1563,6 +1563,11 @@ func TestAgentKnockSessionEnvelopeContract(t *testing.T) {
 		{name: "missing session", body: `{"errCode":"0","opnTime":900}`, wantClass: AgentKnockRejectSessionID},
 		{name: "deny omits session", body: `{"errCode":"52004","opnTime":0}`},
 		{name: "deny contains zero session", body: `{"sessId":0,"errCode":"52004","opnTime":0}`, wantClass: AgentKnockRejectSessionID},
+		{name: "duplicate session precedes duplicate ordinary field", body: `{"sessId":1,"sessId":2,"errCode":"0","errCode":"52004","opnTime":900}`, wantClass: AgentKnockRejectSessionID},
+		{name: "malformed session precedes malformed lifetime", body: `{"sessId":"1","errCode":"0","opnTime":"900"}`, wantClass: AgentKnockRejectSessionID},
+		{name: "duplicate ordinary field is structural", body: `{"sessId":1,"errCode":"0","errCode":"52004","opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "malformed error with valid session is structural", body: `{"sessId":1,"errCode":0,"opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "malformed error with malformed session is session", body: `{"sessId":null,"errCode":0,"opnTime":900}`, wantClass: AgentKnockRejectSessionID},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

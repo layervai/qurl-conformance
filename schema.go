@@ -3067,7 +3067,7 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 	if c.Outcome != AgentKnockOutcomeSuccess && (c.ExpectedACToken != "" || c.ExpectedResourceHost != "" || c.ExpectedSessionID != "" || c.ExpectedOpenTime != 0) {
 		return fmt.Errorf("conformance: non-success agent-knock reply case %q must not carry an expected result", c.Name)
 	}
-	if c.ReplyType == 2 && !(c.Outcome == AgentKnockOutcomeReject && c.RejectClass == AgentKnockRejectBodyParse) {
+	if c.ReplyType == 2 {
 		sessionID, openTime, envelopeClass, sessionErr := validateAgentKnockSessionEnvelope([]byte(c.BodyJSON))
 		if sessionErr != nil {
 			if c.Outcome != AgentKnockOutcomeReject || c.RejectClass != envelopeClass {
@@ -3126,18 +3126,44 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 }
 
 func validateAgentKnockSessionEnvelope(body []byte) (uint64, uint32, string, error) {
+	// sessId is a protocol fence, so inspect its raw top-level occurrences before
+	// the generic closed-shape decoder. Its presence, canonical number shape,
+	// uint64 range, and uniqueness always classify as session_id; a duplicate of
+	// any other field remains an ordinary body_parse failure.
+	rawSessions, sessionScanErr := topLevelJSONFieldValues(body, "sessId")
+	if len(rawSessions) > 1 {
+		return 0, 0, AgentKnockRejectSessionID, errors.New("ACK contains duplicate sessId")
+	}
+	var sessionID uint64
+	if len(rawSessions) == 1 {
+		sessionText := string(rawSessions[0])
+		if sessionText == "" || strings.IndexFunc(sessionText, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+			return 0, 0, AgentKnockRejectSessionID, errors.New("ACK sessId is not a canonical JSON uint64 number")
+		}
+		parsed, err := strconv.ParseUint(sessionText, 10, 64)
+		if err != nil || parsed == 0 {
+			return 0, 0, AgentKnockRejectSessionID, errors.New("ACK sessId is outside the nonzero uint64 range")
+		}
+		sessionID = parsed
+	}
+	if sessionScanErr != nil {
+		return 0, 0, AgentKnockRejectBodyParse, sessionScanErr
+	}
 	if err := rejectDuplicateJSONKeys(body); err != nil {
-		return 0, 0, AgentKnockRejectSessionID, err
+		return 0, 0, AgentKnockRejectBodyParse, err
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(body, &fields); err != nil {
-		return 0, 0, AgentKnockRejectSessionID, err
+	if err := json.Unmarshal(body, &fields); err != nil || fields == nil {
+		if err == nil {
+			err = errors.New("ACK body is not an object")
+		}
+		return 0, 0, AgentKnockRejectBodyParse, err
 	}
 	var errCode string
 	if raw, ok := fields["errCode"]; !ok || json.Unmarshal(raw, &errCode) != nil {
-		return 0, 0, AgentKnockRejectSessionID, errors.New("errCode is missing or is not a string")
+		return 0, 0, AgentKnockRejectBodyParse, errors.New("errCode is missing or is not a string")
 	}
-	rawSession, sessionPresent := fields["sessId"]
+	sessionPresent := len(rawSessions) == 1
 	if errCode != "" && errCode != "0" {
 		if sessionPresent {
 			return 0, 0, AgentKnockRejectSessionID, errors.New("denied ACK contains sessId")
@@ -3146,14 +3172,6 @@ func validateAgentKnockSessionEnvelope(body []byte) (uint64, uint32, string, err
 	}
 	if !sessionPresent {
 		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK omits sessId")
-	}
-	sessionText := string(rawSession)
-	if sessionText == "" || strings.IndexFunc(sessionText, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
-		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK sessId is not a canonical JSON uint64 number")
-	}
-	sessionID, err := strconv.ParseUint(sessionText, 10, 64)
-	if err != nil || sessionID == 0 {
-		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK sessId is outside the nonzero uint64 range")
 	}
 	var openTime uint32
 	rawOpenTime, ok := fields["opnTime"]
@@ -3164,6 +3182,47 @@ func validateAgentKnockSessionEnvelope(body []byte) (uint64, uint32, string, err
 		return 0, 0, AgentKnockRejectSessionLifetime, errors.New("successful ACK opnTime is outside the positive uint32 range")
 	}
 	return sessionID, openTime, "", nil
+}
+
+// topLevelJSONFieldValues preserves repeated occurrences of one exact key.
+// It intentionally stops after the first object; the generic strict pass owns
+// trailing-data and all non-target duplicate classification.
+func topLevelJSONFieldValues(body []byte, target string) ([]json.RawMessage, error) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	token, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	opening, ok := token.(json.Delim)
+	if !ok || opening != '{' {
+		return nil, errors.New("ACK body is not an object")
+	}
+	var values []json.RawMessage
+	for dec.More() {
+		keyToken, err := dec.Token()
+		if err != nil {
+			return values, err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return values, errors.New("ACK object key is not a string")
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return values, err
+		}
+		if key == target {
+			values = append(values, bytes.Clone(raw))
+		}
+	}
+	closing, err := dec.Token()
+	if err != nil {
+		return values, err
+	}
+	if delim, ok := closing.(json.Delim); !ok || delim != '}' {
+		return values, errors.New("ACK object is not closed")
+	}
+	return values, nil
 }
 
 func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) error {

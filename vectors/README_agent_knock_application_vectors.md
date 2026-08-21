@@ -92,8 +92,13 @@ ACK producer envelope. Consumers must accept the standard exact-resource
 rejecting unknown or duplicate fields, trailing data, null/non-object bodies,
 wrong field types, and every non-null pre-access action on a successful ACK.
 In addition, success requires a present nonzero canonical JSON uint64 `sessId`
-and positive uint32 `opnTime`; denied ACKs must omit `sessId` entirely. Strict
-field decoding and wrong-type rejection must occur before pre-access evaluation.
+and positive uint32 `opnTime`; denied ACKs must omit `sessId` entirely. Inspect
+the exact top-level `sessId` occurrences before generic closed-shape decoding:
+missing success fields, any denied-ACK presence, duplicates, wrong JSON types,
+noncanonical numbers, zero, and overflow always reject as `session_id`, even if
+another field would independently reject as `body_parse`. Duplicates of other
+fields remain `body_parse`. Remaining strict field decoding and wrong-type
+rejection must occur before pre-access evaluation.
 A consumer must not repin to schema v4 until these reply cases run through its
 real production interpreter.
 
@@ -168,9 +173,9 @@ Closed `reject_class` vocabulary:
 | `wrong_resource` | success maps contain entries, but not for the requested `resId` |
 | `missing_token` | requested `acTokens` entry is absent or empty |
 | `missing_host` | requested `resHost` entry is absent or empty |
-| `body_parse` | ACK is not one closed-schema object: unknown/duplicate fields, trailing data, null/non-object body, or wrong field type |
+| `body_parse` | ACK is not one closed-schema object: unknown fields, duplicate non-`sessId` fields, trailing data, null/non-object body, or a wrong non-`sessId` field type |
 | `unsupported_pre_access` | a successful ACK contains a non-null `preActions` value under any map key and therefore requires an unsupported NHP_ACC phase |
-| `session_id` | success omits or malforms `sessId`, uses zero/out-of-range values, or a denied ACK contains `sessId` at all |
+| `session_id` | success omits `sessId`; any ACK duplicates or malforms it or uses zero/out-of-range values; or a denied ACK contains it at all. This class takes precedence over independent `body_parse` defects. |
 | `session_lifetime` | a structurally valid successful ACK carries a zero `opnTime`; wrong JSON types remain `body_parse` |
 | `counter` | ACK does not echo the request counter |
 | `reply_type` | a knock received neither `NHP_ACK` nor `NHP_COK` |
