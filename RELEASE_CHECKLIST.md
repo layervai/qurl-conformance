@@ -29,6 +29,7 @@ handoff real rather than assumed.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`
+- [ ] `python3 scripts/check-claude-model-lockstep.py`
 - [ ] `(cd tools/verify-assignment-ticket && go test ./...)`
 - [ ] npm and Python package smokes green (CI job `vectors + go + cross-language`)
 - [ ] `go.mod` still has no `require` line
