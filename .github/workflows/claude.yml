@@ -309,11 +309,12 @@ jobs:
       - name: Run Claude Code
         id: claude
         if: success()
-        # v1.0.180 keeps interactive commands on the same fail-closed runner as
-        # automatic review and avoids the v1.0.140/141 issue-comment crash.
-        # Keep the audited v1.0.183 pin: v1.0.187 rewrites the credential-free
-        # local origin even in API-signing mode, which the terminal snapshot
-        # guard correctly rejects.
+        # v1.0.183 includes the v1.0.180 fixes that keep interactive commands on
+        # the same fail-closed runner as automatic review and avoid the
+        # v1.0.140/141 issue-comment crash. Do not move to v1.0.187: it rewrites
+        # the credential-free local origin even in API-signing mode, which the
+        # terminal snapshot guard correctly rejects. Re-audit and advance once
+        # an upstream release restores origin compatibility.
         uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1.0.183
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
