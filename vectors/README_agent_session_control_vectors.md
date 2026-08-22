@@ -5,7 +5,8 @@ transitions a native UDP connector needs after its first registered-agent
 knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
 policy, while this artifact validates the Noise packet bytes and transition
-correlation.
+correlation. Its `schema_version` is `2`; version 1's bodyful EXT plus ACK was
+removed by this breaking bodyless one-way EXT contract and is not accepted.
 
 ## Positive flows
 

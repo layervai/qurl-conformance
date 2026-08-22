@@ -225,7 +225,7 @@ artifact has its own `artifact` id:
   `vectors/README_agent_knock_application_vectors.md`.
 - **Registered-agent session control**
   (`qurl-agent-session-control-vectors`,
-  `agent_session_control_vectors.json`) — deterministic full packets for the
+  `agent_session_control_vectors.json`, schema version 2) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and bodyless one-way global EXT, pinned to
   `layervai/qurl-go` producer revision
   `c345051876be4f74bb46ff36dfcbffbbf9d45cee`. The COK wire

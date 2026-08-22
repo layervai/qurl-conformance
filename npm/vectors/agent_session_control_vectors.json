@@ -309,6 +309,6 @@
     "exit_response": "none",
     "rkn_header_digest": "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "source_of_truth": "github.com/layervai/qurl-conformance"
 }

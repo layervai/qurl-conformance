@@ -17,6 +17,10 @@ const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
 	// re-knock and one-way global-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
+	// AgentSessionControlSchemaVersion identifies the bodyless one-way EXT and
+	// server-session-bound ACK shape. Version 1 included a bodyful EXT response
+	// and is intentionally not accepted.
+	AgentSessionControlSchemaVersion = 2
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// sealed the golden packets and introduced the strict server-session ACK plus
 	// bodyless one-way EXT contract in layervai/qurl-go. This is the signed,
@@ -158,8 +162,8 @@ func ParseAgentSessionControlFile(data []byte) (*AgentSessionControlFile, error)
 	if f.Artifact != AgentSessionControlArtifactID {
 		return nil, fmt.Errorf("conformance: agent-session artifact = %q, want %q", f.Artifact, AgentSessionControlArtifactID)
 	}
-	if f.SchemaVersion != 1 {
-		return nil, fmt.Errorf("conformance: agent-session schema_version = %d, want 1", f.SchemaVersion)
+	if f.SchemaVersion != AgentSessionControlSchemaVersion {
+		return nil, fmt.Errorf("conformance: agent-session schema_version = %d, want %d", f.SchemaVersion, AgentSessionControlSchemaVersion)
 	}
 	if f.ProducerRevision != AgentSessionControlProducerRevision {
 		return nil, fmt.Errorf("conformance: agent-session producer revision = %q, want %q", f.ProducerRevision, AgentSessionControlProducerRevision)

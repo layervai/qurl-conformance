@@ -14,7 +14,7 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AgentSessionControl(): %v", err)
 	}
-	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != 1 || af.ProducerRevision != AgentSessionControlProducerRevision {
+	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != AgentSessionControlSchemaVersion || af.ProducerRevision != AgentSessionControlProducerRevision {
 		t.Fatalf("identity = %q/v%d/%q", af.Artifact, af.SchemaVersion, af.ProducerRevision)
 	}
 	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 15 {
