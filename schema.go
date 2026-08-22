@@ -27,7 +27,7 @@
 //     duplicate packet bytes.
 //   - The registered-agent session-control contract
 //     (agent_session_control_vectors.json): deterministic KNK/COK/RKN/ACK and
-//     EXT/ACK packets, strict cookie handling, and closed flow negatives.
+//     a bodyless one-way EXT packet, strict cookie handling, and closed flow negatives.
 //   - The agent API-key ID contract (agent_api_key_id_vectors.json): issuer
 //     construction and strict consumer cases for registration-info key_id and
 //     completion device_api_key_id.
@@ -2584,6 +2584,8 @@ const (
 	AgentKnockRejectMissingHost          = "missing_host"
 	AgentKnockRejectBodyParse            = "body_parse"
 	AgentKnockRejectUnsupportedPreAccess = "unsupported_pre_access"
+	AgentKnockRejectSessionID            = "session_id"
+	AgentKnockRejectSessionLifetime      = "session_lifetime"
 	AgentKnockRejectCounter              = "counter"
 	AgentKnockRejectReplyType            = "reply_type"
 )
@@ -2662,9 +2664,11 @@ type AgentKnockRequestExpectation struct {
 // values are decimal strings so JavaScript consumers never lose uint64
 // precision. BodyJSON stays raw so malformed application shapes, including
 // deliberate trailing data, survive the artifact and reach the consumer's real
-// parser. ExpectedACToken and ExpectedResourceHost are present only on success
-// and pin the exact requested-resource map values a conforming interpreter must
-// return; optional ACK metadata cannot substitute for either.
+// parser. ExpectedACToken, ExpectedResourceHost, ExpectedSessionID, and
+// ExpectedOpenTime are present only on success and pin the exact values a
+// conforming interpreter must return; optional ACK metadata cannot substitute
+// for them. Session ID remains a decimal string outside BodyJSON so JavaScript
+// consumers can compare every uint64 value without losing precision.
 type AgentKnockReplyCase struct {
 	Name                 string `json:"name"`
 	ReplyType            int    `json:"reply_type"`
@@ -2675,6 +2679,8 @@ type AgentKnockReplyCase struct {
 	RejectClass          string `json:"reject_class,omitempty"`
 	ExpectedACToken      string `json:"expected_ac_token,omitempty"`
 	ExpectedResourceHost string `json:"expected_resource_host,omitempty"`
+	ExpectedSessionID    string `json:"expected_session_id,omitempty"`
+	ExpectedOpenTime     uint32 `json:"expected_open_time,omitempty"`
 }
 
 // ParseAgentKnockApplicationFile strictly parses and validates the
@@ -2696,8 +2702,8 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		return nil, fmt.Errorf("conformance: agent-knock application file has artifact %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 3 {
-		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 3", af.SchemaVersion)
+	if af.SchemaVersion != 4 {
+		return nil, fmt.Errorf("conformance: agent-knock application file has schema_version %d, want 4", af.SchemaVersion)
 	}
 	if af.Description == "" || af.SourceOfTruth == "" || len(af.Notes) == 0 {
 		return nil, errors.New("conformance: agent-knock application file missing description, source_of_truth, or notes")
@@ -2713,7 +2719,7 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 	}
 
 	required := []string{
-		"ack_success", "ack_success_optional_metadata", "ack_success_empty_err_code",
+		"ack_success", "ack_success_optional_metadata", "ack_success_empty_err_code", "ack_success_max_open_time",
 		"ack_deny", "ack_deny_50001", "ack_deny_51002", "ack_deny_51101",
 		"ack_deny_52002", "ack_deny_52005", "ack_deny_52007", "ack_deny_52009",
 		"ack_deny_52010", "ack_deny_52011", "ack_deny_52021", "ack_deny_52025",
@@ -2725,6 +2731,14 @@ func ParseAgentKnockApplicationFile(data []byte) (*AgentKnockApplicationFile, er
 		"reject_pre_access_action_other_resource", "reject_malformed_pre_actions",
 		"reject_malformed_asp_token", "reject_malformed_redirect_url",
 		"reject_malformed_opn_time", "reject_malformed_agent_addr",
+		"reject_success_missing_session_id", "reject_success_zero_session_id",
+		"reject_success_null_session_id", "reject_success_negative_session_id",
+		"reject_success_string_session_id", "reject_success_fraction_session_id",
+		"reject_success_exponent_session_id", "reject_success_overflow_session_id",
+		"reject_success_duplicate_session_id", "reject_success_zero_open_time",
+		"reject_deny_zero_session_id", "reject_deny_nonzero_session_id",
+		"reject_deny_null_session_id", "reject_deny_string_session_id",
+		"reject_deny_duplicate_session_id",
 		"reject_unknown_ack_field", "reject_duplicate_ack_field",
 		"reject_trailing_ack_data", "reject_null_ack_body",
 		"reject_non_object_ack_body", "reject_counter_mismatch", "reject_reply_type_mismatch",
@@ -3044,12 +3058,31 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		return fmt.Errorf("conformance: agent-knock reply case %q has unknown outcome %q", c.Name, c.Outcome)
 	}
 	// Expected-result presence is a pure function of success-ness: required on
-	// success, forbidden on every other outcome.
-	if c.Outcome == AgentKnockOutcomeSuccess && (c.ExpectedACToken == "" || c.ExpectedResourceHost == "") {
+	// success, forbidden on every other outcome. ExpectedOpenTime uses zero as
+	// its omission sentinel because a successful NHP ACK lifetime is separately
+	// required to be nonzero by validateAgentKnockSessionEnvelope.
+	if c.Outcome == AgentKnockOutcomeSuccess && (c.ExpectedACToken == "" || c.ExpectedResourceHost == "" || c.ExpectedSessionID == "" || c.ExpectedOpenTime == 0) {
 		return fmt.Errorf("conformance: success agent-knock reply case %q must carry a non-empty expected result", c.Name)
 	}
-	if c.Outcome != AgentKnockOutcomeSuccess && (c.ExpectedACToken != "" || c.ExpectedResourceHost != "") {
+	if c.Outcome != AgentKnockOutcomeSuccess && (c.ExpectedACToken != "" || c.ExpectedResourceHost != "" || c.ExpectedSessionID != "" || c.ExpectedOpenTime != 0) {
 		return fmt.Errorf("conformance: non-success agent-knock reply case %q must not carry an expected result", c.Name)
+	}
+	if c.ReplyType == 2 {
+		sessionID, openTime, envelopeClass, sessionErr := validateAgentKnockSessionEnvelope([]byte(c.BodyJSON))
+		if sessionErr != nil {
+			if c.Outcome != AgentKnockOutcomeReject || c.RejectClass != envelopeClass {
+				return fmt.Errorf("conformance: agent-knock reply case %q has an unintended session envelope failure: %w", c.Name, sessionErr)
+			}
+		} else {
+			if c.RejectClass == AgentKnockRejectSessionID || c.RejectClass == AgentKnockRejectSessionLifetime {
+				return fmt.Errorf("conformance: session-envelope reject case %q has a valid session envelope", c.Name)
+			}
+			if c.Outcome == AgentKnockOutcomeSuccess {
+				if strconv.FormatUint(sessionID, 10) != c.ExpectedSessionID || openTime != c.ExpectedOpenTime {
+					return fmt.Errorf("conformance: success agent-knock reply case %q expected session/lifetime does not match body", c.Name)
+				}
+			}
+		}
 	}
 	switch c.Outcome {
 	case AgentKnockOutcomeSuccess:
@@ -3072,7 +3105,8 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		switch c.RejectClass {
 		case AgentKnockRejectWrongResource, AgentKnockRejectMissingToken,
 			AgentKnockRejectMissingHost, AgentKnockRejectBodyParse,
-			AgentKnockRejectUnsupportedPreAccess:
+			AgentKnockRejectUnsupportedPreAccess, AgentKnockRejectSessionID,
+			AgentKnockRejectSessionLifetime:
 			if c.ReplyType != 2 || req != reply {
 				return fmt.Errorf("conformance: application reject case %q must be a matched NHP_ACK", c.Name)
 			}
@@ -3089,6 +3123,111 @@ func validateAgentKnockReplyCase(c AgentKnockReplyCase) error {
 		}
 	}
 	return nil
+}
+
+func validateAgentKnockSessionEnvelope(body []byte) (uint64, uint32, string, error) {
+	// sessId is a protocol fence, so inspect its raw top-level occurrences before
+	// the generic closed-shape decoder. Its presence, canonical number shape,
+	// uint64 range, and uniqueness always classify as session_id; a duplicate of
+	// any other field remains an ordinary body_parse failure.
+	rawSessions, sessionScanErr := topLevelJSONFieldValues(body, "sessId")
+	if len(rawSessions) > 1 {
+		return 0, 0, AgentKnockRejectSessionID, errors.New("ACK contains duplicate sessId")
+	}
+	var sessionID uint64
+	if len(rawSessions) == 1 {
+		sessionText := string(rawSessions[0])
+		if sessionText == "" || strings.IndexFunc(sessionText, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+			return 0, 0, AgentKnockRejectSessionID, errors.New("ACK sessId is not a canonical JSON uint64 number")
+		}
+		parsed, err := strconv.ParseUint(sessionText, 10, 64)
+		if err != nil || parsed == 0 {
+			return 0, 0, AgentKnockRejectSessionID, errors.New("ACK sessId is outside the nonzero uint64 range")
+		}
+		sessionID = parsed
+	}
+	if sessionScanErr != nil {
+		return 0, 0, AgentKnockRejectBodyParse, sessionScanErr
+	}
+	if err := rejectDuplicateJSONKeys(body); err != nil {
+		return 0, 0, AgentKnockRejectBodyParse, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil || fields == nil {
+		if err == nil {
+			err = errors.New("ACK body is not an object")
+		}
+		return 0, 0, AgentKnockRejectBodyParse, err
+	}
+	var errCode string
+	if raw, ok := fields["errCode"]; !ok || json.Unmarshal(raw, &errCode) != nil {
+		return 0, 0, AgentKnockRejectBodyParse, errors.New("errCode is missing or is not a string")
+	}
+	sessionPresent := len(rawSessions) == 1
+	if errCode != "" && errCode != "0" {
+		if sessionPresent {
+			return 0, 0, AgentKnockRejectSessionID, errors.New("denied ACK contains sessId")
+		}
+	}
+	var openTime uint32
+	rawOpenTime, ok := fields["opnTime"]
+	if !ok || json.Unmarshal(rawOpenTime, &openTime) != nil {
+		return 0, 0, AgentKnockRejectBodyParse, errors.New("ACK opnTime is missing or is not a uint32")
+	}
+	if errCode != "" && errCode != "0" {
+		if openTime != 0 {
+			return 0, 0, AgentKnockRejectBodyParse, errors.New("denied ACK opnTime is not zero")
+		}
+		return 0, 0, "", nil
+	}
+	if !sessionPresent {
+		return 0, 0, AgentKnockRejectSessionID, errors.New("successful ACK omits sessId")
+	}
+	if openTime == 0 {
+		return 0, 0, AgentKnockRejectSessionLifetime, errors.New("successful ACK opnTime is outside the positive uint32 range")
+	}
+	return sessionID, openTime, "", nil
+}
+
+// topLevelJSONFieldValues preserves repeated occurrences of one exact key.
+// It intentionally stops after the first object; the generic strict pass owns
+// trailing-data and all non-target duplicate classification.
+func topLevelJSONFieldValues(body []byte, target string) ([]json.RawMessage, error) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	token, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	opening, ok := token.(json.Delim)
+	if !ok || opening != '{' {
+		return nil, errors.New("ACK body is not an object")
+	}
+	var values []json.RawMessage
+	for dec.More() {
+		keyToken, err := dec.Token()
+		if err != nil {
+			return values, err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return values, errors.New("ACK object key is not a string")
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return values, err
+		}
+		if key == target {
+			values = append(values, bytes.Clone(raw))
+		}
+	}
+	closing, err := dec.Token()
+	if err != nil {
+		return values, err
+	}
+	if delim, ok := closing.(json.Delim); !ok || delim != '}' {
+		return values, errors.New("ACK object is not closed")
+	}
+	return values, nil
 }
 
 func validateAgentKnockExpectedResult(resourceID string, c AgentKnockReplyCase) error {

@@ -7,7 +7,7 @@ ciphertext. `relay_knock_golden.json` remains the only artifact for the KNK/ACK
 Noise packet format.
 
 All identifiers, addresses, hosts, cookies, and tokens are synthetic. The
-artifact id is `qurl-agent-knock-application-vectors`; `schema_version` is `3`.
+artifact id is `qurl-agent-knock-application-vectors`; `schema_version` is `4`.
 A breaking shape or semantic change requires a schema-version bump.
 
 ## Request golden
@@ -86,14 +86,26 @@ folding, truncating, or aliasing is non-conformant. Go's
 consumer must apply an exact-key gate rather than relying on struct decoding
 alone to reject `runID`.
 
-**Schema-v3 migration obligation:** reply parsing now covers the complete current
+**Schema-v4 migration obligation:** reply parsing covers the complete current
 ACK producer envelope. Consumers must accept the standard exact-resource
 `preActions: null` shape and typed optional `aspToken` / `redirectUrl`, while
 rejecting unknown or duplicate fields, trailing data, null/non-object bodies,
 wrong field types, and every non-null pre-access action on a successful ACK.
-Strict field decoding and wrong-type rejection must occur before pre-access
-evaluation. A consumer must not repin to schema v3 until these reply cases run
-through its real production interpreter.
+In addition, success requires a present nonzero canonical JSON uint64 `sessId`
+and positive uint32 `opnTime`; denied ACKs must omit `sessId` entirely and carry
+the producer's typed uint32 `opnTime: 0` denial value. A missing, wrong-type,
+overflowing, or nonzero denial `opnTime` is `body_parse`, not `server_deny` or
+`session_lifetime`. Inspect present exact top-level `sessId` occurrences before
+generic closed-shape decoding: any denied-ACK presence, duplicates, wrong JSON
+types, noncanonical
+valid JSON numbers, zero, and overflow reject as `session_id`, even if another
+field would independently reject as `body_parse`. A well-formed successful ACK
+that omits `sessId` also rejects as `session_id`; when an ordinary structural
+defect prevents establishing a successful ACK, it remains `body_parse`.
+Duplicates of other fields remain `body_parse`. Remaining strict field decoding
+and wrong-type rejection must occur before pre-access evaluation.
+A consumer must not repin to schema v4 until these reply cases run through its
+real production interpreter.
 
 Request reject classes are closed:
 
@@ -117,16 +129,19 @@ correlation metadata that remains outside the application JSON:
   "body_json": "{...}",
   "outcome": "success",
   "expected_ac_token": "...",
-  "expected_resource_host": "..."
+  "expected_resource_host": "...",
+  "expected_session_id": "72623859790382856",
+  "expected_open_time": 900
 }
 ```
 
-Counters are decimal strings so uint64 precision survives JavaScript and other
-number-limited consumers. Success entries carry `expected_ac_token` and
-`expected_resource_host` but no `reject_class`; every non-success entry carries
-`reject_class` and neither expected-result field. The expected-result fields pin
-the values returned from the requested resource's `acTokens` / `resHost`
-entries. Despite its historical name,
+Counters and expected session IDs are decimal strings so uint64 precision
+survives JavaScript and other number-limited consumers. Success entries carry
+`expected_ac_token`, `expected_resource_host`, `expected_session_id`, and
+`expected_open_time` but no `reject_class`; every non-success entry carries
+`reject_class` and no expected-result field. These fields pin the server session,
+lifetime, and values returned from the requested resource's `acTokens` /
+`resHost` entries. Despite its historical name,
 `reject_class` classifies the reason for all non-success dispositions, including
 authenticated `deny` and `retry` outcomes as well as fail-closed client `reject`
 outcomes.
@@ -134,7 +149,7 @@ outcomes.
 The success bodies reproduce the current ACK producer's serialization order and
 `omitempty` behavior:
 
-`errCode`, optional `errMsg`, `resHost`, `opnTime`, optional `aspToken`,
+`sessId`, `errCode`, optional `errMsg`, `resHost`, `opnTime`, optional `aspToken`,
 `agentAddr`, `acTokens`, optional `preActions`, optional `redirectUrl`.
 
 The ordinary success golden initializes `preActions` and maps the requested
@@ -144,7 +159,8 @@ different `aspToken` proves that only `acTokens[requested_res_id]` can become th
 declared admission token. `ack_success_empty_err_code` is byte-for-byte the
 ordinary success golden except its `errCode` is the empty string, pinning the
 other half of the success rule the notes have always declared: `""` and `"0"`
-are both success.
+are both success. `ack_success_max_open_time` pins MaxUint64 `sessId` and the
+full uint32 `opnTime` range. Denied ACK goldens omit `sessId`.
 
 | Outcome | Required handling |
 | --- | --- |
@@ -162,8 +178,10 @@ Closed `reject_class` vocabulary:
 | `wrong_resource` | success maps contain entries, but not for the requested `resId` |
 | `missing_token` | requested `acTokens` entry is absent or empty |
 | `missing_host` | requested `resHost` entry is absent or empty |
-| `body_parse` | ACK is not one closed-schema object: unknown/duplicate fields, trailing data, null/non-object body, or wrong field type |
+| `body_parse` | ACK is not one closed-schema object: unknown fields, duplicate non-`sessId` fields, trailing data, null/non-object body, or a wrong non-`sessId` field type |
 | `unsupported_pre_access` | a successful ACK contains a non-null `preActions` value under any map key and therefore requires an unsupported NHP_ACC phase |
+| `session_id` | a well-formed success omits `sessId`; any ACK duplicates or malforms a present `sessId` or uses zero/out-of-range values; or a denied ACK contains it at all. Present-`sessId` violations take precedence over independent `body_parse` defects. |
+| `session_lifetime` | a structurally valid successful ACK carries a zero `opnTime`; wrong JSON types remain `body_parse` |
 | `counter` | ACK does not echo the request counter |
 | `reply_type` | a knock received neither `NHP_ACK` nor `NHP_COK` |
 
@@ -222,10 +240,10 @@ Consumers must derive each declared outcome through their production paths:
    and an echoed request counter before trusting its body.
 4. Strictly decode one ACK object with the complete field vocabulary above.
    Reject duplicate/unknown fields, a second/trailing value, null/non-object
-   bodies, and wrong types. `opnTime` is an unsigned 32-bit JSON number;
-   `agentAddr`, `aspToken`, and `redirectUrl` are strings (the latter two are
-   optional); `preActions` is an optional object whose values preserve
-   null-vs-non-null.
+   bodies, and wrong types. `opnTime` is an unsigned 32-bit JSON number; denied
+   ACKs require its exact zero value. `agentAddr`, `aspToken`, and `redirectUrl`
+   are strings (the latter two are optional); `preActions` is an optional object
+   whose values preserve null-vs-non-null.
 5. Evaluate `errCode` before map validation. Empty string and `"0"` mean
    success; any other string is an authenticated deny.
 6. On success, accept absent/empty/all-null `preActions`. Reject
