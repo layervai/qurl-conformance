@@ -27,7 +27,7 @@ Both `initial_assignment` and `refresh_assignment` use the same four steps:
    sends exactly one fresh NHP_LST. An authenticated compressed COK or one with
    any unknown flag is terminal: no proof LST, third LST, or fallback is sent.
    The second LST has fresh Noise ephemeral material, timestamp, and counter;
-   flags exactly `0x0004`; and a byte-identical authenticated application body,
+   flags exactly `0x0002`; and a byte-identical authenticated application body,
    including the same `request_nonce`.
 4. NHP core verifies return routability before dispatch. The worker then
    strict-decodes the assignment body; malformed application JSON is silent.
@@ -96,46 +96,34 @@ missing-active failure.
 
 ## Proof placement
 
-No header extension or application-body cookie field is added. Bit `0x0004` is
-reserved as `NHP_FLAG_HUB_LST_COOKIE_PROOF`; bit 0 remains extended-length and
-bit 1 remains compression. A proof LST requires `0x0004` exclusively.
+No header extension or application-body cookie field is added. Standard
+compression is bit `0x0001`; the LayerV assignment extension reserves bit
+`0x0002` as `NHP_FLAG_HUB_LST_COOKIE_PROOF`. A proof LST requires `0x0002`
+exclusively.
 
-The raw decoded cookie is additional input to the existing 32-byte Curve header
-digest:
+The raw decoded cookie is additional input to the NHP 1.2 keyed header MAC:
 
 ```text
-BLAKE2s-256(
-  initial_hash ||
-  hub_server_static_public_key_raw32 ||
-  serialized_header[0:208] ||
-  cookie_raw32
-)
+header_mac_key = HMAC-BLAKE2s-256(ck3, "nhp-header-mac-v1" || 0x00)
+header_mac = HMAC-BLAKE2s-256(
+  header_mac_key,
+  serialized_header[0:128] || payload_ciphertext || cookie_raw32)
 ```
 
-`proof_digest_kat` is deliberately a digest-primitive KAT, not a complete
-encrypted proof packet. Its 208-byte prefix takes deterministic fresh header
-material from the refresh golden, sets the proof flag, and advances the counter
-to 23. The loader asserts that both its counter and ephemeral public key differ
-from the initial-flight vector. The flow fixtures independently require the
-proof flight's authenticated body and embedded `request_nonce` to remain
-byte-identical to its own unproven flight.
+`header_mac_kat` is deliberately a primitive/transcript KAT, not a complete
+encrypted proof packet. It pins the exact chain key, domain bytes, 128-byte
+header prefix, payload ciphertext, raw cookie, and expected 32-byte MAC. The Go,
+npm, and Python gates recompute the same answer. The flow fixtures independently
+require the proof flight's authenticated body and embedded `request_nonce` to
+remain byte-identical to its own unproven flight.
 
-Because the prefix is copied from the refresh golden, it carries that packet's
-`HeaderCommon[8:10]` — NHP protocol **1.1** (`01 01`), which every packet family
-in this repository moved to together. `header_prefix_hex` and
-`expected_digest_hex` therefore changed with the version bump even though the
-digest construction did not: the digest is taken over the prefix bytes, and the
-version byte is one of them. The loader re-derives the prefix from the refresh
-request rather than trusting the stored value, so the version stays bound to the
-assignment family's own gate.
-
-The digest is unkeyed and is not peer authentication. Return-routability comes
-from possession of the opaque HMAC cookie delivered to the observed source;
-peer authentication still comes from the normal Noise static-key decrypt and
-trust decision. Header type, flag, fresh counter, timestamp, and ephemeral
-material are inside the serialized prefix, so copying a proof digest to another
-header fails. Copying an overload RKN cookie fails the separate HMAC domain and
-the LST-only flag/type gates.
+The packet families carry NHP protocol **1.2** (`01 02`). The version, type,
+flags, declared payload size, counter, ephemeral key, sealed static key,
+timestamp, body ciphertext, and cookie are all in the keyed authenticated
+transcript. Return-routability still comes from possession of the opaque cookie
+delivered to the observed source, while authenticated peer identity comes from
+the Noise static-key exchange. Copying an overload RKN cookie fails the separate
+cookie HMAC domain and the LST-only flag/type gates.
 
 The cookie intentionally does not authorize an application body. Noise AEAD
 authenticates the exact body. Reusing a valid current cookie from the same IP
@@ -161,33 +149,33 @@ its plaintext is exactly:
 {"trxId":21,"cookie":"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY="}
 ```
 
-The 240-byte Curve header plus 16-byte body AEAD tag is a 256-byte overhead for
+The 160-byte standard Curve header plus 16-byte body AEAD tag is a 176-byte overhead for
 every nonempty encrypted body. Current NHP emits a truly empty message as a
-240-byte header-only packet, with no body tag. With the maximum uint64
-transaction id, COK is 86 plaintext bytes and 342 sealed packet bytes. The
+160-byte header-only packet, with no body tag. With the maximum uint64
+transaction id, COK is 86 plaintext bytes and 262 sealed packet bytes. The
 size-boundary cases pin that maximum transaction id explicitly. The producer
 must still compare the actual sealed COK
 length to the actual received LST length; it emits only when
 `len(COK) < len(LST)`. Equality is silent. The size cases include
-the real 240-byte core-empty packet plus cryptographically valid smaller and
+the real 160-byte core-empty packet plus cryptographically valid smaller and
 equal-size nonempty LST framing so an
-implementation cannot rely only on today's 493-byte initial and 437-byte
+implementation cannot rely only on today's 413-byte initial and 357-byte
 refresh assignment fixtures. The `malformed_json_87` case is deliberately
 challenge-size eligible: the Hub must not decode or authorize an application
 body until the cookie proof returns.
 
-The NHP packet maximum is 4,096 bytes, so the maximum plaintext body is 3,840
-bytes (`4096 - 240 - 16`).
+The NHP packet maximum is 4,096 bytes, so the maximum plaintext body is 3,920
+bytes (`4096 - 160 - 16`).
 
 The `assignment_success_sizes` cases keep the anti-reflection analysis tied to
 the real success envelopes. Initial enrollment's current assignment packet
-fixture is only 797 bytes because it carries a placeholder ticket; it is retained
+fixture is only 715 bytes because it carries a placeholder ticket; it is retained
 under the explicitly legacy-named field and is not the sizing proof. The real
-qat1 golden is 1,521 body bytes / 1,777 packet bytes, an exact amplification
-fraction of `1777/493` from the initial LST. Substituting the maximum 2,304-byte
-ticket into its 518-byte JSON envelope yields 2,822 / 3,078 bytes and the
-worst pinned fraction `3078/493`. Refresh has no ticket and remains 363 / 619,
-or `619/437`. These larger success packets are emitted only after source proof.
+qat1 golden is 1,519 body bytes / 1,695 packet bytes, an exact amplification
+fraction of `1695/413` from the initial LST. Substituting the maximum 2,304-byte
+ticket into its 516-byte JSON envelope yields 2,820 / 2,996 bytes and the
+worst pinned fraction `2996/413`. Refresh has no ticket and remains 361 / 537,
+or `537/357`. These larger success packets are emitted only after source proof.
 
 ## Consumer execution
 

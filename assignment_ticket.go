@@ -13,7 +13,7 @@ const (
 	// AssignmentTicketArtifactID identifies the standalone qat1 artifact.
 	AssignmentTicketArtifactID = "qurl-assignment-ticket-v1-vectors"
 	// AssignmentTicketSchemaVersion is the only schema accepted by this release.
-	AssignmentTicketSchemaVersion = 1
+	AssignmentTicketSchemaVersion = 2
 
 	AssignmentTicketPrefix        = "qat1"
 	AssignmentTicketSigningDomain = "qurl-agent-assignment-ticket-v1"
@@ -22,10 +22,10 @@ const (
 	// ASCII test credential committed in the golden artifact.
 	AssignmentTicketSyntheticCredentialBytes = 51
 
-	assignmentTicketNHPPacketOverheadBytes        = 256
+	assignmentTicketNHPPacketOverheadBytes        = 176
 	assignmentTicketLRTEnvelopeWithoutTicketBytes = 516
 	assignmentTicketMaxLRTBodyBytes               = 2820
-	assignmentTicketMaxLRTPacketBytes             = 3076
+	assignmentTicketMaxLRTPacketBytes             = 2996
 )
 
 // AssignmentTicketFile freezes the byte-level qat1 signing profile, the three
@@ -346,7 +346,7 @@ func validateAssignmentTicketContract(c AssignmentTicketContract) error {
 		c.RawSignatureBytes != 64 || c.SignaturePartCharacters != 86 || c.MaxKIDCharacters != 64 ||
 		c.DigestCharacters != 43 || c.AgentPublicKeyCharacters != 44 ||
 		c.MaxLifetimeSeconds != 900 || c.NotBeforeOffsetSeconds != -30 ||
-		c.NHPBodyMaxBytes != 3840 || c.NHPPacketMaxBytes != 4096 ||
+		c.NHPBodyMaxBytes != 3920 || c.NHPPacketMaxBytes != 4096 ||
 		!slices.Equal(c.ClaimOrder, assignmentTicketClaimOrder) ||
 		!slices.Equal(c.CredentialKinds, assignmentTicketCredentialKinds) ||
 		!slices.Equal(c.PlacementModes, assignmentTicketPlacementModes) {

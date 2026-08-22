@@ -6,14 +6,14 @@
       "body_json": "",
       "counter": "43",
       "ephemeral_private_hex": "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
-      "header_digest_hex": "4c6ec0f7074e56bd5666334cce76c7162408e722686737164b84fd41f939d9bf",
+      "header_mac_hex": "66aaf5af147e41d7bfe5c491d3cb42e3c81deb266865aabfc39eaba0af94b11b",
       "header_name": "NHP_EXT",
       "header_type": 16,
-      "packet_hex": "55555555554555550101000000000000000000000000002b4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004bb2f858a5602819f1087d64b0eebf0d9a9506ba4835b57073d52e35373565f1c7743eea4683288d59180be722946df799859dd3145f9579f54235dec0a9faeb22ff2c74df1786f54c6ec0f7074e56bd5666334cce76c7162408e722686737164b84fd41f939d9bf",
+      "packet_hex": "55555555554555550102000000000000000000000000002b4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c4bb2f858a5602819f1087d64b0eebf0d9a9506ba4835b57073d52e35373565f1c7743eea4683288d59180be722946df7817f7e069fb7c5795260bc51d88caa794d00ac4d76fd824866aaf5af147e41d7bfe5c491d3cb42e3c81deb266865aabfc39eaba0af94b11b",
       "preamble_hex": "55555555",
       "receiver_key": "assigned_cell",
       "sender_key": "agent",
-      "timestamp_nanos": "1800000000000000005"
+      "timestamp_millis": "1800000000005"
     }
   },
   "cookie_body_cases": [
@@ -177,17 +177,17 @@
       "stage": "reknock_ack"
     },
     {
-      "mutation": "digest_uses_different_cookie",
-      "name": "reject_rkn_wrong_cookie_digest",
+      "mutation": "header_mac_uses_different_cookie",
+      "name": "reject_rkn_wrong_cookie_mac",
       "outcome": "reject",
-      "reject_class": "header_digest",
+      "reject_class": "header_mac",
       "stage": "reknock_request"
     },
     {
-      "mutation": "header_digest_bit_flip",
-      "name": "reject_rkn_tampered_digest",
+      "mutation": "header_mac_bit_flip",
+      "name": "reject_rkn_tampered_mac",
       "outcome": "reject",
-      "reject_class": "header_digest",
+      "reject_class": "header_mac",
       "stage": "reknock_request"
     },
     {
@@ -232,7 +232,7 @@
   "notes": [
     "Every packet was sealed by the exact producer revision with fixed synthetic key, ephemeral, timestamp, counter, preamble, body, and cookie inputs; independent consumers must rebuild initiator packets and authenticate-open replies.",
     "The producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation pins that consumer rule. The NHP_ACK counter must echo NHP_RKN.",
-    "The NHP_RKN header digest mixes the exact decoded 32-byte cookie after the ordinary header prefix. NHP_EXT uses the ordinary no-cookie digest, MUST have no body, and is one-way: the server sends neither NHP_ACK nor NHP_COK.",
+    "The NHP_RKN header MAC authenticates the exact decoded 32-byte cookie after the header prefix and payload ciphertext. NHP_EXT uses the ordinary no-cookie MAC, MUST have no body, and is one-way: the server sends neither NHP_ACK nor NHP_COK.",
     "The successful NHP_ACK carries a nonzero server-assigned uint64 sessId and its resHost, acTokens, and preActions maps contain exactly one entry keyed by the session resId.",
     "NHP_EXT applies to every active access session owned by the authenticated agent identity. It is reserved for whole-agent shutdown, never per-resource stop, replacement-session retirement, or ordinary FRP cleanup.",
     "All identities, hosts, keys, cookies, counters, and tokens are synthetic conformance data."
@@ -243,14 +243,14 @@
       "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
       "counter": "42",
       "ephemeral_private_hex": "c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0",
-      "header_digest_hex": "81846a0d8e71b0b662500754da9c8584748df642473da9aa80b9bbb8f52e2c64",
+      "header_mac_hex": "65b0504050f68f599573d8bfe13057d4c7aba9d34bdbdde9d54e42076b6570e2",
       "header_name": "NHP_ACK",
       "header_type": 2,
-      "packet_hex": "44444444444645580101000000000000000000000000002a3a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe240000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000917648d991288f3e19eb90193bf26510230066a7a9b70dc2b0eeb97e2d71621f6abf50e11f59ed2a11d598a884b88b68efc40ddcd8f6c91bd582d3d1717fb9f9b75b205696c7ac8f81846a0d8e71b0b662500754da9c8584748df642473da9aa80b9bbb8f52e2c64c061348f1113db25d7ea2b8f53fee1666651fc0710dbca30561a6aea90c6eb69348b0b3de1c164527318ff3a494e6ec933a9cfb8c23b43855640299bcfe55f020769021521b7ffd4b319bcf4c723652b1241686189e2f394555bf475a371814f419329c54f7bea9a9c7db29f39886a496e280983b5fc61f24ecce0726962c8744357ee7f5dc89f616358d0c3836a8932ffe7fed7156c842947354a56783e779810797cee380f55c6166c05a46df9d3ce81c65fd5562ef0354a84352870ffba4343b3c5f11e0d31d707c2ca61b382a240d1ce8157d08202e847a8cf3dafbf96587d894881a2edb9a5339e2f9e0ce33b1fa05d04fee3b92f6ed297b7f99d9f745e7573697c41aa3e850554eface59ecdd1cd8dabe735fc40cb9b9f7ae7",
+      "packet_hex": "44444444444645580102000000000000000000000000002a3a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe24917648d991288f3e19eb90193bf26510230066a7a9b70dc2b0eeb97e2d71621f6abf50e11f59ed2a11d598a884b88b68f73eee09531e991bde5406f56dd727eaded20481b262a73165b0504050f68f599573d8bfe13057d4c7aba9d34bdbdde9d54e42076b6570e2b5115c6a07ca1ba707b8aa8c280e5f438caffed86594ef0095c47877439ba90fcd7bb08a460476e5dcdef3f93cd9686145505a8917c2c9927d33c6858c67f253653d747b335f1845b95b9019c2d98a31a9e69c42a53dbfe0ffcc3da60b5e31b6a4a8dd0f7b3651ade7f47ee94144710cd0a85b30e3832f095fb42d6d5eea5e3c7cc6cde14c1249264aaced1473910814acb7a5810f9dac14a58c8f025002fd2fad95fe06615b7adc8a6d460947c24f951cc0b629af1e11a95ca014bae34ba92d43aa2289ffd07cba9e5e4a2ec45233a52cb1eaa943c54ffc9997e010fc686fda2886dbd869851aadec392968f3cbbcb0fd8707b6632a61d328fcbfe50af83e7719b398c29076b6160cfc9e3bf63ebe3bc2eef642f7725356c41874fc",
       "preamble_hex": "44444444",
       "receiver_key": "agent",
       "sender_key": "assigned_cell",
-      "timestamp_nanos": "1800000000000000004"
+      "timestamp_millis": "1800000000004"
     },
     "cookie_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
     "cookie_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
@@ -259,42 +259,42 @@
       "body_json": "{\"trxId\":41,\"cookie\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
       "counter": "41",
       "ephemeral_private_hex": "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
-      "header_digest_hex": "34915d885931cf915101d36462cd42a8496efdf54c392411a60ae842f220fd55",
+      "header_mac_hex": "81a997499d10aa30f9187b09bb2bc8b989ebe5dc357e44d8ab8e9f5a60eecb16",
       "header_name": "NHP_COK",
       "header_type": 7,
-      "packet_hex": "2222222222252276010100000000000000000000000000295869aff450549732cbaaed5e5df9b30a6da31cb0e5742bad5ad4a1a768f1a67b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c3e744adc0e6ba3403c3a9decbdc742db440e44fd79690be593f9cba730044e13926383e3059aaee003b175bc2c3c904ef3bf6d3015e6bad113426aca956a6e21c5ceebc830f618634915d885931cf915101d36462cd42a8496efdf54c392411a60ae842f220fd55374a137998b46a324d4ee8c9bd1af3cc92cb48a4582089b3ed92614a054003aade4d9261575c6d66b92a7d7f0e5eeebed6b1a7aecb2d5323f8ae832467dd13feb54ca2c366d0a0e1b507f6589eba3f4c86a4cc71",
+      "packet_hex": "2222222222252276010200000000000000000000000000295869aff450549732cbaaed5e5df9b30a6da31cb0e5742bad5ad4a1a768f1a67bc3e744adc0e6ba3403c3a9decbdc742db440e44fd79690be593f9cba730044e13926383e3059aaee003b175bc2c3c904f7c115068ab63bada9048da21f3809654684606ffdea76a281a997499d10aa30f9187b09bb2bc8b989ebe5dc357e44d8ab8e9f5a60eecb16d7a8fcead54ad4259fe005443a96bb89cfb3b5022b85a831808bb9f236d1d98089bd8af4d66b4692d1151f2f59efdbc502cac971a4686cbaef797bf3c64c88897c7b419130318b69ce1808e761a7dff1128f7c6a",
       "preamble_hex": "22222222",
       "receiver_key": "agent",
       "sender_key": "assigned_cell",
-      "timestamp_nanos": "1800000000000000002"
+      "timestamp_millis": "1800000000002"
     },
     "knock_request": {
       "body_hex": "7b2268656164657254797065223a312c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
       "body_json": "{\"headerType\":1,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
       "counter": "41",
       "ephemeral_private_hex": "8182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0",
-      "header_digest_hex": "facac9d03b8df97e834ea0470b2a942fa725b9b37801d4efe3f4fcbbcb5ae455",
+      "header_mac_hex": "87a8ace5e29662d10e299f322902eb8d93a56978e1f1a095548553ee61bcafcf",
       "header_name": "NHP_KNK",
       "header_type": 1,
-      "packet_hex": "11111111111011bd01010000000000000000000000000029883186b800b41d5cf0429695da9b3cc4f328ebcd184a6e482fa578c103f06c7700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001735abc776684123346b82023de4591ce37a652e08c0a9152e88c6590e0e8b0f5f88fb77cd380a7a4cd30ea15b66803e2851b345dd6d5de84dda7dc185aedf4f7847107e79fbab1cfacac9d03b8df97e834ea0470b2a942fa725b9b37801d4efe3f4fcbbcb5ae455402c2aedd72be51adaf3cfbbe1b01646c391b80988ef7727ea0bc766539a5ddfc4d9f686aab7411f74c6f4d74f30c48c211dff3d42f3ed5d7d48b1a43b5faef049922b3a989a4a644059afb2a40edd41a131f57ca38c8c328aa615d3f967e7e38d0c68d4e8d6461d8f6000a2e8572a3443e6f6bd69142d460bda9212d5b04251df1ec199f517ed40427c93a125ed8e43b4a7ebe1dda590866225a4ac95cf132c630f675a146f189aaee68b31",
+      "packet_hex": "11111111111011bd01020000000000000000000000000029883186b800b41d5cf0429695da9b3cc4f328ebcd184a6e482fa578c103f06c771735abc776684123346b82023de4591ce37a652e08c0a9152e88c6590e0e8b0f5f88fb77cd380a7a4cd30ea15b66803e30ab509056850de8c14a9676548e83413e1b5f3e4cdcf14687a8ace5e29662d10e299f322902eb8d93a56978e1f1a095548553ee61bcafcf0307867341b8c73d478d2fb27021f3b1b3e936a2099a3db78c3a56869b415e792712f533234840c5087e450e089dbe19e18e4c8339c8afb74ef0bc531e9131869c11271f4f0bd9f3983010ae0478c588f37070fb7e6cdf367721f77fade62800d6665dcd39a83ce9a2775d93181355c9fbf26eb13748f448e8fbead4165287917fe6b92e48db451f065a3fcf98643380fc776548449845ffe9484f5f352298dbcd8bd8d4817e654d9d3171b2",
       "preamble_hex": "11111111",
       "receiver_key": "assigned_cell",
       "sender_key": "agent",
-      "timestamp_nanos": "1800000000000000001"
+      "timestamp_millis": "1800000000001"
     },
     "reknock_request": {
       "body_hex": "7b2268656164657254797065223a382c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
       "body_json": "{\"headerType\":8,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
       "counter": "42",
       "ephemeral_private_hex": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
-      "header_digest_hex": "e3898a6c88f9eb30b68d534501eaef4385abffd244f09a37ddfbf92f6dcc14d0",
+      "header_mac_hex": "5ea9fd75c0cd3609dfdf41fa7d7b8b95352a97e95c5efffe2dac726605c4953b",
       "header_name": "NHP_RKN",
       "header_type": 8,
-      "packet_hex": "33333333333b339f0101000000000000000000000000002aad438bfae31f6c093d61d4339255ea798092c9fadd07b97827f4b0ae9dee7c1c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e9229ad0f5c9c62cb065f3a78e18a72af7e720e439128461f76f2676609635537434f2b59cca78c47e592ed5269ef07b8d7eabf1f4313027454c06656df5b20d82a09fc4625d4d7e3898a6c88f9eb30b68d534501eaef4385abffd244f09a37ddfbf92f6dcc14d0660d8bd74d0c72c08b3f641390b6cb8e321cf326422c71a2931704dcf006d48820da3cdccbb76eaf46633e0c3079ad7858ff9421fe79ab7a7454757528b045142bdfc673ab74665479ec5f846a66c60391f18c0b4392c84a0dc7917fc840127cc37265b20fc5fdd576d055be976dc3cc352486ef68cc6dae6f510bedf9ca6a59524bc5ecff202fa7887b4ad34642ceef6f5853b263ba92c9c5a4084c43d2975ba8eaa06cadd75ea5701add4b",
+      "packet_hex": "33333333333b339f0102000000000000000000000000002aad438bfae31f6c093d61d4339255ea798092c9fadd07b97827f4b0ae9dee7c1c9e9229ad0f5c9c62cb065f3a78e18a72af7e720e439128461f76f2676609635537434f2b59cca78c47e592ed5269ef07a02d096a94ab43021f7e3964a9ae818b4ac6414ff1048ac15ea9fd75c0cd3609dfdf41fa7d7b8b95352a97e95c5efffe2dac726605c4953b822ed70c0cfa7c1f4e191b579a44ce853697f48dfd502c0938b0a92d5a83069440a370761b2574ce8e5a91d039746014241e84d4c55cd15aecaad90c732711bae8245876f4dc3437224d85cfce012e06134b674b6405802acc0addf8c863105775534c69945b2c3fd7a00eb5154175602d47a79a1859b274c8e84a2d2d6bf50299912734264f827bdecc3548f39b49cfb1a74346e1320524575d96d2285af793f01b103218e691a10200d98d",
       "preamble_hex": "33333333",
       "receiver_key": "assigned_cell",
       "sender_key": "agent",
-      "timestamp_nanos": "1800000000000000003"
+      "timestamp_millis": "1800000000003"
     }
   },
   "producer_revision": "c345051876be4f74bb46ff36dfcbffbbf9d45cee",
@@ -307,8 +307,8 @@
     "exit_body": "empty",
     "exit_cookie_challenge_allowed": false,
     "exit_response": "none",
-    "rkn_header_digest": "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)"
+    "rkn_header_mac": "HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || cookie)"
   },
-  "schema_version": 2,
+  "schema_version": 4,
   "source_of_truth": "github.com/layervai/qurl-conformance"
 }

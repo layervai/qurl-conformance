@@ -62,6 +62,7 @@ import (
 	"crypto/ecdh"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -419,26 +420,37 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 // version is a repo-wide fact, not a per-family one, so a family must never
 // restate the literals.
 //
-// Minor 1 is the transcript that folds the 24-byte serialized HeaderCommon into
-// the body-seal AAD. Under 1.0 the flag word, header type and declared size rode
-// outside every AEAD and were forgeable by anyone holding the peer's static
-// public key. Consumers must reject a packet below this minor on the version
-// rather than on an AEAD tag.
+// Minor 2 authenticates header[0:128], the complete payload ciphertext, and any
+// type-specific cookie proof with a domain-separated keyed HMAC-BLAKE2s derived
+// from ck3. It therefore covers bodyless non-KPL packets that have no body AEAD
+// tag. Appendix A2.1 KPL is a separate exact 12-zero-byte exception and does not
+// appear in these Curve-packet artifacts. Consumers reject a packet below this
+// minor at the version gate.
 const (
 	NHPProtocolVersionMajor = 1
-	NHPProtocolVersionMinor = 1
+	NHPProtocolVersionMinor = 2
 )
 
 // validateNHPPacketProtocolVersion asserts the version bytes a decoded NHP
 // packet carries. It deliberately says nothing about HeaderCommon[10:12]: the
-// flag word is per-family (the relay ack sets 0x0002, the Hub proof header
-// 0x0004), so each family keeps its own flag gate.
+// flag word is per-family (the relay ack sets compression bit 0x0001, the Hub
+// proof header uses the LayerV extension bit 0x0002), so each family keeps its
+// own flag gate.
 //
 // This is a structural gate on plaintext header bytes. It does not authenticate
 // the packet — see RELEASE_CHECKLIST.md for who does.
 func validateNHPPacketProtocolVersion(name string, packet []byte) error {
-	if len(packet) < 10 {
-		return fmt.Errorf("conformance: %s is too short to carry a protocol version", name)
+	if len(packet) < 160 {
+		return fmt.Errorf("conformance: %s is too short to carry a Curve header", name)
+	}
+	preamble := binary.BigEndian.Uint32(packet[0:4])
+	typeAndSize := preamble ^ binary.BigEndian.Uint32(packet[4:8])
+	declaredPayloadSize := int(typeAndSize & 0xffff)
+	if len(packet) != 160+declaredPayloadSize {
+		return fmt.Errorf("conformance: %s declared payload size %d does not match %d trailing bytes", name, declaredPayloadSize, len(packet)-160)
+	}
+	if !allZeroBytes(packet[12:16]) {
+		return fmt.Errorf("conformance: %s reserved HeaderCommon bytes are nonzero", name)
 	}
 	if packet[8] != NHPProtocolVersionMajor || packet[9] != NHPProtocolVersionMinor {
 		return fmt.Errorf("conformance: %s protocol version = %d.%d, want %d.%d",
@@ -447,12 +459,23 @@ func validateNHPPacketProtocolVersion(name string, packet []byte) error {
 	return nil
 }
 
+func allZeroBytes(value []byte) bool {
+	for _, b := range value {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // RelayKnockArtifactID is the fixed identity string the relay-knock artifact's
 // top-level "artifact" field must carry. The loader enforces it so a consumer
 // that relies on "the loader rejects malformed files" cannot silently load a
 // DIFFERENT document into these structs. A consumer in another language should
 // assert the same id.
 const RelayKnockArtifactID = "qurl-relay-knock-golden-vectors"
+
+const RelayKnockSchemaVersion = 3
 
 // RelayKnockFile is the top-level relay/NHP-handshake golden artifact: a
 // deterministic knock packet a conformant initiator must reproduce byte-for-byte,
@@ -472,7 +495,7 @@ type RelayKnockFile struct {
 // RelayKnockCase is one golden packet (knock or ack). Every value is the exact
 // hex (or, for the numeric fields, the stringified value) the case uses; only the
 // fields relevant to a given case are populated. All fields are strings — including
-// timestamp_nanos, which exceeds 2^53 and so is carried as a decimal string rather
+// timestamp_millis, which exceeds 2^53 and so is carried as a decimal string rather
 // than a JSON number.
 type RelayKnockCase struct {
 	// ServerStaticPrivHex / ServerStaticPubHex are the server static X25519 key.
@@ -490,8 +513,8 @@ type RelayKnockCase struct {
 	// EphemeralPrivHex is the fixed initiator ephemeral private key the knock case
 	// seals under (so the knock packet is deterministic).
 	EphemeralPrivHex string `json:"ephemeral_priv_hex,omitempty"`
-	// TimestampNanos is the handshake timestamp, decimal string (exceeds 2^53).
-	TimestampNanos string `json:"timestamp_nanos"`
+	// TimestampMillis is the handshake timestamp, decimal string (exceeds 2^53).
+	TimestampMillis string `json:"timestamp_millis"`
 	// Counter is the knock counter as a decimal string.
 	Counter string `json:"counter,omitempty"`
 	// CounterHex is the ack counter as a hex string (no 0x prefix, no padding).
@@ -519,8 +542,8 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	if rf.Artifact != RelayKnockArtifactID {
 		return nil, fmt.Errorf("conformance: relay-knock file has artifact %q, want %q", rf.Artifact, RelayKnockArtifactID)
 	}
-	if rf.SchemaVersion == 0 {
-		return nil, errors.New("conformance: relay-knock file missing schema_version")
+	if rf.SchemaVersion != RelayKnockSchemaVersion {
+		return nil, fmt.Errorf("conformance: relay-knock schema_version = %d, want %d", rf.SchemaVersion, RelayKnockSchemaVersion)
 	}
 	// Fail closed on a blank load-bearing field: a consumer that re-runs the
 	// golden bytes (rebuild knock.packet_hex / decrypt ack.packet_hex) must not
@@ -559,6 +582,8 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 // should assert the same id.
 const AgentRegistrationArtifactID = "qurl-agent-registration-golden-vectors"
 
+const AgentRegistrationSchemaVersion = 3
+
 // AgentRegistrationFile is the top-level NHP agent-registration golden artifact:
 // the OTP request, the emailed-code and pre-issued-key REG requests (all three
 // DETERMINISTIC — a conformant initiator must reproduce packet_hex byte-for-byte),
@@ -586,7 +611,7 @@ type AgentRegistrationFile struct {
 // AgentRegistrationCase is one golden packet: an OTP/REG initiator request or a
 // RAK reply. Every value is the exact hex (or, for the numeric fields, the
 // stringified value) the case uses; only the fields relevant to a given case are
-// populated. All fields are strings — including timestamp_nanos, which exceeds
+// populated. All fields are strings — including timestamp_millis, which exceeds
 // 2^53 and so is carried as a decimal string rather than a JSON number.
 //
 // Deterministic cases (otp, reg_emailed, reg_preissued) carry the same fields as
@@ -612,8 +637,8 @@ type AgentRegistrationCase struct {
 	// EphemeralPrivHex is the fixed initiator ephemeral private key the
 	// deterministic cases seal under (so the packet is reproducible).
 	EphemeralPrivHex string `json:"ephemeral_priv_hex,omitempty"`
-	// TimestampNanos is the handshake timestamp, decimal string (exceeds 2^53).
-	TimestampNanos string `json:"timestamp_nanos"`
+	// TimestampMillis is the handshake timestamp, decimal string (exceeds 2^53).
+	TimestampMillis string `json:"timestamp_millis"`
 	// Counter is the deterministic-case counter as a decimal string.
 	Counter string `json:"counter,omitempty"`
 	// CounterHex is the frozen RAK counter as a hex string (no 0x prefix, no
@@ -644,8 +669,8 @@ func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
 	if af.Artifact != AgentRegistrationArtifactID {
 		return nil, fmt.Errorf("conformance: agent-registration file has artifact %q, want %q", af.Artifact, AgentRegistrationArtifactID)
 	}
-	if af.SchemaVersion == 0 {
-		return nil, errors.New("conformance: agent-registration file missing schema_version")
+	if af.SchemaVersion != AgentRegistrationSchemaVersion {
+		return nil, fmt.Errorf("conformance: agent-registration schema_version = %d, want %d", af.SchemaVersion, AgentRegistrationSchemaVersion)
 	}
 	// Fail closed on a blank load-bearing field: a consumer that re-runs the
 	// golden bytes (rebuild the OTP/REG packet_hex / decrypt the RAK packet_hex)
@@ -680,6 +705,10 @@ func ParseAgentRegistrationFile(data []byte) (*AgentRegistrationFile, error) {
 // AgentAssignmentArtifactID is the fixed identity of the NHP assignment,
 // assigned-cell activation, and registration-completion golden artifact.
 const AgentAssignmentArtifactID = "qurl-agent-assignment-golden-vectors"
+
+// AgentAssignmentSchemaVersion is the only assignment artifact shape accepted
+// by the strict loader. Version 5 carries NHP 1.2 authenticated packet bytes.
+const AgentAssignmentSchemaVersion = 6
 
 // The exact NHP header values used for list request/result exchanges. Results
 // echo their request's counter and never use the overload-cookie reply type.
@@ -735,7 +764,7 @@ const (
 	// the revision's higher-level assignment request builder knows the current
 	// artifact schema; consumers add that support conformance-first.
 	//
-	// It names the protocol-1.1 codec commit on branch
+	// It names the protocol-1.2 codec commit on branch
 	// justin/feat/authenticate-nhp-header-aad, which is pushed and immutable but
 	// NOT yet merged. A pre-merge pin is the only value that is true today; a
 	// squash-merge will mint a different SHA, so re-pinning to the merged commit
@@ -764,7 +793,7 @@ const (
 // silently behind.
 const (
 	nhpPacketProducerProtocolMajor = 1
-	nhpPacketProducerProtocolMinor = 1
+	nhpPacketProducerProtocolMinor = 2
 )
 
 // Exact synthetic production-shaped fixture values.
@@ -791,11 +820,11 @@ const (
 	AgentAssignmentRefreshRequestNonceFixture = "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8"
 )
 
-// NHP Curve packets use a 240-byte HeaderCurve and the transport reads into a
+// NHP Curve packets use a 160-byte standard HeaderCurve and the transport reads into a
 // fixed 4096-byte PacketBufferSize. These inclusive framing bounds reject
 // impossible fixtures before the producer verifier authenticates their bodies.
 const (
-	agentAssignmentCurveHeaderBytes  = 240
+	agentAssignmentCurveHeaderBytes  = 160
 	agentAssignmentPacketBufferBytes = 4096
 	agentAssignmentBodyAEADTagBytes  = 16
 	agentAssignmentMaxBodyBytes      = agentAssignmentPacketBufferBytes - agentAssignmentCurveHeaderBytes - agentAssignmentBodyAEADTagBytes
@@ -948,7 +977,7 @@ type AgentAssignmentPacket struct {
 	SenderKey        string `json:"sender_key"`
 	ReceiverKey      string `json:"receiver_key"`
 	EphemeralPrivHex string `json:"ephemeral_priv_hex"`
-	TimestampNanos   string `json:"timestamp_nanos"`
+	TimestampMillis  string `json:"timestamp_millis"`
 	Counter          string `json:"counter"`
 	PreambleHex      string `json:"preamble_hex"`
 	BodyJSON         string `json:"body_json"`
@@ -1264,8 +1293,8 @@ func ParseAgentAssignmentFile(data []byte) (*AgentAssignmentFile, error) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		return nil, fmt.Errorf("conformance: agent-assignment file has artifact %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 4 {
-		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want 4", af.SchemaVersion)
+	if af.SchemaVersion != AgentAssignmentSchemaVersion {
+		return nil, fmt.Errorf("conformance: agent-assignment file has schema_version %d, want %d", af.SchemaVersion, AgentAssignmentSchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, agentAssignmentPublicRegistrationKeyKinds) {
 		return nil, errors.New("conformance: agent-assignment public registration key_kind vocabulary drifted")
@@ -1975,7 +2004,7 @@ func validateAgentAssignmentPacket(name string, packet AgentAssignmentPacket, wa
 	if err := validateAgentAssignmentHex(name+".ephemeral_priv_hex", packet.EphemeralPrivHex, 32); err != nil {
 		return err
 	}
-	if err := validateAgentAssignmentUint64(name+".timestamp_nanos", packet.TimestampNanos); err != nil {
+	if err := validateAgentAssignmentUint64(name+".timestamp_millis", packet.TimestampMillis); err != nil {
 		return err
 	}
 	if err := validateAgentAssignmentUint64(name+".counter", packet.Counter); err != nil {

@@ -51,8 +51,8 @@ registration obtains the user-entered OTP out of band and carries that OTP with
 the ticket in the single REG call.
 
 `lrt_body_template` composes the complete positive ticket into the exact LRT
-JSON shape. NHP's nonempty Curve packet uses a 240-byte header and a 16-byte
-body AEAD tag, so `nhp_packet_overhead_bytes=256` and the 4,096-byte packet cap
+JSON shape. NHP's nonempty standard Curve packet uses a 160-byte header and a 16-byte
+body AEAD tag, so `nhp_packet_overhead_bytes=176` and the 4,096-byte packet cap
 leave an exact 3,840-byte plaintext-body maximum. The prior 3,856-byte value
 incorrectly omitted the AEAD tag and is intentionally corrected here.
 
