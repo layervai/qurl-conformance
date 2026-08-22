@@ -68,6 +68,14 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       `TestBuildKnock_GoldenVector`) run against a `replace` directive or a
       pre-release pin pointing at this branch. Record where it ran in the PR.
       Until that has happened the bytes are unverified by anyone.
+- [ ] **Confirm every real ACK denial producer emits the strict lifetime.** At
+      the pinned NHP producer revision, verify `ServerKnockAckMsg.OpenTime`
+      remains a required (non-`omitempty`) uint32 `opnTime` field and exercise
+      native UDP, relay/forwarded ACK, plugin, and early server-denial paths.
+      Every serialized denial must contain typed `opnTime: 0` and omit
+      `sessId`; missing, wrong-type, overflowing, or nonzero denial lifetimes
+      are not conformant `server_deny` bodies. Record the producer tests in the
+      PR or release handoff; consumer-only fixtures do not satisfy this gate.
 - [ ] **State the rollout order.** A 1.1 receiver rejects a 1.0 sender by
       design, so senders must never lead receivers. Vectors release first,
       servers next, clients last, and the 7-day dependency-age quarantine makes

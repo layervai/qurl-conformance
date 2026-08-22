@@ -19,8 +19,11 @@ const (
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// sealed the golden packets and introduced the strict server-session ACK plus
-	// bodyless one-way EXT contract in layervai/qurl-go. Re-pin deliberately if
-	// the eventual merge changes the commit identity; see RELEASE_CHECKLIST.md.
+	// bodyless one-way EXT contract in layervai/qurl-go. This is the signed,
+	// pushed unmerged producer commit that emitted the bytes. A squash merge
+	// creates a different SHA: do not claim it emitted these vectors, and do not
+	// delete the producer branch until the merged-SHA follow-up is available.
+	// Re-pin deliberately under the RELEASE_CHECKLIST.md rule.
 	AgentSessionControlProducerRevision = "c345051876be4f74bb46ff36dfcbffbbf9d45cee"
 
 	AgentSessionHeaderKNK = 1

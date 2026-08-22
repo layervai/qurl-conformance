@@ -1443,8 +1443,9 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		c := byName[name]
 		if c.ExpectedACToken != acTokens[resourceID] || c.ExpectedResourceHost != resourceHosts[resourceID] ||
 			c.ExpectedSessionID == "" || c.ExpectedOpenTime == 0 {
-			t.Errorf("%s expected result = %q/%q, want exact resource maps %q/%q", name,
-				c.ExpectedACToken, c.ExpectedResourceHost, acTokens[resourceID], resourceHosts[resourceID])
+			t.Errorf("%s expected result = token:%q host:%q session:%q open:%d, want exact resource maps %q/%q and nonzero session/open", name,
+				c.ExpectedACToken, c.ExpectedResourceHost, c.ExpectedSessionID, c.ExpectedOpenTime,
+				acTokens[resourceID], resourceHosts[resourceID])
 		}
 	}
 	optional := body("ack_success_optional_metadata")
