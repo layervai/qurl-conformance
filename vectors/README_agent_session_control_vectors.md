@@ -5,8 +5,8 @@ transitions a native UDP connector needs after its first registered-agent
 knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
 policy, while this artifact validates the Noise packet bytes and transition
-correlation. Its `schema_version` is `2`; version 1's bodyful EXT plus ACK was
-removed by this breaking bodyless one-way EXT contract and is not accepted.
+correlation. Its `schema_version` is `3`; version 2's bodyless, one-way global
+EXT contract is not accepted on the current NHP 1.1 envelope.
 
 ## Positive flows
 
@@ -20,15 +20,16 @@ The artifact contains one deterministic instance of each transition:
    the KNK identity, resource, and RunID and authenticates the decoded cookie in
    its header digest.
 4. `overload_reknock.ack`: NHP_ACK (type 2), counter 42.
-5. `clean_exit.request`: bodyless NHP_EXT (type 16), counter 43. It is a one-way
-   authenticated-agent-global teardown and receives no NHP_ACK or NHP_COK.
+5. `clean_exit.request`: resource-scoped NHP_EXT (type 16), counter 43. Its
+   authenticated body repeats the protected-resource session identity.
+6. `clean_exit.ack`: NHP_ACK (type 2), counter 43.
 
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets were emitted byte-for-byte by
 `layervai/qurl-go` producer revision
-`c345051876be4f74bb46ff36dfcbffbbf9d45cee`.
+`bd743b1509a3c70603f2f5350b398a83ed0fd321`.
 
 ## Protocol version
 
@@ -71,9 +72,10 @@ key, and the nonce. Only the AAD moved.
   invalid.
 - `usrId`, `devId`, `aspId`, `resId`, and the canonical 16-character lowercase
   hexadecimal `runId` remain unchanged across KNK and RKN.
-- EXT has no application body, resource, RunID, or response. Its authenticated
-  agent identity selects all live sessions for global teardown, so it must not
-  be used for one-share stop or replacement-session retirement.
+- EXT's authenticated body must repeat the exact user, device, auth-service,
+  resource, and RunID identity. Its ACK counter echoes the EXT counter and its
+  success body remains bound to that resource. It is not an agent-global or
+  one-way operation on the current NHP 1.1 envelope.
 - Decryption is insufficient without peer authentication. Replies are accepted
   only under the assigned cell's pinned static public key; requests are accepted
   only under the registered agent's static public key.
@@ -143,12 +145,12 @@ The declared reject classes are:
    revision, key roles, closed case sets, and all canonical hex/base64 forms.
 2. Rebuild KNK, RKN, and EXT from their deterministic inputs and compare every
    complete packet byte. For RKN, include the decoded cookie in the digest.
-3. Authenticate and decrypt COK and the RKN ACK under the assigned cell public key;
+3. Authenticate and decrypt COK and both ACKs under the assigned cell public key;
    authenticate initiator packets under the agent public key in a responder
    verifier.
-4. Apply the counter, type/body, immutable-RunID, cookie, ACK-session, and
-   reply-disposition gates above. Require EXT to be bodyless and never await a
-   response. Missing fixtures or unknown cases are failures, never skips.
+4. Apply the counter, type/body, immutable-identity/RunID, cookie, ACK-session,
+   and reply-disposition gates above. Require the EXT ACK to echo the request
+   counter. Missing fixtures or unknown cases are failures, never skips.
 5. Execute every cookie and flow case through the implementation's real entry
    points and assert the declared reject class.
 

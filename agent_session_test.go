@@ -28,13 +28,15 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 		af.OverloadReknock.CookieReply,
 		af.OverloadReknock.ReknockRequest,
 		af.OverloadReknock.ACK,
+		af.CleanExit.Request,
+		af.CleanExit.ACK,
 	} {
 		if p.PacketHex == "" || p.BodyHex == "" || p.HeaderDigestHex == "" {
 			t.Fatalf("incomplete packet %+v", p)
 		}
 	}
-	if af.CleanExit.Request.PacketHex == "" || af.CleanExit.Request.BodyHex != "" || af.CleanExit.Request.BodyJSON != "" || af.CleanExit.Request.HeaderDigestHex == "" {
-		t.Fatalf("invalid bodyless exit packet %+v", af.CleanExit.Request)
+	if af.CleanExit.Request.HeaderType != AgentSessionHeaderEXT || af.CleanExit.ACK.HeaderType != AgentSessionHeaderACK {
+		t.Fatalf("invalid resource-scoped exit exchange %+v", af.CleanExit)
 	}
 
 	raw := AgentSessionControlVectors()
@@ -85,6 +87,7 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.Keys.Agent.StaticPublicHex = af.Keys.AssignedCell.StaticPublicHex
 		}},
 		{"packet role", "type or key roles", func(af *AgentSessionControlFile) { af.CleanExit.Request.SenderKey = "assigned_cell" }},
+		{"exit ack role", "type or key roles", func(af *AgentSessionControlFile) { af.CleanExit.ACK.ReceiverKey = "assigned_cell" }},
 		{"packet body bytes", "body_hex", func(af *AgentSessionControlFile) { af.OverloadReknock.ReknockRequest.BodyHex = "00" }},
 		{"packet framing", "size", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ACK.PacketHex = af.OverloadReknock.ACK.PacketHex[:len(af.OverloadReknock.ACK.PacketHex)-2]
@@ -114,6 +117,9 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 		{"exit body", "packet size is inconsistent with body", func(af *AgentSessionControlFile) {
 			af.CleanExit.Request.BodyJSON = `{}`
 			af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
+		}},
+		{"exit ack counter", "clean_exit.ack wire counter", func(af *AgentSessionControlFile) {
+			af.CleanExit.ACK.Counter = "44"
 		}},
 		{"ack semantics", "success body drifted", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ACK.BodyJSON = strings.Replace(af.OverloadReknock.ACK.BodyJSON, `"opnTime":900`, `"opnTime":901`, 1)
@@ -166,15 +172,38 @@ func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
 	}
 }
 
-func TestAgentSessionFlowBindingsRejectBodyfulExit(t *testing.T) {
+func TestAgentSessionFlowBindingsRejectBodylessExit(t *testing.T) {
 	af, err := AgentSessionControl()
 	if err != nil {
 		t.Fatal(err)
 	}
-	af.CleanExit.Request.BodyJSON = `{}`
-	af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
-	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "EXT must have an empty body") {
+	af.CleanExit.Request.BodyJSON = ""
+	af.CleanExit.Request.BodyHex = ""
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit EXT body") {
 		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want bodyless EXT rejection", err)
+	}
+}
+
+func TestAgentSessionFlowBindingsRejectExitIdentityDrift(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.CleanExit.Request.BodyJSON = strings.Replace(af.CleanExit.Request.BodyJSON, "connector-conformance-01", "connector-conformance-02", 1)
+	af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit identity") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want clean-exit identity rejection", err)
+	}
+}
+
+func TestAgentSessionFlowBindingsRejectExitACKCounterDrift(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.CleanExit.ACK.Counter = "44"
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit ACK counter") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want clean-exit ACK counter rejection", err)
 	}
 }
 

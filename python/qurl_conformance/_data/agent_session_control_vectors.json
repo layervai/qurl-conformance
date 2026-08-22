@@ -1,15 +1,29 @@
 {
   "artifact": "qurl-agent-session-control-vectors",
   "clean_exit": {
+    "ack": {
+      "body_hex": "7b22736573734964223a37323632333835393739303338323835362c22657272436f6465223a2230222c22726573486f7374223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a22667270732e73616e64626f782e6578616d706c653a37303030227d2c226f706e54696d65223a3930302c226167656e7441646472223a223230332e302e3131332e393a3439313532222c226163546f6b656e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a2261632d746f6b656e2d636f6e666f726d616e63652d3031227d2c22707265416374696f6e73223a7b22636f6e6e6563746f722d636f6e666f726d616e63652d3031223a6e756c6c7d7d",
+      "body_json": "{\"sessId\":72623859790382856,\"errCode\":\"0\",\"resHost\":{\"connector-conformance-01\":\"frps.sandbox.example:7000\"},\"opnTime\":900,\"agentAddr\":\"203.0.113.9:49152\",\"acTokens\":{\"connector-conformance-01\":\"ac-token-conformance-01\"},\"preActions\":{\"connector-conformance-01\":null}}",
+      "counter": "43",
+      "ephemeral_private_hex": "d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0",
+      "header_digest_hex": "bd5506cd9a1269343df7dca2ea9a847094e2fe48f25f2e20047c85d175621b85",
+      "header_name": "NHP_ACK",
+      "header_type": 2,
+      "packet_hex": "666666666664677a0101000000000000000000000000002b21c3332b61be6a7b6ab8461e155651b17501b6e07532ecf9ab6661bd5a2ca5750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000404eb98b986bb9480320b3fbed8143c922d94f72f2b2e26def7f4e0aae0475a316546747e509d047e9eb52790c62890c4b84f8b2e2fff3d489775d5eb3f328efa94718eb95c1e5e8bd5506cd9a1269343df7dca2ea9a847094e2fe48f25f2e20047c85d175621b858e8024505ddb1e004ec7981d054d912f8a334522e839e5e068e6aa963c6adf96cd28c4382877fbd47413b0bc429b06a2181a0831c2c4dad6de4ce4ed81a7b8ee8b64ad9c90e47f37a7069f9a19de220dafa963326c108698ac7f18aaf454eb5ca2809c8fa29d4c4999334872bac063e87e62f3d942d249a6c61b4d5cb1a0048ea0ceba688a0b1a139b99ebaaa5acd758ac3dfab4a2cd86ef99e591718d99520b32fed062ed6e71df006764d67b1d5f4b8bf0255f76487a9a0ea1035020514208b1e6aecc4f56dd940f6b155e231066ea355293d41cf852053f57cfa55857d725fecd695c227415b2d3b27861b0809a31aa671e68829078ba5d92e0363ba0369f657bb4d3e0a64749015ae15c78ab83e177fd5b44eda9cf02179e8c81",
+      "preamble_hex": "66666666",
+      "receiver_key": "agent",
+      "sender_key": "assigned_cell",
+      "timestamp_nanos": "1800000000000000006"
+    },
     "request": {
-      "body_hex": "",
-      "body_json": "",
+      "body_hex": "7b2268656164657254797065223a31362c227573724964223a226167656e742d636f6e666f726d616e63652d3031222c226465764964223a226167656e742d636f6e666f726d616e63652d3031222c226173704964223a226167656e74222c227265734964223a22636f6e6e6563746f722d636f6e666f726d616e63652d3031222c2272756e4964223a2230313233343536373839616263646566227d",
+      "body_json": "{\"headerType\":16,\"usrId\":\"agent-conformance-01\",\"devId\":\"agent-conformance-01\",\"aspId\":\"agent\",\"resId\":\"connector-conformance-01\",\"runId\":\"0123456789abcdef\"}",
       "counter": "43",
       "ephemeral_private_hex": "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
-      "header_digest_hex": "4c6ec0f7074e56bd5666334cce76c7162408e722686737164b84fd41f939d9bf",
+      "header_digest_hex": "45219814407224b2b302d9584d76594a77e043472e9c5d43f35358ff9cb0f151",
       "header_name": "NHP_EXT",
       "header_type": 16,
-      "packet_hex": "55555555554555550101000000000000000000000000002b4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004bb2f858a5602819f1087d64b0eebf0d9a9506ba4835b57073d52e35373565f1c7743eea4683288d59180be722946df799859dd3145f9579f54235dec0a9faeb22ff2c74df1786f54c6ec0f7074e56bd5666334cce76c7162408e722686737164b84fd41f939d9bf",
+      "packet_hex": "55555555554555f80101000000000000000000000000002b4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004bb2f858a5602819f1087d64b0eebf0d9a9506ba4835b57073d52e35373565f1c7743eea4683288d59180be722946df799859dd3145f9579f54235dec0a9faeb22ff2c74df1786f545219814407224b2b302d9584d76594a77e043472e9c5d43f35358ff9cb0f151a38ed99acadab33dc58c4cbe7ca3fb2462e151a87e5eae1eb8bdfe3af7a30f7116c7a53ff9bfb21de4e26c1cb9e7a66fa1df69662215b4367f6bd79815843ea49831d03c3337fc4cd401f9b98d26250feeef7a35a361dd867edd6ce72d243bd9c8ba9be8f8357d3629cae90a2b0437dab7c932c8f417c04c126d0a14a3ee8215086d129bbc600db43832b8f7705d5e867833a4e47b833db3504c913ddcf4ad7d4850d7f7acce9e40fd704a81b6",
       "preamble_hex": "55555555",
       "receiver_key": "assigned_cell",
       "sender_key": "agent",
@@ -113,7 +127,7 @@
       "reject_class": "body_parse"
     }
   ],
-  "description": "Registered-agent native UDP overload re-knock and bodyless one-way global-exit golden packets.",
+  "description": "Deterministic NHP 1.1 overload re-knock and resource-scoped clean-exit request/ACK vectors",
   "flow_cases": [
     {
       "mutation": "none",
@@ -231,10 +245,10 @@
   },
   "notes": [
     "Every packet was sealed by the exact producer revision with fixed synthetic key, ephemeral, timestamp, counter, preamble, body, and cookie inputs; independent consumers must rebuild initiator packets and authenticate-open replies.",
-    "The producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation pins that consumer rule. The NHP_ACK counter must echo NHP_RKN.",
-    "The NHP_RKN header digest mixes the exact decoded 32-byte cookie after the ordinary header prefix. NHP_EXT uses the ordinary no-cookie digest, MUST have no body, and is one-way: the server sends neither NHP_ACK nor NHP_COK.",
-    "The successful NHP_ACK carries a nonzero server-assigned uint64 sessId and its resHost, acTokens, and preActions maps contain exactly one entry keyed by the session resId.",
-    "NHP_EXT applies to every active access session owned by the authenticated agent identity. It is reserved for whole-agent shutdown, never per-resource stop, replacement-session retirement, or ordinary FRP cleanup.",
+    "The producer intentionally echoes the NHP_KNK counter in NHP_COK for relay compatibility, as frozen here, but native UDP consumers must treat the authenticated COK wire counter as unconstrained and correlate only when decrypted trxId equals the originating NHP_KNK counter. The accept_cok_wire_counter_unconstrained flow mutation pins that consumer rule. Every NHP_ACK counter must echo its request.",
+    "The NHP_RKN header digest mixes the exact decoded 32-byte cookie after the ordinary header prefix. Resource-scoped NHP_EXT uses the ordinary no-cookie digest and carries the exact protected-resource session identity in its authenticated body.",
+    "Every successful NHP_ACK carries a nonzero server-assigned uint64 sessId and its resHost, acTokens, and preActions maps contain exactly one entry keyed by the session resId.",
+    "NHP_EXT closes only the exact authenticated resource and RunID named by its body and receives a counter-echoing NHP_ACK. It is not an agent-global or one-way operation on the current NHP 1.1 envelope.",
     "All identities, hosts, keys, cookies, counters, and tokens are synthetic conformance data."
   ],
   "overload_reknock": {
@@ -297,18 +311,18 @@
       "timestamp_nanos": "1800000000000000003"
     }
   },
-  "producer_revision": "c345051876be4f74bb46ff36dfcbffbbf9d45cee",
+  "producer_revision": "bd743b1509a3c70603f2f5350b398a83ed0fd321",
   "protocol": {
     "ack_counter_correlation": "must_echo_request",
     "cok_body_transaction_correlation": "must_equal_knock_counter",
     "cok_wire_counter_correlation": "unconstrained",
     "cookie_encoding": "base64_std_padded_canonical",
     "cookie_size_bytes": 32,
-    "exit_body": "empty",
+    "exit_body": "protected_resource_session_identity",
     "exit_cookie_challenge_allowed": false,
-    "exit_response": "none",
+    "exit_response": "counter_echoing_ack",
     "rkn_header_digest": "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)"
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "source_of_truth": "github.com/layervai/qurl-conformance"
 }

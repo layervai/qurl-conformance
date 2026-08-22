@@ -28,7 +28,7 @@ trust.
 | `vectors/agent_assignment_golden.json` | deterministic hub LST/LRT assignment, account-only assigned-cell OTP, REG/RAK activation, completion LST/LRT packets, strict request/binding/size/result rejects, and the producer-pinned closed error-body taxonomy (see Scope) |
 | `vectors/agent_knock_application_vectors.json` | registered-agent KNK body and RunID request-policy cases plus already-decrypted ACK/COK dispositions; no Noise packet duplication |
 | `vectors/README_agent_knock_application_vectors.md` | application-vector schema, outcome/reject vocabulary, and consumer algorithm |
-| `vectors/agent_session_control_vectors.json` | deterministic full-packet KNK/COK/RKN/ACK overload recovery and bodyless one-way global EXT, strict cookie parsing, authentication, and closed flow rejects |
+| `vectors/agent_session_control_vectors.json` | deterministic full-packet KNK/COK/RKN/ACK overload recovery and resource-scoped EXT/ACK, strict cookie parsing, authentication, and closed flow rejects |
 | `vectors/README_agent_session_control_vectors.md` | session-control wire contract, correlation rules, digest formula, reject vocabulary, and consumer algorithm |
 | `vectors/agent_api_key_id_vectors.json` | issuer and strict-consumer fixtures for agent registration `key_id` / `device_api_key_id` |
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
@@ -225,10 +225,10 @@ artifact has its own `artifact` id:
   `vectors/README_agent_knock_application_vectors.md`.
 - **Registered-agent session control**
   (`qurl-agent-session-control-vectors`,
-  `agent_session_control_vectors.json`, schema version 2) — deterministic full packets for the
-  overload path KNK -> COK -> RKN -> ACK and bodyless one-way global EXT, pinned to
+  `agent_session_control_vectors.json`, schema version 3) — deterministic full packets for the
+  overload path KNK -> COK -> RKN -> ACK and resource-scoped EXT -> ACK, pinned to
   `layervai/qurl-go` producer revision
-  `c345051876be4f74bb46ff36dfcbffbbf9d45cee`. The COK wire
+  `bd743b1509a3c70603f2f5350b398a83ed0fd321`. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw
@@ -236,8 +236,8 @@ artifact has its own `artifact` id:
   a nonzero server-assigned uint64 session ID. Its raw JSON `sessId` number can
   exceed JavaScript's safe-integer range, so JavaScript consumers must parse it
   losslessly into `BigInt` rather than pass it through an ordinary
-  `JSON.parse` number. EXT is bodyless, receives no
-  response, and closes all sessions for its authenticated agent identity. The
+  `JSON.parse` number. EXT carries the exact protected-resource session identity,
+  receives a counter-echoing ACK, and closes only that resource and RunID. The
   artifact freezes both static X25519 identities, every
   deterministic ephemeral key, body byte, header digest, and packet byte, plus
   closed cookie and flow reject suites. Consumers must rebuild initiator
