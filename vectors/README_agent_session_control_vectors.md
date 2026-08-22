@@ -5,10 +5,8 @@ transitions a native UDP connector needs after its first registered-agent
 knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
 policy, while this artifact validates the Noise packet bytes and transition
-correlation. Its `schema_version` is `4`; version 4 uses the standard 160-byte
-PKI/Curve header for every non-KPL NHP 1.2 packet. Version 3's 240-byte profile,
-version 1's bodyful EXT plus ACK, and version 2's unauthenticated empty-body
-framing are not accepted.
+correlation. Its `schema_version` is `2`; version 1's bodyful EXT plus ACK was
+removed by this breaking bodyless one-way EXT contract and is not accepted.
 
 ## Positive flows
 
@@ -20,29 +18,35 @@ The artifact contains one deterministic instance of each transition:
    padded RFC 4648 standard base64.
 3. `overload_reknock.reknock_request`: NHP_RKN (type 8), counter 42. It retains
    the KNK identity, resource, and RunID and authenticates the decoded cookie in
-   its keyed header MAC.
+   its header digest.
 4. `overload_reknock.ack`: NHP_ACK (type 2), counter 42.
 5. `clean_exit.request`: bodyless NHP_EXT (type 16), counter 43. It is a one-way
    authenticated-agent-global teardown and receives no NHP_ACK or NHP_COK.
 
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
-bytes, header MAC, and complete packet bytes. The two static X25519 keypairs
+bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets were emitted byte-for-byte by
 `layervai/qurl-go` producer revision
 `c345051876be4f74bb46ff36dfcbffbbf9d45cee`.
 
 ## Protocol version
 
-`HeaderCommon[8:10]` carries `01 02` — NHP protocol **1.2**. Every packet in
-this artifact was regenerated for it. A 1.2 receiver rejects a 1.1 or older
-sender before cryptographic transcript work.
+`HeaderCommon[8:10]` carries `01 01` — NHP protocol **1.1**. Every packet in
+this artifact was regenerated for it; the 1.0 bytes this file used to carry are
+not forward-compatible and a 1.1 receiver rejects a 1.0 sender by design.
 
-1.2 retains the 24-byte `HeaderCommon` body-AAD binding and adds a
-domain-separated keyed header MAC over the complete serialized header prefix
-and payload ciphertext. Empty-body EXT therefore remains authenticated even
-without an AEAD body tag. Reject a packet below minor 2 on the version byte so
-the wire-break failure is explicit.
+1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
+as the body-seal AAD, so **editing any header field breaks the body open**.
+Under 1.0 the flag word, header type and declared payload size rode outside
+every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
+holding the peer's static *public* key can recompute. Reject a packet below
+minor 1 on the version byte, not on an AEAD tag, so the failure is explicit;
+admit a higher minor so a later compatible release cannot strand deployed
+clients.
+
+The header digest input is unchanged, and so are chain-key derivation, the body
+key, and the nonce. Only the AAD moved.
 
 ## Correlation contract
 
@@ -74,23 +78,22 @@ the wire-break failure is explicit.
   only under the assigned cell's pinned static public key; requests are accepted
   only under the registered agent's static public key.
 
-## RKN header MAC
+## RKN header digest
 
-After the sender and receiver derive `ck3`, they derive the 32-byte MAC key:
-
-```text
-header_mac_key = HMAC-BLAKE2s-256(ck3, "nhp-header-mac-v1" || 0x00)
-```
-
-For an ordinary packet, header bytes 128:160 are:
+For a normal request, the 32-byte digest at header bytes 208:240 is:
 
 ```text
-HMAC-BLAKE2s-256(header_mac_key, header[0:128] || payload_ciphertext)
+BLAKE2s-256(initial_hash || server_static_public_key || header[0:208])
 ```
 
-For RKN, append the raw decoded 32-byte cookie to that MAC input. The base64
-text is never authenticated directly. A different cookie or a one-bit MAC
-change must fail before timestamp/body processing or application authorization.
+For RKN, append the raw decoded 32-byte cookie:
+
+```text
+BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)
+```
+
+The base64 text is never hashed. A different cookie or a one-bit digest change
+must fail before body authorization.
 
 ## Cookie body contract
 
@@ -130,7 +133,7 @@ The declared reject classes are:
 | `counter` | authenticated transaction correlation failed |
 | `header_type` | outer and authenticated application types disagree |
 | `reply_type` | the transition received a disallowed authenticated reply type |
-| `header_mac` | RKN keyed header MAC did not authenticate the exact cookie, header, and payload ciphertext |
+| `header_digest` | RKN digest did not authenticate the exact cookie and header |
 | `application_body` | immutable identity, resource, RunID, or exact body parsing failed |
 | `peer_authentication` | the expected static peer key did not authenticate the packet |
 

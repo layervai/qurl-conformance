@@ -225,21 +225,21 @@ artifact has its own `artifact` id:
   `vectors/README_agent_knock_application_vectors.md`.
 - **Registered-agent session control**
   (`qurl-agent-session-control-vectors`,
-  `agent_session_control_vectors.json`, schema version 4) — deterministic full packets for the
+  `agent_session_control_vectors.json`, schema version 2) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and bodyless one-way global EXT, pinned to
   `layervai/qurl-go` producer revision
   `c345051876be4f74bb46ff36dfcbffbbf9d45cee`. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
-  standard-base64 32-byte cookie by appending the raw cookie bytes to the keyed
-  NHP 1.2 header-MAC transcript. The RKN ACK counter echoes RKN and the successful ACK carries
+  standard-base64 32-byte cookie by extending the header digest with the raw
+  cookie bytes. The RKN ACK counter echoes RKN and the successful ACK carries
   a nonzero server-assigned uint64 session ID. Its raw JSON `sessId` number can
   exceed JavaScript's safe-integer range, so JavaScript consumers must parse it
   losslessly into `BigInt` rather than pass it through an ordinary
   `JSON.parse` number. EXT is bodyless, receives no
   response, and closes all sessions for its authenticated agent identity. The
   artifact freezes both static X25519 identities, every
-  deterministic ephemeral key, body byte, header MAC, and packet byte, plus
+  deterministic ephemeral key, body byte, header digest, and packet byte, plus
   closed cookie and flow reject suites. Consumers must rebuild initiator
   packets, authenticate replies against the assigned cell key, and enforce the
   application-body and correlation gates after decryption. See
@@ -340,7 +340,7 @@ artifact has its own `artifact` id:
 - **Connector Hub LST return-routability cookie v1**
   (`qurl-connector-hub-lst-cookie-v1-vectors`,
   `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing,
-  the Hub-LST-only `0x0002` proof flag and MAC input, initial and refresh
+  the Hub-LST-only `0x0004` proof flag and digest input, initial and refresh
   flows, strict zero-flag COK parsing (including terminal compressed and
   unknown-flag rejects), dynamic no-amplification bounds, and silent
   pre-Authority rejects. It neither changes nor reuses the existing overload
@@ -374,37 +374,31 @@ the artifact. Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 
-Every non-KPL NHP packet in this repository — relay-knock, agent-registration,
-agent-assignment, and agent-session — carries **protocol 1.2** in
-`HeaderCommon[8:10]` (`01 02`), exposed as `NHPProtocolVersionMajor` /
+Every NHP packet in this repository — relay-knock, agent-registration,
+agent-assignment, and agent-session — carries **protocol 1.1** in
+`HeaderCommon[8:10]` (`01 01`), exposed as `NHPProtocolVersionMajor` /
 `NHPProtocolVersionMinor`. All four families moved from 1.0 together and the
 loaders assert the bytes.
 
-1.2 retains the body-AAD binding introduced in 1.1 and replaces the terminal
-unkeyed digest with a domain-separated HMAC-BLAKE2s-256 key derived from `ck3`.
-The MAC authenticates `header[0:128] || payload_ciphertext` and, for RKN/Hub
-return-routability packets, the exact raw 32-byte cookie. This authenticates
-header-only messages as well as packets with an AEAD body tag. Reserved header
-bytes and the unsupported IBC identity region must be all zero.
+1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
+as the body-seal AAD, so **editing any header field breaks the body open**.
+Under 1.0 the flag word, header type and declared payload size rode outside
+every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
+holding the peer's static *public* key can recompute — so those fields were
+forgeable. Chain-key derivation, the body key, the nonce, and the header-digest
+input are unchanged.
 
-A 1.2 receiver rejects 1.1 and older senders by design, so senders must never lead
+A 1.1 receiver rejects a 1.0 sender by design, so senders must never lead
 receivers on a rollout. Reject a lower minor on the version byte rather than on
-a MAC/AEAD failure, so the failure is explicit. A higher minor is accepted only
-while it preserves the authenticated transcript. A future framing, KDF, MAC, or
-AEAD-transcript change must use a new protocol major; raising only the new
-receiver's floor cannot protect already-deployed floor-based receivers.
-
-The Appendix A2.1 KPL keepalive is not represented by these packet artifacts.
-It is the specification's exact 12-byte all-zero, empty-body exception and does
-not use the authenticated Curve framing above.
+an AEAD tag, so the failure is explicit; admit a higher minor so a later
+compatible release cannot strand deployed clients.
 
 ## Who authenticates these bytes
 
 This repository publishes wire truth; it does not authenticate it. The module is
-stdlib-only by rule (`go.mod` carries no `require`), so no Go check can recompute
-a complete packet or header MAC. The npm and Python smokes do independently
-recompute the synthetic Hub header-MAC KAT; complete-packet gates remain
-**structural**: framing,
+stdlib-only by rule (`go.mod` carries no `require`), so no BLAKE2s or AEAD
+primitive exists here and no in-repo check can recompute a packet, a header
+digest, or the Hub proof digest. The in-repo gates are **structural**: framing,
 lengths, canonical hex/base64, key roles, counter and version bytes, cross-field
 correlation. A transcription error inside an otherwise well-formed regenerated
 `packet_hex` would pass CI here.

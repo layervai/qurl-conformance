@@ -17,10 +17,10 @@ const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
 	// re-knock and one-way global-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
-	// AgentSessionControlSchemaVersion identifies the NHP 1.2 keyed header-MAC,
-	// bodyless one-way EXT, and server-session-bound ACK shape. Earlier schemas
-	// are intentionally not accepted.
-	AgentSessionControlSchemaVersion = 4
+	// AgentSessionControlSchemaVersion identifies the bodyless one-way EXT and
+	// server-session-bound ACK shape. Version 1 included a bodyful EXT response
+	// and is intentionally not accepted.
+	AgentSessionControlSchemaVersion = 2
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// sealed the golden packets and introduced the strict server-session ACK plus
 	// bodyless one-way EXT contract in layervai/qurl-go. This is the signed,
@@ -37,7 +37,7 @@ const (
 	AgentSessionHeaderEXT = 16
 
 	AgentSessionCookieSize     = 32
-	AgentSessionHeaderSize     = 160
+	AgentSessionHeaderSize     = 240
 	AgentSessionTagSize        = 16
 	AgentSessionPacketMaxBytes = 4096
 
@@ -60,7 +60,7 @@ const (
 	AgentSessionRejectCounter            = "counter"
 	AgentSessionRejectHeaderType         = "header_type"
 	AgentSessionRejectReplyType          = "reply_type"
-	AgentSessionRejectHeaderMAC          = "header_mac"
+	AgentSessionRejectHeaderDigest       = "header_digest"
 	AgentSessionRejectApplicationBody    = "application_body"
 	AgentSessionRejectPeerAuthentication = "peer_authentication"
 )
@@ -90,7 +90,7 @@ type AgentSessionProtocol struct {
 	COKWireCounterCorrelation     string `json:"cok_wire_counter_correlation"`
 	COKBodyTransactionCorrelation string `json:"cok_body_transaction_correlation"`
 	ACKCounterCorrelation         string `json:"ack_counter_correlation"`
-	RKNHeaderMAC                  string `json:"rkn_header_mac"`
+	RKNHeaderDigest               string `json:"rkn_header_digest"`
 	ExitBody                      string `json:"exit_body"`
 	ExitResponse                  string `json:"exit_response"`
 	ExitCookieChallengeAllowed    bool   `json:"exit_cookie_challenge_allowed"`
@@ -128,12 +128,12 @@ type AgentSessionPacket struct {
 	SenderKey           string `json:"sender_key"`
 	ReceiverKey         string `json:"receiver_key"`
 	EphemeralPrivateHex string `json:"ephemeral_private_hex"`
-	TimestampMillis     string `json:"timestamp_millis"`
+	TimestampNanos      string `json:"timestamp_nanos"`
 	Counter             string `json:"counter"`
 	PreambleHex         string `json:"preamble_hex"`
 	BodyJSON            string `json:"body_json"`
 	BodyHex             string `json:"body_hex"`
-	HeaderMACHex        string `json:"header_mac_hex"`
+	HeaderDigestHex     string `json:"header_digest_hex"`
 	PacketHex           string `json:"packet_hex"`
 }
 
@@ -209,7 +209,7 @@ func validateAgentSessionProtocol(p AgentSessionProtocol) error {
 	if p.CookieSizeBytes != AgentSessionCookieSize || p.CookieEncoding != "base64_std_padded_canonical" ||
 		p.COKWireCounterCorrelation != "unconstrained" || p.COKBodyTransactionCorrelation != "must_equal_knock_counter" ||
 		p.ACKCounterCorrelation != "must_echo_request" ||
-		p.RKNHeaderMAC != "HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || cookie)" ||
+		p.RKNHeaderDigest != "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)" ||
 		p.ExitBody != "empty" || p.ExitResponse != "none" ||
 		p.ExitCookieChallengeAllowed {
 		return errors.New("conformance: agent-session protocol contract drifted")
@@ -257,10 +257,10 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if err := validateAgentAssignmentHex("agent-session "+name+" preamble", p.PreambleHex, 4); err != nil {
 		return err
 	}
-	if err := validateAgentAssignmentHex("agent-session "+name+" header MAC", p.HeaderMACHex, 32); err != nil {
+	if err := validateAgentAssignmentHex("agent-session "+name+" header digest", p.HeaderDigestHex, 32); err != nil {
 		return err
 	}
-	if err := validateAgentAssignmentUint64("agent-session "+name+" timestamp", p.TimestampMillis); err != nil {
+	if err := validateAgentAssignmentUint64("agent-session "+name+" timestamp", p.TimestampNanos); err != nil {
 		return err
 	}
 	if err := validateAgentAssignmentUint64("agent-session "+name+" counter", p.Counter); err != nil {
@@ -303,14 +303,19 @@ func validateAgentSessionPacket(name string, p AgentSessionPacket, wantName stri
 	if binary.BigEndian.Uint64(packet[16:24]) != counter {
 		return fmt.Errorf("conformance: agent-session %s wire counter drifted", name)
 	}
-	headerMAC, _ := hex.DecodeString(p.HeaderMACHex)
-	if !bytes.Equal(packet[128:160], headerMAC) {
-		return fmt.Errorf("conformance: agent-session %s header_mac_hex does not match packet", name)
+	headerDigest, _ := hex.DecodeString(p.HeaderDigestHex)
+	if !bytes.Equal(packet[208:240], headerDigest) {
+		return fmt.Errorf("conformance: agent-session %s header_digest_hex does not match packet", name)
 	}
 	ephemeralPrivate, _ := hex.DecodeString(p.EphemeralPrivateHex)
 	ephemeral, err := ecdh.X25519().NewPrivateKey(ephemeralPrivate)
 	if err != nil || !bytes.Equal(packet[24:56], ephemeral.PublicKey().Bytes()) {
 		return fmt.Errorf("conformance: agent-session %s ephemeral key does not match packet", name)
+	}
+	for _, b := range packet[56:136] {
+		if b != 0 {
+			return fmt.Errorf("conformance: agent-session %s identity padding is nonzero", name)
+		}
 	}
 	return nil
 }
@@ -383,7 +388,7 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	}
 	var cok agentSessionCookieBody
 	if err := json.Unmarshal([]byte(o.CookieReply.BodyJSON), &cok); err != nil || cok.Cookie != o.CookieB64 {
-		return errors.New("conformance: agent-session COK cookie differs from RKN header-MAC cookie")
+		return errors.New("conformance: agent-session COK cookie differs from RKN digest cookie")
 	}
 	if err := validateAgentSessionACKBody("RKN ACK", o.ACK.BodyJSON, 900, knock.ResourceID); err != nil {
 		return err
@@ -524,8 +529,8 @@ func validateAgentSessionFlowCases(cases []AgentSessionFlowCase) error {
 		"reject_exit_nonempty_body":             {Name: "reject_exit_nonempty_body", Stage: "exit_request", Mutation: "nonempty_body", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectApplicationBody},
 		"reject_rkn_ack_type_cok":               {Name: "reject_rkn_ack_type_cok", Stage: "reknock_ack", Mutation: "reply_type_7", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectReplyType},
 		"reject_rkn_ack_counter_mismatch":       {Name: "reject_rkn_ack_counter_mismatch", Stage: "reknock_ack", Mutation: "reply_counter_differs_from_rkn", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectCounter},
-		"reject_rkn_wrong_cookie_mac":           {Name: "reject_rkn_wrong_cookie_mac", Stage: "reknock_request", Mutation: "header_mac_uses_different_cookie", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectHeaderMAC},
-		"reject_rkn_tampered_mac":               {Name: "reject_rkn_tampered_mac", Stage: "reknock_request", Mutation: "header_mac_bit_flip", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectHeaderMAC},
+		"reject_rkn_wrong_cookie_digest":        {Name: "reject_rkn_wrong_cookie_digest", Stage: "reknock_request", Mutation: "digest_uses_different_cookie", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectHeaderDigest},
+		"reject_rkn_tampered_digest":            {Name: "reject_rkn_tampered_digest", Stage: "reknock_request", Mutation: "header_digest_bit_flip", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectHeaderDigest},
 		"reject_rkn_trailing_body":              {Name: "reject_rkn_trailing_body", Stage: "reknock_request", Mutation: "body_trailing_value", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectApplicationBody},
 		"reject_rkn_changed_run_id":             {Name: "reject_rkn_changed_run_id", Stage: "reknock_request", Mutation: "run_id_differs_from_knock", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectApplicationBody},
 		"reject_reply_wrong_server_key":         {Name: "reject_reply_wrong_server_key", Stage: "reply_authentication", Mutation: "decrypt_with_different_server_key", Outcome: AgentSessionOutcomeReject, RejectClass: AgentSessionRejectPeerAuthentication},

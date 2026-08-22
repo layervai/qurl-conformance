@@ -7,10 +7,9 @@ tagging the release that publishes them.
 ## What CI here does and does not prove
 
 The root module is stdlib-only by rule — `go.mod` carries no `require` line —
-so **no BLAKE2s, X25519-AEAD or Noise primitive exists in the Go module**, and
-no Go test here can recompute a `packet_hex` or `header_mac_hex`. The npm and
-Python package smokes independently recompute the synthetic Hub header-MAC KAT,
-but they do not reseal complete Noise packets. That is deliberate: an artifact that imported a
+so **no BLAKE2s, X25519-AEAD or Noise primitive exists in this repository**, and
+no test here can recompute a `packet_hex`, a `header_digest_hex`, or the Hub
+`expected_digest_hex`. That is deliberate: a vectors artifact that imported a
 codec to check itself would depend on its own consumers, and every wire change
 would deadlock.
 
@@ -37,8 +36,8 @@ handoff real rather than assumed.
 
 ## When a release regenerates NHP packet bytes
 
-Applies whenever any `packet_hex`, `header_mac_hex`, `header_prefix_hex` or
-`expected_mac_hex` changes — a protocol bump, a key rotation, a reseal.
+Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
+`expected_digest_hex` changes — a protocol bump, a key rotation, a reseal.
 
 - [ ] **Name the producer.** Record which repository and commit emitted the new
       bytes. Update `AgentSessionControlProducerRevision` (`agent_session.go`),
@@ -77,13 +76,10 @@ Applies whenever any `packet_hex`, `header_mac_hex`, `header_prefix_hex` or
       `sessId`; missing, wrong-type, overflowing, or nonzero denial lifetimes
       are not conformant `server_deny` bodies. Record the producer tests in the
       PR or release handoff; consumer-only fixtures do not satisfy this gate.
-- [ ] **State the rollout order.** Merge and publish the exact producer commit
-      first without deploying it, then release these vectors, then perform the
-      coordinated NHP 1.2 fleet cutover, and release clients last. The 1.2
-      160-byte/HMAC profile is intentionally incompatible with every 1.1 peer,
-      so senders must never lead receivers and a mixed-version rolling window
-      is not supported. The dependency-age quarantine keeps these as separate,
-      reviewable passes.
+- [ ] **State the rollout order.** A 1.1 receiver rejects a 1.0 sender by
+      design, so senders must never lead receivers. Vectors release first,
+      servers next, clients last, and the 7-day dependency-age quarantine makes
+      each step a separate pass roughly a week apart.
 
 ## After the release
 

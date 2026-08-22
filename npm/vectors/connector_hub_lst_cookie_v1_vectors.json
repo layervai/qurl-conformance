@@ -1,6 +1,6 @@
 {
   "artifact": "qurl-connector-hub-lst-cookie-v1-vectors",
-  "schema_version": 3,
+  "schema_version": 1,
   "description": "Strict native-UDP return-routability challenge for authenticated initial and refresh assignment LST handled by Connector Hub workers. The challenge prevents an unregistered LST from reflecting a larger Authority-backed LRT to an unproven source address.",
   "source_of_truth": "layervai/qurl-conformance",
   "contract": {
@@ -42,10 +42,10 @@
     "success_header_type": 6,
     "unproven_header_flags_hex": "0000",
     "proof_flag_name": "NHP_FLAG_HUB_LST_COOKIE_PROOF",
-    "proof_flag_hex": "0002",
+    "proof_flag_hex": "0004",
     "proof_flag_exclusive": true,
-    "proof_header_mac": "HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || raw_cookie)",
-    "proof_cookie_mac_input": "raw_32_bytes",
+    "proof_header_digest": "BLAKE2s-256(initial_hash || hub_server_static_public_key || header[0:208] || raw_cookie)",
+    "proof_cookie_digest_input": "raw_32_bytes",
     "proof_header_freshness_rule": "fresh_ephemeral_timestamp_and_counter",
     "proof_body_rule": "byte_identical_to_unproven_authenticated_body",
     "proof_request_nonce_rule": "same_request_nonce_inside_identical_body",
@@ -57,16 +57,16 @@
     "additive_application_profiles": [
       "qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition"
     ],
-    "curve_header_bytes": 160,
+    "curve_header_bytes": 240,
     "body_aead_tag_bytes": 16,
-    "empty_body_packet_bytes": 160,
-    "nonempty_packet_overhead_bytes": 176,
-    "max_plaintext_body_bytes": 3920,
+    "empty_body_packet_bytes": 240,
+    "nonempty_packet_overhead_bytes": 256,
+    "max_plaintext_body_bytes": 3840,
     "max_packet_bytes": 4096,
     "challenge_max_transaction_id": "18446744073709551615",
     "challenge_max_body_json": "{\"trxId\":18446744073709551615,\"cookie\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"}",
     "challenge_max_body_bytes": 86,
-    "challenge_max_packet_bytes": 262
+    "challenge_max_packet_bytes": 342
   },
   "cookie_kats": [
     {
@@ -101,14 +101,18 @@
       "cookie_b64": "2gVYp0i3nuyJL0haEcPe7tuQQd/s19E7Fes32QEyPx0="
     }
   ],
-  "header_mac_kat": {
-    "purpose": "nhp_1_2_header_mac_with_payload_and_cookie",
-    "chain_key_hex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
-    "kdf_domain_hex": "6e68702d6865616465722d6d61632d763100",
-    "header_prefix_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
-    "payload_ciphertext_hex": "deadbeef010203",
-    "raw_cookie_hex": "5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
-    "expected_mac_hex": "199691cefc6b02e78b56142f27ba3158889557c1d307c450aa85e14a8ca6fb3d"
+  "proof_digest_kat": {
+    "purpose": "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet",
+    "initial_hash_hex": "4e4850206861736867656e20762e32303233303432314064656570636c6f75647364702e636f6d",
+    "hub_server_static_public_key_hex": "4d27bcee3135c4944b28d27dd809b07be10c35160d20131caa7e85575498d07c",
+    "header_prefix_hex": "c1d2e3f4c1d7e331010100040000000000000000000000173a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe240000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e51c96e754bba5426ed4b5d6cf38cb3c173568c29010c70049925f42dd10c0c1cecf72766c7475288fd5da54d18c2cf7f6656361fcaefc4c25c8f5069da44db732656a2e235c7212",
+    "header_type": 5,
+    "header_flags_hex": "0004",
+    "counter": "23",
+    "timestamp_nanos": "1700000000000002000",
+    "ephemeral_public_key_hex": "3a553d74792d727efa9b9a4cde3da1ad93f1a2d0c09cb639b1a3c0fda14cbe24",
+    "raw_cookie_hex": "606fc2b99882d8dc6254d89a8756493c5183d068c07475005127f1adf8ebacb6",
+    "expected_digest_hex": "394bf178250b4d78461193415e8c7f15b632b6b58a560b1ffb14f505583f0c30"
   },
   "flows": [
     {
@@ -119,13 +123,13 @@
       "proof_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"enroll\",\"request_nonce\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\",\"credential\":\"lv_live_conformance_bootstrap_secret_0001\"}}",
       "request_nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
       "unproven_header_flags_hex": "0000",
-      "proof_header_flags_hex": "0002",
-      "unproven_request_packet_bytes": 413,
+      "proof_header_flags_hex": "0004",
+      "unproven_request_packet_bytes": 493,
       "challenge_body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "challenge_body_bytes": 68,
-      "challenge_packet_bytes": 244,
-      "proof_request_packet_bytes": 413,
-      "legacy_assignment_fixture_result_packet_bytes": 715,
+      "challenge_packet_bytes": 324,
+      "proof_request_packet_bytes": 493,
+      "legacy_assignment_fixture_result_packet_bytes": 795,
       "authority_invocations_before_proof": 0,
       "authority_invocations_after_proof": 1
     },
@@ -137,13 +141,13 @@
       "proof_body_json": "{\"usrId\":\"\",\"devId\":\"agent-conform\",\"aspId\":\"agent\",\"usrData\":{\"query\":\"cell_assignment\",\"version\":1,\"mode\":\"refresh\",\"request_nonce\":\"wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8\"}}",
       "request_nonce": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8",
       "unproven_header_flags_hex": "0000",
-      "proof_header_flags_hex": "0002",
-      "unproven_request_packet_bytes": 357,
+      "proof_header_flags_hex": "0004",
+      "unproven_request_packet_bytes": 437,
       "challenge_body_json": "{\"trxId\":22,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "challenge_body_bytes": 68,
-      "challenge_packet_bytes": 244,
-      "proof_request_packet_bytes": 357,
-      "legacy_assignment_fixture_result_packet_bytes": 537,
+      "challenge_packet_bytes": 324,
+      "proof_request_packet_bytes": 437,
+      "legacy_assignment_fixture_result_packet_bytes": 617,
       "authority_invocations_before_proof": 0,
       "authority_invocations_after_proof": 1
     }
@@ -155,8 +159,8 @@
       "application_body_class": "empty",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 0,
-      "received_lst_packet_bytes": 160,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 240,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "drop_silently"
     },
     {
@@ -165,8 +169,8 @@
       "application_body_class": "opaque_fill_85",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 85,
-      "received_lst_packet_bytes": 261,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 341,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "drop_silently"
     },
     {
@@ -175,8 +179,8 @@
       "application_body_class": "opaque_fill_86",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 86,
-      "received_lst_packet_bytes": 262,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 342,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "drop_silently"
     },
     {
@@ -185,8 +189,8 @@
       "application_body_class": "refresh_assignment",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 181,
-      "received_lst_packet_bytes": 357,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 437,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "challenge_size_eligible"
     },
     {
@@ -195,8 +199,8 @@
       "application_body_class": "malformed_json_87",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 87,
-      "received_lst_packet_bytes": 263,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 343,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "challenge_size_eligible"
     },
     {
@@ -205,8 +209,8 @@
       "application_body_class": "initial_assignment",
       "challenge_transaction_id": "18446744073709551615",
       "request_plaintext_body_bytes": 237,
-      "received_lst_packet_bytes": 413,
-      "candidate_cok_packet_bytes": 262,
+      "received_lst_packet_bytes": 493,
+      "candidate_cok_packet_bytes": 342,
       "size_gate_action": "challenge_size_eligible"
     }
   ],
@@ -215,33 +219,33 @@
       "name": "initial_real_qat1_golden",
       "phase": "initial_assignment",
       "basis": "assignment_ticket_v1.golden_lrt_envelope",
-      "request_packet_bytes": 413,
+      "request_packet_bytes": 493,
       "result_body_bytes": 1519,
-      "result_packet_bytes": 1695,
-      "amplification_numerator_bytes": 1695,
-      "amplification_denominator_bytes": 413,
-      "legacy_assignment_fixture_packet_bytes": 715
+      "result_packet_bytes": 1775,
+      "amplification_numerator_bytes": 1775,
+      "amplification_denominator_bytes": 493,
+      "legacy_assignment_fixture_packet_bytes": 795
     },
     {
       "name": "initial_max_ticket_envelope",
       "phase": "initial_assignment",
       "basis": "assignment_ticket_v1.template_plus_max_ticket",
-      "request_packet_bytes": 413,
+      "request_packet_bytes": 493,
       "result_body_bytes": 2820,
-      "result_packet_bytes": 2996,
-      "amplification_numerator_bytes": 2996,
-      "amplification_denominator_bytes": 413
+      "result_packet_bytes": 3076,
+      "amplification_numerator_bytes": 3076,
+      "amplification_denominator_bytes": 493
     },
     {
       "name": "refresh_assignment_golden",
       "phase": "refresh_assignment",
       "basis": "agent_assignment_golden.refresh_result",
-      "request_packet_bytes": 357,
+      "request_packet_bytes": 437,
       "result_body_bytes": 361,
-      "result_packet_bytes": 537,
-      "amplification_numerator_bytes": 537,
-      "amplification_denominator_bytes": 357,
-      "legacy_assignment_fixture_packet_bytes": 537
+      "result_packet_bytes": 617,
+      "amplification_numerator_bytes": 617,
+      "amplification_denominator_bytes": 437,
+      "legacy_assignment_fixture_packet_bytes": 617
     }
   ],
   "key_cases": [
@@ -483,7 +487,7 @@
       "name": "reject_compressed_challenge",
       "stage": "challenge_reply",
       "mutation": "compress_flag_set",
-      "header_flags_hex": "0001",
+      "header_flags_hex": "0002",
       "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
@@ -492,7 +496,7 @@
       "name": "reject_unknown_flag_challenge",
       "stage": "challenge_reply",
       "mutation": "unknown_flag_set",
-      "header_flags_hex": "0004",
+      "header_flags_hex": "0008",
       "body_json": "{\"trxId\":21,\"cookie\":\"YG/CuZiC2NxiVNiah1ZJPFGD0GjAdHUAUSfxrfjrrLY=\"}",
       "outcome": "reject",
       "client_action": "stop_without_third_lst_or_fallback"
