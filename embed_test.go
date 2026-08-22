@@ -379,8 +379,8 @@ func TestEmbeddedRelayKnockLoads(t *testing.T) {
 	if rf.Artifact != RelayKnockArtifactID {
 		t.Errorf("artifact = %q, want %q", rf.Artifact, RelayKnockArtifactID)
 	}
-	if rf.SchemaVersion == 0 {
-		t.Errorf("schema_version = 0, want non-zero")
+	if rf.SchemaVersion != RelayKnockSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", rf.SchemaVersion, RelayKnockSchemaVersion)
 	}
 	if rf.Knock.PacketHex == "" {
 		t.Errorf("knock.packet_hex is empty")
@@ -398,8 +398,8 @@ func TestEmbeddedAgentRegistrationLoads(t *testing.T) {
 	if af.Artifact != AgentRegistrationArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentRegistrationArtifactID)
 	}
-	if af.SchemaVersion == 0 {
-		t.Errorf("schema_version = 0, want non-zero")
+	if af.SchemaVersion != AgentRegistrationSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", af.SchemaVersion, AgentRegistrationSchemaVersion)
 	}
 
 	// Every case must carry a non-empty packet_hex and body_hex.
@@ -452,8 +452,8 @@ func TestEmbeddedAgentAssignmentLoads(t *testing.T) {
 	if af.Artifact != AgentAssignmentArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentAssignmentArtifactID)
 	}
-	if af.SchemaVersion != 4 {
-		t.Errorf("schema_version = %d, want 4", af.SchemaVersion)
+	if af.SchemaVersion != AgentAssignmentSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", af.SchemaVersion, AgentAssignmentSchemaVersion)
 	}
 	if !slices.Equal(af.PublicRegistrationKeyKinds, []string{"bootstrap", "connector_bootstrap", "account", "agent"}) {
 		t.Errorf("public registration key kinds = %v", af.PublicRegistrationKeyKinds)
@@ -1589,13 +1589,13 @@ func TestAgentKnockSessionEnvelopeContract(t *testing.T) {
 }
 
 // downgradeNHPPacketVersion rewrites HeaderCommon[9] of a hex-encoded NHP packet
-// to 0, i.e. back to the protocol-1.0 transcript that left the header word
-// unauthenticated. Byte 9 is hex characters 18:20.
+// to 1, i.e. the immediately previous protocol version that lacks the keyed
+// NHP 1.2 header MAC. Byte 9 is hex characters 18:20.
 func downgradeNHPPacketVersion(packetHex string) string {
 	if len(packetHex) < 20 {
 		return packetHex
 	}
-	return packetHex[:18] + "00" + packetHex[20:]
+	return packetHex[:18] + "01" + packetHex[20:]
 }
 
 // nhpGoldenPacketHexes returns every NHP golden packet in the repository keyed by

@@ -21,7 +21,7 @@ const (
 	ConnectorHubLSTCookieArtifactID = "qurl-connector-hub-lst-cookie-v1-vectors"
 	// ConnectorHubLSTCookieSchemaVersion is the only schema accepted by this
 	// release.
-	ConnectorHubLSTCookieSchemaVersion = 1
+	ConnectorHubLSTCookieSchemaVersion = 3
 
 	ConnectorHubLSTCookieAlgorithm       = "HMAC-SHA-256"
 	ConnectorHubLSTCookieDomain          = "nhp-connector-hub-lst-cookie-v1"
@@ -34,17 +34,14 @@ const (
 	ConnectorHubLSTCookieWindowSeconds   = 30
 
 	ConnectorHubLSTCookieProofFlagName     = "NHP_FLAG_HUB_LST_COOKIE_PROOF"
-	ConnectorHubLSTCookieProofFlagHex      = "0004"
-	ConnectorHubLSTCookieProofFlag         = uint16(0x0004)
+	ConnectorHubLSTCookieProofFlagHex      = "0002"
+	ConnectorHubLSTCookieProofFlag         = uint16(0x0002)
 	ConnectorHubLSTCookieChallengeFlagsHex = "0000"
-	ConnectorHubLSTProofKATPurpose         = "digest_primitive_with_fresh_proof_header_not_complete_encrypted_packet"
-	// Recomputed for protocol 1.1: the KAT header prefix is derived from the
-	// refresh-assignment request packet, whose HeaderCommon now carries minor 1,
-	// so the digest over that prefix moves with it. Keep in lockstep with
-	// TestHubLSTCookieProofDigestKAT in the NHP reference implementation.
-	connectorHubLSTProofExpectedDigest = "394bf178250b4d78461193415e8c7f15b632b6b58a560b1ffb14f505583f0c30"
+	ConnectorHubLSTHeaderMACKATPurpose     = "nhp_1_2_header_mac_with_payload_and_cookie"
+	ConnectorHubLSTHeaderMACKDFDomainHex   = "6e68702d6865616465722d6d61632d763100"
+	connectorHubLSTExpectedHeaderMAC       = "199691cefc6b02e78b56142f27ba3158889557c1d307c450aa85e14a8ca6fb3d"
 
-	ConnectorHubLSTCookieHeaderBytes       = 240
+	ConnectorHubLSTCookieHeaderBytes       = 160
 	ConnectorHubLSTCookieBodyAEADTagBytes  = 16
 	ConnectorHubLSTCookiePacketMaxBytes    = 4096
 	ConnectorHubLSTCookiePacketOverhead    = ConnectorHubLSTCookieHeaderBytes + ConnectorHubLSTCookieBodyAEADTagBytes
@@ -89,8 +86,8 @@ var connectorHubLSTCookieChallengeCases = map[string]struct {
 	"reject_cookie_encoding":        {"challenge_reply", "cookie_not_canonical_padded_base64", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
 	"reject_cookie_length":          {"challenge_reply", "decoded_cookie_not_32_bytes", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
 	"reject_untrusted_server":       {"challenge_reply", "cok_not_authenticated_by_pinned_hub_key", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_compressed_challenge":   {"challenge_reply", "compress_flag_set", "0002", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
-	"reject_unknown_flag_challenge": {"challenge_reply", "unknown_flag_set", "0008", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_compressed_challenge":   {"challenge_reply", "compress_flag_set", "0001", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
+	"reject_unknown_flag_challenge": {"challenge_reply", "unknown_flag_set", "0004", ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
 	"reject_second_challenge":       {"proof_reply", "authenticated_cok_after_proof_lst", ConnectorHubLSTCookieChallengeFlagsHex, ConnectorHubLSTCookieOutcomeReject, ConnectorHubLSTCookieClientStop},
 }
 
@@ -103,7 +100,7 @@ type ConnectorHubLSTCookieFile struct {
 	SourceOfTruth  string                              `json:"source_of_truth"`
 	Contract       ConnectorHubLSTCookieContract       `json:"contract"`
 	CookieKATs     []ConnectorHubLSTCookieKAT          `json:"cookie_kats"`
-	ProofDigestKAT ConnectorHubLSTProofDigestKAT       `json:"proof_digest_kat"`
+	HeaderMACKAT   ConnectorHubLSTHeaderMACKAT         `json:"header_mac_kat"`
 	Flows          []ConnectorHubLSTCookieFlow         `json:"flows"`
 	SizeCases      []ConnectorHubLSTCookieSizeCase     `json:"size_cases"`
 	SuccessSizes   []ConnectorHubAssignmentSuccessSize `json:"assignment_success_sizes"`
@@ -146,8 +143,8 @@ type ConnectorHubLSTCookieContract struct {
 	ProofFlagName                 string   `json:"proof_flag_name"`
 	ProofFlagHex                  string   `json:"proof_flag_hex"`
 	ProofFlagExclusive            bool     `json:"proof_flag_exclusive"`
-	ProofHeaderDigest             string   `json:"proof_header_digest"`
-	ProofCookieDigestInput        string   `json:"proof_cookie_digest_input"`
+	ProofHeaderMAC                string   `json:"proof_header_mac"`
+	ProofCookieMACInput           string   `json:"proof_cookie_mac_input"`
 	ProofHeaderFreshnessRule      string   `json:"proof_header_freshness_rule"`
 	ProofBodyRule                 string   `json:"proof_body_rule"`
 	ProofRequestNonceRule         string   `json:"proof_request_nonce_rule"`
@@ -183,23 +180,19 @@ type ConnectorHubLSTCookieKAT struct {
 	EqualTo                       string `json:"equal_to,omitempty"`
 }
 
-// ConnectorHubLSTProofDigestKAT freezes an executable digest over a fresh
-// deterministic Curve header prefix and the opaque Hub cookie. It is a digest
-// primitive, not a complete encrypted packet; flow fixtures separately pin
-// the byte-identical body and request nonce. Cryptographic consumers recompute
-// ExpectedDigestHex with BLAKE2s-256.
-type ConnectorHubLSTProofDigestKAT struct {
-	Purpose                     string `json:"purpose"`
-	InitialHashHex              string `json:"initial_hash_hex"`
-	HubServerStaticPublicKeyHex string `json:"hub_server_static_public_key_hex"`
-	HeaderPrefixHex             string `json:"header_prefix_hex"`
-	HeaderType                  int    `json:"header_type"`
-	HeaderFlagsHex              string `json:"header_flags_hex"`
-	Counter                     string `json:"counter"`
-	TimestampNanos              string `json:"timestamp_nanos"`
-	EphemeralPublicKeyHex       string `json:"ephemeral_public_key_hex"`
-	RawCookieHex                string `json:"raw_cookie_hex"`
-	ExpectedDigestHex           string `json:"expected_digest_hex"`
+// ConnectorHubLSTHeaderMACKAT freezes the NHP 1.2 domain-separated keyed
+// header-MAC primitive, including both payload ciphertext and the type-specific
+// raw Hub cookie. It is deliberately not a complete packet; packet artifacts
+// separately pin canonical 1.2 framing and cryptographic consumers recompute
+// ExpectedMACHex with the real codec.
+type ConnectorHubLSTHeaderMACKAT struct {
+	Purpose              string `json:"purpose"`
+	ChainKeyHex          string `json:"chain_key_hex"`
+	KDFDomainHex         string `json:"kdf_domain_hex"`
+	HeaderPrefixHex      string `json:"header_prefix_hex"`
+	PayloadCiphertextHex string `json:"payload_ciphertext_hex"`
+	RawCookieHex         string `json:"raw_cookie_hex"`
+	ExpectedMACHex       string `json:"expected_mac_hex"`
 }
 
 // ConnectorHubLSTCookieFlow freezes one initial or refresh
@@ -371,7 +364,7 @@ func ParseConnectorHubLSTCookieFile(data []byte) (*ConnectorHubLSTCookieFile, er
 	if err != nil {
 		return nil, fmt.Errorf("conformance: load Connector Hub ticket linkage: %w", err)
 	}
-	if err := validateConnectorHubLSTProofDigestKAT(file.ProofDigestKAT, file.CookieKATs, assignment); err != nil {
+	if err := validateConnectorHubLSTHeaderMACKAT(file.HeaderMACKAT); err != nil {
 		return nil, err
 	}
 	if err := validateConnectorHubLSTCookieFlows(file.Flows, file.CookieKATs[0], assignment); err != nil {
@@ -415,8 +408,8 @@ func validateConnectorHubLSTCookieContract(contract ConnectorHubLSTCookieContrac
 		SuccessHeaderName:       AgentAssignmentResultHeaderName, SuccessHeaderType: AgentAssignmentResultHeaderType,
 		UnprovenHeaderFlagsHex: "0000", ProofFlagName: ConnectorHubLSTCookieProofFlagName,
 		ProofFlagHex: ConnectorHubLSTCookieProofFlagHex, ProofFlagExclusive: true,
-		ProofHeaderDigest:      "BLAKE2s-256(initial_hash || hub_server_static_public_key || header[0:208] || raw_cookie)",
-		ProofCookieDigestInput: "raw_32_bytes", ProofHeaderFreshnessRule: "fresh_ephemeral_timestamp_and_counter",
+		ProofHeaderMAC:      "HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || raw_cookie)",
+		ProofCookieMACInput: "raw_32_bytes", ProofHeaderFreshnessRule: "fresh_ephemeral_timestamp_and_counter",
 		ProofBodyRule:         "byte_identical_to_unproven_authenticated_body",
 		ProofRequestNonceRule: "same_request_nonce_inside_identical_body", ProofResendLimit: 1,
 		SecondChallengeAction: ConnectorHubLSTCookieClientStop, AuthorityBeforeProofAllowed: false,
@@ -483,67 +476,42 @@ func validateConnectorHubLSTCookieKATs(kats []ConnectorHubLSTCookieKAT) error {
 	return nil
 }
 
-func validateConnectorHubLSTProofDigestKAT(kat ConnectorHubLSTProofDigestKAT, cookieKATs []ConnectorHubLSTCookieKAT, assignment *AgentAssignmentFile) error {
-	initialHash := []byte("NHP hashgen v.20230421@deepcloudsdp.com")
-	hubKey, err := hex.DecodeString(kat.HubServerStaticPublicKeyHex)
-	if err != nil || hex.EncodeToString(hubKey) != kat.HubServerStaticPublicKeyHex || len(hubKey) != 32 ||
-		kat.HubServerStaticPublicKeyHex != assignment.Keys.Hub.StaticPubHex {
-		return errors.New("conformance: Connector Hub LST proof-digest Hub key is invalid")
+func validateConnectorHubLSTHeaderMACKAT(kat ConnectorHubLSTHeaderMACKAT) error {
+	if kat.Purpose != ConnectorHubLSTHeaderMACKATPurpose || kat.KDFDomainHex != ConnectorHubLSTHeaderMACKDFDomainHex ||
+		kat.ExpectedMACHex != connectorHubLSTExpectedHeaderMAC {
+		return errors.New("conformance: Connector Hub LST header-MAC KAT identity or output drift")
 	}
-	initialPacket, err := hex.DecodeString(assignment.InitialAssignment.Request.PacketHex)
-	if err != nil || len(initialPacket) < 208 {
-		return errors.New("conformance: Connector Hub LST proof-digest linked request is invalid")
-	}
-	refreshPacket, err := hex.DecodeString(assignment.RefreshAssignment.Request.PacketHex)
-	if err != nil || len(refreshPacket) < 208 {
-		return errors.New("conformance: Connector Hub LST proof-digest fresh-header source is invalid")
-	}
-	// The KAT prefix is the refresh request's own header bytes with only the
-	// proof flag and counter restamped, so its HeaderCommon[8:10] is covered by
-	// the assignment family's protocol-version gate; do not restate that here.
-	wantPrefix := bytes.Clone(refreshPacket[:208])
-	binary.BigEndian.PutUint16(wantPrefix[10:12], ConnectorHubLSTCookieProofFlag)
-	binary.BigEndian.PutUint64(wantPrefix[16:24], 23)
-	prefix, err := hex.DecodeString(kat.HeaderPrefixHex)
-	if err != nil || len(prefix) != 208 || hex.EncodeToString(prefix) != kat.HeaderPrefixHex || !bytes.Equal(prefix, wantPrefix) {
-		return errors.New("conformance: Connector Hub LST proof-digest header prefix drift")
-	}
-	counter, err := strconv.ParseUint(kat.Counter, 10, 64)
-	if err != nil || strconv.FormatUint(counter, 10) != kat.Counter {
-		return errors.New("conformance: Connector Hub LST proof-digest counter is invalid")
-	}
-	word := binary.BigEndian.Uint32(prefix[0:4]) ^ binary.BigEndian.Uint32(prefix[4:8])
-	if kat.Purpose != ConnectorHubLSTProofKATPurpose || kat.InitialHashHex != hex.EncodeToString(initialHash) ||
-		kat.HeaderType != AgentAssignmentRequestHeaderType ||
-		int(word>>16) != kat.HeaderType || kat.HeaderFlagsHex != ConnectorHubLSTCookieProofFlagHex ||
-		binary.BigEndian.Uint16(prefix[10:12]) != ConnectorHubLSTCookieProofFlag || kat.Counter != "23" ||
-		binary.BigEndian.Uint64(prefix[16:24]) != counter || kat.TimestampNanos != assignment.RefreshAssignment.Request.TimestampNanos ||
-		kat.EphemeralPublicKeyHex != hex.EncodeToString(prefix[24:56]) {
-		return errors.New("conformance: Connector Hub LST proof-digest typed header fields drift")
-	}
-	if kat.TimestampNanos == assignment.InitialAssignment.Request.TimestampNanos ||
-		binary.BigEndian.Uint64(prefix[16:24]) == binary.BigEndian.Uint64(initialPacket[16:24]) ||
-		bytes.Equal(prefix[24:56], initialPacket[24:56]) {
-		return errors.New("conformance: Connector Hub LST proof-digest header is not fresh")
-	}
-	if len(cookieKATs) == 0 || kat.RawCookieHex != cookieKATs[0].CookieHex {
-		return errors.New("conformance: Connector Hub LST proof-digest cookie linkage drift")
-	}
-	if kat.ExpectedDigestHex != connectorHubLSTProofExpectedDigest {
-		return errors.New("conformance: Connector Hub LST proof-digest output drift")
-	}
+	components := make(map[string][]byte, 6)
 	for name, check := range map[string]struct {
 		value string
 		bytes int
 	}{
-		"initial hash":    {kat.InitialHashHex, len(initialHash)},
-		"cookie":          {kat.RawCookieHex, ConnectorHubLSTCookieBytes},
-		"expected digest": {kat.ExpectedDigestHex, 32},
+		"chain key":          {kat.ChainKeyHex, 32},
+		"KDF domain":         {kat.KDFDomainHex, 18},
+		"header prefix":      {kat.HeaderPrefixHex, 128},
+		"payload ciphertext": {kat.PayloadCiphertextHex, 7},
+		"cookie":             {kat.RawCookieHex, ConnectorHubLSTCookieBytes},
+		"expected MAC":       {kat.ExpectedMACHex, 32},
 	} {
-		decoded, err := hex.DecodeString(check.value)
-		if err != nil || hex.EncodeToString(decoded) != check.value || len(decoded) != check.bytes {
-			return fmt.Errorf("conformance: Connector Hub LST proof-digest %s is invalid", name)
+		component, err := hex.DecodeString(check.value)
+		if err != nil || hex.EncodeToString(component) != check.value || len(component) != check.bytes {
+			return fmt.Errorf("conformance: Connector Hub LST header-MAC KAT %s is invalid", name)
 		}
+		components[name] = component
+	}
+	for i, b := range components["chain key"] {
+		if b != byte(0xa0+i) {
+			return errors.New("conformance: Connector Hub LST header-MAC KAT chain key input drift")
+		}
+	}
+	for i, b := range components["header prefix"] {
+		if b != byte(i) {
+			return errors.New("conformance: Connector Hub LST header-MAC KAT header prefix input drift")
+		}
+	}
+	if !bytes.Equal(components["payload ciphertext"], []byte{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03}) ||
+		!bytes.Equal(components["cookie"], bytes.Repeat([]byte{0x5c}, ConnectorHubLSTCookieBytes)) {
+		return errors.New("conformance: Connector Hub LST header-MAC KAT payload or cookie input drift")
 	}
 	return nil
 }
