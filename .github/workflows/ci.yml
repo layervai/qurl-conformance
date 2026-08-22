@@ -227,8 +227,8 @@ jobs:
             reject_cookie_encoding: '0000',
             reject_cookie_length: '0000',
             reject_untrusted_server: '0000',
-            reject_compressed_challenge: '0002',
-            reject_unknown_flag_challenge: '0008',
+            reject_compressed_challenge: '0001',
+            reject_unknown_flag_challenge: '0004',
             reject_second_challenge: '0000',
           };
           const hubCookieChallengesComplete =
@@ -549,7 +549,7 @@ jobs:
               h.cases.some(v => !deriveHubRequestId(v)) ||
               assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
               hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 3 ||
-              hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
+              hc.contract.proof_flag_hex !== '0002' || hc.contract.challenge_header_flags_hex !== '0000' ||
               hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
               hc.contract.proof_header_mac !== 'HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || raw_cookie)' ||
               !verifyHubHeaderMACKAT() ||
@@ -751,8 +751,8 @@ jobs:
               'reject_cookie_encoding': '0000',
               'reject_cookie_length': '0000',
               'reject_untrusted_server': '0000',
-              'reject_compressed_challenge': '0002',
-              'reject_unknown_flag_challenge': '0008',
+              'reject_compressed_challenge': '0001',
+              'reject_unknown_flag_challenge': '0004',
               'reject_second_challenge': '0000',
           }
           canonical = '0123456789abcdef'
@@ -1082,7 +1082,7 @@ jobs:
           assert all(derive_hub_request_id(v) for v in h['cases'])
           assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
           assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 3
-          assert hc['contract']['proof_flag_hex'] == '0004'
+          assert hc['contract']['proof_flag_hex'] == '0002'
           assert hc['contract']['challenge_header_flags_hex'] == '0000'
           assert hc['contract']['http_fallback_allowed'] is False
           assert hc['contract']['proof_header_mac'] == r'HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\x00), data=header[0:128] || payload_ciphertext || raw_cookie)'
