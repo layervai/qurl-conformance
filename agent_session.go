@@ -15,20 +15,20 @@ import (
 
 const (
 	// AgentSessionControlArtifactID identifies the registered-agent overload
-	// re-knock and one-way global-exit packet artifact.
+	// re-knock and resource-scoped clean-exit packet artifact.
 	AgentSessionControlArtifactID = "qurl-agent-session-control-vectors"
-	// AgentSessionControlSchemaVersion identifies the bodyless one-way EXT and
-	// server-session-bound ACK shape. Version 1 included a bodyful EXT response
-	// and is intentionally not accepted.
-	AgentSessionControlSchemaVersion = 2
+	// AgentSessionControlSchemaVersion identifies the resource-scoped EXT/ACK
+	// and server-session-bound ACK shape. Version 2's bodyless, one-way global
+	// EXT contract is intentionally not accepted on the current NHP 1.1 envelope.
+	AgentSessionControlSchemaVersion = 3
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// sealed the golden packets and introduced the strict server-session ACK plus
-	// bodyless one-way EXT contract in layervai/qurl-go. This is the signed,
+	// resource-scoped EXT/ACK contract in layervai/qurl-go. This is the signed,
 	// pushed unmerged producer commit that emitted the bytes. A squash merge
 	// creates a different SHA: do not claim it emitted these vectors, and do not
 	// delete the producer branch until the merged-SHA follow-up is available.
 	// Re-pin deliberately under the RELEASE_CHECKLIST.md rule.
-	AgentSessionControlProducerRevision = "c345051876be4f74bb46ff36dfcbffbbf9d45cee"
+	AgentSessionControlProducerRevision = "bd743b1509a3c70603f2f5350b398a83ed0fd321"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2
@@ -66,7 +66,7 @@ const (
 )
 
 // AgentSessionControlFile is the complete packet and negative-case contract for
-// one overload KNK/COK/RKN/ACK sequence and one bodyless, one-way EXT.
+// one overload KNK/COK/RKN/ACK sequence and one resource-scoped EXT/ACK.
 type AgentSessionControlFile struct {
 	Artifact         string                       `json:"artifact"`
 	SchemaVersion    int                          `json:"schema_version"`
@@ -117,6 +117,7 @@ type AgentSessionOverloadReknock struct {
 
 type AgentSessionCleanExit struct {
 	Request AgentSessionPacket `json:"request"`
+	ACK     AgentSessionPacket `json:"ack"`
 }
 
 // AgentSessionPacket carries every deterministic input plus the full packet.
@@ -187,6 +188,7 @@ func ParseAgentSessionControlFile(data []byte) (*AgentSessionControlFile, error)
 		{"overload_reknock.reknock_request", "NHP_RKN", "agent", "assigned_cell", AgentSessionHeaderRKN, f.OverloadReknock.ReknockRequest},
 		{"overload_reknock.ack", "NHP_ACK", "assigned_cell", "agent", AgentSessionHeaderACK, f.OverloadReknock.ACK},
 		{"clean_exit.request", "NHP_EXT", "agent", "assigned_cell", AgentSessionHeaderEXT, f.CleanExit.Request},
+		{"clean_exit.ack", "NHP_ACK", "assigned_cell", "agent", AgentSessionHeaderACK, f.CleanExit.ACK},
 	}
 	for _, p := range packets {
 		if err := validateAgentSessionPacket(p.name, p.packet, p.headerName, p.headerType, p.sender, p.receiver); err != nil {
@@ -210,7 +212,7 @@ func validateAgentSessionProtocol(p AgentSessionProtocol) error {
 		p.COKWireCounterCorrelation != "unconstrained" || p.COKBodyTransactionCorrelation != "must_equal_knock_counter" ||
 		p.ACKCounterCorrelation != "must_echo_request" ||
 		p.RKNHeaderDigest != "BLAKE2s-256(initial_hash || server_static_public_key || header[0:208] || cookie)" ||
-		p.ExitBody != "empty" || p.ExitResponse != "none" ||
+		p.ExitBody != "protected_resource_session_identity" || p.ExitResponse != "counter_echoing_ack" ||
 		p.ExitCookieChallengeAllowed {
 		return errors.New("conformance: agent-session protocol contract drifted")
 	}
@@ -352,6 +354,9 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	if o.ACK.Counter != o.ReknockRequest.Counter {
 		return errors.New("conformance: agent-session RKN ACK counter binding drifted")
 	}
+	if f.CleanExit.ACK.Counter != f.CleanExit.Request.Counter {
+		return errors.New("conformance: agent-session clean-exit ACK counter binding drifted")
+	}
 	if knockCounter == rknCounter || rknCounter == exitCounter || knockCounter == exitCounter {
 		return errors.New("conformance: agent-session request counters must be distinct")
 	}
@@ -379,8 +384,16 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 	if knock != rkn || !isCanonicalAgentKnockRunID(knock.RunID) || knock.AuthServiceID != "agent" {
 		return errors.New("conformance: agent-session identity, resource, or RunID changed across KNK/RKN")
 	}
-	if f.CleanExit.Request.BodyJSON != "" || f.CleanExit.Request.BodyHex != "" {
-		return errors.New("conformance: agent-session EXT must have an empty body")
+	exit, err := decodeAgentSessionKnockBody(f.CleanExit.Request.BodyJSON)
+	if err != nil {
+		return fmt.Errorf("conformance: agent-session clean-exit EXT body: %w", err)
+	}
+	if exit.HeaderType != AgentSessionHeaderEXT {
+		return errors.New("conformance: agent-session clean-exit body headerType does not match outer type")
+	}
+	exit.HeaderType = 0
+	if exit != knock {
+		return errors.New("conformance: agent-session clean-exit identity, resource, or RunID drifted")
 	}
 
 	if class := classifyAgentSessionCookieBody(o.CookieReply.BodyJSON, knockCounter); class != "" {
@@ -391,6 +404,9 @@ func validateAgentSessionFlowBindings(f *AgentSessionControlFile) error {
 		return errors.New("conformance: agent-session COK cookie differs from RKN digest cookie")
 	}
 	if err := validateAgentSessionACKBody("RKN ACK", o.ACK.BodyJSON, 900, knock.ResourceID); err != nil {
+		return err
+	}
+	if err := validateAgentSessionACKBody("clean-exit ACK", f.CleanExit.ACK.BodyJSON, 900, knock.ResourceID); err != nil {
 		return err
 	}
 	return nil
