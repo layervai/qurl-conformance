@@ -4,8 +4,9 @@
 transitions a native UDP connector needs after its first registered-agent
 knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
-policy, while this artifact proves the Noise packet bytes and transition
-correlation.
+policy, while this artifact validates the Noise packet bytes and transition
+correlation. Its `schema_version` is `2`; version 1's bodyful EXT plus ACK was
+removed by this breaking bodyless one-way EXT contract and is not accepted.
 
 ## Positive flows
 
@@ -19,16 +20,15 @@ The artifact contains one deterministic instance of each transition:
    the KNK identity, resource, and RunID and authenticates the decoded cookie in
    its header digest.
 4. `overload_reknock.ack`: NHP_ACK (type 2), counter 42.
-5. `clean_exit.request`: NHP_EXT (type 16), counter 43. It retains the same
-   identity, resource, and RunID.
-6. `clean_exit.ack`: NHP_ACK (type 2), counter 43.
+5. `clean_exit.request`: bodyless NHP_EXT (type 16), counter 43. It is a one-way
+   authenticated-agent-global teardown and receives no NHP_ACK or NHP_COK.
 
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets were emitted byte-for-byte by
 `layervai/qurl-go` producer revision
-`c4729832bf29b0f356964035864707f6904b1982`.
+`c345051876be4f74bb46ff36dfcbffbbf9d45cee`.
 
 ## Protocol version
 
@@ -57,17 +57,23 @@ key, and the nonce. Only the AAD moved.
 - The frozen COK carries counter 41 because the producer intentionally
   echoes the KNK counter for relay compatibility. Native UDP consumers must not
   depend on that producer equality: the `accept_cok_wire_counter_unconstrained`
-  flow mutation proves correlation still succeeds with a different
+  flow mutation confirms correlation still succeeds with a different
   authenticated outer counter.
-- An ACK counter must equal the request counter for its RKN or EXT.
+- The RKN ACK counter must equal the RKN request counter.
+- A successful ACK must carry a nonzero server-assigned uint64 `sessId`. The raw
+  JSON number can exceed JavaScript's safe-integer range; parse it losslessly
+  into `BigInt`, never through an ordinary `JSON.parse` number.
 - Each successful ACK's `resHost`, `acTokens`, and `preActions` map must contain
   exactly one entry keyed by the session `resId`. This single-resource shape is
   validated before the byte-canonical producer-JSON check.
-- The authenticated body's case-sensitive `headerType` must equal the outer
-  packet type. A type 1 packet with a type 8 body, or the inverse, is invalid.
+- The KNK/RKN authenticated body's case-sensitive `headerType` must equal the
+  outer packet type. A type 1 packet with a type 8 body, or the inverse, is
+  invalid.
 - `usrId`, `devId`, `aspId`, `resId`, and the canonical 16-character lowercase
-  hexadecimal `runId` remain unchanged across KNK, RKN, and EXT.
-- A cookie challenge is valid after KNK only. EXT accepts ACK and never COK.
+  hexadecimal `runId` remain unchanged across KNK and RKN.
+- EXT has no application body, resource, RunID, or response. Its authenticated
+  agent identity selects all live sessions for global teardown, so it must not
+  be used for one-share stop or replacement-session retirement.
 - Decryption is insufficient without peer authentication. Replies are accepted
   only under the assigned cell's pinned static public key; requests are accepted
   only under the registered agent's static public key.
@@ -112,8 +118,8 @@ This division is contractually required: the conformance package exposes frozen
 packets and stateless cryptographic verification, not a competing session state
 machine. Reimplementing `header_type`, `reply_type`, counter, or
 `application_body` transitions here would only self-test a reference parser and
-could not prove that the shipping consumer rejects them. A consumer's
-conformance gate is incomplete until all 19 cases execute through its actual
+could not validate that the shipping consumer rejects them. A consumer's
+conformance gate is incomplete until all 15 cases execute through its actual
 session entry points with no skips.
 
 The declared reject classes are:
@@ -137,11 +143,12 @@ The declared reject classes are:
    revision, key roles, closed case sets, and all canonical hex/base64 forms.
 2. Rebuild KNK, RKN, and EXT from their deterministic inputs and compare every
    complete packet byte. For RKN, include the decoded cookie in the digest.
-3. Authenticate and decrypt COK and ACK under the assigned cell public key;
+3. Authenticate and decrypt COK and the RKN ACK under the assigned cell public key;
    authenticate initiator packets under the agent public key in a responder
    verifier.
-4. Apply the counter, type/body, immutable-RunID, cookie, and reply-disposition
-   gates above. Missing fixtures or unknown cases are failures, never skips.
+4. Apply the counter, type/body, immutable-RunID, cookie, ACK-session, and
+   reply-disposition gates above. Require EXT to be bodyless and never await a
+   response. Missing fixtures or unknown cases are failures, never skips.
 5. Execute every cookie and flow case through the implementation's real entry
    points and assert the declared reject class.
 

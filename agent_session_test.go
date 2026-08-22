@@ -14,11 +14,11 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AgentSessionControl(): %v", err)
 	}
-	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != 1 || af.ProducerRevision != AgentSessionControlProducerRevision {
+	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != AgentSessionControlSchemaVersion || af.ProducerRevision != AgentSessionControlProducerRevision {
 		t.Fatalf("identity = %q/v%d/%q", af.Artifact, af.SchemaVersion, af.ProducerRevision)
 	}
-	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 19 {
-		t.Fatalf("case counts = cookie:%d flow:%d, want 16/19", len(af.CookieBodyCases), len(af.FlowCases))
+	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 15 {
+		t.Fatalf("case counts = cookie:%d flow:%d, want 16/15", len(af.CookieBodyCases), len(af.FlowCases))
 	}
 	if af.Protocol.COKWireCounterCorrelation != "unconstrained" || af.Protocol.ExitCookieChallengeAllowed {
 		t.Fatalf("protocol = %+v", af.Protocol)
@@ -28,12 +28,13 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 		af.OverloadReknock.CookieReply,
 		af.OverloadReknock.ReknockRequest,
 		af.OverloadReknock.ACK,
-		af.CleanExit.Request,
-		af.CleanExit.ACK,
 	} {
 		if p.PacketHex == "" || p.BodyHex == "" || p.HeaderDigestHex == "" {
 			t.Fatalf("incomplete packet %+v", p)
 		}
+	}
+	if af.CleanExit.Request.PacketHex == "" || af.CleanExit.Request.BodyHex != "" || af.CleanExit.Request.BodyJSON != "" || af.CleanExit.Request.HeaderDigestHex == "" {
+		t.Fatalf("invalid bodyless exit packet %+v", af.CleanExit.Request)
 	}
 
 	raw := AgentSessionControlVectors()
@@ -86,7 +87,7 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 		{"packet role", "type or key roles", func(af *AgentSessionControlFile) { af.CleanExit.Request.SenderKey = "assigned_cell" }},
 		{"packet body bytes", "body_hex", func(af *AgentSessionControlFile) { af.OverloadReknock.ReknockRequest.BodyHex = "00" }},
 		{"packet framing", "size", func(af *AgentSessionControlFile) {
-			af.CleanExit.ACK.PacketHex = af.CleanExit.ACK.PacketHex[:len(af.CleanExit.ACK.PacketHex)-2]
+			af.OverloadReknock.ACK.PacketHex = af.OverloadReknock.ACK.PacketHex[:len(af.OverloadReknock.ACK.PacketHex)-2]
 		}},
 		{"packet limit", "packet exceeds 4096-byte limit", func(af *AgentSessionControlFile) {
 			body := strings.Repeat("x", AgentSessionPacketMaxBytes-AgentSessionHeaderSize-AgentSessionTagSize+1)
@@ -95,7 +96,7 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.OverloadReknock.KnockRequest.PacketHex = strings.Repeat("00", AgentSessionPacketMaxBytes+1)
 		}},
 		{"packet protocol version", "protocol version", func(af *AgentSessionControlFile) {
-			af.CleanExit.ACK.PacketHex = downgradeNHPPacketVersion(af.CleanExit.ACK.PacketHex)
+			af.OverloadReknock.ACK.PacketHex = downgradeNHPPacketVersion(af.OverloadReknock.ACK.PacketHex)
 		}},
 		{"packet digest", "header_digest_hex", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ReknockRequest.HeaderDigestHex = strings.Repeat("0", 64)
@@ -107,12 +108,16 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 			af.OverloadReknock.CookieReply.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.CookieReply.BodyJSON))
 		}},
 		{"immutable run id", "identity, resource, or RunID", func(af *AgentSessionControlFile) {
-			af.CleanExit.Request.BodyJSON = strings.Replace(af.CleanExit.Request.BodyJSON, "0123456789abcdef", "fedcba9876543210", 1)
+			af.OverloadReknock.ReknockRequest.BodyJSON = strings.Replace(af.OverloadReknock.ReknockRequest.BodyJSON, "0123456789abcdef", "fedcba9876543210", 1)
+			af.OverloadReknock.ReknockRequest.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ReknockRequest.BodyJSON))
+		}},
+		{"exit body", "packet size is inconsistent with body", func(af *AgentSessionControlFile) {
+			af.CleanExit.Request.BodyJSON = `{}`
 			af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
 		}},
 		{"ack semantics", "success body drifted", func(af *AgentSessionControlFile) {
-			af.CleanExit.ACK.BodyJSON = strings.Replace(af.CleanExit.ACK.BodyJSON, `"opnTime":1`, `"opnTime":2`, 1)
-			af.CleanExit.ACK.BodyHex = hex.EncodeToString([]byte(af.CleanExit.ACK.BodyJSON))
+			af.OverloadReknock.ACK.BodyJSON = strings.Replace(af.OverloadReknock.ACK.BodyJSON, `"opnTime":900`, `"opnTime":901`, 1)
+			af.OverloadReknock.ACK.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ACK.BodyJSON))
 		}},
 		{"cookie case", "classified", func(af *AgentSessionControlFile) { af.CookieBodyCases[0].Outcome = AgentSessionOutcomeReject }},
 		{"duplicate cookie case", "duplicate cookie case", func(af *AgentSessionControlFile) { af.CookieBodyCases[1] = af.CookieBodyCases[0] }},
@@ -158,6 +163,18 @@ func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
 	af.OverloadReknock.CookieReply.Counter = "18446744073709551615"
 	if err := validateAgentSessionFlowBindings(af); err != nil {
 		t.Fatalf("different authenticated COK wire counter must not affect body transaction correlation: %v", err)
+	}
+}
+
+func TestAgentSessionFlowBindingsRejectBodyfulExit(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.CleanExit.Request.BodyJSON = `{}`
+	af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "EXT must have an empty body") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want bodyless EXT rejection", err)
 	}
 }
 

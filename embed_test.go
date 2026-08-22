@@ -1095,8 +1095,8 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 	if af.Artifact != AgentKnockApplicationArtifactID {
 		t.Errorf("artifact = %q, want %q", af.Artifact, AgentKnockApplicationArtifactID)
 	}
-	if af.SchemaVersion != 3 {
-		t.Errorf("schema_version = %d, want 3", af.SchemaVersion)
+	if af.SchemaVersion != 4 {
+		t.Errorf("schema_version = %d, want 4", af.SchemaVersion)
 	}
 
 	var body map[string]any
@@ -1153,9 +1153,9 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 
 	wantCases := map[string]bool{
 		"ack_success": false, "ack_success_optional_metadata": false,
-		"ack_success_empty_err_code": false,
-		"ack_deny":                   false,
-		"ack_deny_50001":             false, "ack_deny_51002": false,
+		"ack_success_empty_err_code": false, "ack_success_max_open_time": false,
+		"ack_deny":       false,
+		"ack_deny_50001": false, "ack_deny_51002": false,
 		"ack_deny_51101": false, "ack_deny_52002": false,
 		"ack_deny_52005": false, "ack_deny_52007": false,
 		"ack_deny_52009": false, "ack_deny_52010": false,
@@ -1173,6 +1173,21 @@ func TestEmbeddedAgentKnockApplicationLoads(t *testing.T) {
 		"reject_malformed_redirect_url":           false,
 		"reject_malformed_opn_time":               false,
 		"reject_malformed_agent_addr":             false,
+		"reject_success_missing_session_id":       false,
+		"reject_success_zero_session_id":          false,
+		"reject_success_null_session_id":          false,
+		"reject_success_negative_session_id":      false,
+		"reject_success_string_session_id":        false,
+		"reject_success_fraction_session_id":      false,
+		"reject_success_exponent_session_id":      false,
+		"reject_success_overflow_session_id":      false,
+		"reject_success_duplicate_session_id":     false,
+		"reject_success_zero_open_time":           false,
+		"reject_deny_zero_session_id":             false,
+		"reject_deny_nonzero_session_id":          false,
+		"reject_deny_null_session_id":             false,
+		"reject_deny_string_session_id":           false,
+		"reject_deny_duplicate_session_id":        false,
 		"reject_unknown_ack_field":                false,
 		"reject_duplicate_ack_field":              false,
 		"reject_trailing_ack_data":                false,
@@ -1326,6 +1341,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	// producerACK mirrors OpenNHP nhp/common/nhpmsg.go's ServerKnockAckMsg at main commit
 	// 1dbedcadee2018cd6a8684cc4b53b9e6a9048da4.
 	type producerACK struct {
+		SessionID         uint64            `json:"sessId,omitempty"`
 		ErrCode           string            `json:"errCode"`
 		ErrMsg            string            `json:"errMsg,omitempty"`
 		ResourceHost      map[string]string `json:"resHost"`
@@ -1340,6 +1356,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		RedirectURL      string               `json:"redirectUrl,omitempty"`
 	}
 	standard := producerACK{
+		SessionID:        72623859790382856,
 		ErrCode:          "0",
 		ResourceHost:     map[string]string{resourceID: "frps.sandbox.example:7000"},
 		OpenTime:         900,
@@ -1354,6 +1371,9 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	optionalMetadata.RedirectURL = "https://redirect.example/conformance"
 	emptyErrCodeSuccess := standard
 	emptyErrCodeSuccess.ErrCode = ""
+	maxOpenTimeSuccess := standard
+	maxOpenTimeSuccess.SessionID = ^uint64(0)
+	maxOpenTimeSuccess.OpenTime = ^uint32(0)
 	denied := producerACK{
 		ErrCode:   "52004",
 		ErrMsg:    "failed to find resource",
@@ -1379,6 +1399,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		"ack_success":                   standard,
 		"ack_success_optional_metadata": optionalMetadata,
 		"ack_success_empty_err_code":    emptyErrCodeSuccess,
+		"ack_success_max_open_time":     maxOpenTimeSuccess,
 		"ack_deny":                      denied,
 	}
 	for name, errMsg := range widenedDenyMessages {
@@ -1402,6 +1423,7 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 		"ack_success":                   "0",
 		"ack_success_optional_metadata": "0",
 		"ack_success_empty_err_code":    "",
+		"ack_success_max_open_time":     "0",
 	} {
 		if got := stringField(name, "errCode"); got != wantErrCode {
 			t.Errorf("%s errCode = %q, want %q", name, got, wantErrCode)
@@ -1419,9 +1441,11 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 			t.Errorf("%s preActions = %v, %v; want exact-resource null", name, preActions, err)
 		}
 		c := byName[name]
-		if c.ExpectedACToken != acTokens[resourceID] || c.ExpectedResourceHost != resourceHosts[resourceID] {
-			t.Errorf("%s expected result = %q/%q, want exact resource maps %q/%q", name,
-				c.ExpectedACToken, c.ExpectedResourceHost, acTokens[resourceID], resourceHosts[resourceID])
+		if c.ExpectedACToken != acTokens[resourceID] || c.ExpectedResourceHost != resourceHosts[resourceID] ||
+			c.ExpectedSessionID == "" || c.ExpectedOpenTime == 0 {
+			t.Errorf("%s expected result = token:%q host:%q session:%q open:%d, want exact resource maps %q/%q and nonzero session/open", name,
+				c.ExpectedACToken, c.ExpectedResourceHost, c.ExpectedSessionID, c.ExpectedOpenTime,
+				acTokens[resourceID], resourceHosts[resourceID])
 		}
 	}
 	optional := body("ack_success_optional_metadata")
@@ -1525,6 +1549,45 @@ func assertAgentKnockReplyBodySemantics(t *testing.T, af *AgentKnockApplicationF
 	}
 }
 
+func TestAgentKnockSessionEnvelopeContract(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantSession  uint64
+		wantOpenTime uint32
+		wantClass    string
+	}{
+		{name: "max values accepted", body: `{"sessId":18446744073709551615,"errCode":"0","opnTime":4294967295}`, wantSession: ^uint64(0), wantOpenTime: ^uint32(0)},
+		{name: "zero lifetime", body: `{"sessId":1,"errCode":"0","opnTime":0}`, wantClass: AgentKnockRejectSessionLifetime},
+		{name: "string lifetime is structural", body: `{"sessId":1,"errCode":"0","opnTime":"900"}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "overflow lifetime is structural", body: `{"sessId":1,"errCode":"0","opnTime":4294967296}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "missing session", body: `{"errCode":"0","opnTime":900}`, wantClass: AgentKnockRejectSessionID},
+		{name: "missing session with malformed lifetime is structural", body: `{"errCode":"0","opnTime":"900"}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "missing session with duplicate ordinary field is structural", body: `{"errCode":"0","errCode":"0","opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "deny omits session", body: `{"errCode":"52004","opnTime":0}`},
+		{name: "deny missing lifetime is structural", body: `{"errCode":"52004"}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "deny string lifetime is structural", body: `{"errCode":"52004","opnTime":"0"}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "deny overflow lifetime is structural", body: `{"errCode":"52004","opnTime":4294967296}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "deny nonzero lifetime is structural", body: `{"errCode":"52004","opnTime":1}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "deny contains zero session", body: `{"sessId":0,"errCode":"52004","opnTime":0}`, wantClass: AgentKnockRejectSessionID},
+		{name: "deny contains nonzero session", body: `{"sessId":1,"errCode":"52004","opnTime":0}`, wantClass: AgentKnockRejectSessionID},
+		{name: "deny session presence precedes malformed lifetime", body: `{"sessId":1,"errCode":"52004","opnTime":"0"}`, wantClass: AgentKnockRejectSessionID},
+		{name: "duplicate session precedes duplicate ordinary field", body: `{"sessId":1,"sessId":2,"errCode":"0","errCode":"52004","opnTime":900}`, wantClass: AgentKnockRejectSessionID},
+		{name: "malformed session precedes malformed lifetime", body: `{"sessId":"1","errCode":"0","opnTime":"900"}`, wantClass: AgentKnockRejectSessionID},
+		{name: "duplicate ordinary field is structural", body: `{"sessId":1,"errCode":"0","errCode":"52004","opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "malformed error with valid session is structural", body: `{"sessId":1,"errCode":0,"opnTime":900}`, wantClass: AgentKnockRejectBodyParse},
+		{name: "malformed error with malformed session is session", body: `{"sessId":null,"errCode":0,"opnTime":900}`, wantClass: AgentKnockRejectSessionID},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sessionID, openTime, class, err := validateAgentKnockSessionEnvelope([]byte(tc.body))
+			if class != tc.wantClass || sessionID != tc.wantSession || openTime != tc.wantOpenTime || (err != nil) != (tc.wantClass != "") {
+				t.Fatalf("envelope = session:%d open:%d class:%q err:%v, want session:%d open:%d class:%q", sessionID, openTime, class, err, tc.wantSession, tc.wantOpenTime, tc.wantClass)
+			}
+		})
+	}
+}
+
 // downgradeNHPPacketVersion rewrites HeaderCommon[9] of a hex-encoded NHP packet
 // to 0, i.e. back to the protocol-1.0 transcript that left the header word
 // unauthenticated. Byte 9 is hex characters 18:20.
@@ -1583,10 +1646,9 @@ func nhpGoldenPacketHexes(t *testing.T) map[string]string {
 	packets["agent_session.reknock_request"] = sc.OverloadReknock.ReknockRequest.PacketHex
 	packets["agent_session.reknock_ack"] = sc.OverloadReknock.ACK.PacketHex
 	packets["agent_session.exit_request"] = sc.CleanExit.Request.PacketHex
-	packets["agent_session.exit_ack"] = sc.CleanExit.ACK.PacketHex
 
-	if len(packets) != 22 {
-		t.Fatalf("collected %d NHP golden packets, want 22", len(packets))
+	if len(packets) != 21 {
+		t.Fatalf("collected %d NHP golden packets, want 21", len(packets))
 	}
 	return packets
 }
@@ -1869,7 +1931,7 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 3") {
+		if _, err := ParseAgentKnockApplicationFile(b); err == nil || !strings.Contains(err.Error(), "want 4") {
 			t.Fatalf("error = %v, want schema version rejection", err)
 		}
 	})
@@ -2089,11 +2151,11 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 
 	t.Run("success with non-null pre-access action", func(t *testing.T) {
 		b := mutateCase(t, "ack_success", func(c *AgentKnockReplyCase) {
-			var body map[string]any
+			var body map[string]json.RawMessage
 			if err := json.Unmarshal([]byte(c.BodyJSON), &body); err != nil {
 				t.Fatal(err)
 			}
-			body["preActions"] = map[string]any{"foreign-resource": map[string]any{"acIp": "198.51.100.8"}}
+			body["preActions"] = json.RawMessage(`{"foreign-resource":{"acIp":"198.51.100.8"}}`)
 			encoded, err := json.Marshal(body)
 			if err != nil {
 				t.Fatal(err)
