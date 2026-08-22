@@ -29,11 +29,11 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 		af.OverloadReknock.ReknockRequest,
 		af.OverloadReknock.ACK,
 	} {
-		if p.PacketHex == "" || p.BodyHex == "" || p.HeaderMACHex == "" {
+		if p.PacketHex == "" || p.BodyHex == "" || p.HeaderDigestHex == "" {
 			t.Fatalf("incomplete packet %+v", p)
 		}
 	}
-	if af.CleanExit.Request.PacketHex == "" || af.CleanExit.Request.BodyHex != "" || af.CleanExit.Request.BodyJSON != "" || af.CleanExit.Request.HeaderMACHex == "" {
+	if af.CleanExit.Request.PacketHex == "" || af.CleanExit.Request.BodyHex != "" || af.CleanExit.Request.BodyJSON != "" || af.CleanExit.Request.HeaderDigestHex == "" {
 		t.Fatalf("invalid bodyless exit packet %+v", af.CleanExit.Request)
 	}
 
@@ -98,8 +98,8 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 		{"packet protocol version", "protocol version", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ACK.PacketHex = downgradeNHPPacketVersion(af.OverloadReknock.ACK.PacketHex)
 		}},
-		{"packet MAC", "header_mac_hex", func(af *AgentSessionControlFile) {
-			af.OverloadReknock.ReknockRequest.HeaderMACHex = strings.Repeat("0", 64)
+		{"packet digest", "header_digest_hex", func(af *AgentSessionControlFile) {
+			af.OverloadReknock.ReknockRequest.HeaderDigestHex = strings.Repeat("0", 64)
 		}},
 		{"packet ephemeral", "ephemeral key", func(af *AgentSessionControlFile) { af.CleanExit.Request.EphemeralPrivateHex = strings.Repeat("1", 64) }},
 		{"cookie", "cookie encoding", func(af *AgentSessionControlFile) { af.OverloadReknock.CookieB64 = "***" }},

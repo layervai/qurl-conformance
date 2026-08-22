@@ -148,18 +148,6 @@ jobs:
               .update(preimage).digest();
             return cookie.toString('hex') === vector.cookie_hex && cookie.toString('base64') === vector.cookie_b64;
           };
-          const verifyHubHeaderMACKAT = () => {
-            const kat = hc.header_mac_kat;
-            const domain = Buffer.from(kat.kdf_domain_hex, 'hex');
-            if (domain.toString('ascii') !== 'nhp-header-mac-v1\0') return false;
-            const macKey = crypto.createHmac('blake2s256', Buffer.from(kat.chain_key_hex, 'hex'))
-              .update(domain).digest();
-            return crypto.createHmac('blake2s256', macKey)
-              .update(Buffer.from(kat.header_prefix_hex, 'hex'))
-              .update(Buffer.from(kat.payload_ciphertext_hex, 'hex'))
-              .update(Buffer.from(kat.raw_cookie_hex, 'hex'))
-              .digest('hex') === kat.expected_mac_hex;
-          };
           const cridCrc32c = buf => {
             let crc = 0xffffffff;
             for (const byte of buf) {
@@ -227,8 +215,8 @@ jobs:
             reject_cookie_encoding: '0000',
             reject_cookie_length: '0000',
             reject_untrusted_server: '0000',
-            reject_compressed_challenge: '0001',
-            reject_unknown_flag_challenge: '0004',
+            reject_compressed_challenge: '0002',
+            reject_unknown_flag_challenge: '0008',
             reject_second_challenge: '0000',
           };
           const hubCookieChallengesComplete =
@@ -300,9 +288,8 @@ jobs:
               qv2.transport_contract.component_max !== 240 ||
               qv2.transport_contract.max_transport_length !== 6826 ||
               qv2.classes.transport.vectors.length !== 39 || !c.issuerSignatureVectors().issuer ||
-              r.schema_version !== 3 || !r.knock.packet_hex || !r.ack.packet_hex ||
-              a.schema_version !== 3 || !a.otp.packet_hex || !a.rak_success.packet_hex ||
-              s.schema_version !== 6 || s.initial_assignment.request.header_type !== 5 ||
+              !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
+              s.schema_version !== 4 || s.initial_assignment.request.header_type !== 5 ||
               !nonceIsCanonical32(assignmentInitialRequest.usrData.request_nonce) ||
               !nonceIsCanonical32(assignmentRefreshRequest.usrData.request_nonce) ||
               assignmentInitialRequest.usrData.request_nonce === assignmentRefreshRequest.usrData.request_nonce ||
@@ -358,7 +345,7 @@ jobs:
               assignmentOtpChallengeBindings.accept_exact_challenge_binding.outcome !== 'accept' ||
               !assignmentOtpChallengesAgree ||
               s.account_credential_otp.packet_size_contract.cases.length !== 2 ||
-              s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3920 ||
+              s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3840 ||
               s.account_credential_otp.packet_size_contract.max_packet_bytes !== 4096 ||
               assignmentOtpSizes.accept_max_plaintext_body.expected_packet_bytes !== 4096 ||
               assignmentOtpSizes.reject_plaintext_body_over_max.reject_class !== 'packet_size' ||
@@ -444,7 +431,7 @@ jobs:
               replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
-              x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 4 ||
+              x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 2 ||
               x.producer_revision !== 'c345051876be4f74bb46ff36dfcbffbbf9d45cee' ||
               x.protocol.cok_wire_counter_correlation !== 'unconstrained' ||
               x.protocol.cok_body_transaction_correlation !== 'must_equal_knock_counter' ||
@@ -452,7 +439,7 @@ jobs:
               x.protocol.exit_body !== 'empty' || x.protocol.exit_response !== 'none' ||
               x.protocol.exit_cookie_challenge_allowed !== false ||
               sessionCookie.length !== 32 || sessionCookie.toString('base64') !== x.overload_reknock.cookie_b64 ||
-              sessionPackets.length !== 5 || sessionPackets.some(v => !v.packet_hex || !v.header_mac_hex) ||
+              sessionPackets.length !== 5 || sessionPackets.some(v => !v.packet_hex || !v.header_digest_hex) ||
               sessionPackets.slice(0, 4).some(v => !v.body_hex) ||
               x.overload_reknock.knock_request.header_type !== 1 ||
               x.overload_reknock.cookie_reply.header_type !== 7 ||
@@ -470,7 +457,7 @@ jobs:
               idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.registration_info_accept_with_companion_field.expected_id !== 'key_A1b2C3d4E5f6' ||
               idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse' ||
-              t.artifact !== 'qurl-assignment-ticket-v1-vectors' || t.schema_version !== 2 ||
+              t.artifact !== 'qurl-assignment-ticket-v1-vectors' || t.schema_version !== 1 ||
               t.golden.token.split('.').length !== 3 || t.golden.signature_b64url.length !== 86 ||
               t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
               t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
@@ -548,11 +535,9 @@ jobs:
               h.cases.length !== 6 || hubRequestIds.size !== h.cases.length ||
               h.cases.some(v => !deriveHubRequestId(v)) ||
               assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
-              hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 3 ||
-              hc.contract.proof_flag_hex !== '0002' || hc.contract.challenge_header_flags_hex !== '0000' ||
+              hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
+              hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
               hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
-              hc.contract.proof_header_mac !== 'HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\\x00), data=header[0:128] || payload_ciphertext || raw_cookie)' ||
-              !verifyHubHeaderMACKAT() ||
               !hc.contract.additive_application_profiles.includes('qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition') ||
               hc.cookie_kats.some(vector => !deriveHubLstCookie(vector)) ||
               ['reject_compressed_challenge', 'reject_unknown_flag_challenge'].some(name =>
@@ -560,8 +545,8 @@ jobs:
                 hubCookieChallenges[name]?.client_action !== 'stop_without_third_lst_or_fallback'
               ) ||
               hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
-              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 2996 ||
-              cr.artifact !== 'qurl-agent-credential-recovery-v1-vectors' || cr.schema_version !== 2 ||
+              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3076 ||
+              cr.artifact !== 'qurl-agent-credential-recovery-v1-vectors' || cr.schema_version !== 1 ||
               cr.protocol.transport !== 'NHP_UDP_ONLY' || cr.protocol.http_fallback_allowed !== false ||
               cr.protocol.relay_fallback_allowed !== false || cr.protocol.client_cell_selection_allowed !== false ||
               cr.protocol.recovery_grant_lifetime_seconds !== 900 ||
@@ -685,18 +670,6 @@ jobs:
                   return False
               cookie = hmac.new(bytes.fromhex(vector['signing_key_hex']), preimage, hashlib.sha256).digest()
               return cookie.hex() == vector['cookie_hex'] and base64.b64encode(cookie).decode('ascii') == vector['cookie_b64']
-          def verify_hub_header_mac_kat():
-              kat = hc['header_mac_kat']
-              domain = bytes.fromhex(kat['kdf_domain_hex'])
-              if domain != b'nhp-header-mac-v1\0':
-                  return False
-              mac_key = hmac.new(bytes.fromhex(kat['chain_key_hex']), domain, hashlib.blake2s).digest()
-              authenticated = b''.join((
-                  bytes.fromhex(kat['header_prefix_hex']),
-                  bytes.fromhex(kat['payload_ciphertext_hex']),
-                  bytes.fromhex(kat['raw_cookie_hex']),
-              ))
-              return hmac.new(mac_key, authenticated, hashlib.blake2s).hexdigest() == kat['expected_mac_hex']
           def crid_crc32c(data):
               crc = 0xffffffff
               for byte in data:
@@ -751,8 +724,8 @@ jobs:
               'reject_cookie_encoding': '0000',
               'reject_cookie_length': '0000',
               'reject_untrusted_server': '0000',
-              'reject_compressed_challenge': '0001',
-              'reject_unknown_flag_challenge': '0004',
+              'reject_compressed_challenge': '0002',
+              'reject_unknown_flag_challenge': '0008',
               'reject_second_challenge': '0000',
           }
           canonical = '0123456789abcdef'
@@ -767,9 +740,9 @@ jobs:
           assert qv2['transport_contract']['max_transport_length'] == 6826
           assert len(qv2['classes']['transport']['vectors']) == 39
           assert q.issuer_signature_vectors()['issuer']
-          assert r['schema_version'] == 3 and r['knock']['packet_hex'] and r['ack']['packet_hex']
-          assert a['schema_version'] == 3 and a['otp']['packet_hex'] and a['rak_success']['packet_hex']
-          assert s['schema_version'] == 6
+          assert r['knock']['packet_hex'] and r['ack']['packet_hex']
+          assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
+          assert s['schema_version'] == 4
           assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
           assert s['initial_assignment']['request']['header_type'] == 5
           assert s['initial_assignment']['result']['header_type'] == 6
@@ -878,7 +851,7 @@ jobs:
           ):
               assert account_otp_challenge_bindings[challenge_case]['reject_class'] == 'challenge_binding'
           assert len(account_otp['packet_size_contract']['cases']) == 2
-          assert account_otp['packet_size_contract']['max_plaintext_body_bytes'] == 3920
+          assert account_otp['packet_size_contract']['max_plaintext_body_bytes'] == 3840
           assert account_otp['packet_size_contract']['max_packet_bytes'] == 4096
           assert account_otp_sizes['accept_max_plaintext_body']['expected_packet_bytes'] == 4096
           assert account_otp_sizes['reject_plaintext_body_over_max']['reject_class'] == 'packet_size'
@@ -971,7 +944,7 @@ jobs:
           assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
-          assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 4
+          assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 2
           assert x['producer_revision'] == 'c345051876be4f74bb46ff36dfcbffbbf9d45cee'
           assert x['protocol']['cok_wire_counter_correlation'] == 'unconstrained'
           assert x['protocol']['cok_body_transaction_correlation'] == 'must_equal_knock_counter'
@@ -981,7 +954,7 @@ jobs:
           assert len(session_cookie) == 32
           assert base64.b64encode(session_cookie).decode() == x['overload_reknock']['cookie_b64']
           assert len(session_packets) == 5
-          assert all(v['packet_hex'] and v['header_mac_hex'] for v in session_packets)
+          assert all(v['packet_hex'] and v['header_digest_hex'] for v in session_packets)
           assert all(v['body_hex'] for v in session_packets[:4])
           assert [v['header_type'] for v in session_packets] == [1, 7, 8, 2, 16]
           assert x['clean_exit']['request']['body_hex'] == '' and x['clean_exit']['request']['body_json'] == ''
@@ -999,7 +972,7 @@ jobs:
           assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['registration_info_accept_with_companion_field']['expected_id'] == 'key_A1b2C3d4E5f6'
           assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
-          assert t['artifact'] == 'qurl-assignment-ticket-v1-vectors' and t['schema_version'] == 2
+          assert t['artifact'] == 'qurl-assignment-ticket-v1-vectors' and t['schema_version'] == 1
           assert len(t['golden']['token'].split('.')) == 3 and len(t['golden']['signature_b64url']) == 86
           assert t['golden']['lrt_body_bytes'] <= t['contract']['nhp_body_max_bytes']
           assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
@@ -1081,12 +1054,10 @@ jobs:
           assert len({v['hub_request_id'] for v in h['cases']}) == len(h['cases'])
           assert all(derive_hub_request_id(v) for v in h['cases'])
           assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
-          assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 3
-          assert hc['contract']['proof_flag_hex'] == '0002'
+          assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 1
+          assert hc['contract']['proof_flag_hex'] == '0004'
           assert hc['contract']['challenge_header_flags_hex'] == '0000'
           assert hc['contract']['http_fallback_allowed'] is False
-          assert hc['contract']['proof_header_mac'] == r'HMAC-BLAKE2s-256(key=KDF(ck3, nhp-header-mac-v1\x00), data=header[0:128] || payload_ciphertext || raw_cookie)'
-          assert verify_hub_header_mac_kat()
           assert 'qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition' in hc['contract']['additive_application_profiles']
           assert all(derive_hub_lst_cookie(vector) for vector in hc['cookie_kats'])
           assert len(hc['challenge_cases']) == len(hub_cookie_challenge_flags)
@@ -1100,8 +1071,8 @@ jobs:
           hub_cookie_sizes = {v['name']: v for v in hc['size_cases']}
           assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
           hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}
-          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 2996
-          assert cr['artifact'] == 'qurl-agent-credential-recovery-v1-vectors' and cr['schema_version'] == 2
+          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3076
+          assert cr['artifact'] == 'qurl-agent-credential-recovery-v1-vectors' and cr['schema_version'] == 1
           assert cr['protocol']['transport'] == 'NHP_UDP_ONLY'
           assert cr['protocol']['http_fallback_allowed'] is False
           assert cr['protocol']['relay_fallback_allowed'] is False

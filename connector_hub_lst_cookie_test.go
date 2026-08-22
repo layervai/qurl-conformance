@@ -3,6 +3,7 @@ package conformance
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -22,14 +23,14 @@ func TestEmbeddedConnectorHubLSTCookieLoads(t *testing.T) {
 		t.Fatalf("case counts = KAT:%d flow:%d size:%d success:%d key:%d reject:%d challenge:%d",
 			len(file.CookieKATs), len(file.Flows), len(file.SizeCases), len(file.SuccessSizes), len(file.KeyCases), len(file.RejectCases), len(file.ChallengeCases))
 	}
-	if file.Contract.ProofFlagHex != "0002" || !file.Contract.ProofFlagExclusive || file.Contract.ChallengeCompressed ||
+	if file.Contract.ProofFlagHex != "0004" || !file.Contract.ProofFlagExclusive || file.Contract.ChallengeCompressed ||
 		file.Contract.ChallengeHeaderFlagsHex != ConnectorHubLSTCookieChallengeFlagsHex ||
 		file.Contract.AuthorityBeforeProofAllowed || file.Contract.HTTPFallbackAllowed || file.Contract.RequestPaddingFallbackAllowed {
 		t.Fatalf("security contract drifted: %+v", file.Contract)
 	}
-	if file.Contract.EmptyBodyPacketBytes != 160 || file.Contract.NonemptyPacketOverheadBytes != 176 ||
-		file.Contract.MaxPlaintextBodyBytes != 3920 || file.Contract.MaxPacketBytes != 4096 ||
-		file.Contract.ChallengeMaxBodyBytes != 86 || file.Contract.ChallengeMaxPacketBytes != 262 {
+	if file.Contract.EmptyBodyPacketBytes != 240 || file.Contract.NonemptyPacketOverheadBytes != 256 ||
+		file.Contract.MaxPlaintextBodyBytes != 3840 || file.Contract.MaxPacketBytes != 4096 ||
+		file.Contract.ChallengeMaxBodyBytes != 86 || file.Contract.ChallengeMaxPacketBytes != 342 {
 		t.Fatalf("size contract drifted: %+v", file.Contract)
 	}
 	if file.Flows[0].UnprovenBodyJSON != file.Flows[0].ProofBodyJSON ||
@@ -78,17 +79,22 @@ func TestConnectorHubLSTCookieAddressCanonicalization(t *testing.T) {
 	}
 }
 
-func TestConnectorHubLSTHeaderMACKATShape(t *testing.T) {
+func TestConnectorHubLSTProofDigestKATUsesFreshHeaderMaterial(t *testing.T) {
 	file, err := ConnectorHubLSTCookie()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file.HeaderMACKAT.Purpose != ConnectorHubLSTHeaderMACKATPurpose ||
-		len(mustDecodeHubTestHex(t, file.HeaderMACKAT.ChainKeyHex)) != 32 ||
-		len(mustDecodeHubTestHex(t, file.HeaderMACKAT.HeaderPrefixHex)) != 128 ||
-		len(mustDecodeHubTestHex(t, file.HeaderMACKAT.RawCookieHex)) != 32 ||
-		len(mustDecodeHubTestHex(t, file.HeaderMACKAT.ExpectedMACHex)) != 32 {
-		t.Fatalf("header-MAC KAT shape drifted: %+v", file.HeaderMACKAT)
+	assignment, err := AgentAssignmentGolden()
+	if err != nil {
+		t.Fatal(err)
+	}
+	proofPrefix := mustDecodeHubTestHex(t, file.ProofDigestKAT.HeaderPrefixHex)
+	initialPacket := mustDecodeHubTestHex(t, assignment.InitialAssignment.Request.PacketHex)
+	if file.ProofDigestKAT.Purpose != ConnectorHubLSTProofKATPurpose ||
+		file.ProofDigestKAT.TimestampNanos == assignment.InitialAssignment.Request.TimestampNanos ||
+		binary.BigEndian.Uint64(proofPrefix[16:24]) == binary.BigEndian.Uint64(initialPacket[16:24]) ||
+		bytes.Equal(proofPrefix[24:56], initialPacket[24:56]) {
+		t.Fatalf("proof digest KAT reused initial-flight material: %+v", file.ProofDigestKAT)
 	}
 }
 
@@ -126,8 +132,8 @@ func TestConnectorHubLSTCookieSizeGateIsStrict(t *testing.T) {
 			t.Fatalf("case %q violates strict comparison: %+v", c.Name, c)
 		}
 	}
-	if got := file.SuccessSizes[1]; got.ResultBodyBytes != 2820 || got.ResultPacketBytes != 2996 ||
-		got.AmplificationNumeratorBytes != 2996 || got.AmplificationDenominatorBytes != 413 {
+	if got := file.SuccessSizes[1]; got.ResultBodyBytes != 2820 || got.ResultPacketBytes != 3076 ||
+		got.AmplificationNumeratorBytes != 3076 || got.AmplificationDenominatorBytes != 493 {
 		t.Fatalf("max ticket success size = %+v", got)
 	}
 }
@@ -178,15 +184,15 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 		change         func(*ConnectorHubLSTCookieFile)
 	}{
 		{"identity", "identity", func(file *ConnectorHubLSTCookieFile) { file.Artifact = "other" }},
-		{"contract", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ProofFlagHex = "0004" }},
-		{"challenge contract flags", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ChallengeHeaderFlagsHex = "0001" }},
+		{"contract", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ProofFlagHex = "0002" }},
+		{"challenge contract flags", "contract drift", func(file *ConnectorHubLSTCookieFile) { file.Contract.ChallengeHeaderFlagsHex = "0002" }},
 		{"cookie KAT", "preimage drift", func(file *ConnectorHubLSTCookieFile) {
 			file.CookieKATs[0].PreimageHex = strings.Repeat("0", len(file.CookieKATs[0].PreimageHex))
 		}},
 		{"mapped KAT", "identity drift", func(file *ConnectorHubLSTCookieFile) { file.CookieKATs[1].EqualTo = "" }},
-		{"header MAC", "header-MAC KAT", func(file *ConnectorHubLSTCookieFile) { file.HeaderMACKAT.HeaderPrefixHex = strings.Repeat("0", 416) }},
-		{"header MAC output", "output drift", func(file *ConnectorHubLSTCookieFile) {
-			file.HeaderMACKAT.ExpectedMACHex = strings.Repeat("0", 64)
+		{"proof digest", "header prefix drift", func(file *ConnectorHubLSTCookieFile) { file.ProofDigestKAT.HeaderPrefixHex = strings.Repeat("0", 416) }},
+		{"proof digest output", "output drift", func(file *ConnectorHubLSTCookieFile) {
+			file.ProofDigestKAT.ExpectedDigestHex = strings.Repeat("0", 64)
 		}},
 		{"flow body", "flow drift", func(file *ConnectorHubLSTCookieFile) { file.Flows[0].ProofBodyJSON += " " }},
 		{"size equality", "size case", func(file *ConnectorHubLSTCookieFile) {
@@ -199,7 +205,7 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 			file.ChallengeCases[0].ClientAction = ConnectorHubLSTCookieClientStop
 		}},
 		{"challenge flags", "challenge", func(file *ConnectorHubLSTCookieFile) {
-			file.ChallengeCases[0].HeaderFlagsHex = "0001"
+			file.ChallengeCases[0].HeaderFlagsHex = "0002"
 		}},
 	}
 	for _, test := range tests {

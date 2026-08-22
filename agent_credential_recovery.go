@@ -16,7 +16,7 @@ import (
 const (
 	AgentCredentialRecoveryArtifactID           = "qurl-agent-credential-recovery-v1-vectors"
 	AgentCredentialRecoveryHubCookieProfile     = AgentCredentialRecoveryArtifactID + "/hub_cookie_composition"
-	AgentCredentialRecoverySchemaVersion        = 2
+	AgentCredentialRecoverySchemaVersion        = 1
 	AgentCredentialRecoveryRequestHeader        = "NHP_LST"
 	AgentCredentialRecoveryRequestType          = 5
 	AgentCredentialRecoveryResultHeader         = "NHP_LRT"
@@ -26,7 +26,7 @@ const (
 	AgentCredentialRecoveryGrantLifetimeSeconds = 900
 	AgentCredentialRecoveryHorizonSeconds       = 90 * 24 * 60 * 60
 	AgentCredentialRecoveryPacketOverheadBytes  = ConnectorHubLSTCookiePacketOverhead
-	AgentCredentialRecoveryMaxBodyBytes         = 3920
+	AgentCredentialRecoveryMaxBodyBytes         = 3840
 	AgentCredentialRecoveryMaxPacketBytes       = 4096
 
 	AgentCredentialRecoveryHubPhase  = "hub_issue_recovery"

@@ -45,8 +45,8 @@ func TestAssignmentTicketMaximumLRTEnvelopeIncludesJSONOverhead(t *testing.T) {
 	envelopeWithoutTicket := len(af.Golden.LRTBodyTemplate) - len(af.Golden.TicketMarker)
 	maxBody := envelopeWithoutTicket + af.Contract.MaxTicketASCIIBytes
 	maxPacket := maxBody + af.Golden.NHPPacketOverheadBytes
-	if af.Contract.NHPBodyMaxBytes != 3920 || envelopeWithoutTicket != 516 || maxBody != 2820 || maxPacket != 2996 {
-		t.Fatalf("NHP/LRT budget = body-max:%d envelope:%d max-body:%d max-packet:%d, want 3920/516/2820/2996",
+	if af.Contract.NHPBodyMaxBytes != 3840 || envelopeWithoutTicket != 516 || maxBody != 2820 || maxPacket != 3076 {
+		t.Fatalf("NHP/LRT budget = body-max:%d envelope:%d max-body:%d max-packet:%d, want 3840/516/2820/3076",
 			af.Contract.NHPBodyMaxBytes, envelopeWithoutTicket, maxBody, maxPacket)
 	}
 	if maxBody > af.Contract.NHPBodyMaxBytes || maxPacket > af.Contract.NHPPacketMaxBytes {
