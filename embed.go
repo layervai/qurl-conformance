@@ -101,7 +101,7 @@ func AgentKnockApplicationVectors() []byte {
 }
 
 // AgentSessionControlVectors returns the deterministic native-UDP overload
-// re-knock and resource-scoped clean-exit packet artifact.
+// re-knock and exact-session retirement packet artifact.
 func AgentSessionControlVectors() []byte {
 	b, err := vectorsFS.ReadFile(agentSessionControlName)
 	if err != nil {
@@ -273,7 +273,7 @@ func AgentKnockApplication() (*AgentKnockApplicationFile, error) {
 }
 
 // AgentSessionControl strictly parses the native-UDP overload re-knock and
-// resource-scoped clean-exit packet artifact.
+// exact-session retirement packet artifact.
 func AgentSessionControl() (*AgentSessionControlFile, error) {
 	return ParseAgentSessionControlFile(AgentSessionControlVectors())
 }

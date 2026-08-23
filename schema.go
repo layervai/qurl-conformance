@@ -27,7 +27,8 @@
 //     duplicate packet bytes.
 //   - The registered-agent session-control contract
 //     (agent_session_control_vectors.json): deterministic KNK/COK/RKN/ACK and
-//     a resource-scoped EXT/ACK exchange, strict cookie handling, and closed flow negatives.
+//     an exact-receipt EXT/ACK retirement exchange, strict cookie and denial
+//     handling, and closed flow negatives.
 //   - The agent API-key ID contract (agent_api_key_id_vectors.json): issuer
 //     construction and strict consumer cases for registration-info key_id and
 //     completion device_api_key_id.

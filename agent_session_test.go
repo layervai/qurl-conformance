@@ -17,8 +17,8 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 	if af.Artifact != AgentSessionControlArtifactID || af.SchemaVersion != AgentSessionControlSchemaVersion || af.ProducerRevision != AgentSessionControlProducerRevision {
 		t.Fatalf("identity = %q/v%d/%q", af.Artifact, af.SchemaVersion, af.ProducerRevision)
 	}
-	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 15 {
-		t.Fatalf("case counts = cookie:%d flow:%d, want 16/15", len(af.CookieBodyCases), len(af.FlowCases))
+	if len(af.CookieBodyCases) != 16 || len(af.FlowCases) != 28 {
+		t.Fatalf("case counts = cookie:%d flow:%d, want 16/28", len(af.CookieBodyCases), len(af.FlowCases))
 	}
 	if af.Protocol.COKWireCounterCorrelation != "unconstrained" || af.Protocol.ExitCookieChallengeAllowed {
 		t.Fatalf("protocol = %+v", af.Protocol)
@@ -28,15 +28,17 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 		af.OverloadReknock.CookieReply,
 		af.OverloadReknock.ReknockRequest,
 		af.OverloadReknock.ACK,
-		af.CleanExit.Request,
-		af.CleanExit.ACK,
+		af.ExactSessionExit.Request,
+		af.ExactSessionExit.ACK,
+		af.DenialACKs.Knock,
+		af.DenialACKs.Exit,
 	} {
 		if p.PacketHex == "" || p.BodyHex == "" || p.HeaderDigestHex == "" {
 			t.Fatalf("incomplete packet %+v", p)
 		}
 	}
-	if af.CleanExit.Request.HeaderType != AgentSessionHeaderEXT || af.CleanExit.ACK.HeaderType != AgentSessionHeaderACK {
-		t.Fatalf("invalid resource-scoped exit exchange %+v", af.CleanExit)
+	if af.ExactSessionExit.Request.HeaderType != AgentSessionHeaderEXT || af.ExactSessionExit.ACK.HeaderType != AgentSessionHeaderACK {
+		t.Fatalf("invalid exact-session exit exchange %+v", af.ExactSessionExit)
 	}
 
 	raw := AgentSessionControlVectors()
@@ -86,8 +88,9 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 		{"keypair", "keys do not form", func(af *AgentSessionControlFile) {
 			af.Keys.Agent.StaticPublicHex = af.Keys.AssignedCell.StaticPublicHex
 		}},
-		{"packet role", "type or key roles", func(af *AgentSessionControlFile) { af.CleanExit.Request.SenderKey = "assigned_cell" }},
-		{"exit ack role", "type or key roles", func(af *AgentSessionControlFile) { af.CleanExit.ACK.ReceiverKey = "assigned_cell" }},
+		{"packet role", "type or key roles", func(af *AgentSessionControlFile) { af.ExactSessionExit.Request.SenderKey = "assigned_cell" }},
+		{"exit ack role", "type or key roles", func(af *AgentSessionControlFile) { af.ExactSessionExit.ACK.ReceiverKey = "assigned_cell" }},
+		{"denial ack role", "type or key roles", func(af *AgentSessionControlFile) { af.DenialACKs.Knock.ReceiverKey = "assigned_cell" }},
 		{"packet body bytes", "body_hex", func(af *AgentSessionControlFile) { af.OverloadReknock.ReknockRequest.BodyHex = "00" }},
 		{"packet framing", "size", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ACK.PacketHex = af.OverloadReknock.ACK.PacketHex[:len(af.OverloadReknock.ACK.PacketHex)-2]
@@ -104,26 +107,50 @@ func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
 		{"packet digest", "header_digest_hex", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ReknockRequest.HeaderDigestHex = strings.Repeat("0", 64)
 		}},
-		{"packet ephemeral", "ephemeral key", func(af *AgentSessionControlFile) { af.CleanExit.Request.EphemeralPrivateHex = strings.Repeat("1", 64) }},
+		{"packet ephemeral", "ephemeral key", func(af *AgentSessionControlFile) {
+			af.ExactSessionExit.Request.EphemeralPrivateHex = strings.Repeat("1", 64)
+		}},
 		{"cookie", "cookie encoding", func(af *AgentSessionControlFile) { af.OverloadReknock.CookieB64 = "***" }},
 		{"cok transaction", "canonical COK body", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.CookieReply.BodyJSON = `{"trxId":42,"cookie":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}`
 			af.OverloadReknock.CookieReply.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.CookieReply.BodyJSON))
 		}},
-		{"immutable run id", "identity, resource, or RunID", func(af *AgentSessionControlFile) {
+		{"immutable run id", "identity, resource, RunID, or runAttempt", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ReknockRequest.BodyJSON = strings.Replace(af.OverloadReknock.ReknockRequest.BodyJSON, "0123456789abcdef", "fedcba9876543210", 1)
 			af.OverloadReknock.ReknockRequest.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ReknockRequest.BodyJSON))
 		}},
 		{"exit body", "packet size is inconsistent with body", func(af *AgentSessionControlFile) {
-			af.CleanExit.Request.BodyJSON = `{}`
-			af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
+			af.ExactSessionExit.Request.BodyJSON = `{}`
+			af.ExactSessionExit.Request.BodyHex = hex.EncodeToString([]byte(af.ExactSessionExit.Request.BodyJSON))
 		}},
-		{"exit ack counter", "clean_exit.ack wire counter", func(af *AgentSessionControlFile) {
-			af.CleanExit.ACK.Counter = "44"
+		{"exit ack counter", "exact_session_exit.ack wire counter", func(af *AgentSessionControlFile) {
+			af.ExactSessionExit.ACK.Counter = "44"
 		}},
 		{"ack semantics", "success body drifted", func(af *AgentSessionControlFile) {
 			af.OverloadReknock.ACK.BodyJSON = strings.Replace(af.OverloadReknock.ACK.BodyJSON, `"opnTime":900`, `"opnTime":901`, 1)
 			af.OverloadReknock.ACK.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ACK.BodyJSON))
+		}},
+		{"ack missing receipt", "success body drifted", func(af *AgentSessionControlFile) {
+			before := af.OverloadReknock.ACK.BodyJSON
+			af.OverloadReknock.ACK.BodyJSON = strings.Replace(before, `"cellId":"cell0",`, "", 1)
+			af.OverloadReknock.ACK.BodyJSON += strings.Repeat(" ", len(before)-len(af.OverloadReknock.ACK.BodyJSON))
+			af.OverloadReknock.ACK.BodyHex = hex.EncodeToString([]byte(af.OverloadReknock.ACK.BodyJSON))
+		}},
+		{"exit receipt drift", "EXT receipt drifted", func(af *AgentSessionControlFile) {
+			af.ExactSessionExit.Request.BodyJSON = strings.Replace(af.ExactSessionExit.Request.BodyJSON, `"sessId":72623859790382856`, `"sessId":72623859790382857`, 1)
+			af.ExactSessionExit.Request.BodyHex = hex.EncodeToString([]byte(af.ExactSessionExit.Request.BodyJSON))
+		}},
+		{"close event drift", "success authority drifted", func(af *AgentSessionControlFile) {
+			before := af.ExactSessionExit.ACK.BodyJSON
+			af.ExactSessionExit.ACK.BodyJSON = strings.Replace(before, `"state":"closing"`, `"state":"ready"`, 1)
+			af.ExactSessionExit.ACK.BodyJSON += strings.Repeat(" ", len(before)-len(af.ExactSessionExit.ACK.BodyJSON))
+			af.ExactSessionExit.ACK.BodyHex = hex.EncodeToString([]byte(af.ExactSessionExit.ACK.BodyJSON))
+		}},
+		{"knock denial receipt", "unknown field", func(af *AgentSessionControlFile) {
+			before := af.DenialACKs.Knock.BodyJSON
+			af.DenialACKs.Knock.BodyJSON = `{"errCode":"52004","sessId":1,"opnTime":0}`
+			af.DenialACKs.Knock.BodyJSON += strings.Repeat(" ", len(before)-len(af.DenialACKs.Knock.BodyJSON))
+			af.DenialACKs.Knock.BodyHex = hex.EncodeToString([]byte(af.DenialACKs.Knock.BodyJSON))
 		}},
 		{"cookie case", "classified", func(af *AgentSessionControlFile) { af.CookieBodyCases[0].Outcome = AgentSessionOutcomeReject }},
 		{"duplicate cookie case", "duplicate cookie case", func(af *AgentSessionControlFile) { af.CookieBodyCases[1] = af.CookieBodyCases[0] }},
@@ -172,27 +199,27 @@ func TestAgentSessionCOKWireCounterIsUnconstrained(t *testing.T) {
 	}
 }
 
-func TestAgentSessionFlowBindingsRejectBodylessExit(t *testing.T) {
+func TestAgentSessionFlowBindingsRejectBodylessExactExit(t *testing.T) {
 	af, err := AgentSessionControl()
 	if err != nil {
 		t.Fatal(err)
 	}
-	af.CleanExit.Request.BodyJSON = ""
-	af.CleanExit.Request.BodyHex = ""
-	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit EXT body") {
+	af.ExactSessionExit.Request.BodyJSON = ""
+	af.ExactSessionExit.Request.BodyHex = ""
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "exact-session EXT body") {
 		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want bodyless EXT rejection", err)
 	}
 }
 
-func TestAgentSessionFlowBindingsRejectExitIdentityDrift(t *testing.T) {
+func TestAgentSessionFlowBindingsRejectExitReceiptDrift(t *testing.T) {
 	af, err := AgentSessionControl()
 	if err != nil {
 		t.Fatal(err)
 	}
-	af.CleanExit.Request.BodyJSON = strings.Replace(af.CleanExit.Request.BodyJSON, "connector-conformance-01", "connector-conformance-02", 1)
-	af.CleanExit.Request.BodyHex = hex.EncodeToString([]byte(af.CleanExit.Request.BodyJSON))
-	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit identity") {
-		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want clean-exit identity rejection", err)
+	af.ExactSessionExit.Request.BodyJSON = strings.Replace(af.ExactSessionExit.Request.BodyJSON, `"runAttempt":1`, `"runAttempt":2`, 1)
+	af.ExactSessionExit.Request.BodyHex = hex.EncodeToString([]byte(af.ExactSessionExit.Request.BodyJSON))
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "EXT receipt drifted") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want exact receipt rejection", err)
 	}
 }
 
@@ -201,9 +228,9 @@ func TestAgentSessionFlowBindingsRejectExitACKCounterDrift(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	af.CleanExit.ACK.Counter = "44"
-	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "clean-exit ACK counter") {
-		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want clean-exit ACK counter rejection", err)
+	af.ExactSessionExit.ACK.Counter = "44"
+	if err := validateAgentSessionFlowBindings(af); err == nil || !strings.Contains(err.Error(), "exact-session exit ACK counter") {
+		t.Fatalf("validateAgentSessionFlowBindings() error = %v, want exact-session ACK counter rejection", err)
 	}
 }
 
@@ -235,10 +262,98 @@ func TestAgentSessionACKBodyRequiresSingleResourceMaps(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = validateAgentSessionACKBody("RKN ACK", string(body), 900, knock.ResourceID)
+			_, err = validateAgentSessionACKBody("RKN ACK", string(body), 900, knock.ResourceID)
 			if err == nil || !strings.Contains(err.Error(), "resource maps must each contain exactly one entry") {
 				t.Fatalf("error = %v, want single-resource-map rejection", err)
 			}
 		})
+	}
+}
+
+func TestAgentSessionExactReceiptAndDenialBodiesFailClosed(t *testing.T) {
+	af, err := AgentSessionControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	knock, err := decodeAgentSessionKnockBody(af.OverloadReknock.KnockRequest.BodyJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := validateAgentSessionACKBody("RKN ACK", af.OverloadReknock.ACK.BodyJSON, 900, knock.ResourceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt != (agentSessionReceipt{
+		CellID: "cell0", SessionID: 72623859790382856,
+		SessionIssuedAtMillis: 1800000000000,
+		RunID:                 "0123456789abcdef", RunAttempt: 1,
+	}) {
+		t.Fatalf("success receipt = %+v", receipt)
+	}
+
+	for name, body := range map[string]string{
+		"knock missing run attempt": strings.Replace(af.OverloadReknock.KnockRequest.BodyJSON, `,"runAttempt":1`, "", 1),
+		"knock zero run attempt":    strings.Replace(af.OverloadReknock.KnockRequest.BodyJSON, `"runAttempt":1`, `"runAttempt":0`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := decodeAgentSessionKnockBody(body); err == nil {
+				t.Fatalf("decodeAgentSessionKnockBody(%s) succeeded", body)
+			}
+		})
+	}
+
+	for name, body := range map[string]string{
+		"success missing cell":        strings.Replace(af.OverloadReknock.ACK.BodyJSON, `,"cellId":"cell0"`, "", 1),
+		"success missing issuance":    strings.Replace(af.OverloadReknock.ACK.BodyJSON, `,"sessIssuedAtMillis":1800000000000`, "", 1),
+		"success zero attempt":        strings.Replace(af.OverloadReknock.ACK.BodyJSON, `"runAttempt":1`, `"runAttempt":0`, 1),
+		"success unknown receipt key": strings.TrimSuffix(af.OverloadReknock.ACK.BodyJSON, "}") + `,"future":true}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := validateAgentSessionACKBody("RKN ACK", body, 900, knock.ResourceID); err == nil {
+				t.Fatalf("validateAgentSessionACKBody(%s) succeeded", body)
+			}
+		})
+	}
+
+	exit, err := decodeAgentSessionExactExitBody(af.ExactSessionExit.Request.BodyJSON)
+	if err != nil || exit.agentSessionReceipt != receipt {
+		t.Fatalf("exact EXT = %+v, %v", exit, err)
+	}
+	for name, body := range map[string]string{
+		"resource scoped shim": `{"headerType":16,"usrId":"agent-conformance-01","devId":"agent-conformance-01","aspId":"agent","resId":"connector-conformance-01","runId":"0123456789abcdef","runAttempt":1}`,
+		"receipt mismatch":     strings.Replace(af.ExactSessionExit.Request.BodyJSON, `"sessId":72623859790382856`, `"sessId":72623859790382857`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := decodeAgentSessionExactExitBody(body)
+			if err == nil && got.agentSessionReceipt == receipt {
+				t.Fatalf("exact EXT mutation was accepted: %+v", got)
+			}
+		})
+	}
+
+	for name, body := range map[string]string{
+		"missing event":    strings.Replace(af.ExactSessionExit.ACK.BodyJSON, `,"closeEventId":"0123456789abcdef0123456789abcdef"`, "", 1),
+		"uppercase event":  strings.Replace(af.ExactSessionExit.ACK.BodyJSON, `0123456789abcdef0123456789abcdef`, `0123456789ABCDEF0123456789ABCDEF`, 1),
+		"invalid state":    strings.Replace(af.ExactSessionExit.ACK.BodyJSON, `"state":"closing"`, `"state":"ready"`, 1),
+		"receipt mismatch": strings.Replace(af.ExactSessionExit.ACK.BodyJSON, `"runAttempt":1`, `"runAttempt":2`, 1),
+	} {
+		t.Run("close "+name, func(t *testing.T) {
+			if err := validateAgentSessionCloseACKBody("exact-session exit ACK", body, receipt); err == nil {
+				t.Fatalf("validateAgentSessionCloseACKBody(%s) succeeded", body)
+			}
+		})
+	}
+
+	if err := validateAgentSessionKnockDenialACKBody(af.DenialACKs.Knock.BodyJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateAgentSessionExitDenialACKBody(af.DenialACKs.Exit.BodyJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateAgentSessionKnockDenialACKBody(strings.TrimSuffix(af.DenialACKs.Knock.BodyJSON, "}") + `,"sessId":1}`); err == nil {
+		t.Fatal("knock denial accepted a session receipt")
+	}
+	if err := validateAgentSessionExitDenialACKBody(strings.TrimSuffix(af.DenialACKs.Exit.BodyJSON, "}") + `,"closeEventId":"0123456789abcdef0123456789abcdef"}`); err == nil {
+		t.Fatal("exit denial accepted close-event authority")
 	}
 }
