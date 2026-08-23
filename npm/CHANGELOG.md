@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.13.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.12.4...npm-v0.13.0) (2026-08-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** define exact session retirement receipts
+* **vectors:** add durable session lifecycle authority ([#101](https://github.com/layervai/qurl-conformance/issues/101))
+* **vectors:** publish session-bound ACK and one-way EXT vectors ([#98](https://github.com/layervai/qurl-conformance/issues/98))
+* define Connector resource NHP contract
+
+### Features
+
+* define Connector resource NHP contract ([daba318](https://github.com/layervai/qurl-conformance/commit/daba31877fb69562885f2aa8799f6b7e1d909c61))
+* **vectors:** add durable session lifecycle authority ([#101](https://github.com/layervai/qurl-conformance/issues/101)) ([149814a](https://github.com/layervai/qurl-conformance/commit/149814a3d6316f4913b626323c760492d5cde0b9))
+* **vectors:** define exact session retirement receipts ([c6c0b67](https://github.com/layervai/qurl-conformance/commit/c6c0b67637f0f81e281647ab18b5efce45d6ee64))
+* **vectors:** publish session-bound ACK and one-way EXT vectors ([#98](https://github.com/layervai/qurl-conformance/issues/98)) ([7248e53](https://github.com/layervai/qurl-conformance/commit/7248e535c5e85376c4c73cf5bb7d459032dd8e35))
+
+
+### Bug Fixes
+
+* **vectors:** pin session producer to merged main ([9d130aa](https://github.com/layervai/qurl-conformance/commit/9d130aaf1b6bcb371a4a1efa48e0fb98c2ab4077))
+* **vectors:** restore current-envelope session vectors ([#103](https://github.com/layervai/qurl-conformance/issues/103)) ([9f5d2f2](https://github.com/layervai/qurl-conformance/commit/9f5d2f2938a5c783610c31852f63f33a0117dbe5))
+
+
+### Reverts
+
+* **vectors:** restore current NHP envelope ([#102](https://github.com/layervai/qurl-conformance/issues/102)) ([c1b361c](https://github.com/layervai/qurl-conformance/commit/c1b361c040c273abc2301b33a2562e39cfb71533))
+
 ## [0.12.4](https://github.com/layervai/qurl-conformance/compare/npm-v0.12.3...npm-v0.12.4) (2026-08-20)
 
 
