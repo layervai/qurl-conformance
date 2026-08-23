@@ -31,11 +31,11 @@ The artifact contains one deterministic instance of each transition:
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
-are synthetic. The committed packets were emitted byte-for-byte by
+are synthetic. The committed packets are reproduced byte-for-byte by
 `layervai/qurl-go` producer revision
-`aaf6e7f368419d74d0c644dca24252dc3d668a8e`. This is a signed,
-pushed, unmerged producer checkpoint; every pin must move to the final merged
-producer SHA before release.
+`b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed
+commit on qurl-go main whose opt-in deterministic regeneration gate reproduces
+every committed body and packet byte.
 
 ## Protocol version
 

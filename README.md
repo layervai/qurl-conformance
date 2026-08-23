@@ -228,9 +228,9 @@ artifact has its own `artifact` id:
   `agent_session_control_vectors.json`, schema version 4) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and exact-session EXT -> ACK, pinned to
   `layervai/qurl-go` producer revision
-  `aaf6e7f368419d74d0c644dca24252dc3d668a8e`. This is a signed,
-  pushed producer checkpoint and must be re-pinned to the merged producer SHA
-  before release. The COK wire
+  `b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed
+  commit on qurl-go main whose deterministic regeneration gate reproduces the
+  committed artifact. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
   standard-base64 32-byte cookie by extending the header digest with the raw
