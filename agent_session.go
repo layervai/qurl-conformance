@@ -25,9 +25,8 @@ const (
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// deterministically reproduces the golden packets and contains the strict
 	// exact-session receipt and EXT/ACK retirement contract in layervai/qurl-go.
-	// This is the signed
-	// commit on qurl-go main whose deterministic regeneration gate
-	// reproduces every committed body and packet byte.
+	// This signed qurl-go main commit contains the deterministic regeneration
+	// gate that reproduces every committed body and packet byte.
 	AgentSessionControlProducerRevision = "b962ee4aa82f643d507ddf75adc3c110df8dff9d"
 
 	AgentSessionHeaderKNK = 1
