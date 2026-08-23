@@ -1645,10 +1645,13 @@ func nhpGoldenPacketHexes(t *testing.T) map[string]string {
 	packets["agent_session.cookie_reply"] = sc.OverloadReknock.CookieReply.PacketHex
 	packets["agent_session.reknock_request"] = sc.OverloadReknock.ReknockRequest.PacketHex
 	packets["agent_session.reknock_ack"] = sc.OverloadReknock.ACK.PacketHex
-	packets["agent_session.exit_request"] = sc.CleanExit.Request.PacketHex
+	packets["agent_session.exit_request"] = sc.ExactSessionExit.Request.PacketHex
+	packets["agent_session.exit_ack"] = sc.ExactSessionExit.ACK.PacketHex
+	packets["agent_session.knock_denial_ack"] = sc.DenialACKs.Knock.PacketHex
+	packets["agent_session.exit_denial_ack"] = sc.DenialACKs.Exit.PacketHex
 
-	if len(packets) != 21 {
-		t.Fatalf("collected %d NHP golden packets, want 21", len(packets))
+	if len(packets) != 24 {
+		t.Fatalf("collected %d NHP golden packets, want 24", len(packets))
 	}
 	return packets
 }

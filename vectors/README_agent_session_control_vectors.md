@@ -5,8 +5,8 @@ transitions a native UDP connector needs after its first registered-agent
 knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
 policy, while this artifact validates the Noise packet bytes and transition
-correlation. Its `schema_version` is `3`; version 2's bodyless, one-way global
-EXT contract is not accepted on the current NHP 1.1 envelope.
+correlation. Its `schema_version` is `4`; earlier resource-scoped and bodyless,
+one-way global EXT contracts are not accepted on the current NHP 1.1 envelope.
 
 ## Positive flows
 
@@ -17,19 +17,25 @@ The artifact contains one deterministic instance of each transition:
    `body.trxId` is 41 and its cookie is exactly 32 bytes encoded as canonical,
    padded RFC 4648 standard base64.
 3. `overload_reknock.reknock_request`: NHP_RKN (type 8), counter 42. It retains
-   the KNK identity, resource, and RunID and authenticates the decoded cookie in
-   its header digest.
-4. `overload_reknock.ack`: NHP_ACK (type 2), counter 42.
-5. `clean_exit.request`: resource-scoped NHP_EXT (type 16), counter 43. Its
-   authenticated body repeats the protected-resource session identity.
-6. `clean_exit.ack`: NHP_ACK (type 2), counter 43.
+   the KNK identity, resource, RunID, and positive `runAttempt`, and authenticates
+   the decoded cookie in its header digest.
+4. `overload_reknock.ack`: NHP_ACK (type 2), counter 42. Its success body returns
+   the exact immutable session receipt.
+5. `exact_session_exit.request`: NHP_EXT (type 16), counter 43. Its authenticated
+   body carries that exact receipt rather than a resource identity.
+6. `exact_session_exit.ack`: NHP_ACK (type 2), counter 43. Its dedicated body
+   repeats the receipt and adds `closeEventId` and retirement `state`.
+7. `denial_acks.knock` and `denial_acks.exit`: authenticated NHP_ACK examples
+   that omit every receipt and close-event field.
 
 Every packet records the exact sender and receiver key roles, deterministic
 ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets were emitted byte-for-byte by
 `layervai/qurl-go` producer revision
-`bd743b1509a3c70603f2f5350b398a83ed0fd321`.
+`aaf6e7f368419d74d0c644dca24252dc3d668a8e`. This is a signed,
+pushed, unmerged producer checkpoint; every pin must move to the final merged
+producer SHA before release.
 
 ## Protocol version
 
@@ -61,7 +67,11 @@ key, and the nonce. Only the AAD moved.
   flow mutation confirms correlation still succeeds with a different
   authenticated outer counter.
 - The RKN ACK counter must equal the RKN request counter.
-- A successful ACK must carry a nonzero server-assigned uint64 `sessId`. The raw
+- KNK and RKN must carry the same canonical 16-lowercase-hex `runId` and the
+  same positive uint64 `runAttempt`.
+- A successful ACK must carry an exact immutable receipt: nonempty `cellId`,
+  nonzero server-assigned uint64 `sessId`, positive `sessIssuedAtMillis`, and
+  the request's exact `runId` and `runAttempt`. The raw
   JSON number can exceed JavaScript's safe-integer range; parse it losslessly
   into `BigInt`, never through an ordinary `JSON.parse` number.
 - Each successful ACK's `resHost`, `acTokens`, and `preActions` map must contain
@@ -70,12 +80,14 @@ key, and the nonce. Only the AAD moved.
 - The KNK/RKN authenticated body's case-sensitive `headerType` must equal the
   outer packet type. A type 1 packet with a type 8 body, or the inverse, is
   invalid.
-- `usrId`, `devId`, `aspId`, `resId`, and the canonical 16-character lowercase
-  hexadecimal `runId` remain unchanged across KNK and RKN.
-- EXT's authenticated body must repeat the exact user, device, auth-service,
-  resource, and RunID identity. Its ACK counter echoes the EXT counter and its
-  success body remains bound to that resource. It is not an agent-global or
-  one-way operation on the current NHP 1.1 envelope.
+- `usrId`, `devId`, `aspId`, `resId`, `runId`, and `runAttempt` remain unchanged
+  across KNK and RKN.
+- EXT's authenticated body contains `headerType`, `aspId`, and the exact receipt
+  only. Its ACK counter echoes EXT; a success repeats the receipt and adds a
+  canonical 32-character lowercase hexadecimal `closeEventId` plus state
+  `closing` or `closed`. A denial carries its canonical nonzero `errCode` and
+  omits all receipt, close-event, and state fields. The same omission rule
+  applies to knock denials. Unknown or duplicate JSON fields fail closed.
 - Decryption is insufficient without peer authentication. Replies are accepted
   only under the assigned cell's pinned static public key; requests are accepted
   only under the registered agent's static public key.
@@ -121,7 +133,7 @@ packets and stateless cryptographic verification, not a competing session state
 machine. Reimplementing `header_type`, `reply_type`, counter, or
 `application_body` transitions here would only self-test a reference parser and
 could not validate that the shipping consumer rejects them. A consumer's
-conformance gate is incomplete until all 15 cases execute through its actual
+conformance gate is incomplete until all 28 cases execute through its actual
 session entry points with no skips.
 
 The declared reject classes are:
@@ -137,6 +149,9 @@ The declared reject classes are:
 | `reply_type` | the transition received a disallowed authenticated reply type |
 | `header_digest` | RKN digest did not authenticate the exact cookie and header |
 | `application_body` | immutable identity, resource, RunID, or exact body parsing failed |
+| `session_receipt` | an exact receipt is absent, invalid, or differs across the request/ACK/EXT chain |
+| `denial_receipt` | an authenticated denial improperly carries receipt or close-event authority |
+| `close_event` | close-event ID or retirement state is absent or invalid |
 | `peer_authentication` | the expected static peer key did not authenticate the packet |
 
 ## Consumer algorithm
@@ -145,12 +160,13 @@ The declared reject classes are:
    revision, key roles, closed case sets, and all canonical hex/base64 forms.
 2. Rebuild KNK, RKN, and EXT from their deterministic inputs and compare every
    complete packet byte. For RKN, include the decoded cookie in the digest.
-3. Authenticate and decrypt COK and both ACKs under the assigned cell public key;
+3. Authenticate and decrypt COK and every success/denial ACK under the assigned cell public key;
    authenticate initiator packets under the agent public key in a responder
    verifier.
-4. Apply the counter, type/body, immutable-identity/RunID, cookie, ACK-session,
-   and reply-disposition gates above. Require the EXT ACK to echo the request
-   counter. Missing fixtures or unknown cases are failures, never skips.
+4. Apply the counter, type/body, immutable-identity/runAttempt, cookie, exact
+   receipt, denial-omission, and reply-disposition gates above. Require the EXT
+   ACK to echo the request counter. Missing fixtures or unknown cases are
+   failures, never skips.
 5. Execute every cookie and flow case through the implementation's real entry
    points and assert the declared reject class.
 
