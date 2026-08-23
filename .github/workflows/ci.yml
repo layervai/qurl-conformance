@@ -451,7 +451,7 @@ jobs:
               !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
               replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
               x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 4 ||
-              x.producer_revision !== 'aaf6e7f368419d74d0c644dca24252dc3d668a8e' ||
+              x.producer_revision !== 'b962ee4aa82f643d507ddf75adc3c110df8dff9d' ||
               x.protocol.cok_wire_counter_correlation !== 'unconstrained' ||
               x.protocol.cok_body_transaction_correlation !== 'must_equal_knock_counter' ||
               x.protocol.ack_counter_correlation !== 'must_echo_request' ||
@@ -988,7 +988,7 @@ jobs:
           assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
           assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
           assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 4
-          assert x['producer_revision'] == 'aaf6e7f368419d74d0c644dca24252dc3d668a8e'
+          assert x['producer_revision'] == 'b962ee4aa82f643d507ddf75adc3c110df8dff9d'
           assert x['protocol']['cok_wire_counter_correlation'] == 'unconstrained'
           assert x['protocol']['cok_body_transaction_correlation'] == 'must_equal_knock_counter'
           assert x['protocol']['ack_counter_correlation'] == 'must_echo_request'

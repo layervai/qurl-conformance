@@ -23,13 +23,11 @@ const (
 	// accepted on the current NHP 1.1 envelope.
 	AgentSessionControlSchemaVersion = 4
 	// AgentSessionControlProducerRevision is the exact producer revision that
-	// sealed the golden packets and introduced the strict exact-session receipt
-	// and EXT/ACK retirement contract in layervai/qurl-go. This is the signed,
-	// pushed unmerged producer commit that emitted the bytes. A squash merge
-	// creates a different SHA: do not claim it emitted these vectors, and do not
-	// delete the producer branch until the merged-SHA follow-up is available.
-	// Re-pin deliberately under the RELEASE_CHECKLIST.md rule.
-	AgentSessionControlProducerRevision = "aaf6e7f368419d74d0c644dca24252dc3d668a8e"
+	// deterministically reproduces the golden packets and contains the strict
+	// exact-session receipt and EXT/ACK retirement contract in layervai/qurl-go.
+	// This signed qurl-go main commit contains the deterministic regeneration
+	// gate that reproduces every committed body and packet byte.
+	AgentSessionControlProducerRevision = "b962ee4aa82f643d507ddf75adc3c110df8dff9d"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2
