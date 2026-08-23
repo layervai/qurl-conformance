@@ -242,6 +242,15 @@ jobs:
             const decoded = Buffer.from(value, 'base64url');
             return decoded.length === 32 && decoded.toString('base64url') === value;
           };
+          // sessId is uint64 authority and the fixture deliberately exceeds
+          // Number.MAX_SAFE_INTEGER. Extract its canonical decimal token from
+          // the already-strict body and compare as BigInt; JSON.parse would
+          // silently make nearby session IDs equal after rounding.
+          const exactSessionID = body => {
+            const match = /"sessId":(0|[1-9][0-9]*)(?=[,}])/.exec(body);
+            if (!match) throw new Error('missing or noncanonical sessId');
+            return BigInt(match[1]);
+          };
           const assignmentRegister = JSON.parse(s.assigned_cell_registration.request.body_json);
           const assignmentOtp = JSON.parse(s.account_credential_otp.request.body_json);
           const assignmentOtpBinding = s.account_credential_otp.enrollment_binding;
@@ -461,17 +470,19 @@ jobs:
               x.denial_acks.knock.header_type !== 2 || x.denial_acks.exit.header_type !== 2 ||
               x.exact_session_exit.ack.counter !== x.exact_session_exit.request.counter ||
               sessionKnock.runAttempt !== 1 || exactExitRequest.headerType !== 16 || exactExitRequest.aspId !== 'agent' ||
-              exactExitRequest.cellId !== sessionACK.cellId || exactExitRequest.sessId !== sessionACK.sessId ||
+              exactExitRequest.cellId !== sessionACK.cellId ||
+              exactSessionID(x.exact_session_exit.request.body_json) !== exactSessionID(x.overload_reknock.ack.body_json) ||
               exactExitRequest.sessIssuedAtMillis !== sessionACK.sessIssuedAtMillis ||
               exactExitRequest.runId !== sessionACK.runId || exactExitRequest.runAttempt !== sessionACK.runAttempt ||
-              exactExitAck.cellId !== exactExitRequest.cellId || exactExitAck.sessId !== exactExitRequest.sessId ||
+              exactExitAck.cellId !== exactExitRequest.cellId ||
+              exactSessionID(x.exact_session_exit.ack.body_json) !== exactSessionID(x.exact_session_exit.request.body_json) ||
               exactExitAck.sessIssuedAtMillis !== exactExitRequest.sessIssuedAtMillis ||
               exactExitAck.runId !== exactExitRequest.runId || exactExitAck.runAttempt !== exactExitRequest.runAttempt ||
               !/^[0-9a-f]{32}$/.test(exactExitAck.closeEventId) || !['closing', 'closed'].includes(exactExitAck.state) ||
               deniedAuthorityFields.some(k => Object.hasOwn(knockDenial, k) || Object.hasOwn(exitDenial, k)) ||
               JSON.parse(x.overload_reknock.cookie_reply.body_json).trxId !== Number(x.overload_reknock.knock_request.counter) ||
               x.overload_reknock.ack.counter !== x.overload_reknock.reknock_request.counter ||
-              JSON.parse(x.overload_reknock.ack.body_json).sessId <= 0 ||
+              exactSessionID(x.overload_reknock.ack.body_json) <= 0n ||
               x.cookie_body_cases.length !== 16 || x.flow_cases.length !== 28 ||
               i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
               i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
