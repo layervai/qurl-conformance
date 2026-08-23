@@ -293,6 +293,7 @@ jobs:
           const exactExitAck = JSON.parse(x.exact_session_exit.ack.body_json);
           const knockDenial = JSON.parse(x.denial_acks.knock.body_json);
           const exitDenial = JSON.parse(x.denial_acks.exit.body_json);
+          const deniedAuthorityFields = ['cellId', 'sessId', 'sessIssuedAtMillis', 'runId', 'runAttempt', 'closeEventId', 'state'];
           if (qv2.schema_version !== 2 || qv2.transport_contract.prefix !== 'qv2t1' ||
               qv2.transport_contract.component_max !== 240 ||
               qv2.transport_contract.max_transport_length !== 6826 ||
@@ -467,7 +468,7 @@ jobs:
               exactExitAck.sessIssuedAtMillis !== exactExitRequest.sessIssuedAtMillis ||
               exactExitAck.runId !== exactExitRequest.runId || exactExitAck.runAttempt !== exactExitRequest.runAttempt ||
               !/^[0-9a-f]{32}$/.test(exactExitAck.closeEventId) || !['closing', 'closed'].includes(exactExitAck.state) ||
-              Object.hasOwn(knockDenial, 'sessId') || Object.hasOwn(exitDenial, 'sessId') || Object.hasOwn(exitDenial, 'closeEventId') ||
+              deniedAuthorityFields.some(k => Object.hasOwn(knockDenial, k) || Object.hasOwn(exitDenial, k)) ||
               JSON.parse(x.overload_reknock.cookie_reply.body_json).trxId !== Number(x.overload_reknock.knock_request.counter) ||
               x.overload_reknock.ack.counter !== x.overload_reknock.reknock_request.counter ||
               JSON.parse(x.overload_reknock.ack.body_json).sessId <= 0 ||
@@ -995,12 +996,13 @@ jobs:
           assert session_knock['runAttempt'] == 1
           assert exact_exit_request['headerType'] == 16 and exact_exit_request['aspId'] == 'agent'
           receipt_fields = ('cellId', 'sessId', 'sessIssuedAtMillis', 'runId', 'runAttempt')
+          denied_authority_fields = receipt_fields + ('closeEventId', 'state')
           assert all(exact_exit_request[k] == session_ack[k] for k in receipt_fields)
           assert all(exact_exit_ack[k] == exact_exit_request[k] for k in receipt_fields)
           assert re.fullmatch(r'[0-9a-f]{32}', exact_exit_ack['closeEventId'])
           assert exact_exit_ack['state'] in ('closing', 'closed')
-          assert all(k not in knock_denial for k in receipt_fields)
-          assert all(k not in exit_denial for k in receipt_fields + ('closeEventId', 'state'))
+          assert all(k not in knock_denial for k in denied_authority_fields)
+          assert all(k not in exit_denial for k in denied_authority_fields)
           assert json.loads(x['overload_reknock']['cookie_reply']['body_json'])['trxId'] == int(x['overload_reknock']['knock_request']['counter'])
           assert x['overload_reknock']['ack']['counter'] == x['overload_reknock']['reknock_request']['counter']
           assert json.loads(x['overload_reknock']['ack']['body_json'])['sessId'] > 0
