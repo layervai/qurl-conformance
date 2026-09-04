@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.1](https://github.com/layervai/qurl-conformance/compare/v0.13.0...v0.13.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **ci:** assert the review origin's destination, not an exact URL ([#122](https://github.com/layervai/qurl-conformance/issues/122)) ([a86ebef](https://github.com/layervai/qurl-conformance/commit/a86ebef7d8dd48d668e16f6da68fc062fbf11983))
+
+
+### Continuous Integration
+
+* **deps:** bump age-check-actions reusable to v0.13.0 ([#120](https://github.com/layervai/qurl-conformance/issues/120)) ([b46efd4](https://github.com/layervai/qurl-conformance/commit/b46efd4c9a51b628b1ca0b87a6074e70177ee922))
+* **deps:** bump remaining ops-routines-workflows shims to v0.13.0 ([#121](https://github.com/layervai/qurl-conformance/issues/121)) ([0af598d](https://github.com/layervai/qurl-conformance/commit/0af598d016be2b2bd94642252ae63132f5cf4fdb))
+* drop Task from the review, keep code search ([#114](https://github.com/layervai/qurl-conformance/issues/114)) ([38605b8](https://github.com/layervai/qurl-conformance/commit/38605b84a7461656ab5c12eea3cebe04cbf4450d))
+* enable code search and delegation in the PR review ([#113](https://github.com/layervai/qurl-conformance/issues/113)) ([b5c8b4b](https://github.com/layervai/qurl-conformance/commit/b5c8b4bd810965b0ecffddb7457472838fd539ad))
+* move Claude PR review to Opus 5 ([#111](https://github.com/layervai/qurl-conformance/issues/111)) ([6e84366](https://github.com/layervai/qurl-conformance/commit/6e8436671adca1702daa26af6cf1986153570bc0))
+
 ## [0.13.0](https://github.com/layervai/qurl-conformance/compare/v0.12.6...v0.13.0) (2026-08-23)
 
 
