@@ -27,29 +27,31 @@ const (
 	DelegatedMintIssueV1SchemaVersion = 1
 	DelegatedMintIssueV1Description   = "Byte-exact private Connector-to-qurl-service authentication contract for delegated-mint capability issuance. The signature binds the configured issuer identity, exact request body, route, authority, replay nonce, and idempotency key. Capability claims and public redemption remain separate service-owned contracts."
 
-	DelegatedMintIssueV1Method                 = "POST"
-	DelegatedMintIssueV1Route                  = "/internal/v1/delegated-mint-capabilities"
-	DelegatedMintIssueV1SigningDomain          = "LV-QURL-CAPABILITY-ISSUE-V1"
-	DelegatedMintIssueV1SigningDomainSeparator = "00"
-	DelegatedMintIssueV1FrameEncoding          = "u32be_byte_length_then_exact_utf8_bytes"
-	DelegatedMintIssueV1BodyDigest             = "SHA-256"
-	DelegatedMintIssueV1BodyDigestEncoding     = "lowercase_hex"
-	DelegatedMintIssueV1SignatureAlgorithm     = "ECDSA_P-256_SHA-256"
-	DelegatedMintIssueV1SignatureEncoding      = "canonical_der_base64url_unpadded_low_s"
-	DelegatedMintIssueV1PublicKeyEncoding      = "der_spki_base64url_unpadded"
-	DelegatedMintIssueV1NonceEncoding          = "base64url_unpadded"
-	DelegatedMintIssueV1NonceBytes             = 16
-	DelegatedMintIssueV1IdempotencyKeyMinBytes = 1
-	DelegatedMintIssueV1IdempotencyKeyMaxBytes = 128
-	DelegatedMintIssueV1AuthorityNormalization = "lowercase_dns_name_no_port"
-	DelegatedMintIssueV1AuthorityMaxBytes      = 253
-	DelegatedMintIssueV1BodyMaxBytes           = 8192
-	DelegatedMintIssueV1SuccessStatus          = 200
-	DelegatedMintIssueV1SuccessContentType     = "application/json"
-	DelegatedMintIssueV1CapabilityTTLSeconds   = 15 * 60
-	DelegatedMintIssueV1AuthorityMaxTTLSeconds = 24 * 60 * 60
-	DelegatedMintIssueV1IdempotencyDomain      = "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1"
-	DelegatedMintIssueV1IdempotencyDerivation  = "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded"
+	DelegatedMintIssueV1Method                      = "POST"
+	DelegatedMintIssueV1Route                       = "/internal/v1/delegated-mint-capabilities"
+	DelegatedMintIssueV1SigningDomain               = "LV-QURL-CAPABILITY-ISSUE-V1"
+	DelegatedMintIssueV1SigningDomainSeparator      = "00"
+	DelegatedMintIssueV1FrameEncoding               = "u32be_byte_length_then_exact_utf8_bytes"
+	DelegatedMintIssueV1BodyDigest                  = "SHA-256"
+	DelegatedMintIssueV1BodyDigestEncoding          = "lowercase_hex"
+	DelegatedMintIssueV1SignatureAlgorithm          = "ECDSA_P-256_SHA-256"
+	DelegatedMintIssueV1SignatureEncoding           = "canonical_der_base64url_unpadded_low_s"
+	DelegatedMintIssueV1PublicKeyEncoding           = "der_spki_base64url_unpadded"
+	DelegatedMintIssueV1NonceEncoding               = "base64url_unpadded"
+	DelegatedMintIssueV1NonceBytes                  = 16
+	DelegatedMintIssueV1IdempotencyKeyMinBytes      = 1
+	DelegatedMintIssueV1IdempotencyKeyMaxBytes      = 128
+	DelegatedMintIssueV1AuthorityNormalization      = "lowercase_dns_name_no_port"
+	DelegatedMintIssueV1AuthorityMaxBytes           = 253
+	DelegatedMintIssueV1BodyMaxBytes                = 8192
+	DelegatedMintIssueV1SuccessStatus               = 200
+	DelegatedMintIssueV1SuccessContentType          = "application/json"
+	DelegatedMintIssueV1CapabilityTTLSeconds        = 15 * 60
+	DelegatedMintIssueV1AuthorityMaxTTLSeconds      = 24 * 60 * 60
+	DelegatedMintIssueV1TimestampMaxSkewSeconds     = 5 * 60
+	DelegatedMintIssueV1NonceReplayRetentionSeconds = 10 * 60
+	DelegatedMintIssueV1IdempotencyDomain           = "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1"
+	DelegatedMintIssueV1IdempotencyDerivation       = "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded"
 
 	DelegatedMintIssueV1IdempotencyKeyHeader = "Idempotency-Key"
 	DelegatedMintIssueV1IssuerIDHeader       = "X-LayerV-Issuer-ID"
@@ -78,40 +80,43 @@ type DelegatedMintIssueV1File struct {
 }
 
 type DelegatedMintIssueV1Contract struct {
-	Method                 string   `json:"method"`
-	Route                  string   `json:"route"`
-	SigningDomainASCII     string   `json:"signing_domain_ascii"`
-	SigningDomainSeparator string   `json:"signing_domain_separator_hex"`
-	FrameEncoding          string   `json:"frame_encoding"`
-	FieldOrder             []string `json:"field_order"`
-	BodyDigest             string   `json:"body_digest"`
-	BodyDigestEncoding     string   `json:"body_digest_encoding"`
-	BodyMaxBytes           int      `json:"body_max_bytes"`
-	SignatureAlgorithm     string   `json:"signature_algorithm"`
-	SignatureEncoding      string   `json:"signature_encoding"`
-	PublicKeyEncoding      string   `json:"public_key_encoding"`
-	NonceEncoding          string   `json:"nonce_encoding"`
-	NonceDecodedBytes      int      `json:"nonce_decoded_bytes"`
-	IdempotencyKeyPattern  string   `json:"idempotency_key_pattern"`
-	IdempotencyDomain      string   `json:"idempotency_derivation_domain_ascii"`
-	IdempotencyDerivation  string   `json:"idempotency_derivation"`
-	IdempotencyKeyMinBytes int      `json:"idempotency_key_min_bytes"`
-	IdempotencyKeyMaxBytes int      `json:"idempotency_key_max_bytes"`
-	IdempotencyKeyHeader   string   `json:"idempotency_key_header"`
-	IssuerFieldPattern     string   `json:"issuer_field_pattern"`
-	IssuerIDHeader         string   `json:"issuer_id_header"`
-	KIDHeader              string   `json:"kid_header"`
-	TimestampHeader        string   `json:"timestamp_header"`
-	NonceHeader            string   `json:"nonce_header"`
-	SignatureHeader        string   `json:"signature_header"`
-	AuthorityNormalization string   `json:"authority_normalization"`
-	AuthorityMaxBytes      int      `json:"authority_max_bytes"`
-	SuccessStatus          int      `json:"success_status"`
-	SuccessContentType     string   `json:"success_content_type"`
-	SuccessEnvelope        string   `json:"success_envelope"`
-	SuccessDataFields      []string `json:"success_data_fields"`
-	CapabilityTTLSeconds   int      `json:"capability_ttl_seconds"`
-	AuthorityMaxTTLSeconds int      `json:"authority_max_ttl_seconds"`
+	Method                      string   `json:"method"`
+	Route                       string   `json:"route"`
+	SigningDomainASCII          string   `json:"signing_domain_ascii"`
+	SigningDomainSeparator      string   `json:"signing_domain_separator_hex"`
+	FrameEncoding               string   `json:"frame_encoding"`
+	FieldOrder                  []string `json:"field_order"`
+	BodyDigest                  string   `json:"body_digest"`
+	BodyDigestEncoding          string   `json:"body_digest_encoding"`
+	BodyMaxBytes                int      `json:"body_max_bytes"`
+	SignatureAlgorithm          string   `json:"signature_algorithm"`
+	SignatureEncoding           string   `json:"signature_encoding"`
+	PublicKeyEncoding           string   `json:"public_key_encoding"`
+	NonceEncoding               string   `json:"nonce_encoding"`
+	NonceDecodedBytes           int      `json:"nonce_decoded_bytes"`
+	IdempotencyKeyPattern       string   `json:"idempotency_key_pattern"`
+	IdempotencyDomain           string   `json:"idempotency_derivation_domain_ascii"`
+	IdempotencyDerivation       string   `json:"idempotency_derivation"`
+	IdempotencyKeyMinBytes      int      `json:"idempotency_key_min_bytes"`
+	IdempotencyKeyMaxBytes      int      `json:"idempotency_key_max_bytes"`
+	IdempotencyKeyHeader        string   `json:"idempotency_key_header"`
+	IssuerFieldPattern          string   `json:"issuer_field_pattern"`
+	IssuerIDHeader              string   `json:"issuer_id_header"`
+	KIDHeader                   string   `json:"kid_header"`
+	TimestampHeader             string   `json:"timestamp_header"`
+	NonceHeader                 string   `json:"nonce_header"`
+	SignatureHeader             string   `json:"signature_header"`
+	AuthorityNormalization      string   `json:"authority_normalization"`
+	AuthorityMaxBytes           int      `json:"authority_max_bytes"`
+	SuccessStatus               int      `json:"success_status"`
+	SuccessContentType          string   `json:"success_content_type"`
+	SuccessEnvelope             string   `json:"success_envelope"`
+	SuccessDataFields           []string `json:"success_data_fields"`
+	CapabilityTTLSeconds        int      `json:"capability_ttl_seconds"`
+	AuthorityMaxTTLSeconds      int      `json:"authority_max_ttl_seconds"`
+	TimestampMaxSkewSeconds     int      `json:"timestamp_max_skew_seconds"`
+	NonceReplayRetentionSeconds int      `json:"nonce_replay_retention_seconds"`
+	ExpiryAuthorityRule         string   `json:"expiry_authority_rule"`
 }
 
 type DelegatedMintIssueV1Golden struct {
@@ -215,6 +220,9 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		SuccessStatus: DelegatedMintIssueV1SuccessStatus, SuccessContentType: DelegatedMintIssueV1SuccessContentType,
 		SuccessEnvelope: "data", SuccessDataFields: delegatedMintIssueV1SuccessDataFields,
 		CapabilityTTLSeconds: DelegatedMintIssueV1CapabilityTTLSeconds, AuthorityMaxTTLSeconds: DelegatedMintIssueV1AuthorityMaxTTLSeconds,
+		TimestampMaxSkewSeconds:     DelegatedMintIssueV1TimestampMaxSkewSeconds,
+		NonceReplayRetentionSeconds: DelegatedMintIssueV1NonceReplayRetentionSeconds,
+		ExpiryAuthorityRule:         "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority",
 	}
 	if !reflect.DeepEqual(contract, want) {
 		return errors.New("conformance: delegated-mint issue contract drift")

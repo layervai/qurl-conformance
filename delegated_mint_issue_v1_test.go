@@ -32,6 +32,10 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		!strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
+	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 600 ||
+		file.Contract.ExpiryAuthorityRule != "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority" {
+		t.Fatalf("freshness/replay/expiry authority contract drifted: %+v", file.Contract)
+	}
 	var body struct {
 		UploadHandle        string `json:"upload_handle"`
 		AudienceKeyID       string `json:"audience_key_id"`

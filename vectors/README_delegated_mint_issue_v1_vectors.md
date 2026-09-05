@@ -20,6 +20,12 @@ the listed unreserved ASCII alphabet. The golden uses the Connector form
 to the same authenticated issuer operation. The exact request body is limited
 to 8,192 bytes before parsing or signature verification.
 
+The service accepts a signed request timestamp only within 300 seconds of its
+current UTC time. It stores an accepted nonce for at least 600 seconds from
+first acceptance. An exact idempotent replay can return its durable result, but
+the same issuer and key cannot use that nonce for a different operation. These
+two bounds are part of v1 and are not local producer retry settings.
+
 The signed authority is a lowercase ASCII DNS name without a port or trailing
 dot. It has at least two labels and at most 253 bytes. Each label is 1 to 63
 bytes, starts and ends with a lowercase letter or digit, and otherwise contains
@@ -44,15 +50,17 @@ the exact issuer-produced object path and the authenticated caller's public
 `audience_key_id`. Capability issuance is separate from later redemption with
 that caller's normal qURL API credential.
 
-`capability_expires_at` is the short-lived bearer expiry, 900 seconds after the
-signed request timestamp. `authority_expires_at` is the stored maximum upload
-authority, at most 86,400 seconds after the initial signed request. A signed
-refresh uses this same route with a higher issue generation. It can move only the
-capability expiry forward, and never after the original authority expiry. It
-must not change the issuer, audience, upload, resource policy, target path,
-batch limit, link TTL limit, or signed upload metadata. The service checks its
-own policy maximum when it stores the first authority; the Connector cannot
-increase it by signing a later request.
+The Connector supplies the two expiry fields so its signed upload record and a
+lost-response retry name one deterministic authority. qurl-service does not
+trust those times. It requires `capability_expires_at` to be exactly 900 seconds
+after the signed request timestamp. It requires the initial
+`authority_expires_at` to be no later than 86,400 seconds after that timestamp.
+A signed refresh uses this same route with a higher issue generation. It can
+move only the capability expiry forward, and never after the original authority
+expiry. It must not change the issuer, audience, upload, resource policy,
+target path, batch limit, link TTL limit, or signed upload metadata. The service
+checks its own policy maximum when it stores the first authority; the Connector
+cannot increase it by signing a later request.
 
 A successful first issue, exact replay, reconciliation, or refresh returns
 HTTP 200 and `Content-Type: application/json` without a charset parameter. The
