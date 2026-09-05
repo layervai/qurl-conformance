@@ -136,6 +136,8 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_percent_encoded_dot_lower":          {present: true, value: targetPathValue("/%2e%2e/secret")},
 	"reject_percent_encoded_dot_upper":          {present: true, value: targetPathValue("/%2E%2E/secret")},
 	"reject_percent_encoded_single_dot":         {present: true, value: targetPathValue("/a%2eb")},
+	"reject_mixed_percent_letter_dot_escape":    {present: true, value: targetPathValue("/view/a%41b%2ec")},
+	"reject_literal_dot_with_percent_escape":    {present: true, value: targetPathValue("/a/../b%41c")},
 	"reject_percent_encoded_slash_lower":        {present: true, value: targetPathValue("/view%2fsecret")},
 	"reject_percent_encoded_slash_upper":        {present: true, value: targetPathValue("/view%2Fsecret")},
 	"reject_percent_encoded_letter_upper_path":  {present: true, value: targetPathValue("/view/a%4Ab")},
@@ -280,6 +282,7 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	if i := strings.IndexByte(p, '?'); i >= 0 {
 		pathPart = p[:i]
 	}
+	hasPathEscape := false
 	for i := 0; i < len(pathPart); i++ {
 		if pathPart[i] != '%' {
 			continue
@@ -293,9 +296,11 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 		if strings.EqualFold(escape, "2e") {
 			return ExpectReject, TargetPathRejectDotSegment, false, nil
 		}
-		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
+		hasPathEscape = true
+		i += 2
 	}
 	segments := strings.Split(pathPart, "/")
+	hasInteriorEmptySegment := false
 	for i, segment := range segments {
 		if segment == "." || segment == ".." {
 			return ExpectReject, TargetPathRejectDotSegment, false, nil
@@ -304,8 +309,11 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 		// segment is one preserved trailing slash. Any other empty segment would
 		// be normalized by common URL stacks and is not canonical.
 		if segment == "" && i > 0 && i < len(segments)-1 {
-			return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
+			hasInteriorEmptySegment = true
 		}
+	}
+	if hasPathEscape || hasInteriorEmptySegment {
+		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 	}
 	return ExpectAccept, "", true, nil
 }

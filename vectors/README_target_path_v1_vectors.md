@@ -46,17 +46,27 @@ The closed local `reject_class` values are:
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
-The order above is not a general precedence contract. Each exact vector states
-its required class. Adding a class or changing an accepted input requires a
-coordinated contract release.
+Malformed percent encoding is classified before the path escape and dot checks.
+After percent syntax is valid, `dot_segment` wins when the path contains any
+case-insensitive `%2e` escape or a literal `.` or `..` segment. This stays true
+when another well-formed path escape is also present. Otherwise, any path escape
+or interior empty segment is `invalid_character`. The `%2e` classification
+deliberately names the escape risk; the decoded dot does not have to be a
+standalone segment.
+
+Other rule combinations have no general precedence contract. Each exact vector
+states its required class. Adding a class or changing an accepted input requires
+a coordinated contract release.
 
 ## Open behavior
 
-Every accepted value has `open_supported: true`. Appending it to a fixed trusted
-origin must preserve the scheme, host, and path bytes. The service ignores the
-query when it authorizes the protected request. A scoped path allows the exact
-path and descendants at a segment boundary. For example, `/view/abc` also
-allows `/view/abc/thumbnail`, but it does not allow `/view/abcd`.
+Every accepted value has `open_supported: true`. This field remains an explicit
+invariant and a reserved compatibility gate even though every v1 accepted case
+is true. Appending the value to a fixed trusted origin must preserve the scheme,
+host, path, and complete request target bytes. The service ignores the query
+when it authorizes the protected request. A scoped path allows the exact path
+and descendants at a segment boundary. For example, `/view/abc` also allows
+`/view/abc/thumbnail`, but it does not allow `/view/abcd`.
 
 The service preserves one trailing slash on redirect. Its path authorization
 treats a scoped path with or without that trailing slash as the same boundary.

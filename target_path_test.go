@@ -118,6 +118,9 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if u.Path != wantPath {
 			t.Errorf("case %q changed path to %q, want %q", c.Name, u.Path, wantPath)
 		}
+		if c.Present && u.RequestURI() != value {
+			t.Errorf("case %q changed request target to %q, want exact %q", c.Name, u.RequestURI(), value)
+		}
 		if u.Path != "" && (!strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//")) {
 			t.Errorf("case %q produced unsafe decoded path %q", c.Name, u.Path)
 		}
@@ -138,6 +141,8 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		"reject_percent_encoded_dot_lower":         TargetPathRejectDotSegment,
 		"reject_percent_encoded_dot_upper":         TargetPathRejectDotSegment,
 		"reject_percent_encoded_single_dot":        TargetPathRejectDotSegment,
+		"reject_mixed_percent_letter_dot_escape":   TargetPathRejectDotSegment,
+		"reject_literal_dot_with_percent_escape":   TargetPathRejectDotSegment,
 		"reject_percent_encoded_slash_lower":       TargetPathRejectInvalidCharacter,
 		"reject_percent_encoded_slash_upper":       TargetPathRejectInvalidCharacter,
 		"reject_percent_encoded_letter_upper_path": TargetPathRejectInvalidCharacter,
@@ -167,6 +172,22 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		}
 		if c.Value == nil || *c.Value != value {
 			t.Errorf("case %q value = %v, want byte-exact %q", name, c.Value, value)
+		}
+	}
+}
+
+func TestTargetPathDotSegmentPrecedence(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"reject_mixed_percent_letter_dot_escape",
+		"reject_literal_dot_with_percent_escape",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectDotSegment {
+			t.Errorf("case %q = %+v, want dot_segment precedence", name, *c)
 		}
 	}
 }

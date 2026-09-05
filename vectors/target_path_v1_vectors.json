@@ -292,6 +292,20 @@
       "reject_class": "dot_segment"
     },
     {
+      "name": "reject_mixed_percent_letter_dot_escape",
+      "present": true,
+      "value": "/view/a%41b%2ec",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_literal_dot_with_percent_escape",
+      "present": true,
+      "value": "/a/../b%41c",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
       "name": "reject_percent_encoded_slash_lower",
       "present": true,
       "value": "/view%2fsecret",

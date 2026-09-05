@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 58;
+          const expectedTargetPathCaseCount = 60;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -208,6 +208,8 @@ jobs:
             'reject_percent_encoded_dot_lower',
             'reject_percent_encoded_dot_upper',
             'reject_percent_encoded_single_dot',
+            'reject_mixed_percent_letter_dot_escape',
+            'reject_literal_dot_with_percent_escape',
           ];
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
@@ -1235,7 +1237,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 58
+          expected_target_path_case_count = 60
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1288,6 +1290,8 @@ jobs:
               'reject_percent_encoded_dot_lower',
               'reject_percent_encoded_dot_upper',
               'reject_percent_encoded_single_dot',
+              'reject_mixed_percent_letter_dot_escape',
+              'reject_literal_dot_with_percent_escape',
           ]
           assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_path_escapes)
           assert all(target_path_cases[name]['reject_class'] == 'dot_segment' for name in dot_path_escapes)
