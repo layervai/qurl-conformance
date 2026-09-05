@@ -117,6 +117,7 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 	for _, name := range []string{
 		"accept_percent_path_upper",
 		"accept_percent_path_lower",
+		"accept_percent_path_safe_41",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
@@ -126,13 +127,19 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 			t.Errorf("case %q lost its raw percent escape", name)
 		}
 	}
-	queryOnly := targetPathCase(t, tf, "accept_percent_only_in_query")
-	if queryOnly.OpenSupported == nil || !*queryOnly.OpenSupported {
-		t.Errorf("query-only percent escape must remain open-supported")
+	for _, name := range []string{
+		"accept_percent_only_in_query",
+		"accept_encoded_dot_slash_in_query",
+	} {
+		queryOnly := targetPathCase(t, tf, name)
+		if queryOnly.OpenSupported == nil || !*queryOnly.OpenSupported {
+			t.Errorf("case %q: query-only percent escape must remain open-supported", name)
+		}
 	}
 	for name, rejectClass := range map[string]string{
 		"reject_percent_encoded_dot_lower":   TargetPathRejectDotSegment,
 		"reject_percent_encoded_dot_upper":   TargetPathRejectDotSegment,
+		"reject_percent_encoded_single_dot":  TargetPathRejectDotSegment,
 		"reject_percent_encoded_slash_lower": TargetPathRejectInvalidCharacter,
 		"reject_percent_encoded_slash_upper": TargetPathRejectInvalidCharacter,
 	} {

@@ -105,9 +105,23 @@
       "open_supported": false
     },
     {
+      "name": "accept_percent_path_safe_41",
+      "present": true,
+      "value": "/view/a%41b",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
       "name": "accept_percent_only_in_query",
       "present": true,
       "value": "/view/x?sig=a%20b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_encoded_dot_slash_in_query",
+      "present": true,
+      "value": "/view/x?next=%2e%2E%2f%2F",
       "outcome": "accept",
       "open_supported": true
     },
@@ -262,6 +276,13 @@
       "name": "reject_percent_encoded_dot_upper",
       "present": true,
       "value": "/%2E%2E/secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_single_dot",
+      "present": true,
+      "value": "/a%2eb",
       "outcome": "reject",
       "reject_class": "dot_segment"
     },

@@ -625,12 +625,15 @@ jobs:
               cridValues.reject_trailing_bits.reject_class !== 'non_canonical' ||
               cridValues.reject_checksum.reject_class !== 'checksum' ||
               tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
-              tp.contract.max_bytes !== 2048 || tp.cases.length !== 43 ||
+              tp.contract.max_bytes !== 2048 || tp.cases.length !== 46 ||
               tp.cases.find(v => v.name === 'accept_omitted')?.present !== false ||
               tp.cases.find(v => v.name === 'reject_explicit_empty')?.reject_class !== 'empty' ||
               tp.cases.find(v => v.name === 'accept_max_bytes')?.value.length !== 2048 ||
               tp.cases.find(v => v.name === 'reject_too_long')?.value.length !== 2049 ||
               tp.cases.find(v => v.name === 'accept_percent_path_upper')?.open_supported !== false ||
+              tp.cases.find(v => v.name === 'accept_percent_path_safe_41')?.value !== '/view/a%41b' ||
+              tp.cases.find(v => v.name === 'accept_encoded_dot_slash_in_query')?.open_supported !== true ||
+              tp.cases.find(v => v.name === 'reject_percent_encoded_single_dot')?.reject_class !== 'dot_segment' ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1189,13 +1192,16 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          assert tp['contract']['max_bytes'] == 2048 and len(tp['cases']) == 43
+          assert tp['contract']['max_bytes'] == 2048 and len(tp['cases']) == 46
           target_path_cases = {v['name']: v for v in tp['cases']}
           assert target_path_cases['accept_omitted']['present'] is False
           assert target_path_cases['reject_explicit_empty']['reject_class'] == 'empty'
           assert len(target_path_cases['accept_max_bytes']['value']) == 2048
           assert len(target_path_cases['reject_too_long']['value']) == 2049
           assert target_path_cases['accept_percent_path_upper']['open_supported'] is False
+          assert target_path_cases['accept_percent_path_safe_41']['value'] == '/view/a%41b'
+          assert target_path_cases['accept_encoded_dot_slash_in_query']['open_supported'] is True
+          assert target_path_cases['reject_percent_encoded_single_dot']['reject_class'] == 'dot_segment'
           print('py ok')
           PY
 

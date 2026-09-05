@@ -133,7 +133,9 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_empty_query":                        {present: true, value: targetPathValue("/?")},
 	"accept_percent_path_upper":                 {present: true, value: targetPathValue("/view/a%4Ab")},
 	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%4ab")},
+	"accept_percent_path_safe_41":               {present: true, value: targetPathValue("/view/a%41b")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
+	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
@@ -156,6 +158,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_dotdot_trailing":                    {present: true, value: targetPathValue("/view/..")},
 	"reject_percent_encoded_dot_lower":          {present: true, value: targetPathValue("/%2e%2e/secret")},
 	"reject_percent_encoded_dot_upper":          {present: true, value: targetPathValue("/%2E%2E/secret")},
+	"reject_percent_encoded_single_dot":         {present: true, value: targetPathValue("/a%2eb")},
 	"reject_percent_encoded_slash_lower":        {present: true, value: targetPathValue("/view%2fsecret")},
 	"reject_percent_encoded_slash_upper":        {present: true, value: targetPathValue("/view%2Fsecret")},
 	"reject_bare_percent":                       {present: true, value: targetPathValue("/a%")},
@@ -295,6 +298,9 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	for i := 0; i < len(pathPart); i++ {
 		if pathPart[i] != '%' {
 			continue
+		}
+		if i+3 > len(pathPart) {
+			return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 		}
 		escape := pathPart[i+1 : i+3]
 		switch {
