@@ -1,0 +1,297 @@
+{
+  "artifact": "qurl-target-path-v1-vectors",
+  "schema_version": 1,
+  "description": "Shared target_path request grammar and current tunnel-open support for qURL Connector mints.",
+  "contract": {
+    "wire_field": "target_path",
+    "max_bytes": 2048,
+    "omitted_semantics": "bare_origin",
+    "explicit_empty_semantics": "reject",
+    "accepted_character_set": "raw_ascii_uri_path_and_query",
+    "accepted_value_handling": "preserve_exact_bytes",
+    "percent_encoding_handling": "accept_well_formed_without_normalize_or_decode",
+    "percent_escaped_path_open_supported": false,
+    "percent_escaped_path_issue": "qurl-service#1250"
+  },
+  "cases": [
+    {
+      "name": "accept_omitted",
+      "present": false,
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_root",
+      "present": true,
+      "value": "/",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_simple_path",
+      "present": true,
+      "value": "/view/abc123",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_path_query",
+      "present": true,
+      "value": "/view/abc123?sig=deadBEEF&exp=1700000000",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_allowed_ascii",
+      "present": true,
+      "value": "/a-b_c.d~e!f$g&h'i(j)k*l+m,n;o=p:q@r",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_deep_path",
+      "present": true,
+      "value": "/a/b/c/d/e/f",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_single_dot_segment",
+      "present": true,
+      "value": "/a/./b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_dotdot_in_query",
+      "present": true,
+      "value": "/view/x?redir=../../etc",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_authority_text_in_query",
+      "present": true,
+      "value": "/path?next=//evil.example",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_trailing_slash",
+      "present": true,
+      "value": "/view/",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_empty_query",
+      "present": true,
+      "value": "/?",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_percent_path_upper",
+      "present": true,
+      "value": "/view/a%2Fb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_percent_path_lower",
+      "present": true,
+      "value": "/view/a%2fb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_percent_encoded_dotdot_raw",
+      "present": true,
+      "value": "/%2e%2e/secret",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_percent_only_in_query",
+      "present": true,
+      "value": "/view/x?sig=a%20b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_max_bytes",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "reject_explicit_empty",
+      "present": true,
+      "value": "",
+      "outcome": "reject",
+      "reject_class": "empty"
+    },
+    {
+      "name": "reject_too_long",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_suffix_host",
+      "present": true,
+      "value": ".evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_relative_path",
+      "present": true,
+      "value": "view/abc",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_absolute_url",
+      "present": true,
+      "value": "https://evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_protocol_relative_authority",
+      "present": true,
+      "value": "//evil.example/path",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_leading_backslash",
+      "present": true,
+      "value": "/\\evil.example",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_backslash_in_path",
+      "present": true,
+      "value": "/view\\..\\x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_fragment",
+      "present": true,
+      "value": "/view/x#fragment",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_space",
+      "present": true,
+      "value": "/view /x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_tab",
+      "present": true,
+      "value": "/view\t/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_newline",
+      "present": true,
+      "value": "/view\n/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_carriage_return",
+      "present": true,
+      "value": "/view\r/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_nul",
+      "present": true,
+      "value": "/view\u0000/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_del",
+      "present": true,
+      "value": "/view/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_non_ascii",
+      "present": true,
+      "value": "/view/é",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_dotdot_leading",
+      "present": true,
+      "value": "/../etc/passwd",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dotdot_middle",
+      "present": true,
+      "value": "/view/../../secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dotdot_trailing",
+      "present": true,
+      "value": "/view/..",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_bare_percent",
+      "present": true,
+      "value": "/a%",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_short_percent",
+      "present": true,
+      "value": "/a%2",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_non_hex_percent_path",
+      "present": true,
+      "value": "/view/x%2Gy",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_non_hex_percent_query",
+      "present": true,
+      "value": "/view/x?sig=a%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_percent_followed_by_path_separator",
+      "present": true,
+      "value": "/a%/b",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    }
+  ]
+}

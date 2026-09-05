@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json vectors/target_path_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -24,6 +24,7 @@ const (
 	connectorHubLSTCookieName   = "vectors/connector_hub_lst_cookie_v1_vectors.json"
 	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
 	cridV1Name                  = "vectors/crid_v1_vectors.json"
+	targetPathV1Name            = "vectors/target_path_v1_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -193,6 +194,16 @@ func CRIDV1Vectors() []byte {
 	return b
 }
 
+// TargetPathV1Vectors returns the raw bytes of the target_path request and
+// current tunnel-open contract shared by the service and SDKs.
+func TargetPathV1Vectors() []byte {
+	b, err := vectorsFS.ReadFile(targetPathV1Name)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", targetPathV1Name, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -228,6 +239,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(agentCredentialRecoveryName)
 	case cridV1Name, "crid_v1_vectors.json":
 		return vectorsFS.ReadFile(cridV1Name)
+	case targetPathV1Name, "target_path_v1_vectors.json":
+		return vectorsFS.ReadFile(targetPathV1Name)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -322,4 +335,9 @@ func AgentCredentialRecovery() (*AgentCredentialRecoveryFile, error) {
 // artifact.
 func CRIDV1() (*CRIDV1File, error) {
 	return ParseCRIDV1File(CRIDV1Vectors())
+}
+
+// TargetPathV1 strictly parses the embedded target_path contract artifact.
+func TargetPathV1() (*TargetPathFile, error) {
+	return ParseTargetPathFile(TargetPathV1Vectors())
 }

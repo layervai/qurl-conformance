@@ -80,3 +80,8 @@ def agent_credential_recovery_vectors():
 def crid_v1_vectors():
     """Return the parsed crid_v1_vectors.json."""
     return _load("crid_v1_vectors.json")
+
+
+def target_path_v1_vectors():
+    """Return the parsed target_path_v1_vectors.json."""
+    return _load("target_path_v1_vectors.json")

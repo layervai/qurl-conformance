@@ -1848,6 +1848,7 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 		{"agent API-key ID", AgentAPIKeyIDVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAPIKeyIDFile(b); return err }},
 		{"Connector resource LST v1", ConnectorResourceLSTV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseConnectorResourceLSTV1File(b); return err }},
 		{"CRID v1", CRIDV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseCRIDV1File(b); return err }},
+		{"target path v1", TargetPathV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseTargetPathFile(b); return err }},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2220,6 +2221,8 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		"vectors/connector_resource_lst_v1_vectors.json",
 		"crid_v1_vectors.json",
 		"vectors/crid_v1_vectors.json",
+		"target_path_v1_vectors.json",
+		"vectors/target_path_v1_vectors.json",
 	} {
 		b, err := Open(name)
 		if err != nil {
