@@ -19,26 +19,32 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	if file.Artifact != DelegatedMintIssueV1ArtifactID || file.SchemaVersion != DelegatedMintIssueV1SchemaVersion {
 		t.Fatalf("identity = %q/v%d", file.Artifact, file.SchemaVersion)
 	}
-	canonical, err := DelegatedMintIssueV1CanonicalBytes(file.Golden)
-	if err != nil {
-		t.Fatal(err)
+	for _, golden := range []DelegatedMintIssueV1Golden{file.Golden, file.RefreshGolden} {
+		canonical, err := DelegatedMintIssueV1CanonicalBytes(golden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(canonical); got == 0 {
+			t.Fatal("canonical signature input is empty")
+		}
 	}
-	if got := len(canonical); got == 0 {
-		t.Fatal("canonical signature input is empty")
-	}
-	if len(file.Golden.Nonce) != 22 || !strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
+	if len(file.Golden.Nonce) != 22 || len(file.RefreshGolden.Nonce) != 22 ||
+		!strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
 	var body struct {
-		UploadHandle  string `json:"upload_handle"`
-		AudienceKeyID string `json:"audience_key_id"`
-		TargetPath    string `json:"target_path"`
+		UploadHandle        string `json:"upload_handle"`
+		AudienceKeyID       string `json:"audience_key_id"`
+		TargetPath          string `json:"target_path"`
+		CapabilityExpiresAt string `json:"capability_expires_at"`
+		AuthorityExpiresAt  string `json:"authority_expires_at"`
 	}
 	if err := json.Unmarshal([]byte(file.Golden.BodyUTF8), &body); err != nil {
 		t.Fatalf("decode golden body: %v", err)
 	}
 	if body.UploadHandle != "upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70" ||
-		body.AudienceKeyID != "key_A1b2C3d4E5f6" || body.TargetPath != "/files/"+body.UploadHandle {
+		body.AudienceKeyID != "key_A1b2C3d4E5f6" || body.TargetPath != "/files/"+body.UploadHandle ||
+		body.CapabilityExpiresAt == body.AuthorityExpiresAt {
 		t.Fatalf("golden body binding drifted: %+v", body)
 	}
 }
@@ -89,6 +95,11 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 	}{
 		{name: "contract", change: func(file *DelegatedMintIssueV1File) { file.Contract.NonceDecodedBytes++ }},
 		{name: "body", change: func(file *DelegatedMintIssueV1File) { file.Golden.BodyUTF8 += " " }},
+		{name: "refresh body", change: func(file *DelegatedMintIssueV1File) { file.RefreshGolden.BodyUTF8 += " " }},
+		{name: "refresh widens batch", change: func(file *DelegatedMintIssueV1File) {
+			file.RefreshGolden.BodyUTF8 = strings.Replace(file.RefreshGolden.BodyUTF8, `"max_batch_size":100`, `"max_batch_size":101`, 1)
+			file.RefreshGolden.BodySHA256 = file.Golden.BodySHA256
+		}},
 		{name: "canonical", change: func(file *DelegatedMintIssueV1File) {
 			file.Golden.CanonicalHex = strings.Repeat("0", len(file.Golden.CanonicalHex))
 		}},
@@ -118,6 +129,65 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ParseDelegatedMintIssueV1File(mutate(t, test.change)); err == nil {
 				t.Fatal("mutated artifact unexpectedly accepted")
+			}
+		})
+	}
+}
+
+func TestDelegatedMintIssueV1IdempotencyAndAuthority(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for generation, want := range map[int]string{
+		1: file.Golden.IdempotencyKey,
+		2: file.RefreshGolden.IdempotencyKey,
+	} {
+		got, err := DelegatedMintIssueV1IdempotencyKey("fileviewer-sandbox", "upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70", generation)
+		if err != nil || got != want {
+			t.Fatalf("generation %d idempotency = %q, %v; want %q", generation, got, err, want)
+		}
+	}
+	for _, authority := range []string{
+		"localhost", "127.0.0.1", "[::1]", "api.layerv.ai:443", "api..layerv.ai",
+		"api.layerv.ai.", "-api.layerv.ai", "api-.layerv.ai", "api_internal.layerv.ai",
+		"API.layerv.ai", "api.layerv.ai\n", "é.layerv.ai",
+	} {
+		if validDelegatedMintIssueV1Authority(authority) {
+			t.Errorf("authority %q unexpectedly accepted", authority)
+		}
+	}
+}
+
+func TestDelegatedMintIssueV1RenewalCannotWidenAuthority(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*DelegatedMintIssueV1Golden){
+		"batch limit": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"max_batch_size":100`, `"max_batch_size":101`, 1)
+		},
+		"link TTL limit": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"max_link_ttl_seconds":86400`, `"max_link_ttl_seconds":86401`, 1)
+		},
+		"audience": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"audience_key_id":"key_A1b2C3d4E5f6"`, `"audience_key_id":"key_Z9y8X7w6V5u4"`, 1)
+		},
+		"authority expiry": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"authority_expires_at":"2026-09-06T23:15:00Z"`, `"authority_expires_at":"2026-09-07T23:15:00Z"`, 1)
+		},
+		"capability past authority": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"capability_expires_at":"2026-09-06T00:00:00Z"`, `"capability_expires_at":"2026-09-07T00:00:00Z"`, 1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			refresh := file.RefreshGolden
+			mutate(&refresh)
+			if err := validateDelegatedMintIssueV1Renewal(file.Golden, refresh); err == nil {
+				t.Fatal("widened refresh unexpectedly accepted")
 			}
 		})
 	}

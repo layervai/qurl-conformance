@@ -95,26 +95,31 @@ jobs:
             prefix.writeUInt32BE(bytes.length);
             return Buffer.concat([prefix, bytes]);
           };
-          const dmBodyHash = crypto.createHash('sha256').update(dm.golden.body_utf8, 'utf8').digest('hex');
-          const dmCanonical = Buffer.concat([
-            Buffer.from(dm.contract.signing_domain_ascii, 'ascii'), Buffer.from([0]),
-            ...dm.contract.field_order.map(name => issueFrame({
-              method: dm.golden.method,
-              authority: dm.golden.authority,
-              route: dm.golden.route,
-              issuer_id: dm.golden.issuer_id,
-              kid: dm.golden.kid,
-              idempotency_key: dm.golden.idempotency_key,
-              timestamp_unix_decimal: String(dm.golden.timestamp_unix),
-              nonce: dm.golden.nonce,
-              body_sha256: dmBodyHash,
-            }[name])),
-          ]);
-          const dmSignatureValid = crypto.verify(
-            'sha256', dmCanonical,
-            crypto.createPublicKey({key: Buffer.from(dm.golden.public_key_der_b64url, 'base64url'), format: 'der', type: 'spki'}),
-            Buffer.from(dm.golden.signature_der_b64url, 'base64url'),
-          );
+          const verifyDMGolden = golden => {
+            const bodyHash = crypto.createHash('sha256').update(golden.body_utf8, 'utf8').digest('hex');
+            const canonical = Buffer.concat([
+              Buffer.from(dm.contract.signing_domain_ascii, 'ascii'), Buffer.from([0]),
+              ...dm.contract.field_order.map(name => issueFrame({
+                method: golden.method,
+                authority: golden.authority,
+                route: golden.route,
+                issuer_id: golden.issuer_id,
+                kid: golden.kid,
+                idempotency_key: golden.idempotency_key,
+                timestamp_unix_decimal: String(golden.timestamp_unix),
+                nonce: golden.nonce,
+                body_sha256: bodyHash,
+              }[name])),
+            ]);
+            return bodyHash === golden.body_sha256 &&
+              canonical.toString('hex') === golden.canonical_hex &&
+              crypto.createHash('sha256').update(canonical).digest('hex') === golden.signing_digest_hex &&
+              crypto.verify(
+                'sha256', canonical,
+                crypto.createPublicKey({key: Buffer.from(golden.public_key_der_b64url, 'base64url'), format: 'der', type: 'spki'}),
+                Buffer.from(golden.signature_der_b64url, 'base64url'),
+              );
+          };
           const deriveHubRequestId = vector => {
             const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
             const nonce = Buffer.from(vector.request_nonce, 'base64url');
@@ -665,10 +670,10 @@ jobs:
               tp.cases.length === 0 ||
               dm.artifact !== 'qurl-delegated-mint-issue-v1-vectors' || dm.schema_version !== 1 ||
               dm.contract.nonce_decoded_bytes !== 16 || dm.contract.body_max_bytes !== 8192 ||
-              dmBodyHash !== dm.golden.body_sha256 ||
-              dmCanonical.toString('hex') !== dm.golden.canonical_hex ||
-              crypto.createHash('sha256').update(dmCanonical).digest('hex') !== dm.golden.signing_digest_hex ||
-              !dmSignatureValid ||
+              dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
+              dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
+              dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
+              !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.refresh_golden) ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -716,22 +721,26 @@ jobs:
           def issue_frame(value):
               encoded = value.encode('utf-8')
               return struct.pack('>I', len(encoded)) + encoded
-          dm_body_hash = hashlib.sha256(dm['golden']['body_utf8'].encode('utf-8')).hexdigest()
-          dm_values = {
-              'method': dm['golden']['method'],
-              'authority': dm['golden']['authority'],
-              'route': dm['golden']['route'],
-              'issuer_id': dm['golden']['issuer_id'],
-              'kid': dm['golden']['kid'],
-              'idempotency_key': dm['golden']['idempotency_key'],
-              'timestamp_unix_decimal': str(dm['golden']['timestamp_unix']),
-              'nonce': dm['golden']['nonce'],
-              'body_sha256': dm_body_hash,
-          }
-          dm_canonical = b''.join([
-              dm['contract']['signing_domain_ascii'].encode('ascii'), b'\0',
-              *(issue_frame(dm_values[name]) for name in dm['contract']['field_order']),
-          ])
+          def verify_dm_golden(golden):
+              body_hash = hashlib.sha256(golden['body_utf8'].encode('utf-8')).hexdigest()
+              values = {
+                  'method': golden['method'],
+                  'authority': golden['authority'],
+                  'route': golden['route'],
+                  'issuer_id': golden['issuer_id'],
+                  'kid': golden['kid'],
+                  'idempotency_key': golden['idempotency_key'],
+                  'timestamp_unix_decimal': str(golden['timestamp_unix']),
+                  'nonce': golden['nonce'],
+                  'body_sha256': body_hash,
+              }
+              canonical = b''.join([
+                  dm['contract']['signing_domain_ascii'].encode('ascii'), b'\0',
+                  *(issue_frame(values[name]) for name in dm['contract']['field_order']),
+              ])
+              return (body_hash == golden['body_sha256'] and
+                      canonical.hex() == golden['canonical_hex'] and
+                      hashlib.sha256(canonical).hexdigest() == golden['signing_digest_hex'])
           def derive_hub_request_id(vector):
               peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
               nonce = base64.urlsafe_b64decode(vector['request_nonce'] + '=' * (-len(vector['request_nonce']) % 4))
@@ -1268,9 +1277,11 @@ jobs:
           )
           assert dm['artifact'] == 'qurl-delegated-mint-issue-v1-vectors' and dm['schema_version'] == 1
           assert dm['contract']['nonce_decoded_bytes'] == 16 and dm['contract']['body_max_bytes'] == 8192
-          assert dm_body_hash == dm['golden']['body_sha256']
-          assert dm_canonical.hex() == dm['golden']['canonical_hex']
-          assert hashlib.sha256(dm_canonical).hexdigest() == dm['golden']['signing_digest_hex']
+          assert dm['contract']['success_status'] == 200 and dm['contract']['success_content_type'] == 'application/json'
+          assert dm['contract']['success_envelope'] == 'data'
+          assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
+          assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
+          assert verify_dm_golden(dm['golden']) and verify_dm_golden(dm['refresh_golden'])
           print('py ok')
           PY
 

@@ -20,6 +20,19 @@ the listed unreserved ASCII alphabet. The golden uses the Connector form
 to the same authenticated issuer operation. The exact request body is limited
 to 8,192 bytes before parsing or signature verification.
 
+The signed authority is a lowercase ASCII DNS name without a port or trailing
+dot. It has at least two labels and at most 253 bytes. Each label is 1 to 63
+bytes, starts and ends with a lowercase letter or digit, and otherwise contains
+only lowercase letters, digits, or hyphens. IP literals, underscores, empty
+labels, controls, and non-ASCII input are invalid.
+
+The Connector derives `Idempotency-Key` as `uci_` plus unpadded base64url of
+SHA-256 over `LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1`, one zero byte, then the
+issuer ID, upload handle, and canonical decimal issue generation. Each value
+has a four-byte unsigned big-endian byte length. Generation has no leading
+zero. A refresh increments the generation and gets a different durable replay
+key.
+
 The signature is canonical ASN.1 DER ECDSA P-256 with low S, encoded as
 canonical unpadded base64url. A verifier must reject padded or non-canonical
 base64url, non-canonical DER, an out-of-range scalar, and a high-S malleability
@@ -30,3 +43,18 @@ namespace. qurl-service loads both from issuer policy. The signed body carries
 the exact issuer-produced object path and the authenticated caller's public
 `audience_key_id`. Capability issuance is separate from later redemption with
 that caller's normal qURL API credential.
+
+`capability_expires_at` is the short-lived bearer expiry, 900 seconds after the
+signed request timestamp. `authority_expires_at` is the stored maximum upload
+authority, at most 86,400 seconds after the initial signed request. A signed
+refresh uses this same route with a higher issue generation. It can move only the
+capability expiry forward, and never after the original authority expiry. It
+must not change the issuer, audience, upload, resource policy, target path,
+batch limit, link TTL limit, or signed upload metadata. The service checks its
+own policy maximum when it stores the first authority; the Connector cannot
+increase it by signing a later request.
+
+A successful first issue, exact replay, reconciliation, or refresh returns
+HTTP 200 and `Content-Type: application/json` without a charset parameter. The
+response data has opaque `capability`, `capability_expires_at`, and
+`authority_expires_at` fields. The Connector does not inspect the capability.

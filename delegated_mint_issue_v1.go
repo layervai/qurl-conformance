@@ -13,11 +13,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
+	"net/netip"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -40,9 +41,15 @@ const (
 	DelegatedMintIssueV1NonceBytes             = 16
 	DelegatedMintIssueV1IdempotencyKeyMinBytes = 1
 	DelegatedMintIssueV1IdempotencyKeyMaxBytes = 128
-	DelegatedMintIssueV1AuthorityNormalization = "lowercase_exact"
+	DelegatedMintIssueV1AuthorityNormalization = "lowercase_dns_name_no_port"
 	DelegatedMintIssueV1AuthorityMaxBytes      = 253
 	DelegatedMintIssueV1BodyMaxBytes           = 8192
+	DelegatedMintIssueV1SuccessStatus          = 200
+	DelegatedMintIssueV1SuccessContentType     = "application/json"
+	DelegatedMintIssueV1CapabilityTTLSeconds   = 15 * 60
+	DelegatedMintIssueV1AuthorityMaxTTLSeconds = 24 * 60 * 60
+	DelegatedMintIssueV1IdempotencyDomain      = "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1"
+	DelegatedMintIssueV1IdempotencyDerivation  = "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded"
 
 	DelegatedMintIssueV1IdempotencyKeyHeader = "Idempotency-Key"
 	DelegatedMintIssueV1IssuerIDHeader       = "X-LayerV-Issuer-ID"
@@ -53,10 +60,12 @@ const (
 )
 
 var (
-	delegatedMintIssueV1IdempotencyPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{1,128}$`)
-	delegatedMintIssueV1IssuerFieldPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
-	delegatedMintIssueV1HexDigestPattern   = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	delegatedMintIssueV1FieldOrder         = []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "body_sha256"}
+	delegatedMintIssueV1IdempotencyPattern  = regexp.MustCompile(`^[A-Za-z0-9._~-]{1,128}$`)
+	delegatedMintIssueV1IssuerFieldPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+	delegatedMintIssueV1UploadHandlePattern = regexp.MustCompile(`^upl_[A-Za-z0-9_-]{43}$`)
+	delegatedMintIssueV1HexDigestPattern    = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	delegatedMintIssueV1FieldOrder          = []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "body_sha256"}
+	delegatedMintIssueV1SuccessDataFields   = []string{"capability", "capability_expires_at", "authority_expires_at"}
 )
 
 type DelegatedMintIssueV1File struct {
@@ -65,6 +74,7 @@ type DelegatedMintIssueV1File struct {
 	Description   string                       `json:"description"`
 	Contract      DelegatedMintIssueV1Contract `json:"contract"`
 	Golden        DelegatedMintIssueV1Golden   `json:"golden"`
+	RefreshGolden DelegatedMintIssueV1Golden   `json:"refresh_golden"`
 }
 
 type DelegatedMintIssueV1Contract struct {
@@ -83,6 +93,8 @@ type DelegatedMintIssueV1Contract struct {
 	NonceEncoding          string   `json:"nonce_encoding"`
 	NonceDecodedBytes      int      `json:"nonce_decoded_bytes"`
 	IdempotencyKeyPattern  string   `json:"idempotency_key_pattern"`
+	IdempotencyDomain      string   `json:"idempotency_derivation_domain_ascii"`
+	IdempotencyDerivation  string   `json:"idempotency_derivation"`
 	IdempotencyKeyMinBytes int      `json:"idempotency_key_min_bytes"`
 	IdempotencyKeyMaxBytes int      `json:"idempotency_key_max_bytes"`
 	IdempotencyKeyHeader   string   `json:"idempotency_key_header"`
@@ -94,23 +106,30 @@ type DelegatedMintIssueV1Contract struct {
 	SignatureHeader        string   `json:"signature_header"`
 	AuthorityNormalization string   `json:"authority_normalization"`
 	AuthorityMaxBytes      int      `json:"authority_max_bytes"`
+	SuccessStatus          int      `json:"success_status"`
+	SuccessContentType     string   `json:"success_content_type"`
+	SuccessEnvelope        string   `json:"success_envelope"`
+	SuccessDataFields      []string `json:"success_data_fields"`
+	CapabilityTTLSeconds   int      `json:"capability_ttl_seconds"`
+	AuthorityMaxTTLSeconds int      `json:"authority_max_ttl_seconds"`
 }
 
 type DelegatedMintIssueV1Golden struct {
-	Method             string `json:"method"`
-	Authority          string `json:"authority"`
-	Route              string `json:"route"`
-	IssuerID           string `json:"issuer_id"`
-	KID                string `json:"kid"`
-	IdempotencyKey     string `json:"idempotency_key"`
-	TimestampUnix      int64  `json:"timestamp_unix"`
-	Nonce              string `json:"nonce"`
-	BodyUTF8           string `json:"body_utf8"`
-	BodySHA256         string `json:"body_sha256"`
-	CanonicalHex       string `json:"canonical_hex"`
-	SigningDigestHex   string `json:"signing_digest_hex"`
-	PublicKeyDERB64URL string `json:"public_key_der_b64url"`
-	SignatureDERB64URL string `json:"signature_der_b64url"`
+	Method                 string `json:"method"`
+	Authority              string `json:"authority"`
+	Route                  string `json:"route"`
+	IssuerID               string `json:"issuer_id"`
+	KID                    string `json:"kid"`
+	IdempotencyKey         string `json:"idempotency_key"`
+	IdempotencyPreimageHex string `json:"idempotency_preimage_hex"`
+	TimestampUnix          int64  `json:"timestamp_unix"`
+	Nonce                  string `json:"nonce"`
+	BodyUTF8               string `json:"body_utf8"`
+	BodySHA256             string `json:"body_sha256"`
+	CanonicalHex           string `json:"canonical_hex"`
+	SigningDigestHex       string `json:"signing_digest_hex"`
+	PublicKeyDERB64URL     string `json:"public_key_der_b64url"`
+	SignatureDERB64URL     string `json:"signature_der_b64url"`
 }
 
 func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, error) {
@@ -128,6 +147,12 @@ func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, erro
 		return nil, err
 	}
 	if err := validateDelegatedMintIssueV1Golden(file.Golden); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1Golden(file.RefreshGolden); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1Renewal(file.Golden, file.RefreshGolden); err != nil {
 		return nil, err
 	}
 	return &file, nil
@@ -180,17 +205,67 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		SignatureAlgorithm: DelegatedMintIssueV1SignatureAlgorithm, SignatureEncoding: DelegatedMintIssueV1SignatureEncoding,
 		PublicKeyEncoding: DelegatedMintIssueV1PublicKeyEncoding, NonceEncoding: DelegatedMintIssueV1NonceEncoding,
 		NonceDecodedBytes: DelegatedMintIssueV1NonceBytes, IdempotencyKeyPattern: delegatedMintIssueV1IdempotencyPattern.String(),
+		IdempotencyDomain: DelegatedMintIssueV1IdempotencyDomain, IdempotencyDerivation: DelegatedMintIssueV1IdempotencyDerivation,
 		IdempotencyKeyMinBytes: DelegatedMintIssueV1IdempotencyKeyMinBytes, IdempotencyKeyMaxBytes: DelegatedMintIssueV1IdempotencyKeyMaxBytes,
 		IdempotencyKeyHeader: DelegatedMintIssueV1IdempotencyKeyHeader,
 		IssuerFieldPattern:   delegatedMintIssueV1IssuerFieldPattern.String(), IssuerIDHeader: DelegatedMintIssueV1IssuerIDHeader,
 		KIDHeader: DelegatedMintIssueV1KIDHeader, TimestampHeader: DelegatedMintIssueV1TimestampHeader,
 		NonceHeader: DelegatedMintIssueV1NonceHeader, SignatureHeader: DelegatedMintIssueV1SignatureHeader,
 		AuthorityNormalization: DelegatedMintIssueV1AuthorityNormalization, AuthorityMaxBytes: DelegatedMintIssueV1AuthorityMaxBytes,
+		SuccessStatus: DelegatedMintIssueV1SuccessStatus, SuccessContentType: DelegatedMintIssueV1SuccessContentType,
+		SuccessEnvelope: "data", SuccessDataFields: delegatedMintIssueV1SuccessDataFields,
+		CapabilityTTLSeconds: DelegatedMintIssueV1CapabilityTTLSeconds, AuthorityMaxTTLSeconds: DelegatedMintIssueV1AuthorityMaxTTLSeconds,
 	}
 	if !reflect.DeepEqual(contract, want) {
 		return errors.New("conformance: delegated-mint issue contract drift")
 	}
 	return nil
+}
+
+type delegatedMintIssueV1Body struct {
+	UploadHandle        string `json:"upload_handle"`
+	IssueGeneration     int    `json:"issue_generation"`
+	UploadRequestDigest string `json:"upload_request_digest"`
+	ContentSHA256       string `json:"content_sha256"`
+	ByteSize            int64  `json:"byte_size"`
+	MediaType           string `json:"media_type"`
+	DisplayFilename     string `json:"display_filename"`
+	AudienceKeyID       string `json:"audience_key_id"`
+	TargetPath          string `json:"target_path"`
+	MaxBatchSize        int    `json:"max_batch_size"`
+	MaxLinkTTLSeconds   int    `json:"max_link_ttl_seconds"`
+	CapabilityExpiresAt string `json:"capability_expires_at"`
+	AuthorityExpiresAt  string `json:"authority_expires_at"`
+}
+
+// DelegatedMintIssueV1IdempotencyKey derives the stable request key used for
+// one issuer upload generation. A later refresh increments generation and gets
+// a different key without changing the upload authority.
+func DelegatedMintIssueV1IdempotencyKey(issuerID, uploadHandle string, generation int) (string, error) {
+	preimage, err := delegatedMintIssueV1IdempotencyPreimage(issuerID, uploadHandle, generation)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(preimage)
+	return "uci_" + base64.RawURLEncoding.EncodeToString(digest[:]), nil
+}
+
+func delegatedMintIssueV1IdempotencyPreimage(issuerID, uploadHandle string, generation int) ([]byte, error) {
+	if !delegatedMintIssueV1IssuerFieldPattern.MatchString(issuerID) ||
+		!delegatedMintIssueV1UploadHandlePattern.MatchString(uploadHandle) || generation <= 0 {
+		return nil, errors.New("conformance: invalid delegated-mint issue idempotency input")
+	}
+	if decoded, err := decodeDelegatedMintIssueV1Base64URL(strings.TrimPrefix(uploadHandle, "upl_")); err != nil || len(decoded) != sha256.Size {
+		return nil, errors.New("conformance: invalid delegated-mint upload handle")
+	}
+	preimage := append([]byte(DelegatedMintIssueV1IdempotencyDomain), 0)
+	for _, field := range []string{issuerID, uploadHandle, strconv.Itoa(generation)} {
+		var length [4]byte
+		binary.BigEndian.PutUint32(length[:], uint32(len(field)))
+		preimage = append(preimage, length[:]...)
+		preimage = append(preimage, field...)
+	}
+	return preimage, nil
 }
 
 func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error {
@@ -241,6 +316,68 @@ func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error
 	return nil
 }
 
+func validateDelegatedMintIssueV1Renewal(initial, refresh DelegatedMintIssueV1Golden) error {
+	if initial.Method != refresh.Method || initial.Authority != refresh.Authority || initial.Route != refresh.Route ||
+		initial.IssuerID != refresh.IssuerID || initial.KID != refresh.KID ||
+		initial.PublicKeyDERB64URL != refresh.PublicKeyDERB64URL || initial.Nonce == refresh.Nonce {
+		return errors.New("conformance: delegated-mint refresh signer binding is invalid")
+	}
+	var initialBody, refreshBody delegatedMintIssueV1Body
+	if err := strictDecodeArtifact([]byte(initial.BodyUTF8), &initialBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint initial body: %w", err)
+	}
+	if err := strictDecodeArtifact([]byte(refresh.BodyUTF8), &refreshBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint refresh body: %w", err)
+	}
+	if initialBody.IssueGeneration != 1 || refreshBody.IssueGeneration != 2 {
+		return errors.New("conformance: delegated-mint golden generations are invalid")
+	}
+	wantInitialKey, err := DelegatedMintIssueV1IdempotencyKey(initial.IssuerID, initialBody.UploadHandle, initialBody.IssueGeneration)
+	if err != nil || initial.IdempotencyKey != wantInitialKey {
+		return errors.New("conformance: delegated-mint initial idempotency key is invalid")
+	}
+	initialPreimage, err := delegatedMintIssueV1IdempotencyPreimage(initial.IssuerID, initialBody.UploadHandle, initialBody.IssueGeneration)
+	if err != nil || initial.IdempotencyPreimageHex != hex.EncodeToString(initialPreimage) {
+		return errors.New("conformance: delegated-mint initial idempotency preimage is invalid")
+	}
+	wantRefreshKey, err := DelegatedMintIssueV1IdempotencyKey(refresh.IssuerID, refreshBody.UploadHandle, refreshBody.IssueGeneration)
+	if err != nil || refresh.IdempotencyKey != wantRefreshKey {
+		return errors.New("conformance: delegated-mint refresh idempotency key is invalid")
+	}
+	refreshPreimage, err := delegatedMintIssueV1IdempotencyPreimage(refresh.IssuerID, refreshBody.UploadHandle, refreshBody.IssueGeneration)
+	if err != nil || refresh.IdempotencyPreimageHex != hex.EncodeToString(refreshPreimage) {
+		return errors.New("conformance: delegated-mint refresh idempotency preimage is invalid")
+	}
+	initialCapabilityExpiry, err := time.Parse(time.RFC3339, initialBody.CapabilityExpiresAt)
+	if err != nil {
+		return errors.New("conformance: delegated-mint initial capability expiry is invalid")
+	}
+	refreshCapabilityExpiry, err := time.Parse(time.RFC3339, refreshBody.CapabilityExpiresAt)
+	if err != nil {
+		return errors.New("conformance: delegated-mint refresh capability expiry is invalid")
+	}
+	authorityExpiry, err := time.Parse(time.RFC3339, initialBody.AuthorityExpiresAt)
+	if err != nil || refreshBody.AuthorityExpiresAt != initialBody.AuthorityExpiresAt {
+		return errors.New("conformance: delegated-mint maximum authority expiry is invalid")
+	}
+	initialIssuedAt := time.Unix(initial.TimestampUnix, 0)
+	refreshIssuedAt := time.Unix(refresh.TimestampUnix, 0)
+	if !initialCapabilityExpiry.After(initialIssuedAt) || !refreshCapabilityExpiry.After(refreshIssuedAt) ||
+		!refreshIssuedAt.After(initialIssuedAt) || !refreshCapabilityExpiry.After(initialCapabilityExpiry) ||
+		refreshCapabilityExpiry.After(authorityExpiry) ||
+		initialCapabilityExpiry.Sub(initialIssuedAt) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second ||
+		refreshCapabilityExpiry.Sub(refreshIssuedAt) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second ||
+		authorityExpiry.Sub(initialIssuedAt) != time.Duration(DelegatedMintIssueV1AuthorityMaxTTLSeconds)*time.Second {
+		return errors.New("conformance: delegated-mint capability expiry exceeds its renewal bounds")
+	}
+	initialBody.IssueGeneration = refreshBody.IssueGeneration
+	initialBody.CapabilityExpiresAt = refreshBody.CapabilityExpiresAt
+	if !reflect.DeepEqual(initialBody, refreshBody) {
+		return errors.New("conformance: delegated-mint refresh widened immutable authority")
+	}
+	return nil
+}
+
 func decodeDelegatedMintIssueV1Base64URL(value string) ([]byte, error) {
 	if value == "" || strings.Contains(value, "=") {
 		return nil, errors.New("non-canonical base64url")
@@ -254,10 +391,26 @@ func decodeDelegatedMintIssueV1Base64URL(value string) ([]byte, error) {
 
 func validDelegatedMintIssueV1Authority(authority string) bool {
 	if authority == "" || len(authority) > DelegatedMintIssueV1AuthorityMaxBytes || authority != strings.ToLower(authority) ||
-		strings.ContainsAny(authority, "\\/@?# ") {
+		strings.Count(authority, ".") == 0 {
 		return false
 	}
-	parsed, err := url.Parse("https://" + authority)
-	return err == nil && parsed.User == nil && parsed.Host == authority && parsed.Hostname() != "" &&
-		parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
+	if _, err := netip.ParseAddr(authority); err == nil {
+		return false
+	}
+	for _, label := range strings.Split(authority, ".") {
+		if label == "" || len(label) > 63 || !delegatedMintIssueV1AuthorityAlphaNumeric(label[0]) ||
+			!delegatedMintIssueV1AuthorityAlphaNumeric(label[len(label)-1]) {
+			return false
+		}
+		for i := 1; i < len(label)-1; i++ {
+			if !delegatedMintIssueV1AuthorityAlphaNumeric(label[i]) && label[i] != '-' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func delegatedMintIssueV1AuthorityAlphaNumeric(value byte) bool {
+	return value >= 'a' && value <= 'z' || value >= '0' && value <= '9'
 }
