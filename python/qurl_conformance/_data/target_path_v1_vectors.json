@@ -1,17 +1,15 @@
 {
   "artifact": "qurl-target-path-v1-vectors",
   "schema_version": 1,
-  "description": "Shared target_path request grammar and current tunnel-open support for qURL Connector mints.",
+  "description": "Shared canonical target_path request grammar for qURL Connector mints.",
   "contract": {
     "wire_field": "target_path",
     "max_bytes": 2048,
     "omitted_semantics": "bare_origin",
     "explicit_empty_semantics": "reject",
-    "accepted_character_set": "raw_ascii_uri_path_and_query",
+    "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
     "accepted_value_handling": "preserve_exact_bytes",
-    "percent_encoding_handling": "reject_path_dot_and_slash_accept_other_well_formed_without_normalize_or_decode",
-    "percent_escaped_path_open_supported": false,
-    "percent_escaped_path_issue": "qurl-service#1250"
+    "percent_encoding_handling": "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode"
   },
   "cases": [
     {
@@ -70,13 +68,6 @@
       "open_supported": true
     },
     {
-      "name": "accept_single_dot_segment",
-      "present": true,
-      "value": "/a/./b",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
       "name": "accept_dotdot_in_query",
       "present": true,
       "value": "/view/x?redir=../../etc",
@@ -103,83 +94,6 @@
       "value": "/?",
       "outcome": "accept",
       "open_supported": true
-    },
-    {
-      "name": "accept_percent_path_upper",
-      "present": true,
-      "value": "/view/a%4Ab",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_percent_path_lower",
-      "present": true,
-      "value": "/view/a%4ab",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_percent_path_safe_41",
-      "present": true,
-      "value": "/view/a%41b",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_double_encoded_dot_path",
-      "present": true,
-      "value": "/view/a%252eb",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_backslash_lower_path",
-      "present": true,
-      "value": "/view/a%5cb",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_backslash_upper_path",
-      "present": true,
-      "value": "/view/a%5Cb",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_nul_path",
-      "present": true,
-      "value": "/view/a%00b",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_fragment_marker_path",
-      "present": true,
-      "value": "/view/a%23b",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_query_marker_path",
-      "present": true,
-      "value": "/view/a%3fb",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_carriage_return_path",
-      "present": true,
-      "value": "/view/a%0db",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_encoded_line_feed_path",
-      "present": true,
-      "value": "/view/a%0ab",
-      "outcome": "accept",
-      "open_supported": false
     },
     {
       "name": "accept_percent_only_in_query",
@@ -217,6 +131,13 @@
       "reject_class": "too_long"
     },
     {
+      "name": "reject_overlong_non_ascii_precedence",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
       "name": "reject_suffix_host",
       "present": true,
       "value": ".evil.example/x",
@@ -243,6 +164,13 @@
       "value": "//evil.example/path",
       "outcome": "reject",
       "reject_class": "authority"
+    },
+    {
+      "name": "reject_interior_empty_segment",
+      "present": true,
+      "value": "/a//b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
     },
     {
       "name": "reject_leading_backslash",
@@ -315,6 +243,13 @@
       "reject_class": "invalid_character"
     },
     {
+      "name": "reject_single_dot_segment",
+      "present": true,
+      "value": "/a/./b",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
       "name": "reject_dotdot_leading",
       "present": true,
       "value": "/../etc/passwd",
@@ -367,6 +302,83 @@
       "name": "reject_percent_encoded_slash_upper",
       "present": true,
       "value": "/view%2Fsecret",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_upper_path",
+      "present": true,
+      "value": "/view/a%4Ab",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_lower_path",
+      "present": true,
+      "value": "/view/a%4ab",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_41_path",
+      "present": true,
+      "value": "/view/a%41b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_double_encoded_dot_path",
+      "present": true,
+      "value": "/view/a%252eb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_backslash_lower_path",
+      "present": true,
+      "value": "/view/a%5cb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_backslash_upper_path",
+      "present": true,
+      "value": "/view/a%5Cb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_nul_path",
+      "present": true,
+      "value": "/view/a%00b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_fragment_marker_path",
+      "present": true,
+      "value": "/view/a%23b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_query_marker_path",
+      "present": true,
+      "value": "/view/a%3fb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_carriage_return_path",
+      "present": true,
+      "value": "/view/a%0db",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_line_feed_path",
+      "present": true,
+      "value": "/view/a%0ab",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },

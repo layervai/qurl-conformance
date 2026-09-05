@@ -54,7 +54,7 @@
 //     validation, version registry, and delivered-key matching.
 //   - The qURL Connector target-path contract
 //     (target_path_v1_vectors.json): shared local input validation, exact wire
-//     preservation, and current tunnel-open support.
+//     preservation, and canonical open-safe paths.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

@@ -47,6 +47,9 @@ func TestEmbeddedTargetPathV1Loads(t *testing.T) {
 		if outcome == ExpectAccept && (c.OpenSupported == nil || *c.OpenSupported != openSupported) {
 			t.Errorf("case %q open_supported does not match %t", c.Name, openSupported)
 		}
+		if outcome == ExpectAccept && !openSupported {
+			t.Errorf("case %q is accepted but not safe to open", c.Name)
+		}
 	}
 	for rejectClass, present := range wantRejectClasses {
 		if !present {
@@ -73,6 +76,16 @@ func TestTargetPathBoundaryAndPresenceSemantics(t *testing.T) {
 	if len(*atMax.Value) != TargetPathMaxBytes || len(*tooLong.Value) != TargetPathMaxBytes+1 {
 		t.Fatalf("boundary lengths = %d/%d, want %d/%d", len(*atMax.Value), len(*tooLong.Value), TargetPathMaxBytes, TargetPathMaxBytes+1)
 	}
+	overlongNonASCII := targetPathCase(t, tf, "reject_overlong_non_ascii_precedence")
+	if got := len(*overlongNonASCII.Value); got != TargetPathMaxBytes+1 {
+		t.Fatalf("non-ASCII boundary bytes = %d, want %d", got, TargetPathMaxBytes+1)
+	}
+	if got := len([]rune(*overlongNonASCII.Value)); got != TargetPathMaxBytes {
+		t.Fatalf("non-ASCII boundary characters = %d, want %d", got, TargetPathMaxBytes)
+	}
+	if overlongNonASCII.RejectClass != TargetPathRejectTooLong {
+		t.Fatalf("non-ASCII boundary reject_class = %q, want %q", overlongNonASCII.RejectClass, TargetPathRejectTooLong)
+	}
 }
 
 func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
@@ -98,70 +111,62 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if u.Scheme != "https" || u.Hostname() != wantHost {
 			t.Errorf("case %q changed origin to %q://%q", c.Name, u.Scheme, u.Hostname())
 		}
+		wantPath := value
+		if query := strings.IndexByte(wantPath, '?'); query >= 0 {
+			wantPath = wantPath[:query]
+		}
+		if u.Path != wantPath {
+			t.Errorf("case %q changed path to %q, want %q", c.Name, u.Path, wantPath)
+		}
 		if u.Path != "" && (!strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//")) {
 			t.Errorf("case %q produced unsafe decoded path %q", c.Name, u.Path)
 		}
 		for _, segment := range strings.Split(u.Path, "/") {
-			if segment == ".." {
+			if segment == "." || segment == ".." {
 				t.Errorf("case %q produced decoded dot segment in path %q", c.Name, u.Path)
 			}
 		}
 	}
 }
 
-func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
+func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{
-		"accept_percent_path_upper",
-		"accept_percent_path_lower",
-		"accept_percent_path_safe_41",
-		"accept_double_encoded_dot_path",
-		"accept_encoded_backslash_lower_path",
-		"accept_encoded_backslash_upper_path",
-		"accept_encoded_nul_path",
-		"accept_encoded_fragment_marker_path",
-		"accept_encoded_query_marker_path",
-		"accept_encoded_carriage_return_path",
-		"accept_encoded_line_feed_path",
-	} {
-		c := targetPathCase(t, tf, name)
-		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
-			t.Errorf("case %q = %+v, want accepted with open_supported=false", name, *c)
-		}
-		if c.Value == nil || !strings.Contains(*c.Value, "%") {
-			t.Errorf("case %q lost its raw percent escape", name)
-		}
-	}
-	doubleEncoded := targetPathCase(t, tf, "accept_double_encoded_dot_path")
-	if doubleEncoded.Value == nil || *doubleEncoded.Value != "/view/a%252eb" {
-		t.Errorf("double-encoded path changed: %+v", *doubleEncoded)
-	}
-	singleDot := targetPathCase(t, tf, "accept_single_dot_segment")
-	if singleDot.OpenSupported == nil || *singleDot.OpenSupported {
-		t.Errorf("single-dot path must remain mint-valid but open-unsupported: %+v", *singleDot)
-	}
-	for _, name := range []string{
-		"accept_percent_only_in_query",
-		"accept_encoded_dot_slash_in_query",
-	} {
-		queryOnly := targetPathCase(t, tf, name)
-		if queryOnly.OpenSupported == nil || !*queryOnly.OpenSupported {
-			t.Errorf("case %q: query-only percent escape must remain open-supported", name)
-		}
-	}
 	for name, rejectClass := range map[string]string{
-		"reject_percent_encoded_dot_lower":   TargetPathRejectDotSegment,
-		"reject_percent_encoded_dot_upper":   TargetPathRejectDotSegment,
-		"reject_percent_encoded_single_dot":  TargetPathRejectDotSegment,
-		"reject_percent_encoded_slash_lower": TargetPathRejectInvalidCharacter,
-		"reject_percent_encoded_slash_upper": TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_dot_lower":         TargetPathRejectDotSegment,
+		"reject_percent_encoded_dot_upper":         TargetPathRejectDotSegment,
+		"reject_percent_encoded_single_dot":        TargetPathRejectDotSegment,
+		"reject_percent_encoded_slash_lower":       TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_slash_upper":       TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_letter_upper_path": TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_letter_lower_path": TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_letter_41_path":    TargetPathRejectInvalidCharacter,
+		"reject_double_encoded_dot_path":           TargetPathRejectInvalidCharacter,
+		"reject_encoded_backslash_lower_path":      TargetPathRejectInvalidCharacter,
+		"reject_encoded_backslash_upper_path":      TargetPathRejectInvalidCharacter,
+		"reject_encoded_nul_path":                  TargetPathRejectInvalidCharacter,
+		"reject_encoded_fragment_marker_path":      TargetPathRejectInvalidCharacter,
+		"reject_encoded_query_marker_path":         TargetPathRejectInvalidCharacter,
+		"reject_encoded_carriage_return_path":      TargetPathRejectInvalidCharacter,
+		"reject_encoded_line_feed_path":            TargetPathRejectInvalidCharacter,
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != rejectClass {
 			t.Errorf("case %q = %+v, want rejected as %q", name, *c, rejectClass)
+		}
+	}
+	for name, value := range map[string]string{
+		"accept_percent_only_in_query":      "/view/x?sig=a%20b",
+		"accept_encoded_dot_slash_in_query": "/view/x?next=%2e%2E%2f%2F",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
+			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
+		}
+		if c.Value == nil || *c.Value != value {
+			t.Errorf("case %q value = %v, want byte-exact %q", name, c.Value, value)
 		}
 	}
 }
@@ -176,6 +181,29 @@ func TestTargetPathRejectsDotSegmentsNotDotSubstrings(t *testing.T) {
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
 			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
 		}
+	}
+	for _, name := range []string{"reject_single_dot_segment", "reject_dotdot_leading", "reject_dotdot_middle", "reject_dotdot_trailing"} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectDotSegment {
+			t.Errorf("case %q = %+v, want dot_segment rejection", name, *c)
+		}
+	}
+}
+
+func TestTargetPathCanonicalSlashRules(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"accept_root", "accept_trailing_slash"} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
+			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
+		}
+	}
+	interiorEmpty := targetPathCase(t, tf, "reject_interior_empty_segment")
+	if interiorEmpty.Outcome != ExpectReject || interiorEmpty.RejectClass != TargetPathRejectInvalidCharacter {
+		t.Errorf("interior empty segment = %+v, want invalid_character rejection", *interiorEmpty)
 	}
 }
 
@@ -217,10 +245,6 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	})
 	t.Run("contract", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.MaxBytes++ }), "contract")
-	})
-	t.Run("contract missing explicit false", func(t *testing.T) {
-		body := strings.Replace(string(raw), `    "percent_escaped_path_open_supported": false,`+"\n", "", 1)
-		assertRejects(t, []byte(body), "missing percent_escaped_path_open_supported")
 	})
 	t.Run("duplicate case", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Cases[1] = tf.Cases[0] }), "duplicate")

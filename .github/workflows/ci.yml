@@ -182,13 +182,33 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 56;
+          const expectedTargetPathCaseCount = 58;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
             );
             process.exit(1);
           }
+          const targetPathInvalidEscapes = [
+            'reject_percent_encoded_slash_lower',
+            'reject_percent_encoded_slash_upper',
+            'reject_percent_encoded_letter_upper_path',
+            'reject_percent_encoded_letter_lower_path',
+            'reject_percent_encoded_letter_41_path',
+            'reject_double_encoded_dot_path',
+            'reject_encoded_backslash_lower_path',
+            'reject_encoded_backslash_upper_path',
+            'reject_encoded_nul_path',
+            'reject_encoded_fragment_marker_path',
+            'reject_encoded_query_marker_path',
+            'reject_encoded_carriage_return_path',
+            'reject_encoded_line_feed_path',
+          ];
+          const targetPathDotEscapes = [
+            'reject_percent_encoded_dot_lower',
+            'reject_percent_encoded_dot_upper',
+            'reject_percent_encoded_single_dot',
+          ];
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
           const recoveryCookieKat = hc.cookie_kats.find(v => v.name === 'ipv4');
@@ -634,36 +654,29 @@ jobs:
               cridValues.reject_checksum.reject_class !== 'checksum' ||
               tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
               tp.contract.max_bytes !== 2048 ||
+              tp.contract.accepted_character_set !== 'raw_ascii_canonical_uri_path_and_query' ||
+              tp.contract.percent_encoding_handling !== 'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode' ||
               targetPathCases.accept_omitted?.present !== false ||
               targetPathCases.reject_explicit_empty?.reject_class !== 'empty' ||
-              targetPathCases.accept_max_bytes?.value.length !== 2048 ||
-              targetPathCases.reject_too_long?.value.length !== 2049 ||
+              Buffer.byteLength(targetPathCases.accept_max_bytes?.value ?? '', 'utf8') !== 2048 ||
+              Buffer.byteLength(targetPathCases.reject_too_long?.value ?? '', 'utf8') !== 2049 ||
+              Buffer.byteLength(targetPathCases.reject_overlong_non_ascii_precedence?.value ?? '', 'utf8') !== 2049 ||
+              targetPathCases.reject_overlong_non_ascii_precedence?.reject_class !== 'too_long' ||
               targetPathCases.accept_dotdot_substring?.value !== '/view/a..b' ||
               targetPathCases.accept_dotdot_substring?.open_supported !== true ||
               targetPathCases.accept_three_dot_segment?.value !== '/view/...' ||
               targetPathCases.accept_three_dot_segment?.open_supported !== true ||
-              targetPathCases.accept_single_dot_segment?.open_supported !== false ||
-              targetPathCases.accept_percent_path_upper?.open_supported !== false ||
-              targetPathCases.accept_percent_path_safe_41?.value !== '/view/a%41b' ||
-              targetPathCases.accept_double_encoded_dot_path?.value !== '/view/a%252eb' ||
-              targetPathCases.accept_encoded_backslash_lower_path?.value !== '/view/a%5cb' ||
-              targetPathCases.accept_encoded_backslash_upper_path?.value !== '/view/a%5Cb' ||
-              targetPathCases.accept_encoded_nul_path?.value !== '/view/a%00b' ||
-              targetPathCases.accept_encoded_fragment_marker_path?.value !== '/view/a%23b' ||
-              targetPathCases.accept_encoded_query_marker_path?.value !== '/view/a%3fb' ||
-              targetPathCases.accept_encoded_carriage_return_path?.value !== '/view/a%0db' ||
-              targetPathCases.accept_encoded_line_feed_path?.value !== '/view/a%0ab' ||
-              [
-                'accept_encoded_backslash_lower_path',
-                'accept_encoded_backslash_upper_path',
-                'accept_encoded_nul_path',
-                'accept_encoded_fragment_marker_path',
-                'accept_encoded_query_marker_path',
-                'accept_encoded_carriage_return_path',
-                'accept_encoded_line_feed_path',
-              ].some(name => targetPathCases[name]?.open_supported !== false) ||
+              targetPathCases.reject_single_dot_segment?.reject_class !== 'dot_segment' ||
+              targetPathCases.reject_interior_empty_segment?.reject_class !== 'invalid_character' ||
+              targetPathCases.accept_root?.open_supported !== true ||
+              targetPathCases.accept_trailing_slash?.open_supported !== true ||
+              targetPathInvalidEscapes.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
+              targetPathDotEscapes.some(name => targetPathCases[name]?.reject_class !== 'dot_segment') ||
+              tp.cases.some(v => v.outcome === 'accept' && v.open_supported !== true) ||
+              targetPathCases.accept_percent_only_in_query?.value !== '/view/x?sig=a%20b' ||
+              targetPathCases.accept_percent_only_in_query?.open_supported !== true ||
+              targetPathCases.accept_encoded_dot_slash_in_query?.value !== '/view/x?next=%2e%2E%2f%2F' ||
               targetPathCases.accept_encoded_dot_slash_in_query?.open_supported !== true ||
-              targetPathCases.reject_percent_encoded_single_dot?.reject_class !== 'dot_segment' ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1222,16 +1235,22 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 56
+          expected_target_path_case_count = 58
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
           assert tp['contract']['max_bytes'] == 2048
+          assert tp['contract']['accepted_character_set'] == 'raw_ascii_canonical_uri_path_and_query'
+          assert tp['contract']['percent_encoding_handling'] == (
+              'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode'
+          )
           target_path_cases = {v['name']: v for v in tp['cases']}
           assert target_path_cases['accept_omitted']['present'] is False
           assert target_path_cases['reject_explicit_empty']['reject_class'] == 'empty'
-          assert len(target_path_cases['accept_max_bytes']['value']) == 2048
-          assert len(target_path_cases['reject_too_long']['value']) == 2049
+          assert len(target_path_cases['accept_max_bytes']['value'].encode()) == 2048
+          assert len(target_path_cases['reject_too_long']['value'].encode()) == 2049
+          assert len(target_path_cases['reject_overlong_non_ascii_precedence']['value'].encode()) == 2049
+          assert target_path_cases['reject_overlong_non_ascii_precedence']['reject_class'] == 'too_long'
           assert target_path_cases['accept_dotdot_substring'] == {
               'name': 'accept_dotdot_substring',
               'present': True,
@@ -1246,26 +1265,37 @@ jobs:
               'outcome': 'accept',
               'open_supported': True,
           }
-          assert target_path_cases['accept_single_dot_segment']['open_supported'] is False
-          assert target_path_cases['accept_percent_path_upper']['open_supported'] is False
-          assert target_path_cases['accept_percent_path_safe_41']['value'] == '/view/a%41b'
-          assert target_path_cases['accept_double_encoded_dot_path']['value'] == '/view/a%252eb'
-          expected_path_escapes = {
-              'accept_encoded_backslash_lower_path': '/view/a%5cb',
-              'accept_encoded_backslash_upper_path': '/view/a%5Cb',
-              'accept_encoded_nul_path': '/view/a%00b',
-              'accept_encoded_fragment_marker_path': '/view/a%23b',
-              'accept_encoded_query_marker_path': '/view/a%3fb',
-              'accept_encoded_carriage_return_path': '/view/a%0db',
-              'accept_encoded_line_feed_path': '/view/a%0ab',
-          }
-          assert all(
-              target_path_cases[name]['value'] == value
-              and target_path_cases[name]['open_supported'] is False
-              for name, value in expected_path_escapes.items()
-          )
+          assert target_path_cases['reject_single_dot_segment']['reject_class'] == 'dot_segment'
+          assert target_path_cases['reject_interior_empty_segment']['reject_class'] == 'invalid_character'
+          assert target_path_cases['accept_root']['open_supported'] is True
+          assert target_path_cases['accept_trailing_slash']['open_supported'] is True
+          invalid_path_escapes = [
+              'reject_percent_encoded_slash_lower',
+              'reject_percent_encoded_slash_upper',
+              'reject_percent_encoded_letter_upper_path',
+              'reject_percent_encoded_letter_lower_path',
+              'reject_percent_encoded_letter_41_path',
+              'reject_double_encoded_dot_path',
+              'reject_encoded_backslash_lower_path',
+              'reject_encoded_backslash_upper_path',
+              'reject_encoded_nul_path',
+              'reject_encoded_fragment_marker_path',
+              'reject_encoded_query_marker_path',
+              'reject_encoded_carriage_return_path',
+              'reject_encoded_line_feed_path',
+          ]
+          dot_path_escapes = [
+              'reject_percent_encoded_dot_lower',
+              'reject_percent_encoded_dot_upper',
+              'reject_percent_encoded_single_dot',
+          ]
+          assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_path_escapes)
+          assert all(target_path_cases[name]['reject_class'] == 'dot_segment' for name in dot_path_escapes)
+          assert all(v['open_supported'] is True for v in tp['cases'] if v['outcome'] == 'accept')
+          assert target_path_cases['accept_percent_only_in_query']['value'] == '/view/x?sig=a%20b'
+          assert target_path_cases['accept_percent_only_in_query']['open_supported'] is True
+          assert target_path_cases['accept_encoded_dot_slash_in_query']['value'] == '/view/x?next=%2e%2E%2f%2F'
           assert target_path_cases['accept_encoded_dot_slash_in_query']['open_supported'] is True
-          assert target_path_cases['reject_percent_encoded_single_dot']['reject_class'] == 'dot_segment'
           print('py ok')
           PY
 

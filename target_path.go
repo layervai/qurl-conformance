@@ -39,42 +39,18 @@ type TargetPathFile struct {
 // TargetPathContract freezes the stable wire and runtime rules that every
 // consumer must apply without normalization.
 type TargetPathContract struct {
-	WireField                       string `json:"wire_field"`
-	MaxBytes                        int    `json:"max_bytes"`
-	OmittedSemantics                string `json:"omitted_semantics"`
-	ExplicitEmptySemantics          string `json:"explicit_empty_semantics"`
-	AcceptedCharacterSet            string `json:"accepted_character_set"`
-	AcceptedValueHandling           string `json:"accepted_value_handling"`
-	PercentEncodingHandling         string `json:"percent_encoding_handling"`
-	PercentEscapedPathOpenSupported bool   `json:"percent_escaped_path_open_supported"`
-	PercentEscapedPathIssue         string `json:"percent_escaped_path_issue"`
-
-	percentEscapedPathOpenSupportedSet bool
-}
-
-// UnmarshalJSON requires the explicit false open-support decision. An omitted
-// security field must not silently take Go's false zero value.
-func (contract *TargetPathContract) UnmarshalJSON(data []byte) error {
-	type plain TargetPathContract
-	var decoded plain
-	if err := strictDecodeArtifact(data, &decoded); err != nil {
-		return err
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	if _, ok := fields["percent_escaped_path_open_supported"]; !ok {
-		return errors.New("conformance: target-path contract missing percent_escaped_path_open_supported")
-	}
-	*contract = TargetPathContract(decoded)
-	contract.percentEscapedPathOpenSupportedSet = true
-	return nil
+	WireField               string `json:"wire_field"`
+	MaxBytes                int    `json:"max_bytes"`
+	OmittedSemantics        string `json:"omitted_semantics"`
+	ExplicitEmptySemantics  string `json:"explicit_empty_semantics"`
+	AcceptedCharacterSet    string `json:"accepted_character_set"`
+	AcceptedValueHandling   string `json:"accepted_value_handling"`
+	PercentEncodingHandling string `json:"percent_encoding_handling"`
 }
 
 // TargetPathCase is one direct public-SDK option input. Present distinguishes
 // omission from an explicit empty string. OpenSupported is required only for
-// accepted cases; a false value records the current percent-escaped path gap.
+// accepted cases. Every accepted canonical value is safe to open.
 type TargetPathCase struct {
 	Name          string  `json:"name"`
 	Present       bool    `json:"present"`
@@ -128,31 +104,21 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_deep_path":                          {present: true, value: targetPathValue("/a/b/c/d/e/f")},
 	"accept_dotdot_substring":                   {present: true, value: targetPathValue("/view/a..b")},
 	"accept_three_dot_segment":                  {present: true, value: targetPathValue("/view/...")},
-	"accept_single_dot_segment":                 {present: true, value: targetPathValue("/a/./b")},
 	"accept_dotdot_in_query":                    {present: true, value: targetPathValue("/view/x?redir=../../etc")},
 	"accept_authority_text_in_query":            {present: true, value: targetPathValue("/path?next=//evil.example")},
 	"accept_trailing_slash":                     {present: true, value: targetPathValue("/view/")},
 	"accept_empty_query":                        {present: true, value: targetPathValue("/?")},
-	"accept_percent_path_upper":                 {present: true, value: targetPathValue("/view/a%4Ab")},
-	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%4ab")},
-	"accept_percent_path_safe_41":               {present: true, value: targetPathValue("/view/a%41b")},
-	"accept_double_encoded_dot_path":            {present: true, value: targetPathValue("/view/a%252eb")},
-	"accept_encoded_backslash_lower_path":       {present: true, value: targetPathValue("/view/a%5cb")},
-	"accept_encoded_backslash_upper_path":       {present: true, value: targetPathValue("/view/a%5Cb")},
-	"accept_encoded_nul_path":                   {present: true, value: targetPathValue("/view/a%00b")},
-	"accept_encoded_fragment_marker_path":       {present: true, value: targetPathValue("/view/a%23b")},
-	"accept_encoded_query_marker_path":          {present: true, value: targetPathValue("/view/a%3fb")},
-	"accept_encoded_carriage_return_path":       {present: true, value: targetPathValue("/view/a%0db")},
-	"accept_encoded_line_feed_path":             {present: true, value: targetPathValue("/view/a%0ab")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
+	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
+	"reject_interior_empty_segment":             {present: true, value: targetPathValue("/a//b")},
 	"reject_leading_backslash":                  {present: true, value: targetPathValue("/\\evil.example")},
 	"reject_backslash_in_path":                  {present: true, value: targetPathValue("/view\\..\\x")},
 	"reject_fragment":                           {present: true, value: targetPathValue("/view/x#fragment")},
@@ -163,6 +129,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_nul":                                {present: true, value: targetPathValue("/view\x00/x")},
 	"reject_del":                                {present: true, value: targetPathValue("/view\x7f/x")},
 	"reject_non_ascii":                          {present: true, value: targetPathValue("/view/é")},
+	"reject_single_dot_segment":                 {present: true, value: targetPathValue("/a/./b")},
 	"reject_dotdot_leading":                     {present: true, value: targetPathValue("/../etc/passwd")},
 	"reject_dotdot_middle":                      {present: true, value: targetPathValue("/view/../../secret")},
 	"reject_dotdot_trailing":                    {present: true, value: targetPathValue("/view/..")},
@@ -171,6 +138,17 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_percent_encoded_single_dot":         {present: true, value: targetPathValue("/a%2eb")},
 	"reject_percent_encoded_slash_lower":        {present: true, value: targetPathValue("/view%2fsecret")},
 	"reject_percent_encoded_slash_upper":        {present: true, value: targetPathValue("/view%2Fsecret")},
+	"reject_percent_encoded_letter_upper_path":  {present: true, value: targetPathValue("/view/a%4Ab")},
+	"reject_percent_encoded_letter_lower_path":  {present: true, value: targetPathValue("/view/a%4ab")},
+	"reject_percent_encoded_letter_41_path":     {present: true, value: targetPathValue("/view/a%41b")},
+	"reject_double_encoded_dot_path":            {present: true, value: targetPathValue("/view/a%252eb")},
+	"reject_encoded_backslash_lower_path":       {present: true, value: targetPathValue("/view/a%5cb")},
+	"reject_encoded_backslash_upper_path":       {present: true, value: targetPathValue("/view/a%5Cb")},
+	"reject_encoded_nul_path":                   {present: true, value: targetPathValue("/view/a%00b")},
+	"reject_encoded_fragment_marker_path":       {present: true, value: targetPathValue("/view/a%23b")},
+	"reject_encoded_query_marker_path":          {present: true, value: targetPathValue("/view/a%3fb")},
+	"reject_encoded_carriage_return_path":       {present: true, value: targetPathValue("/view/a%0db")},
+	"reject_encoded_line_feed_path":             {present: true, value: targetPathValue("/view/a%0ab")},
 	"reject_bare_percent":                       {present: true, value: targetPathValue("/a%")},
 	"reject_short_percent":                      {present: true, value: targetPathValue("/a%2")},
 	"reject_non_hex_percent_path":               {present: true, value: targetPathValue("/view/x%2Gy")},
@@ -196,18 +174,15 @@ func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
 		return nil, errors.New("conformance: target-path file has empty description")
 	}
 	wantContract := TargetPathContract{
-		WireField:                          "target_path",
-		MaxBytes:                           TargetPathMaxBytes,
-		OmittedSemantics:                   "bare_origin",
-		ExplicitEmptySemantics:             "reject",
-		AcceptedCharacterSet:               "raw_ascii_uri_path_and_query",
-		AcceptedValueHandling:              "preserve_exact_bytes",
-		PercentEncodingHandling:            "reject_path_dot_and_slash_accept_other_well_formed_without_normalize_or_decode",
-		PercentEscapedPathOpenSupported:    false,
-		PercentEscapedPathIssue:            "qurl-service#1250",
-		percentEscapedPathOpenSupportedSet: true,
+		WireField:               "target_path",
+		MaxBytes:                TargetPathMaxBytes,
+		OmittedSemantics:        "bare_origin",
+		ExplicitEmptySemantics:  "reject",
+		AcceptedCharacterSet:    "raw_ascii_canonical_uri_path_and_query",
+		AcceptedValueHandling:   "preserve_exact_bytes",
+		PercentEncodingHandling: "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode",
 	}
-	if !tf.Contract.percentEscapedPathOpenSupportedSet || tf.Contract != wantContract {
+	if tf.Contract != wantContract {
 		return nil, fmt.Errorf("conformance: target-path contract = %+v, want %+v", tf.Contract, wantContract)
 	}
 	if err := validateTargetPathCases(tf.Cases); err != nil {
@@ -315,24 +290,22 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 			return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 		}
 		escape := pathPart[i+1 : i+3]
-		switch {
-		case strings.EqualFold(escape, "2e"):
+		if strings.EqualFold(escape, "2e") {
 			return ExpectReject, TargetPathRejectDotSegment, false, nil
-		case strings.EqualFold(escape, "2f"):
+		}
+		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
+	}
+	segments := strings.Split(pathPart, "/")
+	for i, segment := range segments {
+		if segment == "." || segment == ".." {
+			return ExpectReject, TargetPathRejectDotSegment, false, nil
+		}
+		// The first empty segment is the required leading slash. The last empty
+		// segment is one preserved trailing slash. Any other empty segment would
+		// be normalized by common URL stacks and is not canonical.
+		if segment == "" && i > 0 && i < len(segments)-1 {
 			return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 		}
-		i += 2
 	}
-	openSupported = !strings.Contains(pathPart, "%")
-	for _, segment := range strings.Split(pathPart, "/") {
-		if segment == ".." {
-			return ExpectReject, TargetPathRejectDotSegment, false, nil
-		}
-		if segment == "." {
-			// Browsers and routers can remove this segment before the Connector
-			// sees it, while the stored authorization scope remains byte exact.
-			openSupported = false
-		}
-	}
-	return ExpectAccept, "", openSupported, nil
+	return ExpectAccept, "", true, nil
 }

@@ -194,8 +194,8 @@ func CRIDV1Vectors() []byte {
 	return b
 }
 
-// TargetPathV1Vectors returns the raw bytes of the target_path request and
-// current tunnel-open contract shared by the service and SDKs.
+// TargetPathV1Vectors returns the raw bytes of the canonical target_path
+// request contract shared by the service and SDKs.
 func TargetPathV1Vectors() []byte {
 	b, err := vectorsFS.ReadFile(targetPathV1Name)
 	if err != nil {

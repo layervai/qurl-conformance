@@ -46,8 +46,8 @@ trust.
 | `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
-| `vectors/target_path_v1_vectors.json` | shared qURL Connector target-path request grammar, exact wire values, and current tunnel-open support |
-| `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, percent-escape limitation, and SDK lockstep rule |
+| `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
+| `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -380,9 +380,9 @@ artifact has its own `artifact` id:
   `target_path_v1_vectors.json`) — the shared local preflight and service input
   grammar for the optional per-qURL path and query on a tunnel resource. The
   vectors keep omission distinct from explicit empty, cover the exact 2,048-byte
-  boundary and all closed rejection classes, preserve accepted bytes without
-  decoding or normalization, and record the current percent-escaped path
-  limitation in qurl-service issue #1250. See
+  boundary and all closed rejection classes, reject non-canonical path escapes
+  and segments before dispatch, and preserve accepted bytes without decoding or
+  normalization. Every accepted value is safe to open. See
   `vectors/README_target_path_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
