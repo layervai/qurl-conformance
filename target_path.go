@@ -114,11 +114,13 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
+	"reject_overlong_relative_precedence":       {present: true, value: targetPathValue(strings.Repeat("a", TargetPathMaxBytes+1))},
 	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
+	"reject_authority_invalid_character":        {present: true, value: targetPathValue("//evil.example/a[b]")},
 	"reject_interior_empty_segment":             {present: true, value: targetPathValue("/a//b")},
 	"reject_semicolon_in_path":                  {present: true, value: targetPathValue("/view/abc;x=1")},
 	"reject_semicolon_malformed_percent":        {present: true, value: targetPathValue("/view/a;b%")},
@@ -134,6 +136,9 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_tab":                                {present: true, value: targetPathValue("/view\t/x")},
 	"reject_newline":                            {present: true, value: targetPathValue("/view\n/x")},
 	"reject_carriage_return":                    {present: true, value: targetPathValue("/view\r/x")},
+	"reject_trailing_line_feed":                 {present: true, value: targetPathValue("/view/x\n")},
+	"reject_trailing_carriage_return":           {present: true, value: targetPathValue("/view/x\r")},
+	"reject_trailing_carriage_return_line_feed": {present: true, value: targetPathValue("/view/x\r\n")},
 	"reject_nul":                                {present: true, value: targetPathValue("/view\x00/x")},
 	"reject_del":                                {present: true, value: targetPathValue("/view\x7f/x")},
 	"reject_non_ascii":                          {present: true, value: targetPathValue("/view/é")},
@@ -169,7 +174,9 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_malformed_percent_with_dot_escape":  {present: true, value: targetPathValue("/%2e%2e/x%2G")},
 }
 
-var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$`)
+// Use \z instead of $ so every consumer implements a whole-value full match.
+// Some regex engines let $ match before a final line terminator.
+var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*\z`)
 
 func targetPathHasMalformedPercentEscape(value string) bool {
 	for i := 0; i < len(value); i++ {

@@ -21,6 +21,8 @@ no invalid request leaves the process.
   authority.
 - It contains URI path and query characters only. Backslash, whitespace,
   controls, `#`, and non-ASCII characters are rejected in both components.
+  The validator uses a whole-value full match. It must not use a regular
+  expression end anchor that can match before a trailing line terminator.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
@@ -32,7 +34,8 @@ no invalid request leaves the process.
   `%2f`, is `invalid_character`.
 - Well-formed percent escapes in the query are accepted and preserved exactly.
   Validators do not decode, normalize, recase, or re-encode them. The service
-  does not use the query for path authorization.
+  does not use the query for path authorization. Consumers must never decode
+  encoded query controls in this validation or authorization layer.
 - Resource-type gating is outside this artifact. The service is authoritative:
   it accepts `target_path` only for a wire `type: tunnel` resource and returns
   `invalid_target_path` for another resource type.
@@ -67,10 +70,12 @@ a coordinated contract release.
 
 Every accepted value has `open_supported: true`. This field remains an explicit
 invariant and a reserved compatibility gate even though every v1 accepted case
-is true. Appending the value to a fixed trusted origin must preserve the scheme,
-host, path, and complete request target bytes. The service ignores the query
-when it authorizes the protected request. A scoped path allows the exact path
-and descendants at a segment boundary. For example, `/view/abc` also allows
+is true. Because v1 has no false vector, consumers must also inject a false case
+in a unit test and prove that the open operation rejects it. Appending the value
+to a fixed trusted origin must preserve the scheme, host, path, and complete
+request target bytes. The service ignores the query when it authorizes the
+protected request. A scoped path allows the exact path and descendants at a
+segment boundary. For example, `/view/abc` also allows
 `/view/abc/thumbnail`, but it does not allow `/view/abcd`.
 
 The service preserves one trailing slash on redirect. Its path authorization
@@ -89,7 +94,8 @@ For every case, pass `present` and `value` through the real public option gate:
 3. For each accepted present value, assert that appending it to a fixed trusted
    origin cannot change the scheme, host, or path.
 4. Branch on `open_supported` rather than assuming it is true. Every v1
-   accepted value is true, but a coordinated future contract can gate a subset.
+   accepted value is true, so add an injected false-branch unit test. A
+   coordinated future contract can gate a subset.
 
 The strict Go loader independently derives every outcome and rejects missing,
 duplicate, unknown, or modified cases. The npm and Python packages carry
@@ -97,7 +103,6 @@ byte-identical copies.
 
 ## Lockstep rule
 
-qurl-go issue #244 and qurl-typescript issue #248 track adoption. Neither SDK
-ships this public capability until both SDKs consume the same released vector
-artifact and pass every case. qurl-service remains the final validation and
-resource-type boundary.
+Neither SDK ships this public capability until both SDKs consume the same
+released vector artifact and pass every case. qurl-service remains the final
+validation and resource-type boundary.

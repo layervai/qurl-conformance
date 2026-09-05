@@ -86,6 +86,34 @@ func TestTargetPathBoundaryAndPresenceSemantics(t *testing.T) {
 	if overlongNonASCII.RejectClass != TargetPathRejectTooLong {
 		t.Fatalf("non-ASCII boundary reject_class = %q, want %q", overlongNonASCII.RejectClass, TargetPathRejectTooLong)
 	}
+	overlongRelative := targetPathCase(t, tf, "reject_overlong_relative_precedence")
+	if got := len(*overlongRelative.Value); got != TargetPathMaxBytes+1 {
+		t.Fatalf("relative boundary bytes = %d, want %d", got, TargetPathMaxBytes+1)
+	}
+	if strings.HasPrefix(*overlongRelative.Value, "/") || overlongRelative.RejectClass != TargetPathRejectTooLong {
+		t.Fatalf("relative boundary case = %+v, want too_long before not_absolute", *overlongRelative)
+	}
+}
+
+func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"reject_trailing_line_feed",
+		"reject_trailing_carriage_return",
+		"reject_trailing_carriage_return_line_feed",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("case %q = %+v, want full-value invalid_character rejection", name, *c)
+		}
+	}
+	authority := targetPathCase(t, tf, "reject_authority_invalid_character")
+	if authority.Outcome != ExpectReject || authority.RejectClass != TargetPathRejectAuthority {
+		t.Errorf("authority precedence case = %+v, want authority rejection", *authority)
+	}
 }
 
 func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
