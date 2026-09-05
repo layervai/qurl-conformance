@@ -85,3 +85,8 @@ def crid_v1_vectors():
 def target_path_v1_vectors():
     """Return the parsed target_path_v1_vectors.json."""
     return _load("target_path_v1_vectors.json")
+
+
+def delegated_mint_issue_v1_vectors():
+    """Return the parsed delegated_mint_issue_v1_vectors.json."""
+    return _load("delegated_mint_issue_v1_vectors.json")

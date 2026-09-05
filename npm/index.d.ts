@@ -14,3 +14,4 @@ export declare function connectorHubLstCookieVectors(): unknown;
 export declare function agentCredentialRecoveryVectors(): unknown;
 export declare function cridV1Vectors(): unknown;
 export declare function targetPathV1Vectors(): unknown;
+export declare function delegatedMintIssueV1Vectors(): unknown;

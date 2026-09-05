@@ -82,12 +82,39 @@ jobs:
           const cr = c.agentCredentialRecoveryVectors();
           const cd = c.cridV1Vectors();
           const tp = c.targetPathV1Vectors();
+          const dm = c.delegatedMintIssueV1Vectors();
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
             prefix.writeUInt16BE(value.length, 1);
             return Buffer.concat([prefix, value]);
           };
+          const issueFrame = value => {
+            const bytes = Buffer.from(value, 'utf8');
+            const prefix = Buffer.alloc(4);
+            prefix.writeUInt32BE(bytes.length);
+            return Buffer.concat([prefix, bytes]);
+          };
+          const dmBodyHash = crypto.createHash('sha256').update(dm.golden.body_utf8, 'utf8').digest('hex');
+          const dmCanonical = Buffer.concat([
+            Buffer.from(dm.contract.signing_domain_ascii, 'ascii'), Buffer.from([0]),
+            ...dm.contract.field_order.map(name => issueFrame({
+              method: dm.golden.method,
+              authority: dm.golden.authority,
+              route: dm.golden.route,
+              issuer_id: dm.golden.issuer_id,
+              kid: dm.golden.kid,
+              idempotency_key: dm.golden.idempotency_key,
+              timestamp_unix_decimal: String(dm.golden.timestamp_unix),
+              nonce: dm.golden.nonce,
+              body_sha256: dmBodyHash,
+            }[name])),
+          ]);
+          const dmSignatureValid = crypto.verify(
+            'sha256', dmCanonical,
+            crypto.createPublicKey({key: Buffer.from(dm.golden.public_key_der_b64url, 'base64url'), format: 'der', type: 'spki'}),
+            Buffer.from(dm.golden.signature_der_b64url, 'base64url'),
+          );
           const deriveHubRequestId = vector => {
             const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
             const nonce = Buffer.from(vector.request_nonce, 'base64url');
@@ -636,6 +663,12 @@ jobs:
               tp.contract.accepted_value_handling !== 'preserve_exact_bytes' ||
               tp.contract.percent_encoding_handling !== 'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode' ||
               tp.cases.length === 0 ||
+              dm.artifact !== 'qurl-delegated-mint-issue-v1-vectors' || dm.schema_version !== 1 ||
+              dm.contract.nonce_decoded_bytes !== 16 || dm.contract.body_max_bytes !== 8192 ||
+              dmBodyHash !== dm.golden.body_sha256 ||
+              dmCanonical.toString('hex') !== dm.golden.canonical_hex ||
+              crypto.createHash('sha256').update(dmCanonical).digest('hex') !== dm.golden.signing_digest_hex ||
+              !dmSignatureValid ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -677,8 +710,28 @@ jobs:
           cr = q.agent_credential_recovery_vectors()
           cd = q.crid_v1_vectors()
           tp = q.target_path_v1_vectors()
+          dm = q.delegated_mint_issue_v1_vectors()
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
+          def issue_frame(value):
+              encoded = value.encode('utf-8')
+              return struct.pack('>I', len(encoded)) + encoded
+          dm_body_hash = hashlib.sha256(dm['golden']['body_utf8'].encode('utf-8')).hexdigest()
+          dm_values = {
+              'method': dm['golden']['method'],
+              'authority': dm['golden']['authority'],
+              'route': dm['golden']['route'],
+              'issuer_id': dm['golden']['issuer_id'],
+              'kid': dm['golden']['kid'],
+              'idempotency_key': dm['golden']['idempotency_key'],
+              'timestamp_unix_decimal': str(dm['golden']['timestamp_unix']),
+              'nonce': dm['golden']['nonce'],
+              'body_sha256': dm_body_hash,
+          }
+          dm_canonical = b''.join([
+              dm['contract']['signing_domain_ascii'].encode('ascii'), b'\0',
+              *(issue_frame(dm_values[name]) for name in dm['contract']['field_order']),
+          ])
           def derive_hub_request_id(vector):
               peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
               nonce = base64.urlsafe_b64decode(vector['request_nonce'] + '=' * (-len(vector['request_nonce']) % 4))
@@ -1213,6 +1266,11 @@ jobs:
           assert tp['contract']['percent_encoding_handling'] == (
               'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode'
           )
+          assert dm['artifact'] == 'qurl-delegated-mint-issue-v1-vectors' and dm['schema_version'] == 1
+          assert dm['contract']['nonce_decoded_bytes'] == 16 and dm['contract']['body_max_bytes'] == 8192
+          assert dm_body_hash == dm['golden']['body_sha256']
+          assert dm_canonical.hex() == dm['golden']['canonical_hex']
+          assert hashlib.sha256(dm_canonical).hexdigest() == dm['golden']['signing_digest_hex']
           print('py ok')
           PY
 

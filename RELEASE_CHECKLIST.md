@@ -19,10 +19,12 @@ and protocol-version bytes, counter correlation, closed case vocabularies, and
 byte-identity across `vectors/`, `npm/vectors/` and
 `python/qurl_conformance/_data/`.
 
-CI cannot prove the bytes are **authentic**. A transcription error inside an
-otherwise well-formed regenerated `packet_hex` passes every check in this repo.
-Authentication happens in the consumers, and the steps below are what makes that
-handoff real rather than assumed.
+CI cannot prove the **NHP packet** bytes are authentic. A transcription error
+inside an otherwise well-formed regenerated `packet_hex` passes every check in
+this repo. Authentication happens in the NHP consumers, and the steps below make
+that handoff real rather than assumed. The delegated-mint issue artifact is
+different: its P-256 primitive is in the standard library, so the strict Go
+loader rebuilds and verifies that golden signature here.
 
 ## Every release
 
