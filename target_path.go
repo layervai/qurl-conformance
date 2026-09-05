@@ -131,9 +131,8 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_authority_text_in_query":            {present: true, value: targetPathValue("/path?next=//evil.example")},
 	"accept_trailing_slash":                     {present: true, value: targetPathValue("/view/")},
 	"accept_empty_query":                        {present: true, value: targetPathValue("/?")},
-	"accept_percent_path_upper":                 {present: true, value: targetPathValue("/view/a%2Fb")},
-	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%2fb")},
-	"accept_percent_encoded_dotdot_raw":         {present: true, value: targetPathValue("/%2e%2e/secret")},
+	"accept_percent_path_upper":                 {present: true, value: targetPathValue("/view/a%4Ab")},
+	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%4ab")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
@@ -155,6 +154,10 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_dotdot_leading":                     {present: true, value: targetPathValue("/../etc/passwd")},
 	"reject_dotdot_middle":                      {present: true, value: targetPathValue("/view/../../secret")},
 	"reject_dotdot_trailing":                    {present: true, value: targetPathValue("/view/..")},
+	"reject_percent_encoded_dot_lower":          {present: true, value: targetPathValue("/%2e%2e/secret")},
+	"reject_percent_encoded_dot_upper":          {present: true, value: targetPathValue("/%2E%2E/secret")},
+	"reject_percent_encoded_slash_lower":        {present: true, value: targetPathValue("/view%2fsecret")},
+	"reject_percent_encoded_slash_upper":        {present: true, value: targetPathValue("/view%2Fsecret")},
 	"reject_bare_percent":                       {present: true, value: targetPathValue("/a%")},
 	"reject_short_percent":                      {present: true, value: targetPathValue("/a%2")},
 	"reject_non_hex_percent_path":               {present: true, value: targetPathValue("/view/x%2Gy")},
@@ -186,7 +189,7 @@ func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
 		ExplicitEmptySemantics:             "reject",
 		AcceptedCharacterSet:               "raw_ascii_uri_path_and_query",
 		AcceptedValueHandling:              "preserve_exact_bytes",
-		PercentEncodingHandling:            "accept_well_formed_without_normalize_or_decode",
+		PercentEncodingHandling:            "reject_path_dot_and_slash_accept_other_well_formed_without_normalize_or_decode",
 		PercentEscapedPathOpenSupported:    false,
 		PercentEscapedPathIssue:            "qurl-service#1250",
 		percentEscapedPathOpenSupportedSet: true,
@@ -288,6 +291,19 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	pathPart := p
 	if i := strings.IndexByte(p, '?'); i >= 0 {
 		pathPart = p[:i]
+	}
+	for i := 0; i < len(pathPart); i++ {
+		if pathPart[i] != '%' {
+			continue
+		}
+		escape := pathPart[i+1 : i+3]
+		switch {
+		case strings.EqualFold(escape, "2e"):
+			return ExpectReject, TargetPathRejectDotSegment, false, nil
+		case strings.EqualFold(escape, "2f"):
+			return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
+		}
+		i += 2
 	}
 	for _, segment := range strings.Split(pathPart, "/") {
 		if segment == ".." {

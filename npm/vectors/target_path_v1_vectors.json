@@ -9,7 +9,7 @@
     "explicit_empty_semantics": "reject",
     "accepted_character_set": "raw_ascii_uri_path_and_query",
     "accepted_value_handling": "preserve_exact_bytes",
-    "percent_encoding_handling": "accept_well_formed_without_normalize_or_decode",
+    "percent_encoding_handling": "reject_path_dot_and_slash_accept_other_well_formed_without_normalize_or_decode",
     "percent_escaped_path_open_supported": false,
     "percent_escaped_path_issue": "qurl-service#1250"
   },
@@ -93,21 +93,14 @@
     {
       "name": "accept_percent_path_upper",
       "present": true,
-      "value": "/view/a%2Fb",
+      "value": "/view/a%4Ab",
       "outcome": "accept",
       "open_supported": false
     },
     {
       "name": "accept_percent_path_lower",
       "present": true,
-      "value": "/view/a%2fb",
-      "outcome": "accept",
-      "open_supported": false
-    },
-    {
-      "name": "accept_percent_encoded_dotdot_raw",
-      "present": true,
-      "value": "/%2e%2e/secret",
+      "value": "/view/a%4ab",
       "outcome": "accept",
       "open_supported": false
     },
@@ -226,7 +219,7 @@
     {
       "name": "reject_del",
       "present": true,
-      "value": "/view/x",
+      "value": "/view\u007f/x",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },
@@ -257,6 +250,34 @@
       "value": "/view/..",
       "outcome": "reject",
       "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_lower",
+      "present": true,
+      "value": "/%2e%2e/secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_upper",
+      "present": true,
+      "value": "/%2E%2E/secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_slash_lower",
+      "present": true,
+      "value": "/view%2fsecret",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_slash_upper",
+      "present": true,
+      "value": "/view%2Fsecret",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
     },
     {
       "name": "reject_bare_percent",

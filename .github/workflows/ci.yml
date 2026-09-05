@@ -625,7 +625,7 @@ jobs:
               cridValues.reject_trailing_bits.reject_class !== 'non_canonical' ||
               cridValues.reject_checksum.reject_class !== 'checksum' ||
               tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
-              tp.contract.max_bytes !== 2048 || tp.cases.length !== 40 ||
+              tp.contract.max_bytes !== 2048 || tp.cases.length !== 43 ||
               tp.cases.find(v => v.name === 'accept_omitted')?.present !== false ||
               tp.cases.find(v => v.name === 'reject_explicit_empty')?.reject_class !== 'empty' ||
               tp.cases.find(v => v.name === 'accept_max_bytes')?.value.length !== 2048 ||
@@ -1189,7 +1189,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          assert tp['contract']['max_bytes'] == 2048 and len(tp['cases']) == 40
+          assert tp['contract']['max_bytes'] == 2048 and len(tp['cases']) == 43
           target_path_cases = {v['name']: v for v in tp['cases']}
           assert target_path_cases['accept_omitted']['present'] is False
           assert target_path_cases['reject_explicit_empty']['reject_class'] == 'empty'

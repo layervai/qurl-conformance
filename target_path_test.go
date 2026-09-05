@@ -98,6 +98,14 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if u.Scheme != "https" || u.Hostname() != wantHost {
 			t.Errorf("case %q changed origin to %q://%q", c.Name, u.Scheme, u.Hostname())
 		}
+		if u.Path != "" && (!strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//")) {
+			t.Errorf("case %q produced unsafe decoded path %q", c.Name, u.Path)
+		}
+		for _, segment := range strings.Split(u.Path, "/") {
+			if segment == ".." {
+				t.Errorf("case %q produced decoded dot segment in path %q", c.Name, u.Path)
+			}
+		}
 	}
 }
 
@@ -109,7 +117,6 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 	for _, name := range []string{
 		"accept_percent_path_upper",
 		"accept_percent_path_lower",
-		"accept_percent_encoded_dotdot_raw",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
@@ -122,6 +129,17 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 	queryOnly := targetPathCase(t, tf, "accept_percent_only_in_query")
 	if queryOnly.OpenSupported == nil || !*queryOnly.OpenSupported {
 		t.Errorf("query-only percent escape must remain open-supported")
+	}
+	for name, rejectClass := range map[string]string{
+		"reject_percent_encoded_dot_lower":   TargetPathRejectDotSegment,
+		"reject_percent_encoded_dot_upper":   TargetPathRejectDotSegment,
+		"reject_percent_encoded_slash_lower": TargetPathRejectInvalidCharacter,
+		"reject_percent_encoded_slash_upper": TargetPathRejectInvalidCharacter,
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != rejectClass {
+			t.Errorf("case %q = %+v, want rejected as %q", name, *c, rejectClass)
+		}
 	}
 }
 

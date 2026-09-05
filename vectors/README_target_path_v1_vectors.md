@@ -21,10 +21,14 @@ invalid request leaves the process.
 - It contains URI path and query characters only. Backslash, whitespace,
   controls, `#`, and non-ASCII characters are rejected.
 - A literal `..` path segment is rejected. `..` text in the query is allowed.
-- Each `%` has two hexadecimal digits. Accepted escapes are preserved exactly;
-  validators do not decode, normalize, recase, or re-encode them.
-- The field is valid only for a wire `type: tunnel` resource. The service
-  returns `invalid_target_path` for another resource type.
+- Each `%` has two hexadecimal digits. In the path portion, case-insensitive
+  `%2e` and `%2f` escapes are rejected because a later decode could create a
+  dot segment or path separator. Other accepted escapes are preserved exactly;
+  validators do not decode, normalize, recase, or re-encode them. Percent
+  escapes in the query do not affect path authorization and remain accepted.
+- Resource-type gating is outside this artifact. The service is authoritative:
+  it accepts `target_path` only for a wire `type: tunnel` resource and returns
+  `invalid_target_path` for another resource type.
 
 The closed local `reject_class` values are:
 
@@ -34,8 +38,8 @@ The closed local `reject_class` values are:
 | `too_long` | the raw ASCII value is longer than 2,048 bytes |
 | `not_absolute` | the value does not start with `/` |
 | `authority` | the value starts with `//` |
-| `invalid_character` | the value contains a character outside the allowed raw ASCII set |
-| `dot_segment` | the path portion contains a literal `..` segment |
+| `invalid_character` | the value contains a character outside the allowed raw ASCII set, or a case-insensitive `%2f` escape occurs in the path portion |
+| `dot_segment` | the path portion contains a literal `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape is incomplete or is not hexadecimal |
 
 The order above is not a precedence contract. Consumers assert the declared
@@ -49,15 +53,15 @@ path allows the exact path and descendants at a segment boundary. For example,
 `/view/abc` also allows `/view/abc/thumbnail`, but it does not allow
 `/view/abcd`.
 
-Well-formed percent escapes in the path are valid mint inputs and stay byte
-exact. They are marked `open_supported: false` because qurl-service issue #1250
-tracks a current false-deny: the router supplies a decoded request path while
-the stored scope is escaped. Consumers must not silently reject, decode, or
-normalize these valid mint values. Applications must use unescaped allowed
-ASCII path bytes until #1250 is fixed. Percent escapes that occur only in the
-query are open-supported because the query is not part of path authorization.
-The Connector application must still treat every delivered path as untrusted
-input for its own object lookup.
+Well-formed percent escapes other than encoded dot and slash in the path are
+valid mint inputs and stay byte exact. They are marked `open_supported: false`
+because qurl-service issue #1250 tracks a current false-deny: the router supplies
+a decoded request path while the stored scope is escaped. Consumers must not
+decode, normalize, recase, or re-encode accepted mint values. Applications must
+use unescaped allowed ASCII path bytes until #1250 is fixed. Percent escapes
+that occur only in the query are open-supported because the query is not part
+of path authorization. The Connector application must still treat every
+delivered path as untrusted input for its own object lookup.
 
 ## Consumer algorithm
 
