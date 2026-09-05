@@ -58,12 +58,17 @@ valid mint inputs and stay byte exact. They are marked `open_supported: false`
 because qurl-service issue #1250 tracks a current false-deny: the router supplies
 a decoded request path while the stored scope is escaped. Consumers must not
 decode, normalize, recase, or re-encode accepted mint values. Applications must
-use unescaped allowed ASCII path bytes until #1250 is fixed. Percent escapes
-that occur only in the query are open-supported because the query is not part
-of path authorization. This is a one-layer wire contract: `%252e` is accepted
-and preserved as exact bytes. A Connector must validate the final path after
-its framework's decoding and must still treat every delivered path as untrusted
-input for its own object lookup.
+use unescaped allowed ASCII path bytes until #1250 is fixed. This restriction
+includes encoded backslash, NUL, fragment-marker, and query-marker bytes.
+Percent escapes that occur only in the query are open-supported because the
+query is not part of path authorization. This is a one-layer wire contract:
+`%252e` is accepted and preserved as exact bytes. A Connector must validate the
+final path after its framework's decoding and must still treat every delivered
+path as untrusted input for its own object lookup.
+
+A literal single-dot segment is mint-valid but has `open_supported: false`.
+Browsers and routers can normalize `/a/./b` to `/a/b`, while the service stores
+the original scope. This can cause authorization to deny the normalized request.
 
 ## Consumer algorithm
 

@@ -135,6 +135,11 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%4ab")},
 	"accept_percent_path_safe_41":               {present: true, value: targetPathValue("/view/a%41b")},
 	"accept_double_encoded_dot_path":            {present: true, value: targetPathValue("/view/a%252eb")},
+	"accept_encoded_backslash_lower_path":       {present: true, value: targetPathValue("/view/a%5cb")},
+	"accept_encoded_backslash_upper_path":       {present: true, value: targetPathValue("/view/a%5Cb")},
+	"accept_encoded_nul_path":                   {present: true, value: targetPathValue("/view/a%00b")},
+	"accept_encoded_fragment_marker_path":       {present: true, value: targetPathValue("/view/a%23b")},
+	"accept_encoded_query_marker_path":          {present: true, value: targetPathValue("/view/a%3fb")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
@@ -300,6 +305,8 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 		if pathPart[i] != '%' {
 			continue
 		}
+		// PathUnescape above proves that every percent escape has two following
+		// bytes. Keep this guard so later validation reordering stays fail-closed.
 		if i+3 > len(pathPart) {
 			return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 		}
@@ -312,10 +319,16 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 		}
 		i += 2
 	}
+	openSupported = !strings.Contains(pathPart, "%")
 	for _, segment := range strings.Split(pathPart, "/") {
 		if segment == ".." {
 			return ExpectReject, TargetPathRejectDotSegment, false, nil
 		}
+		if segment == "." {
+			// Browsers and routers can remove this segment before the Connector
+			// sees it, while the stored authorization scope remains byte exact.
+			openSupported = false
+		}
 	}
-	return ExpectAccept, "", !strings.Contains(pathPart, "%"), nil
+	return ExpectAccept, "", openSupported, nil
 }

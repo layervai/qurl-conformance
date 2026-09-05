@@ -119,6 +119,11 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 		"accept_percent_path_lower",
 		"accept_percent_path_safe_41",
 		"accept_double_encoded_dot_path",
+		"accept_encoded_backslash_lower_path",
+		"accept_encoded_backslash_upper_path",
+		"accept_encoded_nul_path",
+		"accept_encoded_fragment_marker_path",
+		"accept_encoded_query_marker_path",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
@@ -131,6 +136,10 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 	doubleEncoded := targetPathCase(t, tf, "accept_double_encoded_dot_path")
 	if doubleEncoded.Value == nil || *doubleEncoded.Value != "/view/a%252eb" {
 		t.Errorf("double-encoded path changed: %+v", *doubleEncoded)
+	}
+	singleDot := targetPathCase(t, tf, "accept_single_dot_segment")
+	if singleDot.OpenSupported == nil || *singleDot.OpenSupported {
+		t.Errorf("single-dot path must remain mint-valid but open-unsupported: %+v", *singleDot)
 	}
 	for _, name := range []string{
 		"accept_percent_only_in_query",

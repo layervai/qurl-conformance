@@ -60,7 +60,7 @@
       "present": true,
       "value": "/a/./b",
       "outcome": "accept",
-      "open_supported": true
+      "open_supported": false
     },
     {
       "name": "accept_dotdot_in_query",
@@ -115,6 +115,41 @@
       "name": "accept_double_encoded_dot_path",
       "present": true,
       "value": "/view/a%252eb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_backslash_lower_path",
+      "present": true,
+      "value": "/view/a%5cb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_backslash_upper_path",
+      "present": true,
+      "value": "/view/a%5Cb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_nul_path",
+      "present": true,
+      "value": "/view/a%00b",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_fragment_marker_path",
+      "present": true,
+      "value": "/view/a%23b",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_query_marker_path",
+      "present": true,
+      "value": "/view/a%3fb",
       "outcome": "accept",
       "open_supported": false
     },
