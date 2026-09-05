@@ -50,7 +50,8 @@ The closed local `reject_class` values are:
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
 The whole-value character-set and path-semicolon checks precede percent-syntax
-classification. After those checks, malformed percent encoding is classified
+classification. Thus `/view/a;b%` and `/view/a[b]%` are `invalid_character`,
+not `percent_encoding`. After those checks, malformed percent encoding is classified
 before the path escape and dot checks. After percent syntax is valid,
 `dot_segment` wins when the path contains any case-insensitive `%2e` escape or
 a literal `.` or `..` segment. This stays true when another well-formed path

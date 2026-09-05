@@ -238,6 +238,22 @@ func TestTargetPathMalformedPercentPrecedence(t *testing.T) {
 	}
 }
 
+func TestTargetPathInvalidCharacterPrecedesMalformedPercent(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"reject_semicolon_malformed_percent",
+		"reject_left_bracket_malformed_percent",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("case %q = %+v, want invalid_character precedence", name, *c)
+		}
+	}
+}
+
 func TestTargetPathRejectsDotSegmentsNotDotSubstrings(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {
