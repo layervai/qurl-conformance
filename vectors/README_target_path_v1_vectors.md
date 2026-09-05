@@ -21,6 +21,9 @@ no invalid request leaves the process.
   authority.
 - It contains URI path and query characters only. Backslash, whitespace,
   controls, `#`, and non-ASCII characters are rejected in both components.
+  `contract.allowed_ascii` is the complete machine-readable raw alphabet. A
+  consumer must compare its character gate with this value; it must not infer
+  the alphabet from the examples.
   The validator uses a whole-value full match. It must not use a regular
   expression end anchor that can match before a trailing line terminator.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
@@ -52,19 +55,21 @@ The closed local `reject_class` values are:
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
-The whole-value character-set and path-semicolon checks precede percent-syntax
+`contract.validation_order` is the complete normative order. After presence,
+the validator checks empty, UTF-8 byte length, the leading slash, and a
+protocol-relative authority. Thus, length wins over `not_absolute`, and
+`authority` wins over all later character, percent, and dot checks. The
+whole-value character-set and path-semicolon checks then precede percent-syntax
 classification. Thus `/view/a;b%` and `/view/a[b]%` are `invalid_character`,
-not `percent_encoding`. After those checks, malformed percent encoding is classified
-before the path escape and dot checks. After percent syntax is valid,
-`dot_segment` wins when the path contains any case-insensitive `%2e` escape or
-a literal `.` or `..` segment. This stays true when another well-formed path
-escape is also present. Otherwise, any path escape or interior empty segment is
-`invalid_character`. The `%2e` classification deliberately names the escape
-risk; the decoded dot does not have to be a standalone segment.
-
-Other rule combinations have no general precedence contract. Each exact vector
-states its required class. Adding a class or changing an accepted input requires
-a coordinated contract release.
+not `percent_encoding`. After those checks, malformed percent encoding is
+classified before the path escape and dot checks. After percent syntax is
+valid, `dot_segment` wins when the path contains any case-insensitive `%2e`
+escape or a literal `.` or `..` segment. This stays true when another
+well-formed path escape is also present. Otherwise, any path escape or interior
+empty segment is `invalid_character`. The `%2e` classification deliberately
+names the escape risk; the decoded dot does not have to be a standalone
+segment. Adding a class or changing this order requires a coordinated contract
+release.
 
 ## Open behavior
 

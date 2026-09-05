@@ -110,9 +110,23 @@ func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
 			t.Errorf("case %q = %+v, want full-value invalid_character rejection", name, *c)
 		}
 	}
-	authority := targetPathCase(t, tf, "reject_authority_invalid_character")
-	if authority.Outcome != ExpectReject || authority.RejectClass != TargetPathRejectAuthority {
-		t.Errorf("authority precedence case = %+v, want authority rejection", *authority)
+	for _, name := range []string{
+		"reject_authority_invalid_character",
+		"reject_authority_malformed_percent",
+		"reject_authority_dot_segment",
+	} {
+		authority := targetPathCase(t, tf, name)
+		if authority.Outcome != ExpectReject || authority.RejectClass != TargetPathRejectAuthority {
+			t.Errorf("authority precedence case %q = %+v, want authority rejection", name, *authority)
+		}
+	}
+	relative := targetPathCase(t, tf, "reject_relative_invalid_character")
+	if relative.Outcome != ExpectReject || relative.RejectClass != TargetPathRejectNotAbsolute {
+		t.Errorf("relative precedence case = %+v, want not_absolute rejection", *relative)
+	}
+	dot := targetPathCase(t, tf, "reject_dot_segment_after_interior_empty")
+	if dot.Outcome != ExpectReject || dot.RejectClass != TargetPathRejectDotSegment {
+		t.Errorf("dot precedence case = %+v, want dot_segment rejection", *dot)
 	}
 }
 
@@ -213,6 +227,13 @@ func TestTargetPathRejectsPrintableCharacterOutsideClosedSet(t *testing.T) {
 	c := targetPathCase(t, tf, "reject_left_bracket")
 	if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
 		t.Errorf("left-bracket case = %+v, want invalid_character rejection", *c)
+	}
+	for value := byte(0x20); value <= 0x7e; value++ {
+		allowed := strings.ContainsRune(tf.Contract.AllowedASCII, rune(value))
+		matched := targetPathPattern.MatchString("/" + string(value))
+		if allowed != matched {
+			t.Errorf("allowed_ascii and validator differ for byte 0x%02x", value)
+		}
 	}
 }
 
@@ -374,6 +395,14 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	})
 	t.Run("contract", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.MaxBytes++ }), "contract")
+	})
+	t.Run("allowed ASCII", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.AllowedASCII += "<" }), "contract")
+	})
+	t.Run("validation order", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+			tf.Contract.ValidationOrder[3], tf.Contract.ValidationOrder[4] = tf.Contract.ValidationOrder[4], tf.Contract.ValidationOrder[3]
+		}), "contract")
 	})
 	t.Run("duplicate case", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Cases[1] = tf.Cases[0] }), "duplicate")

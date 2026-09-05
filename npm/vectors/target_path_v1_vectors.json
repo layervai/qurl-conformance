@@ -8,6 +8,21 @@
     "omitted_semantics": "bare_origin",
     "explicit_empty_semantics": "reject",
     "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
+    "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-",
+    "validation_order": [
+      "presence",
+      "empty",
+      "utf8_byte_length",
+      "leading_slash",
+      "protocol_relative_authority",
+      "raw_ascii_character_set",
+      "path_semicolon",
+      "percent_syntax",
+      "encoded_dot",
+      "literal_dot_segment",
+      "path_escape_or_interior_empty_segment",
+      "accept"
+    ],
     "accepted_value_handling": "preserve_exact_bytes",
     "percent_encoding_handling": "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode"
   },
@@ -173,6 +188,13 @@
       "reject_class": "not_absolute"
     },
     {
+      "name": "reject_relative_invalid_character",
+      "present": true,
+      "value": "view/a[b]",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
       "name": "reject_absolute_url",
       "present": true,
       "value": "https://evil.example/x",
@@ -194,11 +216,32 @@
       "reject_class": "authority"
     },
     {
+      "name": "reject_authority_malformed_percent",
+      "present": true,
+      "value": "//evil.example/b%",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_authority_dot_segment",
+      "present": true,
+      "value": "//evil.example/../b",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
       "name": "reject_interior_empty_segment",
       "present": true,
       "value": "/a//b",
       "outcome": "reject",
       "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_dot_segment_after_interior_empty",
+      "present": true,
+      "value": "/a//../b",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
     },
     {
       "name": "reject_semicolon_in_path",

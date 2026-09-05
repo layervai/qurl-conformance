@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 77;
+          const expectedTargetPathCaseCount = 81;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -667,6 +667,8 @@ jobs:
               tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
               tp.contract.max_bytes !== 2048 ||
               tp.contract.accepted_character_set !== 'raw_ascii_canonical_uri_path_and_query' ||
+              tp.contract.allowed_ascii !== "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-" ||
+              tp.contract.validation_order.join(',') !== 'presence,empty,utf8_byte_length,leading_slash,protocol_relative_authority,raw_ascii_character_set,path_semicolon,percent_syntax,encoded_dot,literal_dot_segment,path_escape_or_interior_empty_segment,accept' ||
               tp.contract.percent_encoding_handling !== 'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode' ||
               targetPathCases.accept_omitted?.present !== false ||
               targetPathCases.reject_explicit_empty?.reject_class !== 'empty' ||
@@ -1264,12 +1266,19 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 77
+          expected_target_path_case_count = 81
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
           assert tp['contract']['max_bytes'] == 2048
           assert tp['contract']['accepted_character_set'] == 'raw_ascii_canonical_uri_path_and_query'
+          assert tp['contract']['allowed_ascii'] == "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
+          assert tp['contract']['validation_order'] == [
+              'presence', 'empty', 'utf8_byte_length', 'leading_slash',
+              'protocol_relative_authority', 'raw_ascii_character_set',
+              'path_semicolon', 'percent_syntax', 'encoded_dot',
+              'literal_dot_segment', 'path_escape_or_interior_empty_segment', 'accept',
+          ]
           assert tp['contract']['percent_encoding_handling'] == (
               'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode'
           )

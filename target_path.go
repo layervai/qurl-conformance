@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -23,7 +24,27 @@ const (
 	TargetPathRejectInvalidCharacter = "invalid_character"
 	TargetPathRejectDotSegment       = "dot_segment"
 	TargetPathRejectPercentEncoding  = "percent_encoding"
+
+	// TargetPathAllowedASCII is the complete raw ASCII alphabet accepted by
+	// the whole-value character gate. Later ordered gates further restrict
+	// semicolons and percent escapes in the path component.
+	TargetPathAllowedASCII = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
 )
+
+var targetPathValidationOrder = []string{
+	"presence",
+	"empty",
+	"utf8_byte_length",
+	"leading_slash",
+	"protocol_relative_authority",
+	"raw_ascii_character_set",
+	"path_semicolon",
+	"percent_syntax",
+	"encoded_dot",
+	"literal_dot_segment",
+	"path_escape_or_interior_empty_segment",
+	"accept",
+}
 
 // TargetPathFile is the language-neutral target_path mint contract shared by
 // service and SDK consumers.
@@ -38,13 +59,15 @@ type TargetPathFile struct {
 // TargetPathContract freezes the stable wire and runtime rules that every
 // consumer must apply without normalization.
 type TargetPathContract struct {
-	WireField               string `json:"wire_field"`
-	MaxBytes                int    `json:"max_bytes"`
-	OmittedSemantics        string `json:"omitted_semantics"`
-	ExplicitEmptySemantics  string `json:"explicit_empty_semantics"`
-	AcceptedCharacterSet    string `json:"accepted_character_set"`
-	AcceptedValueHandling   string `json:"accepted_value_handling"`
-	PercentEncodingHandling string `json:"percent_encoding_handling"`
+	WireField               string   `json:"wire_field"`
+	MaxBytes                int      `json:"max_bytes"`
+	OmittedSemantics        string   `json:"omitted_semantics"`
+	ExplicitEmptySemantics  string   `json:"explicit_empty_semantics"`
+	AcceptedCharacterSet    string   `json:"accepted_character_set"`
+	AllowedASCII            string   `json:"allowed_ascii"`
+	ValidationOrder         []string `json:"validation_order"`
+	AcceptedValueHandling   string   `json:"accepted_value_handling"`
+	PercentEncodingHandling string   `json:"percent_encoding_handling"`
 }
 
 // TargetPathCase is one direct public-SDK option input. Present distinguishes
@@ -118,10 +141,14 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
+	"reject_relative_invalid_character":         {present: true, value: targetPathValue("view/a[b]")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
 	"reject_authority_invalid_character":        {present: true, value: targetPathValue("//evil.example/a[b]")},
+	"reject_authority_malformed_percent":        {present: true, value: targetPathValue("//evil.example/b%")},
+	"reject_authority_dot_segment":              {present: true, value: targetPathValue("//evil.example/../b")},
 	"reject_interior_empty_segment":             {present: true, value: targetPathValue("/a//b")},
+	"reject_dot_segment_after_interior_empty":   {present: true, value: targetPathValue("/a//../b")},
 	"reject_semicolon_in_path":                  {present: true, value: targetPathValue("/view/abc;x=1")},
 	"reject_semicolon_malformed_percent":        {present: true, value: targetPathValue("/view/a;b%")},
 	"reject_leading_backslash":                  {present: true, value: targetPathValue("/\\evil.example")},
@@ -216,10 +243,12 @@ func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
 		OmittedSemantics:        "bare_origin",
 		ExplicitEmptySemantics:  "reject",
 		AcceptedCharacterSet:    "raw_ascii_canonical_uri_path_and_query",
+		AllowedASCII:            TargetPathAllowedASCII,
+		ValidationOrder:         targetPathValidationOrder,
 		AcceptedValueHandling:   "preserve_exact_bytes",
 		PercentEncodingHandling: "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode",
 	}
-	if tf.Contract != wantContract {
+	if !reflect.DeepEqual(tf.Contract, wantContract) {
 		return nil, fmt.Errorf("conformance: target-path contract = %+v, want %+v", tf.Contract, wantContract)
 	}
 	if err := validateTargetPathCases(tf.Cases); err != nil {
