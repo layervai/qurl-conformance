@@ -124,6 +124,8 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 		"accept_encoded_nul_path",
 		"accept_encoded_fragment_marker_path",
 		"accept_encoded_query_marker_path",
+		"accept_encoded_carriage_return_path",
+		"accept_encoded_line_feed_path",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
@@ -160,6 +162,19 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != rejectClass {
 			t.Errorf("case %q = %+v, want rejected as %q", name, *c, rejectClass)
+		}
+	}
+}
+
+func TestTargetPathRejectsDotSegmentsNotDotSubstrings(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"accept_dotdot_substring", "accept_three_dot_segment"} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
+			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
 		}
 	}
 }

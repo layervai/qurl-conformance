@@ -56,6 +56,20 @@
       "open_supported": true
     },
     {
+      "name": "accept_dotdot_substring",
+      "present": true,
+      "value": "/view/a..b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_three_dot_segment",
+      "present": true,
+      "value": "/view/...",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
       "name": "accept_single_dot_segment",
       "present": true,
       "value": "/a/./b",
@@ -150,6 +164,20 @@
       "name": "accept_encoded_query_marker_path",
       "present": true,
       "value": "/view/a%3fb",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_carriage_return_path",
+      "present": true,
+      "value": "/view/a%0db",
+      "outcome": "accept",
+      "open_supported": false
+    },
+    {
+      "name": "accept_encoded_line_feed_path",
+      "present": true,
+      "value": "/view/a%0ab",
       "outcome": "accept",
       "open_supported": false
     },

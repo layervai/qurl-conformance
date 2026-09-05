@@ -42,6 +42,10 @@ The closed local `reject_class` values are:
 | `dot_segment` | the path portion contains a literal `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape is incomplete or is not hexadecimal |
 
+The class names include their encoded forms by design. `dot_segment` also
+includes any case-insensitive encoded dot in the path, and `invalid_character`
+also includes any case-insensitive encoded slash in the path.
+
 The order above is not a precedence contract. Consumers assert the declared
 class for each exact vector. Adding a new class or changing an accepted input is
 a schema change and needs a coordinated release.
@@ -69,6 +73,8 @@ path as untrusted input for its own object lookup.
 A literal single-dot segment is mint-valid but has `open_supported: false`.
 Browsers and routers can normalize `/a/./b` to `/a/b`, while the service stores
 the original scope. This can cause authorization to deny the normalized request.
+Changing an `open_supported` value also requires a coordinated contract release
+across the service, both SDKs, and the Connector.
 
 ## Consumer algorithm
 
