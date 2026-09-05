@@ -87,7 +87,8 @@ For every case, pass `present` and `value` through the real public option gate:
    dispatch occurs.
 3. For each accepted present value, assert that appending it to a fixed trusted
    origin cannot change the scheme, host, or path.
-4. Assert that every accepted value has `open_supported: true`.
+4. Branch on `open_supported` rather than assuming it is true. Every v1
+   accepted value is true, but a coordinated future contract can gate a subset.
 
 The strict Go loader independently derives every outcome and rejects missing,
 duplicate, unknown, or modified cases. The npm and Python packages carry

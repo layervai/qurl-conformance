@@ -110,6 +110,13 @@
       "open_supported": true
     },
     {
+      "name": "accept_encoded_controls_in_query",
+      "present": true,
+      "value": "/view/x?a=%0d%0a%00",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
       "name": "accept_semicolon_in_query",
       "present": true,
       "value": "/view/abc?x=1;y=2",
@@ -204,6 +211,13 @@
       "name": "reject_fragment",
       "present": true,
       "value": "/view/x#fragment",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_left_bracket",
+      "present": true,
+      "value": "/view/a[b]",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },

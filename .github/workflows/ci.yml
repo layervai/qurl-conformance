@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 68;
+          const expectedTargetPathCaseCount = 70;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -685,6 +685,7 @@ jobs:
               targetPathCases.reject_semicolon_in_path?.reject_class !== 'invalid_character' ||
               targetPathCases.accept_semicolon_in_query?.value !== '/view/abc?x=1;y=2' ||
               targetPathCases.accept_semicolon_in_query?.open_supported !== true ||
+              targetPathCases.reject_left_bracket?.reject_class !== 'invalid_character' ||
               targetPathInvalidEscapes.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
               targetPathDotEscapes.some(name => targetPathCases[name]?.reject_class !== 'dot_segment') ||
               targetPathInvalidQueryCharacters.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
@@ -694,6 +695,8 @@ jobs:
               targetPathCases.accept_percent_only_in_query?.open_supported !== true ||
               targetPathCases.accept_encoded_dot_slash_in_query?.value !== '/view/x?next=%2e%2E%2f%2F' ||
               targetPathCases.accept_encoded_dot_slash_in_query?.open_supported !== true ||
+              targetPathCases.accept_encoded_controls_in_query?.value !== '/view/x?a=%0d%0a%00' ||
+              targetPathCases.accept_encoded_controls_in_query?.open_supported !== true ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1252,7 +1255,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 68
+          expected_target_path_case_count = 70
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1289,6 +1292,7 @@ jobs:
           assert target_path_cases['reject_semicolon_in_path']['reject_class'] == 'invalid_character'
           assert target_path_cases['accept_semicolon_in_query']['value'] == '/view/abc?x=1;y=2'
           assert target_path_cases['accept_semicolon_in_query']['open_supported'] is True
+          assert target_path_cases['reject_left_bracket']['reject_class'] == 'invalid_character'
           invalid_path_escapes = [
               'reject_percent_encoded_slash_lower',
               'reject_percent_encoded_slash_upper',
@@ -1330,6 +1334,8 @@ jobs:
           assert target_path_cases['accept_percent_only_in_query']['open_supported'] is True
           assert target_path_cases['accept_encoded_dot_slash_in_query']['value'] == '/view/x?next=%2e%2E%2f%2F'
           assert target_path_cases['accept_encoded_dot_slash_in_query']['open_supported'] is True
+          assert target_path_cases['accept_encoded_controls_in_query']['value'] == '/view/x?a=%0d%0a%00'
+          assert target_path_cases['accept_encoded_controls_in_query']['open_supported'] is True
           print('py ok')
           PY
 

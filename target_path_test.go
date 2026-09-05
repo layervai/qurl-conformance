@@ -165,6 +165,7 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 	for name, value := range map[string]string{
 		"accept_percent_only_in_query":      "/view/x?sig=a%20b",
 		"accept_encoded_dot_slash_in_query": "/view/x?next=%2e%2E%2f%2F",
+		"accept_encoded_controls_in_query":  "/view/x?a=%0d%0a%00",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
@@ -173,6 +174,17 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		if c.Value == nil || *c.Value != value {
 			t.Errorf("case %q value = %v, want byte-exact %q", name, c.Value, value)
 		}
+	}
+}
+
+func TestTargetPathRejectsPrintableCharacterOutsideClosedSet(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := targetPathCase(t, tf, "reject_left_bracket")
+	if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
+		t.Errorf("left-bracket case = %+v, want invalid_character rejection", *c)
 	}
 }
 
