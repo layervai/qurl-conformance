@@ -117,6 +117,7 @@ type DelegatedMintIssueV1Contract struct {
 	TimestampMaxSkewSeconds     int      `json:"timestamp_max_skew_seconds"`
 	NonceReplayRetentionSeconds int      `json:"nonce_replay_retention_seconds"`
 	ExpiryAuthorityRule         string   `json:"expiry_authority_rule"`
+	ExactReplayFreshnessRule    string   `json:"exact_replay_freshness_rule"`
 }
 
 type DelegatedMintIssueV1Golden struct {
@@ -223,6 +224,7 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		TimestampMaxSkewSeconds:     DelegatedMintIssueV1TimestampMaxSkewSeconds,
 		NonceReplayRetentionSeconds: DelegatedMintIssueV1NonceReplayRetentionSeconds,
 		ExpiryAuthorityRule:         "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority",
+		ExactReplayFreshnessRule:    "verify_shape_and_signature_then_exact_durable_lookup_before_freshness_stale_exact_returns_original_changed_conflicts_absent_rejects",
 	}
 	if !reflect.DeepEqual(contract, want) {
 		return errors.New("conformance: delegated-mint issue contract drift")

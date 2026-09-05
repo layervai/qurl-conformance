@@ -33,7 +33,8 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
 	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 600 ||
-		file.Contract.ExpiryAuthorityRule != "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority" {
+		file.Contract.ExpiryAuthorityRule != "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority" ||
+		file.Contract.ExactReplayFreshnessRule != "verify_shape_and_signature_then_exact_durable_lookup_before_freshness_stale_exact_returns_original_changed_conflicts_absent_rejects" {
 		t.Fatalf("freshness/replay/expiry authority contract drifted: %+v", file.Contract)
 	}
 	var body struct {

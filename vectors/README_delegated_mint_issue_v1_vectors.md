@@ -26,6 +26,14 @@ first acceptance. An exact idempotent replay can return its durable result, but
 the same issuer and key cannot use that nonce for a different operation. These
 two bounds are part of v1 and are not local producer retry settings.
 
+The service first validates request shape and verifies the signature. It then
+does an exact durable idempotency lookup before it applies timestamp freshness.
+An exact stored request returns its original result even after the 300-second
+freshness window. That result can contain an expired capability; the Connector
+uses the signed next generation to refresh it. The same idempotency key with
+different authenticated request bytes is a conflict. A stale request with no
+exact committed result cannot create or change state.
+
 The signed authority is a lowercase ASCII DNS name without a port or trailing
 dot. It has at least two labels and at most 253 bytes. Each label is 1 to 63
 bytes, starts and ends with a lowercase letter or digit, and otherwise contains
