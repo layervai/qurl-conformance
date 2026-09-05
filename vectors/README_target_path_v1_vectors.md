@@ -60,8 +60,10 @@ a decoded request path while the stored scope is escaped. Consumers must not
 decode, normalize, recase, or re-encode accepted mint values. Applications must
 use unescaped allowed ASCII path bytes until #1250 is fixed. Percent escapes
 that occur only in the query are open-supported because the query is not part
-of path authorization. The Connector application must still treat every
-delivered path as untrusted input for its own object lookup.
+of path authorization. This is a one-layer wire contract: `%252e` is accepted
+and preserved as exact bytes. A Connector must validate the final path after
+its framework's decoding and must still treat every delivered path as untrusted
+input for its own object lookup.
 
 ## Consumer algorithm
 

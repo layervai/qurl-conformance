@@ -118,6 +118,7 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 		"accept_percent_path_upper",
 		"accept_percent_path_lower",
 		"accept_percent_path_safe_41",
+		"accept_double_encoded_dot_path",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || *c.OpenSupported {
@@ -126,6 +127,10 @@ func TestTargetPathPercentEncodingRemainsRaw(t *testing.T) {
 		if c.Value == nil || !strings.Contains(*c.Value, "%") {
 			t.Errorf("case %q lost its raw percent escape", name)
 		}
+	}
+	doubleEncoded := targetPathCase(t, tf, "accept_double_encoded_dot_path")
+	if doubleEncoded.Value == nil || *doubleEncoded.Value != "/view/a%252eb" {
+		t.Errorf("double-encoded path changed: %+v", *doubleEncoded)
 	}
 	for _, name := range []string{
 		"accept_percent_only_in_query",

@@ -134,6 +134,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_percent_path_upper":                 {present: true, value: targetPathValue("/view/a%4Ab")},
 	"accept_percent_path_lower":                 {present: true, value: targetPathValue("/view/a%4ab")},
 	"accept_percent_path_safe_41":               {present: true, value: targetPathValue("/view/a%41b")},
+	"accept_double_encoded_dot_path":            {present: true, value: targetPathValue("/view/a%252eb")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
