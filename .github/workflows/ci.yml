@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 60;
+          const expectedTargetPathCaseCount = 64;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -210,6 +210,12 @@ jobs:
             'reject_percent_encoded_single_dot',
             'reject_mixed_percent_letter_dot_escape',
             'reject_literal_dot_with_percent_escape',
+          ];
+          const targetPathInvalidQueryCharacters = [
+            'reject_fragment_in_query',
+            'reject_space_in_query',
+            'reject_backslash_in_query',
+            'reject_non_ascii_in_query',
           ];
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
@@ -674,6 +680,7 @@ jobs:
               targetPathCases.accept_trailing_slash?.open_supported !== true ||
               targetPathInvalidEscapes.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
               targetPathDotEscapes.some(name => targetPathCases[name]?.reject_class !== 'dot_segment') ||
+              targetPathInvalidQueryCharacters.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
               tp.cases.some(v => v.outcome === 'accept' && v.open_supported !== true) ||
               targetPathCases.accept_percent_only_in_query?.value !== '/view/x?sig=a%20b' ||
               targetPathCases.accept_percent_only_in_query?.open_supported !== true ||
@@ -1237,7 +1244,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 60
+          expected_target_path_case_count = 64
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1293,8 +1300,15 @@ jobs:
               'reject_mixed_percent_letter_dot_escape',
               'reject_literal_dot_with_percent_escape',
           ]
+          invalid_query_characters = [
+              'reject_fragment_in_query',
+              'reject_space_in_query',
+              'reject_backslash_in_query',
+              'reject_non_ascii_in_query',
+          ]
           assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_path_escapes)
           assert all(target_path_cases[name]['reject_class'] == 'dot_segment' for name in dot_path_escapes)
+          assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_query_characters)
           assert all(v['open_supported'] is True for v in tp['cases'] if v['outcome'] == 'accept')
           assert target_path_cases['accept_percent_only_in_query']['value'] == '/view/x?sig=a%20b'
           assert target_path_cases['accept_percent_only_in_query']['open_supported'] is True

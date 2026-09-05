@@ -20,7 +20,7 @@ no invalid request leaves the process.
 - It starts with one `/`. A leading `//` is rejected because it can select a new
   authority.
 - It contains URI path and query characters only. Backslash, whitespace,
-  controls, `#`, and non-ASCII characters are rejected.
+  controls, `#`, and non-ASCII characters are rejected in both components.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.

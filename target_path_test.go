@@ -176,6 +176,24 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 	}
 }
 
+func TestTargetPathRejectsInvalidQueryCharacters(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"reject_fragment_in_query",
+		"reject_space_in_query",
+		"reject_backslash_in_query",
+		"reject_non_ascii_in_query",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("case %q = %+v, want invalid_character rejection", name, *c)
+		}
+	}
+}
+
 func TestTargetPathDotSegmentPrecedence(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {

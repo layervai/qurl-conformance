@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 )
@@ -122,13 +121,17 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_leading_backslash":                  {present: true, value: targetPathValue("/\\evil.example")},
 	"reject_backslash_in_path":                  {present: true, value: targetPathValue("/view\\..\\x")},
 	"reject_fragment":                           {present: true, value: targetPathValue("/view/x#fragment")},
+	"reject_fragment_in_query":                  {present: true, value: targetPathValue("/view/x?a=b#frag")},
 	"reject_space":                              {present: true, value: targetPathValue("/view /x")},
+	"reject_space_in_query":                     {present: true, value: targetPathValue("/view/x?a=b c")},
+	"reject_backslash_in_query":                 {present: true, value: targetPathValue("/view/x?a=\\")},
 	"reject_tab":                                {present: true, value: targetPathValue("/view\t/x")},
 	"reject_newline":                            {present: true, value: targetPathValue("/view\n/x")},
 	"reject_carriage_return":                    {present: true, value: targetPathValue("/view\r/x")},
 	"reject_nul":                                {present: true, value: targetPathValue("/view\x00/x")},
 	"reject_del":                                {present: true, value: targetPathValue("/view\x7f/x")},
 	"reject_non_ascii":                          {present: true, value: targetPathValue("/view/é")},
+	"reject_non_ascii_in_query":                 {present: true, value: targetPathValue("/view/x?a=é")},
 	"reject_single_dot_segment":                 {present: true, value: targetPathValue("/a/./b")},
 	"reject_dotdot_leading":                     {present: true, value: targetPathValue("/../etc/passwd")},
 	"reject_dotdot_middle":                      {present: true, value: targetPathValue("/view/../../secret")},
@@ -159,6 +162,23 @@ var targetPathFixtures = map[string]targetPathFixture{
 }
 
 var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$`)
+
+func targetPathHasMalformedPercentEscape(value string) bool {
+	for i := 0; i < len(value); i++ {
+		if value[i] != '%' {
+			continue
+		}
+		if i+2 >= len(value) || !isTargetPathHex(value[i+1]) || !isTargetPathHex(value[i+2]) {
+			return true
+		}
+		i += 2
+	}
+	return false
+}
+
+func isTargetPathHex(value byte) bool {
+	return value >= '0' && value <= '9' || value >= 'a' && value <= 'f' || value >= 'A' && value <= 'F'
+}
 
 // ParseTargetPathFile strictly parses and independently re-derives every case.
 func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
@@ -275,7 +295,7 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	if !targetPathPattern.MatchString(p) {
 		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 	}
-	if _, parseErr := url.PathUnescape(p); parseErr != nil {
+	if targetPathHasMalformedPercentEscape(p) {
 		return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 	}
 	pathPart := p
@@ -287,8 +307,9 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 		if pathPart[i] != '%' {
 			continue
 		}
-		// PathUnescape above proves that every percent escape has two following
-		// bytes. Keep this guard so later validation reordering stays fail-closed.
+		// The whole-value scan above proves that every percent escape has two
+		// following hexadecimal bytes. Keep this guard so later validation
+		// reordering stays fail-closed.
 		if i+3 > len(pathPart) {
 			return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 		}
@@ -315,5 +336,7 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	if hasPathEscape || hasInteriorEmptySegment {
 		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 	}
+	// Every canonical value is open-supported in v1. Keep the separate result
+	// as a reserved compatibility gate for a coordinated future contract.
 	return ExpectAccept, "", true, nil
 }
