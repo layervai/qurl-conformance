@@ -63,7 +63,8 @@ because qurl-service issue #1250 tracks a current false-deny: the router supplie
 a decoded request path while the stored scope is escaped. Consumers must not
 decode, normalize, recase, or re-encode accepted mint values. Applications must
 use unescaped allowed ASCII path bytes until #1250 is fixed. This restriction
-includes encoded backslash, NUL, fragment-marker, and query-marker bytes.
+includes encoded backslash, NUL, fragment-marker, query-marker,
+carriage-return, and line-feed bytes.
 Percent escapes that occur only in the query are open-supported because the
 query is not part of path authorization. This is a one-layer wire contract:
 `%252e` is accepted and preserved as exact bytes. A Connector must validate the
