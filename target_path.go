@@ -99,7 +99,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_root":                               {present: true, value: targetPathValue("/")},
 	"accept_simple_path":                        {present: true, value: targetPathValue("/view/abc123")},
 	"accept_path_query":                         {present: true, value: targetPathValue("/view/abc123?sig=deadBEEF&exp=1700000000")},
-	"accept_allowed_ascii":                      {present: true, value: targetPathValue("/a-b_c.d~e!f$g&h'i(j)k*l+m,n;o=p:q@r")},
+	"accept_allowed_ascii":                      {present: true, value: targetPathValue("/a-b_c.d~e!f$g&h'i(j)k*l+m,n=o:p@q")},
 	"accept_deep_path":                          {present: true, value: targetPathValue("/a/b/c/d/e/f")},
 	"accept_dotdot_substring":                   {present: true, value: targetPathValue("/view/a..b")},
 	"accept_three_dot_segment":                  {present: true, value: targetPathValue("/view/...")},
@@ -109,6 +109,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_empty_query":                        {present: true, value: targetPathValue("/?")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
+	"accept_semicolon_in_query":                 {present: true, value: targetPathValue("/view/abc?x=1;y=2")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
@@ -118,6 +119,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
 	"reject_interior_empty_segment":             {present: true, value: targetPathValue("/a//b")},
+	"reject_semicolon_in_path":                  {present: true, value: targetPathValue("/view/abc;x=1")},
 	"reject_leading_backslash":                  {present: true, value: targetPathValue("/\\evil.example")},
 	"reject_backslash_in_path":                  {present: true, value: targetPathValue("/view\\..\\x")},
 	"reject_fragment":                           {present: true, value: targetPathValue("/view/x#fragment")},
@@ -159,6 +161,8 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_non_hex_percent_path":               {present: true, value: targetPathValue("/view/x%2Gy")},
 	"reject_non_hex_percent_query":              {present: true, value: targetPathValue("/view/x?sig=a%ZZ")},
 	"reject_percent_followed_by_path_separator": {present: true, value: targetPathValue("/a%/b")},
+	"reject_malformed_percent_with_dot_segment": {present: true, value: targetPathValue("/a/../b%")},
+	"reject_malformed_percent_with_dot_escape":  {present: true, value: targetPathValue("/%2e%2e/x%2G")},
 }
 
 var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$`)
@@ -295,12 +299,19 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	if !targetPathPattern.MatchString(p) {
 		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 	}
-	if targetPathHasMalformedPercentEscape(p) {
-		return ExpectReject, TargetPathRejectPercentEncoding, false, nil
-	}
 	pathPart := p
 	if i := strings.IndexByte(p, '?'); i >= 0 {
 		pathPart = p[:i]
+	}
+	// Matrix-parameter processing is not consistent across proxies and origin
+	// frameworks. Reject a literal semicolon in the authorized path so a later
+	// layer cannot strip it and widen the selected resource. Query semicolons do
+	// not take part in path authorization and remain byte-exact.
+	if strings.Contains(pathPart, ";") {
+		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
+	}
+	if targetPathHasMalformedPercentEscape(p) {
+		return ExpectReject, TargetPathRejectPercentEncoding, false, nil
 	}
 	hasPathEscape := false
 	for i := 0; i < len(pathPart); i++ {

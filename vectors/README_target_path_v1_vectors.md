@@ -24,6 +24,9 @@ no invalid request leaves the process.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
+- A literal `;` is rejected in the path because proxies and origin frameworks
+  can strip matrix parameters after authorization. It remains valid and
+  byte-exact in the query, which does not take part in path authorization.
 - Every percent escape in the path is rejected. A case-insensitive `%2e` path
   escape is `dot_segment`. Every other well-formed path escape, including
   `%2f`, is `invalid_character`.
@@ -42,17 +45,18 @@ The closed local `reject_class` values are:
 | `too_long` | the raw value is longer than 2,048 UTF-8 bytes |
 | `not_absolute` | the value does not start with `/` |
 | `authority` | the value starts with `//` |
-| `invalid_character` | the value contains a character outside the allowed raw ASCII set, an interior empty path segment, or a well-formed path escape other than `%2e` |
+| `invalid_character` | the value contains a character outside the allowed raw ASCII set, a path semicolon, an interior empty path segment, or a well-formed path escape other than `%2e` |
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
-Malformed percent encoding is classified before the path escape and dot checks.
-After percent syntax is valid, `dot_segment` wins when the path contains any
-case-insensitive `%2e` escape or a literal `.` or `..` segment. This stays true
-when another well-formed path escape is also present. Otherwise, any path escape
-or interior empty segment is `invalid_character`. The `%2e` classification
-deliberately names the escape risk; the decoded dot does not have to be a
-standalone segment.
+The whole-value character-set and path-semicolon checks precede percent-syntax
+classification. After those checks, malformed percent encoding is classified
+before the path escape and dot checks. After percent syntax is valid,
+`dot_segment` wins when the path contains any case-insensitive `%2e` escape or
+a literal `.` or `..` segment. This stays true when another well-formed path
+escape is also present. Otherwise, any path escape or interior empty segment is
+`invalid_character`. The `%2e` classification deliberately names the escape
+risk; the decoded dot does not have to be a standalone segment.
 
 Other rule combinations have no general precedence contract. Each exact vector
 states its required class. Adding a class or changing an accepted input requires

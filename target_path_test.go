@@ -210,6 +210,22 @@ func TestTargetPathDotSegmentPrecedence(t *testing.T) {
 	}
 }
 
+func TestTargetPathMalformedPercentPrecedence(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"reject_malformed_percent_with_dot_segment",
+		"reject_malformed_percent_with_dot_escape",
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectPercentEncoding {
+			t.Errorf("case %q = %+v, want percent_encoding precedence", name, *c)
+		}
+	}
+}
+
 func TestTargetPathRejectsDotSegmentsNotDotSubstrings(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {
@@ -243,6 +259,24 @@ func TestTargetPathCanonicalSlashRules(t *testing.T) {
 	interiorEmpty := targetPathCase(t, tf, "reject_interior_empty_segment")
 	if interiorEmpty.Outcome != ExpectReject || interiorEmpty.RejectClass != TargetPathRejectInvalidCharacter {
 		t.Errorf("interior empty segment = %+v, want invalid_character rejection", *interiorEmpty)
+	}
+}
+
+func TestTargetPathSemicolonIsQueryOnly(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathCase := targetPathCase(t, tf, "reject_semicolon_in_path")
+	if pathCase.Outcome != ExpectReject || pathCase.RejectClass != TargetPathRejectInvalidCharacter {
+		t.Errorf("path semicolon case = %+v, want invalid_character rejection", *pathCase)
+	}
+	queryCase := targetPathCase(t, tf, "accept_semicolon_in_query")
+	if queryCase.Outcome != ExpectAccept || queryCase.OpenSupported == nil || !*queryCase.OpenSupported {
+		t.Errorf("query semicolon case = %+v, want accepted and open-supported", *queryCase)
+	}
+	if queryCase.Value == nil || *queryCase.Value != "/view/abc?x=1;y=2" {
+		t.Errorf("query semicolon value = %v, want byte-exact", queryCase.Value)
 	}
 }
 

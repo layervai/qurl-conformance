@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 64;
+          const expectedTargetPathCaseCount = 68;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -216,6 +216,10 @@ jobs:
             'reject_space_in_query',
             'reject_backslash_in_query',
             'reject_non_ascii_in_query',
+          ];
+          const targetPathMalformedPercentPrecedence = [
+            'reject_malformed_percent_with_dot_segment',
+            'reject_malformed_percent_with_dot_escape',
           ];
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
@@ -678,9 +682,13 @@ jobs:
               targetPathCases.reject_interior_empty_segment?.reject_class !== 'invalid_character' ||
               targetPathCases.accept_root?.open_supported !== true ||
               targetPathCases.accept_trailing_slash?.open_supported !== true ||
+              targetPathCases.reject_semicolon_in_path?.reject_class !== 'invalid_character' ||
+              targetPathCases.accept_semicolon_in_query?.value !== '/view/abc?x=1;y=2' ||
+              targetPathCases.accept_semicolon_in_query?.open_supported !== true ||
               targetPathInvalidEscapes.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
               targetPathDotEscapes.some(name => targetPathCases[name]?.reject_class !== 'dot_segment') ||
               targetPathInvalidQueryCharacters.some(name => targetPathCases[name]?.reject_class !== 'invalid_character') ||
+              targetPathMalformedPercentPrecedence.some(name => targetPathCases[name]?.reject_class !== 'percent_encoding') ||
               tp.cases.some(v => v.outcome === 'accept' && v.open_supported !== true) ||
               targetPathCases.accept_percent_only_in_query?.value !== '/view/x?sig=a%20b' ||
               targetPathCases.accept_percent_only_in_query?.open_supported !== true ||
@@ -1244,7 +1252,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 64
+          expected_target_path_case_count = 68
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1278,6 +1286,9 @@ jobs:
           assert target_path_cases['reject_interior_empty_segment']['reject_class'] == 'invalid_character'
           assert target_path_cases['accept_root']['open_supported'] is True
           assert target_path_cases['accept_trailing_slash']['open_supported'] is True
+          assert target_path_cases['reject_semicolon_in_path']['reject_class'] == 'invalid_character'
+          assert target_path_cases['accept_semicolon_in_query']['value'] == '/view/abc?x=1;y=2'
+          assert target_path_cases['accept_semicolon_in_query']['open_supported'] is True
           invalid_path_escapes = [
               'reject_percent_encoded_slash_lower',
               'reject_percent_encoded_slash_upper',
@@ -1306,9 +1317,14 @@ jobs:
               'reject_backslash_in_query',
               'reject_non_ascii_in_query',
           ]
+          malformed_percent_precedence = [
+              'reject_malformed_percent_with_dot_segment',
+              'reject_malformed_percent_with_dot_escape',
+          ]
           assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_path_escapes)
           assert all(target_path_cases[name]['reject_class'] == 'dot_segment' for name in dot_path_escapes)
           assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_query_characters)
+          assert all(target_path_cases[name]['reject_class'] == 'percent_encoding' for name in malformed_percent_precedence)
           assert all(v['open_supported'] is True for v in tp['cases'] if v['outcome'] == 'accept')
           assert target_path_cases['accept_percent_only_in_query']['value'] == '/view/x?sig=a%20b'
           assert target_path_cases['accept_percent_only_in_query']['open_supported'] is True
