@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Twelve families live here, each under its own artifact id so they stay decoupled
+// Fifteen families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -47,6 +47,14 @@
 //   - The agent credential recovery contract
 //     (agent_credential_recovery_v1_vectors.json): UDP-only same-agent device
 //     credential replacement bodies, grant fences, horizon, and outcomes.
+//   - The Connector resource discovery contract
+//     (connector_resource_lst_v1_vectors.json): strict native LST/LRT resource
+//     lookup, continuity, replay, and error cases.
+//   - The CRID v1 contract (crid_v1_vectors.json): public-key derivation,
+//     validation, version registry, and delivered-key matching.
+//   - The qURL Connector target-path contract
+//     (target_path_v1_vectors.json): shared local input validation, exact wire
+//     preservation, and canonical open-safe paths.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

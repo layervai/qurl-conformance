@@ -1,0 +1,809 @@
+{
+  "artifact": "qurl-target-path-v1-vectors",
+  "schema_version": 1,
+  "description": "Shared canonical target_path request grammar for qURL Connector mints.",
+  "contract": {
+    "wire_field": "target_path",
+    "max_bytes": 2048,
+    "omitted_semantics": "bare_origin",
+    "explicit_empty_semantics": "reject",
+    "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
+    "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-",
+    "query_delimiter": "first_question_mark",
+    "validation_order": [
+      "presence",
+      "whole_value_empty",
+      "whole_value_utf8_byte_length",
+      "whole_value_leading_slash",
+      "whole_value_protocol_relative_authority",
+      "whole_value_raw_ascii_character_set",
+      "split_path_at_first_query_delimiter",
+      "path_semicolon",
+      "whole_value_percent_syntax",
+      "path_encoded_dot",
+      "path_literal_dot_segment",
+      "path_escape_or_interior_empty_segment",
+      "accept"
+    ],
+    "accepted_value_handling": "preserve_exact_bytes",
+    "percent_encoding_handling": "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode"
+  },
+  "cases": [
+    {
+      "name": "accept_omitted",
+      "present": false,
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_root",
+      "present": true,
+      "value": "/",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_simple_path",
+      "present": true,
+      "value": "/view/abc123",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_mixed_case_path",
+      "present": true,
+      "value": "/View/AbC",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_path_query",
+      "present": true,
+      "value": "/view/abc123?sig=deadBEEF&exp=1700000000",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_allowed_ascii",
+      "present": true,
+      "value": "/a-b_c.d~e!f$g&h'i(j)k*l+m,n=o:p@q",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_deep_path",
+      "present": true,
+      "value": "/a/b/c/d/e/f",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_dotdot_substring",
+      "present": true,
+      "value": "/view/a..b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_three_dot_segment",
+      "present": true,
+      "value": "/view/...",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_dotdot_in_query",
+      "present": true,
+      "value": "/view/x?redir=../../etc",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_authority_text_in_query",
+      "present": true,
+      "value": "/path?next=//evil.example",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_trailing_slash",
+      "present": true,
+      "value": "/view/",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_trailing_slash_with_query",
+      "present": true,
+      "value": "/view/?a=b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_empty_query",
+      "present": true,
+      "value": "/?",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_percent_only_in_query",
+      "present": true,
+      "value": "/view/x?sig=a%20b",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_encoded_dot_slash_in_query",
+      "present": true,
+      "value": "/view/x?next=%2e%2E%2f%2F",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_encoded_controls_in_query",
+      "present": true,
+      "value": "/view/x?a=%0d%0a%00",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_semicolon_in_query",
+      "present": true,
+      "value": "/view/abc?x=1;y=2",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_second_question_mark_in_query",
+      "present": true,
+      "value": "/view/x?next=http://e.example/p?q=1",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_max_bytes",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_max_bytes_with_query",
+      "present": true,
+      "value": "/v?q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "reject_too_long_with_query",
+      "present": true,
+      "value": "/v?q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_explicit_empty",
+      "present": true,
+      "value": "",
+      "outcome": "reject",
+      "reject_class": "empty"
+    },
+    {
+      "name": "reject_too_long",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_overlong_non_ascii_precedence",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_overlong_relative_precedence",
+      "present": true,
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_overlong_authority_precedence",
+      "present": true,
+      "value": "//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_overlong_dot_segment_precedence",
+      "present": true,
+      "value": "/../aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_overlong_percent_precedence",
+      "present": true,
+      "value": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%",
+      "outcome": "reject",
+      "reject_class": "too_long"
+    },
+    {
+      "name": "reject_suffix_host",
+      "present": true,
+      "value": ".evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_userinfo_origin_concatenation",
+      "present": true,
+      "value": "@evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_relative_path",
+      "present": true,
+      "value": "view/abc",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_query_only",
+      "present": true,
+      "value": "?a=b",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_leading_space",
+      "present": true,
+      "value": " /view/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_relative_invalid_character",
+      "present": true,
+      "value": "view/a[b]",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_relative_dot_segment_precedence",
+      "present": true,
+      "value": "../etc/passwd",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_relative_malformed_percent",
+      "present": true,
+      "value": "a%/b",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_absolute_url",
+      "present": true,
+      "value": "https://evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
+      "name": "reject_protocol_relative_authority",
+      "present": true,
+      "value": "//evil.example/path",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_authority_invalid_character",
+      "present": true,
+      "value": "//evil.example/a[b]",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_authority_malformed_percent",
+      "present": true,
+      "value": "//evil.example/b%",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_authority_dot_segment",
+      "present": true,
+      "value": "//evil.example/../b",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_authority_semicolon",
+      "present": true,
+      "value": "//evil.example/a;b",
+      "outcome": "reject",
+      "reject_class": "authority"
+    },
+    {
+      "name": "reject_interior_empty_segment",
+      "present": true,
+      "value": "/a//b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_interior_empty_segment_with_query",
+      "present": true,
+      "value": "/a//b?x=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_double_slash",
+      "present": true,
+      "value": "/a//",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_dot_segment_after_interior_empty",
+      "present": true,
+      "value": "/a//../b",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_semicolon_in_path",
+      "present": true,
+      "value": "/view/abc;x=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_semicolon_path_with_query",
+      "present": true,
+      "value": "/view/a;b?c=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_semicolon_malformed_percent",
+      "present": true,
+      "value": "/view/a;b%",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_leading_backslash",
+      "present": true,
+      "value": "/\\evil.example",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_backslash_in_path",
+      "present": true,
+      "value": "/view\\..\\x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_fragment",
+      "present": true,
+      "value": "/view/x#fragment",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_left_bracket",
+      "present": true,
+      "value": "/view/a[b]",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_left_bracket_malformed_percent",
+      "present": true,
+      "value": "/view/a[b]%",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_fragment_in_query",
+      "present": true,
+      "value": "/view/x?a=b#frag",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_space",
+      "present": true,
+      "value": "/view /x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_space",
+      "present": true,
+      "value": "/view/x ",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_space_in_query",
+      "present": true,
+      "value": "/view/x?a=b c",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_backslash_in_query",
+      "present": true,
+      "value": "/view/x?a=\\",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_tab",
+      "present": true,
+      "value": "/view\t/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_newline",
+      "present": true,
+      "value": "/view\n/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_carriage_return",
+      "present": true,
+      "value": "/view\r/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_line_feed",
+      "present": true,
+      "value": "/view/x\n",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_line_feed_after_query",
+      "present": true,
+      "value": "/view/x?a=b\n",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_line_feed_in_query",
+      "present": true,
+      "value": "/view/x?a=b\nc",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_carriage_return",
+      "present": true,
+      "value": "/view/x\r",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_carriage_return_line_feed",
+      "present": true,
+      "value": "/view/x\r\n",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_nul",
+      "present": true,
+      "value": "/view\u0000/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_del",
+      "present": true,
+      "value": "/view\u007f/x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_non_ascii",
+      "present": true,
+      "value": "/view/é",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_non_ascii_in_query",
+      "present": true,
+      "value": "/view/x?a=é",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_single_dot_segment",
+      "present": true,
+      "value": "/a/./b",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dotdot_leading",
+      "present": true,
+      "value": "/../etc/passwd",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dotdot_middle",
+      "present": true,
+      "value": "/view/../../secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dotdot_trailing",
+      "present": true,
+      "value": "/view/..",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dot_segment_before_two_queries",
+      "present": true,
+      "value": "/a/..?b?c",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_lower",
+      "present": true,
+      "value": "/%2e%2e/secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_upper",
+      "present": true,
+      "value": "/%2E%2E/secret",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_single_dot",
+      "present": true,
+      "value": "/a%2eb",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_with_query",
+      "present": true,
+      "value": "/%2e%2e/x?a=b",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_mixed_percent_letter_dot_escape",
+      "present": true,
+      "value": "/view/a%41b%2ec",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_literal_dot_with_percent_escape",
+      "present": true,
+      "value": "/a/../b%41c",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_slash_lower",
+      "present": true,
+      "value": "/view%2fsecret",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_slash_upper",
+      "present": true,
+      "value": "/view%2Fsecret",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_upper_path",
+      "present": true,
+      "value": "/view/a%4Ab",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_lower_path",
+      "present": true,
+      "value": "/view/a%4ab",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_percent_encoded_letter_41_path",
+      "present": true,
+      "value": "/view/a%41b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_path_escape_with_valid_query",
+      "present": true,
+      "value": "/view/a%41b?c=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_path_escape_at_query_boundary",
+      "present": true,
+      "value": "/a%41?b=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_dot_escape_at_query_boundary",
+      "present": true,
+      "value": "/a%2e?b=1",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_double_encoded_dot_path",
+      "present": true,
+      "value": "/view/a%252eb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_backslash_lower_path",
+      "present": true,
+      "value": "/view/a%5cb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_backslash_upper_path",
+      "present": true,
+      "value": "/view/a%5Cb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_nul_path",
+      "present": true,
+      "value": "/view/a%00b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_fragment_marker_path",
+      "present": true,
+      "value": "/view/a%23b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_query_marker_path",
+      "present": true,
+      "value": "/view/a%3fb",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_carriage_return_path",
+      "present": true,
+      "value": "/view/a%0db",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_encoded_line_feed_path",
+      "present": true,
+      "value": "/view/a%0ab",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_bare_percent",
+      "present": true,
+      "value": "/a%",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_short_percent",
+      "present": true,
+      "value": "/a%2",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_non_hex_percent_path",
+      "present": true,
+      "value": "/view/x%2Gy",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_non_hex_percent_query",
+      "present": true,
+      "value": "/view/x?sig=a%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_truncated_percent_in_query",
+      "present": true,
+      "value": "/view/x?a=b%",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_short_percent_in_query",
+      "present": true,
+      "value": "/view/x?a=b%2",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_percent_followed_by_path_separator",
+      "present": true,
+      "value": "/a%/b",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_percent_with_dot_segment",
+      "present": true,
+      "value": "/a/../b%",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_percent_with_dot_escape",
+      "present": true,
+      "value": "/%2e%2e/x%2G",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_query_with_dot_escape_path",
+      "present": true,
+      "value": "/%2e%2e/x?a=%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_query_with_other_path_escape",
+      "present": true,
+      "value": "/view/a%41b?c=%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_query_before_interior_empty",
+      "present": true,
+      "value": "/a//b?c=%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    }
+  ]
+}

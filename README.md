@@ -7,8 +7,8 @@ path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, private Connector Authority invocations, private
 Connector Hub replay identifiers, Hub LST return-routability cookies,
-same-agent device-credential recovery, and CRID v1 resource identifiers
-decoupled by layer.
+same-agent device-credential recovery, CRID v1 resource identifiers, and qURL
+Connector target paths decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -46,6 +46,8 @@ trust.
 | `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
+| `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
+| `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -69,6 +71,7 @@ hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hu
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
+tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -83,13 +86,15 @@ verbatim (same bytes, no reformatting), load them with a strict JSON reader that
 rejects duplicate keys and unknown fields, route each class's input to your real
 entry point, and assert the declared outcome. Treat a missing fixture as a hard
 failure, not a skip. See `vectors/README_qv2_conformance_vectors.md` for the full
-schema and vocabulary. qURL v2 schema version 2 is a deliberate breaking shape:
+schema and vocabulary. For target-path validation, consume
+`target_path_v1_vectors.json` through the real SDK option gate; do not copy its
+rules into a private fixture. qURL v2 schema version 2 is a deliberate breaking shape:
 typed consumers must update their loader for `transport_contract` and the
 `transport` class before adopting this release.
 
 ## Scope
 
-This module hosts fifteen artifacts across fourteen protocol families. Each
+This module hosts sixteen artifacts across fifteen protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -371,6 +376,14 @@ artifact has its own `artifact` id:
   used only when its re-derived CRID equals the held CRID. This family is
   fully stdlib-derivable, so the strict Go loader re-derives every golden
   from the DER key bytes. See `vectors/README_crid_v1_vectors.md`.
+- **qURL Connector target path** (`qurl-target-path-v1-vectors`,
+  `target_path_v1_vectors.json`) — the shared local preflight and service input
+  grammar for the optional per-qURL path and query on a tunnel resource. The
+  vectors keep omission distinct from explicit empty, cover the exact 2,048-byte
+  boundary and all closed rejection classes, reject non-canonical path escapes
+  and segments before dispatch, and preserve accepted bytes without decoding or
+  normalization. Every accepted value is safe to open. See
+  `vectors/README_target_path_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator that
 produces the verify-path vectors lives at `tools/gen` and is run via
