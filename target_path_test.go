@@ -373,6 +373,7 @@ func TestTargetPathInvalidCharacterPrecedesMalformedPercent(t *testing.T) {
 	}
 	for _, name := range []string{
 		"reject_semicolon_malformed_percent",
+		"reject_exclamation_malformed_percent",
 		"reject_left_bracket_malformed_percent",
 	} {
 		c := targetPathCase(t, tf, name)
