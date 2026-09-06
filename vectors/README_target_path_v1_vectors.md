@@ -60,22 +60,22 @@ The closed local `reject_class` values are:
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
 `contract.query_delimiter` pins the first literal `?` as the path/query split.
-`contract.validation_order` is the complete normative order. After presence,
-the validator checks empty, UTF-8 byte length, the leading slash, and a
-protocol-relative authority. Thus, length wins over `not_absolute` and
-`authority`. The `authority` class wins over all later character, percent, and
-dot checks. The
-whole-value character-set and path-semicolon checks then precede percent-syntax
-classification. Thus `/view/a;b%` and `/view/a[b]%` are `invalid_character`,
-not `percent_encoding`. After those checks, malformed percent encoding is
-classified before the path escape and dot checks. After percent syntax is
-valid, `dot_segment` wins when the path contains any case-insensitive `%2e`
-escape or a literal `.` or `..` segment. This stays true when another
-well-formed path escape is also present. Otherwise, any path escape or interior
-empty segment is `invalid_character`. The `%2e` classification deliberately
-names the escape risk; the decoded dot does not have to be a standalone
-segment. Adding a class or changing this order requires a coordinated contract
-release.
+`contract.validation_order` is the complete normative order. Each step name
+states whether it applies to the whole value or only to the path. After
+presence, the validator checks whole-value emptiness, UTF-8 byte length, the
+leading slash, a protocol-relative authority, and the raw ASCII character set.
+Thus, length wins over `not_absolute` and `authority`. The `authority` class
+wins over all later character, percent, and dot checks. The validator then
+splits the path at the first literal `?`. The path-only semicolon check precedes
+the whole-value percent-syntax check. Thus `/view/a;b%` and `/view/a[b]%` are
+`invalid_character`, not `percent_encoding`, while malformed escapes in either
+the path or query are `percent_encoding`. After percent syntax is valid,
+`dot_segment` wins when the path contains any case-insensitive `%2e` escape or
+a literal `.` or `..` segment. This stays true when another well-formed path
+escape is also present. Otherwise, any path escape or interior empty segment is
+`invalid_character`. The `%2e` classification deliberately names the escape
+risk; the decoded dot does not have to be a standalone segment. Adding a class
+or changing this order requires a coordinated contract release.
 
 ## Open behavior
 

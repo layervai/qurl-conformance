@@ -12,15 +12,16 @@
     "query_delimiter": "first_question_mark",
     "validation_order": [
       "presence",
-      "empty",
-      "utf8_byte_length",
-      "leading_slash",
-      "protocol_relative_authority",
-      "raw_ascii_character_set",
+      "whole_value_empty",
+      "whole_value_utf8_byte_length",
+      "whole_value_leading_slash",
+      "whole_value_protocol_relative_authority",
+      "whole_value_raw_ascii_character_set",
+      "split_path_at_first_query_delimiter",
       "path_semicolon",
-      "percent_syntax",
-      "encoded_dot",
-      "literal_dot_segment",
+      "whole_value_percent_syntax",
+      "path_encoded_dot",
+      "path_literal_dot_segment",
       "path_escape_or_interior_empty_segment",
       "accept"
     ],
@@ -600,6 +601,13 @@
       "value": "/a%41?b=1",
       "outcome": "reject",
       "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_dot_escape_at_query_boundary",
+      "present": true,
+      "value": "/a%2e?b=1",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
     },
     {
       "name": "reject_double_encoded_dot_path",

@@ -143,6 +143,33 @@ func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
 	}
 }
 
+func TestTargetPathSecurityCasesHaveIndependentClassPins(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, wantClass := range map[string]string{
+		"reject_userinfo_origin_concatenation":      TargetPathRejectNotAbsolute,
+		"reject_suffix_host":                        TargetPathRejectNotAbsolute,
+		"reject_absolute_url":                       TargetPathRejectNotAbsolute,
+		"reject_relative_path":                      TargetPathRejectNotAbsolute,
+		"reject_leading_space":                      TargetPathRejectNotAbsolute,
+		"reject_protocol_relative_authority":        TargetPathRejectAuthority,
+		"reject_bare_percent":                       TargetPathRejectPercentEncoding,
+		"reject_short_percent":                      TargetPathRejectPercentEncoding,
+		"reject_non_hex_percent_path":               TargetPathRejectPercentEncoding,
+		"reject_non_hex_percent_query":              TargetPathRejectPercentEncoding,
+		"reject_truncated_percent_in_query":         TargetPathRejectPercentEncoding,
+		"reject_short_percent_in_query":             TargetPathRejectPercentEncoding,
+		"reject_percent_followed_by_path_separator": TargetPathRejectPercentEncoding,
+	} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != wantClass {
+			t.Errorf("case %q = %+v, want rejected as %q", name, *c, wantClass)
+		}
+	}
+}
+
 func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {
@@ -197,6 +224,7 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		"reject_percent_encoded_dot_upper":         TargetPathRejectDotSegment,
 		"reject_percent_encoded_single_dot":        TargetPathRejectDotSegment,
 		"reject_percent_encoded_dot_with_query":    TargetPathRejectDotSegment,
+		"reject_dot_escape_at_query_boundary":      TargetPathRejectDotSegment,
 		"reject_mixed_percent_letter_dot_escape":   TargetPathRejectDotSegment,
 		"reject_literal_dot_with_percent_escape":   TargetPathRejectDotSegment,
 		"reject_percent_encoded_slash_lower":       TargetPathRejectInvalidCharacter,
