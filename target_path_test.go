@@ -228,7 +228,7 @@ func TestTargetPathRejectsPrintableCharacterOutsideClosedSet(t *testing.T) {
 	if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
 		t.Errorf("left-bracket case = %+v, want invalid_character rejection", *c)
 	}
-	for value := byte(0x20); value <= 0x7e; value++ {
+	for value := byte(0x00); value <= 0x7f; value++ {
 		allowed := strings.ContainsRune(tf.Contract.AllowedASCII, rune(value))
 		matched := targetPathPattern.MatchString("/" + string(value))
 		if allowed != matched {
@@ -279,6 +279,8 @@ func TestTargetPathMalformedPercentPrecedence(t *testing.T) {
 	for _, name := range []string{
 		"reject_malformed_percent_with_dot_segment",
 		"reject_malformed_percent_with_dot_escape",
+		"reject_malformed_query_with_dot_escape_path",
+		"reject_malformed_query_with_other_path_escape",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectPercentEncoding {

@@ -607,6 +607,20 @@
       "value": "/%2e%2e/x%2G",
       "outcome": "reject",
       "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_query_with_dot_escape_path",
+      "present": true,
+      "value": "/%2e%2e/x?a=%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_malformed_query_with_other_path_escape",
+      "present": true,
+      "value": "/view/a%41b?c=%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
     }
   ]
 }

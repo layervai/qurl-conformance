@@ -202,6 +202,12 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_percent_followed_by_path_separator": {present: true, value: targetPathValue("/a%/b")},
 	"reject_malformed_percent_with_dot_segment": {present: true, value: targetPathValue("/a/../b%")},
 	"reject_malformed_percent_with_dot_escape":  {present: true, value: targetPathValue("/%2e%2e/x%2G")},
+	"reject_malformed_query_with_dot_escape_path": {
+		present: true, value: targetPathValue("/%2e%2e/x?a=%ZZ"),
+	},
+	"reject_malformed_query_with_other_path_escape": {
+		present: true, value: targetPathValue("/view/a%41b?c=%ZZ"),
+	},
 }
 
 // Use \z instead of $ so every consumer implements a whole-value full match.
