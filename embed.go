@@ -338,6 +338,6 @@ func CRIDV1() (*CRIDV1File, error) {
 }
 
 // TargetPathV1 strictly parses the embedded target_path contract artifact.
-func TargetPathV1() (*TargetPathFile, error) {
-	return ParseTargetPathFile(TargetPathV1Vectors())
+func TargetPathV1() (*TargetPathV1File, error) {
+	return ParseTargetPathV1File(TargetPathV1Vectors())
 }

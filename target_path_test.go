@@ -388,11 +388,11 @@ func TestTargetPathUsesFirstQuestionMarkAsQueryDelimiter(t *testing.T) {
 	}
 }
 
-func TestParseTargetPathFileFailsClosed(t *testing.T) {
+func TestParseTargetPathV1FileFailsClosed(t *testing.T) {
 	raw := TargetPathV1Vectors()
-	mutate := func(t *testing.T, change func(*TargetPathFile)) []byte {
+	mutate := func(t *testing.T, change func(*TargetPathV1File)) []byte {
 		t.Helper()
-		var tf TargetPathFile
+		var tf TargetPathV1File
 		if err := json.Unmarshal(raw, &tf); err != nil {
 			t.Fatal(err)
 		}
@@ -405,8 +405,8 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	}
 	assertRejects := func(t *testing.T, body []byte, contains string) {
 		t.Helper()
-		if _, err := ParseTargetPathFile(body); err == nil || !strings.Contains(err.Error(), contains) {
-			t.Fatalf("ParseTargetPathFile() error = %v, want substring %q", err, contains)
+		if _, err := ParseTargetPathV1File(body); err == nil || !strings.Contains(err.Error(), contains) {
+			t.Fatalf("ParseTargetPathV1File() error = %v, want substring %q", err, contains)
 		}
 	}
 
@@ -419,46 +419,46 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 		assertRejects(t, []byte(body), "unknown field")
 	})
 	t.Run("artifact", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Artifact = "other" }), "artifact")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Artifact = "other" }), "artifact")
 	})
 	t.Run("schema", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.SchemaVersion++ }), "schema_version")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.SchemaVersion++ }), "schema_version")
 	})
 	t.Run("contract", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.MaxBytes++ }), "contract")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.MaxBytes++ }), "contract")
 	})
 	t.Run("allowed ASCII", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.AllowedASCII += "<" }), "contract")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.AllowedASCII += "<" }), "contract")
 	})
 	t.Run("query delimiter", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.QueryDelimiter = "last_question_mark" }), "contract")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.QueryDelimiter = "last_question_mark" }), "contract")
 	})
 	t.Run("validation order", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			tf.Contract.ValidationOrder[3], tf.Contract.ValidationOrder[4] = tf.Contract.ValidationOrder[4], tf.Contract.ValidationOrder[3]
 		}), "contract")
 	})
 	t.Run("duplicate case", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Cases[1] = tf.Cases[0] }), "duplicate")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Cases[1] = tf.Cases[0] }), "duplicate")
 	})
 	t.Run("missing case", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Cases = tf.Cases[1:] }), "count")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Cases = tf.Cases[1:] }), "count")
 	})
 	t.Run("unknown case", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Cases[0].Name = "future_case" }), "unknown")
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Cases[0].Name = "future_case" }), "unknown")
 	})
 	t.Run("flipped outcome", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			targetPathCase(t, tf, "accept_root").Outcome = ExpectReject
 		}), "expectation")
 	})
 	t.Run("flipped reject class", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			targetPathCase(t, tf, "reject_fragment").RejectClass = TargetPathRejectDotSegment
 		}), "expectation")
 	})
 	t.Run("accept missing open support", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			targetPathCase(t, tf, "accept_root").OpenSupported = nil
 		}), "open_supported")
 	})
@@ -467,13 +467,13 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 		assertRejects(t, []byte(body), "must omit reject_class")
 	})
 	t.Run("reject has open support", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			value := false
 			targetPathCase(t, tf, "reject_fragment").OpenSupported = &value
 		}), "must omit")
 	})
 	t.Run("present without value", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			targetPathCase(t, tf, "accept_root").Value = nil
 		}), "value presence")
 	})
@@ -482,7 +482,7 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 		assertRejects(t, []byte(body), "missing present")
 	})
 	t.Run("omitted with value", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) {
 			value := "/"
 			targetPathCase(t, tf, "accept_omitted").Value = &value
 		}), "value presence")
@@ -497,7 +497,7 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	})
 }
 
-func targetPathCase(t *testing.T, tf *TargetPathFile, name string) *TargetPathCase {
+func targetPathCase(t *testing.T, tf *TargetPathV1File, name string) *TargetPathCase {
 	t.Helper()
 	for i := range tf.Cases {
 		if tf.Cases[i].Name == name {

@@ -46,9 +46,9 @@ var targetPathValidationOrder = []string{
 	"accept",
 }
 
-// TargetPathFile is the language-neutral target_path mint contract shared by
+// TargetPathV1File is the language-neutral target_path mint contract shared by
 // service and SDK consumers.
-type TargetPathFile struct {
+type TargetPathV1File struct {
 	Artifact      string             `json:"artifact"`
 	SchemaVersion int                `json:"schema_version"`
 	Description   string             `json:"description"`
@@ -148,6 +148,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_userinfo_origin_concatenation":      {present: true, value: targetPathValue("@evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
+	"reject_leading_space":                      {present: true, value: targetPathValue(" /view/x")},
 	"reject_relative_invalid_character":         {present: true, value: targetPathValue("view/a[b]")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
@@ -166,6 +167,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_left_bracket_malformed_percent":     {present: true, value: targetPathValue("/view/a[b]%")},
 	"reject_fragment_in_query":                  {present: true, value: targetPathValue("/view/x?a=b#frag")},
 	"reject_space":                              {present: true, value: targetPathValue("/view /x")},
+	"reject_trailing_space":                     {present: true, value: targetPathValue("/view/x ")},
 	"reject_space_in_query":                     {present: true, value: targetPathValue("/view/x?a=b c")},
 	"reject_backslash_in_query":                 {present: true, value: targetPathValue("/view/x?a=\\")},
 	"reject_tab":                                {present: true, value: targetPathValue("/view\t/x")},
@@ -241,9 +243,9 @@ func isTargetPathHex(value byte) bool {
 	return value >= '0' && value <= '9' || value >= 'a' && value <= 'f' || value >= 'A' && value <= 'F'
 }
 
-// ParseTargetPathFile strictly parses and independently re-derives every case.
-func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
-	var tf TargetPathFile
+// ParseTargetPathV1File strictly parses and independently re-derives every case.
+func ParseTargetPathV1File(data []byte) (*TargetPathV1File, error) {
+	var tf TargetPathV1File
 	if err := strictDecodeArtifact(data, &tf); err != nil {
 		return nil, fmt.Errorf("conformance: parse target-path file: %w", err)
 	}

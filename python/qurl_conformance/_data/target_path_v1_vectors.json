@@ -231,6 +231,13 @@
       "reject_class": "not_absolute"
     },
     {
+      "name": "reject_leading_space",
+      "present": true,
+      "value": " /view/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
       "name": "reject_relative_invalid_character",
       "present": true,
       "value": "view/a[b]",
@@ -353,6 +360,13 @@
       "name": "reject_space",
       "present": true,
       "value": "/view /x",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_trailing_space",
+      "present": true,
+      "value": "/view/x ",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },

@@ -24,7 +24,8 @@ and no invalid request leaves the process.
   `contract.allowed_ascii` is the complete machine-readable raw alphabet. A
   consumer must compare its character gate with this value as an unordered set
   of ASCII bytes; the string order is not normative. It must not infer the
-  alphabet from the examples.
+  alphabet from the examples. The published artifact value is still byte-frozen;
+  the unordered-set rule applies to consumer comparison, not artifact rewrites.
   The validator uses a whole-value full match. It must not use a regular
   expression end anchor that can match before a trailing line terminator.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
@@ -87,6 +88,8 @@ request-target bytes. The authoritative opener ignores the query when it
 authorizes the protected request. A scoped path allows the exact path and
 descendants at a segment boundary. For example, `/view/abc` also allows
 `/view/abc/thumbnail`, but it does not allow `/view/abcd`.
+The accepted `/?` case also preserves its bare trailing query delimiter; an HTTP
+stack must not normalize it to `/`.
 
 The authoritative opener preserves one trailing slash on redirect. Its path
 authorization treats a scoped path with or without that trailing slash as the
@@ -110,7 +113,7 @@ For every case, pass `present` and `value` through the real public option gate:
    accepted value is true, so add an injected false-branch unit test. A
    coordinated future contract can gate a subset.
 
-The Go `ParseTargetPathFile` loader independently derives every outcome and
+The Go `ParseTargetPathV1File` loader independently derives every outcome and
 rejects missing, duplicate, unknown, or modified cases. The npm and Python
 package accessors return the parsed artifact without strict validation;
 consumers in those languages must run the cases through their own public gate.
