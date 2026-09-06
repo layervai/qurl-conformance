@@ -62,6 +62,7 @@ const (
 	DelegatedMintIssueV1TimestampMaxSkewSeconds     = 5 * 60
 	DelegatedMintIssueV1NonceReplayRetentionSeconds = 15 * 60
 	DelegatedMintIssueV1IdempotencyDomain           = "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1"
+	DelegatedMintIssueV1IdempotencyKeyPrefix        = "uci_"
 	DelegatedMintIssueV1IdempotencyDerivation       = "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded"
 
 	DelegatedMintIssueV1IdempotencyKeyHeader = "Idempotency-Key"
@@ -116,6 +117,7 @@ type DelegatedMintIssueV1Contract struct {
 	IdempotencyKeyPattern       string   `json:"idempotency_key_pattern"`
 	IdempotencyDomain           string   `json:"idempotency_derivation_domain_ascii"`
 	IdempotencyDerivation       string   `json:"idempotency_derivation"`
+	IdempotencyKeyPrefix        string   `json:"idempotency_key_prefix"`
 	IdempotencyKeyMinBytes      int      `json:"idempotency_key_min_bytes"`
 	IdempotencyKeyMaxBytes      int      `json:"idempotency_key_max_bytes"`
 	IdempotencyKeyHeader        string   `json:"idempotency_key_header"`
@@ -326,6 +328,7 @@ func DelegatedMintIssueV1ContractValue() DelegatedMintIssueV1Contract {
 		PublicKeyEncoding: DelegatedMintIssueV1PublicKeyEncoding, NonceEncoding: DelegatedMintIssueV1NonceEncoding,
 		NonceDecodedBytes: DelegatedMintIssueV1NonceBytes, IdempotencyKeyPattern: delegatedMintIssueV1IdempotencyPattern.String(),
 		IdempotencyDomain: DelegatedMintIssueV1IdempotencyDomain, IdempotencyDerivation: DelegatedMintIssueV1IdempotencyDerivation,
+		IdempotencyKeyPrefix:   DelegatedMintIssueV1IdempotencyKeyPrefix,
 		IdempotencyKeyMinBytes: DelegatedMintIssueV1IdempotencyKeyMinBytes, IdempotencyKeyMaxBytes: DelegatedMintIssueV1IdempotencyKeyMaxBytes,
 		IdempotencyKeyHeader: DelegatedMintIssueV1IdempotencyKeyHeader,
 		IssuerFieldPattern:   delegatedMintIssueV1IssuerFieldPattern.String(), IssuerIDHeader: DelegatedMintIssueV1IssuerIDHeader,
@@ -399,7 +402,7 @@ func DelegatedMintIssueV1IdempotencyKey(issuerID, uploadHandle string, generatio
 		return "", err
 	}
 	digest := sha256.Sum256(preimage)
-	return "uci_" + base64.RawURLEncoding.EncodeToString(digest[:]), nil
+	return DelegatedMintIssueV1IdempotencyKeyPrefix + base64.RawURLEncoding.EncodeToString(digest[:]), nil
 }
 
 func delegatedMintIssueV1IdempotencyPreimage(issuerID, uploadHandle string, generation int) ([]byte, error) {
@@ -702,6 +705,12 @@ func DelegatedMintIssueV1StateCases(file DelegatedMintIssueV1File) []DelegatedMi
 			PriorOperation: "golden_committed", PriorNonce: "absent", Outcome: "return_durable_result",
 			Status: DelegatedMintIssueV1SuccessStatus, Mutation: "bind_nonce_to_existing_operation",
 			ResponseSource: "golden_durable_result", StrongOperationLookup: true,
+		},
+		{
+			Name: "generation_2_refresh", Input: "refresh_golden", NowUnix: file.RefreshGolden.TimestampUnix,
+			PriorOperation: "generation_2_absent_generation_1_lineage_committed", PriorNonce: "absent", Outcome: "issue_new",
+			Status: DelegatedMintIssueV1SuccessStatus, Mutation: "store_operation_and_bind_nonce",
+			ResponseSource: "new_durable_result", StrongOperationLookup: true,
 		},
 		{
 			Name: "stale_unseen", Input: "golden",

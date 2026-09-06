@@ -13,10 +13,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/big"
 	"os"
 	"strings"
+	"time"
 
 	conformance "github.com/layervai/qurl-conformance"
 )
@@ -24,15 +26,25 @@ import (
 const vectorPath = "../../vectors/delegated_mint_issue_v1_vectors.json"
 
 func main() {
-	if err := run(); err != nil {
+	rotateKeys := flag.Bool("rotate-keys", false, "replace all committed throwaway signing keys and signatures")
+	flag.Parse()
+	if err := run(*rotateKeys); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-delegated-mint: FAILED:", err)
 		os.Exit(1)
 	}
-	fmt.Println("gen-delegated-mint: OK - rotated and verified all delegated-mint goldens")
+	if *rotateKeys {
+		fmt.Println("gen-delegated-mint: OK - rotated and verified all delegated-mint signed vectors")
+		return
+	}
+	fmt.Println("gen-delegated-mint: OK - preserved keys and verified all delegated-mint vectors")
 }
 
-func run() error {
-	raw, err := os.ReadFile(vectorPath)
+func run(rotateKeys bool) error {
+	return runAtPath(vectorPath, rotateKeys)
+}
+
+func runAtPath(path string, rotateKeys bool) error {
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -41,6 +53,29 @@ func run() error {
 		return err
 	}
 	file.Contract = conformance.DelegatedMintIssueV1ContractValue()
+	if rotateKeys {
+		if err := rotateSignedVectors(&file); err != nil {
+			return err
+		}
+	}
+	file.RejectCases, err = conformance.DelegatedMintIssueV1RejectCases(file.Golden)
+	if err != nil {
+		return err
+	}
+	file.StateCases = conformance.DelegatedMintIssueV1StateCases(file)
+	file.ResponseCases = conformance.DelegatedMintIssueV1ResponseCases()
+	out, err := json.MarshalIndent(file, "", "  ")
+	if err != nil {
+		return err
+	}
+	out = append(out, '\n')
+	if _, err := conformance.ParseDelegatedMintIssueV1File(out); err != nil {
+		return fmt.Errorf("self-verify generated artifact: %w", err)
+	}
+	return os.WriteFile(path, out, 0o644)
+}
+
+func rotateSignedVectors(file *conformance.DelegatedMintIssueV1File) error {
 	initialKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
@@ -70,7 +105,8 @@ func run() error {
 	file.NonceReuseSigned.Nonce = file.Golden.Nonce
 	file.NonceReuseSigned.TimestampUnix = file.Golden.TimestampUnix + conformance.DelegatedMintIssueV1TimestampMaxSkewSeconds
 	const refreshCapabilityExpiry = `"capability_expires_at":"2026-09-06T00:00:00Z"`
-	const nonceReuseCapabilityExpiry = `"capability_expires_at":"2026-09-05T23:35:00Z"`
+	nonceReuseExpiry := time.Unix(file.NonceReuseSigned.TimestampUnix+int64(file.Contract.CapabilityTTLSeconds), 0).UTC().Format(time.RFC3339)
+	nonceReuseCapabilityExpiry := `"capability_expires_at":"` + nonceReuseExpiry + `"`
 	if count := strings.Count(file.NonceReuseSigned.BodyUTF8, refreshCapabilityExpiry); count != 1 {
 		return fmt.Errorf("nonce-reuse capability expiry count = %d, want 1", count)
 	}
@@ -93,21 +129,7 @@ func run() error {
 	if err := rotateGolden(&file.AuthorityConflictSigned, initialKey); err != nil {
 		return err
 	}
-	file.RejectCases, err = conformance.DelegatedMintIssueV1RejectCases(file.Golden)
-	if err != nil {
-		return err
-	}
-	file.StateCases = conformance.DelegatedMintIssueV1StateCases(file)
-	file.ResponseCases = conformance.DelegatedMintIssueV1ResponseCases()
-	out, err := json.MarshalIndent(file, "", "  ")
-	if err != nil {
-		return err
-	}
-	out = append(out, '\n')
-	if _, err := conformance.ParseDelegatedMintIssueV1File(out); err != nil {
-		return fmt.Errorf("self-verify generated artifact: %w", err)
-	}
-	return os.WriteFile(vectorPath, out, 0o644)
+	return nil
 }
 
 func rotateGolden(golden *conformance.DelegatedMintIssueV1Golden, privateKey *ecdsa.PrivateKey) error {

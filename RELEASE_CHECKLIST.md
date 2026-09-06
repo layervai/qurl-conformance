@@ -88,7 +88,7 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 
 ## When a release rotates delegated-mint test keys
 
-- [ ] Run `make gen-delegated-mint-vectors` once. Confirm that it self-verifies
+- [ ] Run `make gen-delegated-mint-vectors-rotate` once. Confirm that it self-verifies
       every low-S signature and derives the published reject cases.
 - [ ] Run `scripts/sync-vectors.sh`, then all gates in **Every release**. Confirm
       that the Node smoke verifies every P-256 signature, the Python smoke

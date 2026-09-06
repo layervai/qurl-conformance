@@ -84,6 +84,16 @@ jobs:
           const tp = c.targetPathV1Vectors();
           const dm = c.delegatedMintIssueV1Vectors();
           const dmRejects = Object.fromEntries(dm.reject_cases.map(v => [v.name, v]));
+          const dmSignedInputs = [dm.golden, dm.retry_golden, dm.refresh_golden,
+            dm.wrong_endpoint_signed, dm.nonce_reuse_signed, dm.authority_conflict_signed];
+          const dmKIDPublicKeys = new Map();
+          const dmKIDMappingValid = dmSignedInputs.every(v => {
+            const prior = dmKIDPublicKeys.get(v.kid);
+            if (prior !== undefined && prior !== v.public_key_der_b64url) return false;
+            dmKIDPublicKeys.set(v.kid, v.public_key_der_b64url);
+            return true;
+          });
+          const dmNonceReuseState = dm.state_cases.find(v => v.name === 'reused_nonce_across_operation');
           const dmRejectResponses = {
             authority: '403/invalid_capability_issue',
             body_size: '413/payload_too_large',
@@ -708,6 +718,7 @@ jobs:
               tp.cases.length === 0 ||
               dm.artifact !== 'qurl-delegated-mint-issue-v1-vectors' || dm.schema_version !== 1 ||
               dm.contract.nonce_decoded_bytes !== 16 || dm.contract.body_max_bytes !== 8192 ||
+              dm.contract.idempotency_key_prefix !== 'uci_' ||
               dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
               dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
               dm.contract.error_content_type !== 'application/problem+json' ||
@@ -725,7 +736,7 @@ jobs:
               dm.contract.nonce_replay_retention_seconds <= 2 * dm.contract.timestamp_max_skew_seconds ||
               dm.contract.retry_after_modes.join(',') !== 'absent,exact_seconds,positive_integer_seconds' ||
               dm.reject_cases.length !== 9 || Object.keys(dmRejects).length !== 9 ||
-              dm.state_cases.length !== 8 || dm.response_cases.length !== 8 ||
+              dm.state_cases.length !== 9 || dm.response_cases.length !== 8 || !dmKIDMappingValid ||
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
               dm.reject_cases.some(v => `${v.status}/${v.error_code}` !== dmRejectResponses[v.reject_class]) ||
@@ -733,13 +744,14 @@ jobs:
               !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
               !verifyDMGolden(dm.authority_conflict_signed) ||
               verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects.reject_high_s_signature.value}) ||
-              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
+              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,generation_2_refresh,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
               dm.response_cases.find(v => v.error_code === 'issue_operation_not_found')?.proves_operation_absent !== true ||
               dm.response_cases.filter(v => v.proves_operation_absent).length !== 1 ||
               JSON.stringify(dm.response_cases.find(v => v.error_code === 'rate_limit_exceeded')?.retry_after) !== '{"mode":"positive_integer_seconds"}' ||
               JSON.stringify(dm.response_cases.find(v => v.error_code === 'mutation_outcome_unknown')?.retry_after) !== '{"mode":"exact_seconds","seconds":1}' ||
               dm.response_cases.filter(v => !['rate_limit_exceeded', 'mutation_outcome_unknown'].includes(v.error_code)).some(v => JSON.stringify(v.retry_after) !== '{"mode":"absent"}') ||
               dm.nonce_reuse_signed.timestamp_unix - (dm.golden.timestamp_unix - dm.contract.timestamp_max_skew_seconds) >= dm.contract.nonce_replay_retention_seconds ||
+              !dmNonceReuseState || Math.abs(dmNonceReuseState.now_unix - dm.nonce_reuse_signed.timestamp_unix) > dm.contract.timestamp_max_skew_seconds ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -783,6 +795,14 @@ jobs:
           tp = q.target_path_v1_vectors()
           dm = q.delegated_mint_issue_v1_vectors()
           dm_rejects = {case['name']: case for case in dm['reject_cases']}
+          dm_signed_inputs = [
+              dm['golden'], dm['retry_golden'], dm['refresh_golden'],
+              dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'], dm['authority_conflict_signed'],
+          ]
+          dm_kid_public_keys = {}
+          for signed_input in dm_signed_inputs:
+              prior_key = dm_kid_public_keys.setdefault(signed_input['kid'], signed_input['public_key_der_b64url'])
+              assert prior_key == signed_input['public_key_der_b64url']
           dm_reject_responses = {
               'authority': (403, 'invalid_capability_issue'),
               'body_size': (413, 'payload_too_large'),
@@ -1354,6 +1374,7 @@ jobs:
           )
           assert dm['artifact'] == 'qurl-delegated-mint-issue-v1-vectors' and dm['schema_version'] == 1
           assert dm['contract']['nonce_decoded_bytes'] == 16 and dm['contract']['body_max_bytes'] == 8192
+          assert dm['contract']['idempotency_key_prefix'] == 'uci_'
           assert dm['contract']['success_status'] == 200 and dm['contract']['success_content_type'] == 'application/json'
           assert dm['contract']['success_envelope'] == 'data'
           assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
@@ -1380,9 +1401,9 @@ jobs:
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
           assert all((case['status'], case['error_code']) == dm_reject_responses[case['reject_class']] for case in dm['reject_cases'])
-          assert len(dm['state_cases']) == 8
+          assert len(dm['state_cases']) == 9
           assert [case['name'] for case in dm['state_cases']] == [
-              'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'stale_unseen',
+              'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'generation_2_refresh', 'stale_unseen',
               'alternate_endpoint', 'reused_nonce_across_operation', 'stale_non_exact_retry',
               'fresh_authority_conflict',
           ]
@@ -1396,6 +1417,8 @@ jobs:
           assert dm['nonce_reuse_signed']['nonce'] == dm['golden']['nonce']
           assert dm['nonce_reuse_signed']['idempotency_key'] == dm['refresh_golden']['idempotency_key']
           assert dm['nonce_reuse_signed']['timestamp_unix'] - (dm['golden']['timestamp_unix'] - dm['contract']['timestamp_max_skew_seconds']) < dm['contract']['nonce_replay_retention_seconds']
+          nonce_reuse_state = next(case for case in dm['state_cases'] if case['name'] == 'reused_nonce_across_operation')
+          assert abs(nonce_reuse_state['now_unix'] - dm['nonce_reuse_signed']['timestamp_unix']) <= dm['contract']['timestamp_max_skew_seconds']
           assert all(verify_dm_framing_and_digest(golden) for golden in (
               dm['golden'], dm['retry_golden'], dm['refresh_golden'],
               dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'],

@@ -38,7 +38,8 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		}
 	}
 	if len(file.Golden.Nonce) != 22 || len(file.RetryGolden.Nonce) != 22 || len(file.RefreshGolden.Nonce) != 22 ||
-		!strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
+		file.Contract.IdempotencyKeyPrefix != DelegatedMintIssueV1IdempotencyKeyPrefix ||
+		!strings.HasPrefix(file.Golden.IdempotencyKey, file.Contract.IdempotencyKeyPrefix) || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
 	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 900 ||
@@ -70,8 +71,8 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	if len(file.RejectCases) != 9 {
 		t.Fatalf("reject case count = %d, want 9", len(file.RejectCases))
 	}
-	if len(file.StateCases) != 8 {
-		t.Fatalf("state case count = %d, want 8", len(file.StateCases))
+	if len(file.StateCases) != 9 {
+		t.Fatalf("state case count = %d, want 9", len(file.StateCases))
 	}
 	if len(file.ResponseCases) != 8 {
 		t.Fatalf("response case count = %d, want 8", len(file.ResponseCases))
@@ -203,11 +204,55 @@ func TestDelegatedMintIssueV1NonceReuseStateIsReachable(t *testing.T) {
 	if file.NonceReuseSigned.TimestampUnix-earliestInitialAcceptance >= int64(file.Contract.NonceReplayRetentionSeconds) {
 		t.Fatal("nonce-reuse request can occur at or after the original nonce retention boundary")
 	}
-	state := file.StateCases[5]
+	var state DelegatedMintIssueV1StateCase
+	for _, candidate := range file.StateCases {
+		if candidate.Name == "reused_nonce_across_operation" {
+			state = candidate
+			break
+		}
+	}
+	skew := int64(file.Contract.TimestampMaxSkewSeconds)
+	freshnessDelta := state.NowUnix - file.NonceReuseSigned.TimestampUnix
 	if state.Name != "reused_nonce_across_operation" || state.NowUnix != file.NonceReuseSigned.TimestampUnix ||
 		state.NowUnix-earliestInitialAcceptance >= int64(file.Contract.NonceReplayRetentionSeconds) ||
-		state.NowUnix-file.NonceReuseSigned.TimestampUnix > int64(file.Contract.TimestampMaxSkewSeconds) {
+		freshnessDelta < -skew || freshnessDelta > skew {
 		t.Fatalf("nonce-reuse state is not reachable: %+v", state)
+	}
+}
+
+func TestDelegatedMintIssueV1StateIncludesGeneration2Refresh(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, state := range file.StateCases {
+		if state.Name == "generation_2_refresh" {
+			if state.Input != "refresh_golden" || state.Outcome != "issue_new" || state.Status != 200 ||
+				state.Mutation != "store_operation_and_bind_nonce" || !state.StrongOperationLookup {
+				t.Fatalf("generation-2 refresh state drifted: %+v", state)
+			}
+			return
+		}
+	}
+	t.Fatal("generation-2 refresh state is absent")
+}
+
+func TestDelegatedMintIssueV1KIDMapsToOnePublicKey(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := make(map[string]string)
+	for _, golden := range []DelegatedMintIssueV1Golden{
+		file.Golden, file.RetryGolden, file.RefreshGolden, file.WrongEndpointSigned,
+		file.NonceReuseSigned, file.AuthorityConflictSigned,
+	} {
+		if prior, ok := keys[golden.KID]; ok && prior != golden.PublicKeyDERB64URL {
+			t.Fatalf("kid %q maps to multiple public keys", golden.KID)
+		}
+		keys[golden.KID] = golden.PublicKeyDERB64URL
 	}
 }
 

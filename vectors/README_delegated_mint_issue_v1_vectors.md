@@ -108,14 +108,15 @@ new transport timestamp is fresh. The third keeps the initial operation key
 but changes one immutable authority field. Signature success alone does not
 authorize any of these requests.
 
-`state_cases` publishes the eight required receiver transitions. It covers a
+`state_cases` publishes the nine required receiver transitions. It covers a
 first issue, an exact stale replay after nonce expiry, a fresh reconciliation,
-an authenticated stale strong miss, an alternate endpoint, a nonce reused by a
-different operation, a stale non-exact retry, and a fresh immutable-authority
-conflict. Each case names its complete signed input, prior durable operation and
-nonce state, receiver time, status, public error code, state mutation, and
-response source. The `outcome` and `mutation` values are closed by the contract
-lists. A receiver must not replace a listed rejection with a state write.
+an accepted generation-two refresh, an authenticated stale strong miss, an
+alternate endpoint, a nonce reused by a different operation, a stale non-exact
+retry, and a fresh immutable-authority conflict. Each case names its complete
+signed input, prior durable operation and nonce state, receiver time, status,
+public error code, state mutation, and response source. The `outcome` and
+`mutation` values are closed by the contract lists. A receiver must not replace
+a listed rejection with a state write.
 
 `response_cases` freezes every receiver error status, media type, public code,
 and `Retry-After` rule. Each rule has one closed `mode`: `absent` forbids the
@@ -168,11 +169,14 @@ refresh golden rotates the test key to prove that key ID is transport
 authentication, not operation identity. Consumers verify these committed bytes;
 they do not need either matching test private key.
 
-`make gen-delegated-mint-vectors` creates fresh throwaway P-256 test keys,
-rebuilds the initial, stale-miss retry, and refresh canonical bytes and low-S
+`make gen-delegated-mint-vectors` rebuilds contract metadata, reject cases,
+state cases, and response cases while preserving every committed public key and
+signature. `make gen-delegated-mint-vectors-rotate` creates fresh throwaway P-256 test keys,
+rebuilds the signed canonical bytes and low-S
 signatures, derives the reject cases, and verifies the complete artifact before
-it writes it. The private keys are discarded. Run it only for an intentional
-test-key rotation and then sync the three published mirrors.
+it writes it. The private keys are discarded. Run the explicit rotation target
+only for an intentional test-key rotation and then sync the three published
+mirrors.
 
 Because signature verification happens before operation lookup, the issuer
 service retains the verifier for each accepted key ID until that operation's

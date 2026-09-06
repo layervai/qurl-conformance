@@ -30,6 +30,7 @@
     "idempotency_key_pattern": "^[A-Za-z0-9._~-]{1,128}$",
     "idempotency_derivation_domain_ascii": "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1",
     "idempotency_derivation": "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded",
+    "idempotency_key_prefix": "uci_",
     "idempotency_key_min_bytes": 1,
     "idempotency_key_max_bytes": 128,
     "idempotency_key_header": "Idempotency-Key",
@@ -381,6 +382,19 @@
       "error_code": "",
       "mutation": "bind_nonce_to_existing_operation",
       "response_source": "golden_durable_result",
+      "strong_operation_lookup": true
+    },
+    {
+      "name": "generation_2_refresh",
+      "input": "refresh_golden",
+      "now_unix": 1788651900,
+      "prior_operation": "generation_2_absent_generation_1_lineage_committed",
+      "prior_nonce": "absent",
+      "outcome": "issue_new",
+      "status": 200,
+      "error_code": "",
+      "mutation": "store_operation_and_bind_nonce",
+      "response_source": "new_durable_result",
       "strong_operation_lookup": true
     },
     {
