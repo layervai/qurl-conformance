@@ -24,7 +24,7 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - The generators that produce key-dependent vectors live at `tools/gen` and
   `tools/gen-delegated-mint`. The delegated-mint generator preserves existing
   keys by default; only `make gen-delegated-mint-vectors-rotate` rotates its
-  keys and signatures. Run a rotation target ONCE per intentional test-key
+  keys, KIDs, and signatures. Run a rotation target ONCE per intentional test-key
   rotation. Rotation targets are NEVER run in CI (ECDSA signatures use random
   nonces, so they are not reproducible). The committed JSON is the artifact.
 - `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts.

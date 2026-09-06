@@ -400,7 +400,7 @@ artifact has its own `artifact` id:
 
 This module is intentionally dependency-free (stdlib only). The generators for
 key-dependent vectors live at `tools/gen` and `tools/gen-delegated-mint`. Run the
-explicit rotation Make target once per test-key rotation. The default
+explicit rotation Make target once per test-key and KID rotation. The default
 delegated-mint target preserves existing keys and signatures while it rebuilds
 derived metadata. Rotation targets never run in CI because ECDSA signatures use
 random nonces and are not reproducible. The committed JSON is the artifact.

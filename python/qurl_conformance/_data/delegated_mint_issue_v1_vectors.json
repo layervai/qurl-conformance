@@ -105,7 +105,7 @@
       "idempotency_key",
       "timestamp_unix_decimal",
       "nonce",
-      "exact_body_sha256",
+      "body_sha256",
       "signature_der_b64url"
     ],
     "transport_replay_rule": "exact_accepted_envelope_may_bypass_freshness_same_operation_authority_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate",

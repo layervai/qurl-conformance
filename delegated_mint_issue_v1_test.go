@@ -61,7 +61,7 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		file.Contract.IssuerKeyRetentionRule != "accepted_kid_verifier_retained_until_operation_authority_expires" ||
 		!slices.Equal(file.Contract.OperationIdentityFields, []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key"}) ||
 		!slices.Equal(file.Contract.AuthorityFingerprintFields, []string{"upload_request_digest", "content_sha256", "byte_size", "media_type", "display_filename", "audience_key_id", "target_path", "max_batch_size", "max_link_ttl_seconds", "authority_expires_at", "service_owned_issuer_policy_fingerprint"}) ||
-		!slices.Equal(file.Contract.EnvelopeFingerprintFields, []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"}) ||
+		!slices.Equal(file.Contract.EnvelopeFingerprintFields, []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "body_sha256", "signature_der_b64url"}) ||
 		!slices.Equal(file.Contract.RejectClasses, []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar", "signature_mismatch"}) ||
 		!slices.Equal(file.Contract.StateOutcomes, []string{"issue_new", "return_durable_result", "reject"}) ||
 		!slices.Equal(file.Contract.StateMutations, []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"}) ||
@@ -393,10 +393,6 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 
 func TestDelegatedMintIssueV1RelationsRejectKeyRotationDrift(t *testing.T) {
 	t.Parallel()
-	file, err := DelegatedMintIssueV1()
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, test := range []struct {
 		name   string
 		change func(*DelegatedMintIssueV1File)
@@ -413,9 +409,12 @@ func TestDelegatedMintIssueV1RelationsRejectKeyRotationDrift(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			changed := *file
-			test.change(&changed)
-			if err := validateDelegatedMintIssueV1Relations(&changed); err == nil {
+			changed, err := DelegatedMintIssueV1()
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.change(changed)
+			if err := validateDelegatedMintIssueV1Relations(changed); err == nil {
 				t.Fatal("rotation drift was accepted")
 			}
 		})

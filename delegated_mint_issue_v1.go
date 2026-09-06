@@ -352,7 +352,7 @@ func DelegatedMintIssueV1ContractValue() DelegatedMintIssueV1Contract {
 		ExactReplayFreshnessRule:    "verify_shape_signature_then_operation_lookup_before_freshness_exact_accepted_envelope_returns_original_same_operation_authority_fresh_envelope_reconciles_changed_authority_conflicts_stale_nonexact_rejects_without_mutation",
 		OperationIdentityFields:     []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key"},
 		AuthorityFingerprintFields:  []string{"upload_request_digest", "content_sha256", "byte_size", "media_type", "display_filename", "audience_key_id", "target_path", "max_batch_size", "max_link_ttl_seconds", "authority_expires_at", "service_owned_issuer_policy_fingerprint"},
-		EnvelopeFingerprintFields:   []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"},
+		EnvelopeFingerprintFields:   []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "body_sha256", "signature_der_b64url"},
 		TransportReplayRule:         "exact_accepted_envelope_may_bypass_freshness_same_operation_authority_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate",
 		StaleOperationMissRule:      "authenticated_strongly_consistent_absent_stale_operation_returns_no_mutation_connector_retries_fresh_same_generation",
 		StaleOperationMissStatus:    DelegatedMintIssueV1StaleMissStatus,

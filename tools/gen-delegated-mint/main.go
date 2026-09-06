@@ -1,6 +1,7 @@
-// Command gen-delegated-mint rotates the two throwaway P-256 keys in the
-// delegated-mint conformance artifact. It never runs in CI because ECDSA uses a
-// random nonce. The committed, self-verified JSON is the artifact.
+// Command gen-delegated-mint rebuilds the delegated-mint conformance artifact.
+// Its explicit rotation mode replaces the two throwaway P-256 keys and their
+// KIDs. It never runs in CI because ECDSA uses a random nonce. The committed,
+// self-verified JSON is the artifact.
 package main
 
 import (
@@ -13,10 +14,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,7 +29,7 @@ import (
 const vectorPath = "../../vectors/delegated_mint_issue_v1_vectors.json"
 
 func main() {
-	rotateKeys := flag.Bool("rotate-keys", false, "replace all committed throwaway signing keys and signatures")
+	rotateKeys := flag.Bool("rotate-keys", false, "replace all committed throwaway signing keys, KIDs, and signatures")
 	flag.Parse()
 	if err := run(*rotateKeys); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-delegated-mint: FAILED:", err)
@@ -76,6 +79,21 @@ func runAtPath(path string, rotateKeys bool) error {
 }
 
 func rotateSignedVectors(file *conformance.DelegatedMintIssueV1File) error {
+	initialKID, err := nextRotationKID(file.Golden.KID)
+	if err != nil {
+		return err
+	}
+	refreshKID, err := nextRotationKID(file.RefreshGolden.KID)
+	if err != nil {
+		return err
+	}
+	if initialKID == refreshKID {
+		return errors.New("rotated initial and refresh KIDs must differ")
+	}
+	file.Golden.KID = initialKID
+	file.RetryGolden.KID = refreshKID
+	file.RefreshGolden.KID = refreshKID
+
 	initialKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
@@ -130,6 +148,24 @@ func rotateSignedVectors(file *conformance.DelegatedMintIssueV1File) error {
 		return err
 	}
 	return nil
+}
+
+func nextRotationKID(kid string) (string, error) {
+	const maxIssuerFieldBytes = 64
+	base := kid
+	rotation := 1
+	if separator := strings.LastIndex(kid, "-r"); separator >= 0 {
+		parsed, err := strconv.Atoi(kid[separator+2:])
+		if err == nil && parsed > 0 {
+			base = kid[:separator]
+			rotation = parsed + 1
+		}
+	}
+	next := fmt.Sprintf("%s-r%d", base, rotation)
+	if len(next) > maxIssuerFieldBytes {
+		return "", fmt.Errorf("rotated KID %q exceeds %d bytes", next, maxIssuerFieldBytes)
+	}
+	return next, nil
 }
 
 func rotateGolden(golden *conformance.DelegatedMintIssueV1Golden, privateKey *ecdsa.PrivateKey) error {

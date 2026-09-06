@@ -116,6 +116,23 @@ jobs:
             prefix.writeUInt32BE(bytes.length);
             return Buffer.concat([prefix, bytes]);
           };
+          const deriveDMIssueIdempotency = golden => {
+            const body = JSON.parse(golden.body_utf8);
+            const frame = value => {
+              const bytes = Buffer.from(String(value), 'utf8');
+              const prefix = Buffer.alloc(4);
+              prefix.writeUInt32BE(bytes.length);
+              return Buffer.concat([prefix, bytes]);
+            };
+            const preimage = Buffer.concat([
+              Buffer.from(dm.contract.idempotency_derivation_domain_ascii, 'ascii'), Buffer.from([0]),
+              frame(golden.issuer_id), frame(body.upload_handle), frame(body.issue_generation),
+            ]);
+            return {
+              preimage,
+              key: dm.contract.idempotency_key_prefix + crypto.createHash('sha256').update(preimage).digest('base64url'),
+            };
+          };
           const dmP256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
           const parseDMSignature = encoded => {
             if (typeof encoded !== 'string' || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
@@ -725,6 +742,7 @@ jobs:
               dm.contract.body_authority_fields.join(',') !== 'upload_handle,issue_generation,upload_request_digest,content_sha256,byte_size,media_type,display_filename,audience_key_id,target_path,max_batch_size,max_link_ttl_seconds,capability_expires_at,authority_expires_at' ||
               dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
               dm.contract.external_operation_commit_rule !== 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request' ||
+              dm.contract.envelope_fingerprint_fields.join(',') !== 'method,authority,route,issuer_id,kid,idempotency_key,timestamp_unix_decimal,nonce,body_sha256,signature_der_b64url' ||
               dm.contract.stale_operation_miss_status !== 404 || dm.contract.stale_operation_miss_code !== 'issue_operation_not_found' ||
               dm.golden.kid === dm.retry_golden.kid ||
               dm.golden.public_key_der_b64url === dm.retry_golden.public_key_der_b64url ||
@@ -740,10 +758,20 @@ jobs:
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
               dm.reject_cases.some(v => `${v.status}/${v.error_code}` !== dmRejectResponses[v.reject_class]) ||
+              dmSignedInputs.some(v => {
+                const derived = deriveDMIssueIdempotency(v);
+                return derived.preimage.toString('hex') !== v.idempotency_preimage_hex || derived.key !== v.idempotency_key;
+              }) ||
               !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
               !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
               !verifyDMGolden(dm.authority_conflict_signed) ||
-              verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects.reject_high_s_signature.value}) ||
+              ['reject_padded_signature', 'reject_noncanonical_signature_der', 'reject_high_s_signature', 'reject_zero_r_signature']
+                .some(name => parseDMSignature(dmRejects[name].value) !== null ||
+                  verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects[name].value})) ||
+              dm.wrong_endpoint_signed.authority === dm.golden.authority ||
+              dm.wrong_endpoint_signed.public_key_der_b64url !== dm.golden.public_key_der_b64url ||
+              dm.nonce_reuse_signed.nonce !== dm.golden.nonce ||
+              dm.nonce_reuse_signed.idempotency_key !== dm.refresh_golden.idempotency_key ||
               dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,generation_2_refresh,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
               dm.response_cases.find(v => v.error_code === 'issue_operation_not_found')?.proves_operation_absent !== true ||
               dm.response_cases.filter(v => v.proves_operation_absent).length !== 1 ||
@@ -818,6 +846,18 @@ jobs:
           def issue_frame(value):
               encoded = value.encode('utf-8')
               return struct.pack('>I', len(encoded)) + encoded
+          def derive_dm_issue_idempotency(golden):
+              body = json.loads(golden['body_utf8'])
+              preimage = b''.join((
+                  dm['contract']['idempotency_derivation_domain_ascii'].encode('ascii'), b'\0',
+                  issue_frame(golden['issuer_id']),
+                  issue_frame(body['upload_handle']),
+                  issue_frame(str(body['issue_generation'])),
+              ))
+              key = dm['contract']['idempotency_key_prefix'] + base64.urlsafe_b64encode(
+                  hashlib.sha256(preimage).digest()
+              ).decode('ascii').rstrip('=')
+              return preimage, key
           def verify_dm_framing_and_digest(golden):
               body_hash = hashlib.sha256(golden['body_utf8'].encode('utf-8')).hexdigest()
               values = {
@@ -1389,6 +1429,10 @@ jobs:
           assert dm['contract']['nonce_replay_retention_seconds'] > 2 * dm['contract']['timestamp_max_skew_seconds']
           assert dm['contract']['retry_after_modes'] == ['absent', 'exact_seconds', 'positive_integer_seconds']
           assert dm['contract']['external_operation_commit_rule'] == 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request'
+          assert dm['contract']['envelope_fingerprint_fields'] == [
+              'method', 'authority', 'route', 'issuer_id', 'kid', 'idempotency_key',
+              'timestamp_unix_decimal', 'nonce', 'body_sha256', 'signature_der_b64url',
+          ]
           assert dm['contract']['stale_operation_miss_status'] == 404
           assert dm['contract']['stale_operation_miss_code'] == 'issue_operation_not_found'
           assert dm['golden']['kid'] != dm['retry_golden']['kid']
@@ -1401,6 +1445,11 @@ jobs:
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
           assert all((case['status'], case['error_code']) == dm_reject_responses[case['reject_class']] for case in dm['reject_cases'])
+          assert all(
+              derive_dm_issue_idempotency(golden)[0].hex() == golden['idempotency_preimage_hex'] and
+              derive_dm_issue_idempotency(golden)[1] == golden['idempotency_key']
+              for golden in dm_signed_inputs
+          )
           assert len(dm['state_cases']) == 9
           assert [case['name'] for case in dm['state_cases']] == [
               'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'generation_2_refresh', 'stale_unseen',
