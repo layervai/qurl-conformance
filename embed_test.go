@@ -3,10 +3,16 @@ package conformance
 import (
 	"bytes"
 	"crypto/ecdh"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"regexp"
 	"slices"
@@ -214,6 +220,159 @@ func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) { assertQURLUserX25519KeyPair(t, fragment) })
 	}
+}
+
+// TestIssuerSignatureVectorsPinKeysAndVerifyBytes makes the vector-only key
+// pins and signatures authoritative inside this dependency-free module. A
+// generator edit or hand-edited mirror must not rotate trust or leave a
+// shape-correct signature that no real verifier can accept.
+func TestIssuerSignatureVectorsPinKeysAndVerifyBytes(t *testing.T) {
+	vf, err := ParseVectorFile(IssuerSignatureVectors())
+	if err != nil {
+		t.Fatalf("ParseVectorFile(): %v", err)
+	}
+
+	issuerPublic := fixedVectorP256PublicKey(t, 0x07)
+	wantSPKI, err := x509.MarshalPKIXPublicKey(issuerPublic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := vf.Issuer.SPKIDERB64; got != base64.RawURLEncoding.EncodeToString(wantSPKI) {
+		t.Fatal("committed issuer SPKI does not match the fixed 0x07 vector scalar")
+	}
+	wantX := make([]byte, 32)
+	wantY := make([]byte, 32)
+	issuerPublic.X.FillBytes(wantX)
+	issuerPublic.Y.FillBytes(wantY)
+	if vf.Issuer.JWK.X != base64.RawURLEncoding.EncodeToString(wantX) ||
+		vf.Issuer.JWK.Y != base64.RawURLEncoding.EncodeToString(wantY) {
+		t.Fatal("committed issuer JWK does not match the fixed 0x07 vector scalar")
+	}
+
+	byName := make(map[string]SignatureVector, len(vf.Vectors))
+	for _, vector := range vf.Vectors {
+		byName[vector.Name] = vector
+		wantSigningInput := append([]byte(vf.DomainSeparationPrefix), 0)
+		wantSigningInput = append(wantSigningInput, vector.ClaimsB64...)
+		gotSigningInput, err := base64.RawURLEncoding.DecodeString(vector.SigningInputB64)
+		if err != nil {
+			t.Fatalf("%s signing input: %v", vector.Name, err)
+		}
+		if !bytes.Equal(gotSigningInput, wantSigningInput) {
+			t.Fatalf("%s signing input does not match prefix + NUL + claims", vector.Name)
+		}
+	}
+	accept, ok := byName["accept_valid_low_s"]
+	if !ok {
+		t.Fatal("missing accept_valid_low_s")
+	}
+	acceptRaw := decodeRawBase64URL(t, "accept signature", accept.SigB64Raw)
+	if len(acceptRaw) != 64 {
+		t.Fatalf("accept signature length = %d, want 64", len(acceptRaw))
+	}
+	r := new(big.Int).SetBytes(acceptRaw[:32])
+	s := new(big.Int).SetBytes(acceptRaw[32:])
+	halfOrder := new(big.Int).Rsh(new(big.Int).Set(elliptic.P256().Params().N), 1)
+	if s.Sign() <= 0 || s.Cmp(halfOrder) > 0 {
+		t.Fatal("accept signature is not low-S")
+	}
+	preimage := append([]byte(vf.DomainSeparationPrefix), 0)
+	preimage = append(preimage, accept.ClaimsB64...)
+	digest := sha256.Sum256(preimage)
+	if !ecdsa.Verify(issuerPublic, digest[:], r, s) {
+		t.Fatal("accept signature does not verify under the pinned issuer key")
+	}
+
+	high, ok := byName["reject_high_s"]
+	if !ok {
+		t.Fatal("missing reject_high_s")
+	}
+	highRaw := decodeRawBase64URL(t, "high-S signature", high.SigB64Raw)
+	if len(highRaw) != 64 {
+		t.Fatalf("high-S signature length = %d, want 64", len(highRaw))
+	}
+	highR := new(big.Int).SetBytes(highRaw[:32])
+	highS := new(big.Int).SetBytes(highRaw[32:])
+	wantHighS := new(big.Int).Sub(elliptic.P256().Params().N, s)
+	if high.ClaimsB64 != accept.ClaimsB64 || highR.Cmp(r) != 0 || highS.Cmp(wantHighS) != 0 || highS.Cmp(halfOrder) <= 0 {
+		t.Fatal("high-S vector is not the exact malleated accept signature")
+	}
+	if !ecdsa.Verify(issuerPublic, digest[:], highR, highS) {
+		t.Fatal("high-S vector is not cryptographically valid before normalization rejection")
+	}
+
+	wrongLength, ok := byName["reject_wrong_length_der"]
+	if !ok {
+		t.Fatal("missing reject_wrong_length_der")
+	}
+	der := decodeRawBase64URL(t, "DER signature", wrongLength.SigB64Raw)
+	if len(der) == 64 {
+		t.Fatal("wrong-length DER vector is accidentally a 64-byte wire signature")
+	}
+	var decoded struct{ R, S *big.Int }
+	rest, err := asn1.Unmarshal(der, &decoded)
+	if err != nil || len(rest) != 0 || decoded.R == nil || decoded.S == nil {
+		t.Fatalf("decode DER vector: rest=%d err=%v", len(rest), err)
+	}
+	if wrongLength.ClaimsB64 != accept.ClaimsB64 || decoded.R.Cmp(r) != 0 || decoded.S.Cmp(s) != 0 {
+		t.Fatal("DER vector does not carry the exact accept signature integers")
+	}
+
+	claimsJSON := decodeRawBase64URL(t, "accept claims", accept.ClaimsB64)
+	var claims struct {
+		ResourcePublicKeyB64 string `json:"resource_public_key_b64"`
+	}
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		t.Fatal(err)
+	}
+	resourcePublic := fixedVectorP256PublicKey(t, 0x08)
+	wantResourceSPKI, err := x509.MarshalPKIXPublicKey(resourcePublic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims.ResourcePublicKeyB64 != base64.RawURLEncoding.EncodeToString(wantResourceSPKI) {
+		t.Fatal("committed resource SPKI does not match the fixed 0x08 vector scalar")
+	}
+
+	cf, err := ConformanceVectors()
+	if err != nil {
+		t.Fatal(err)
+	}
+	acceptCount := 0
+	for _, vector := range cf.Classes["fragment"].Vectors {
+		if vector.Expect != ExpectAccept {
+			continue
+		}
+		acceptCount++
+		parts := strings.Split(vector.Fragment, ".")
+		if len(parts) != 4 || parts[1] != accept.ClaimsB64 || parts[3] != accept.SigB64Raw {
+			t.Fatal("fragment accept fixture does not carry the issuer accept claims and signature")
+		}
+	}
+	if acceptCount != 1 {
+		t.Fatalf("fragment accept fixture count = %d, want 1", acceptCount)
+	}
+}
+
+func fixedVectorP256PublicKey(t *testing.T, fill byte) *ecdsa.PublicKey {
+	t.Helper()
+	scalar := bytes.Repeat([]byte{fill}, 32)
+	d := new(big.Int).SetBytes(scalar)
+	curve := elliptic.P256()
+	if d.Sign() <= 0 || d.Cmp(curve.Params().N) >= 0 {
+		t.Fatal("fixed vector scalar is out of range")
+	}
+	x, y := curve.ScalarBaseMult(scalar)
+	return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
+}
+
+func decodeRawBase64URL(t *testing.T, name, value string) []byte {
+	t.Helper()
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		t.Fatalf("decode %s: %v", name, err)
+	}
+	return decoded
 }
 
 func assertQURLUserX25519KeyPair(t *testing.T, fragment string) {
@@ -1894,10 +2053,10 @@ func mustMarshalJSON(t *testing.T, v any) []byte {
 	return b
 }
 
-// TestReleaseChecklistIsReferenced keeps the verification handoff from decaying
-// back into a PR description. Removing the two crypto cross-checks moved the
-// only authentication of these bytes outside this repository, so the document
-// that inherits it has to exist and stay linked from the working notes.
+// TestReleaseChecklistIsReferenced keeps the consumer verification handoff
+// from decaying back into a PR description. The root module now authenticates
+// the stdlib-supported key and signature bytes; AEAD/open-path checks still
+// require independent consumer SDK runs.
 func TestReleaseChecklistIsReferenced(t *testing.T) {
 	checklist, err := os.ReadFile("RELEASE_CHECKLIST.md")
 	if err != nil {

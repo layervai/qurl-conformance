@@ -113,6 +113,8 @@ fragment/transport accept fixture changes.
       rotation when a post-run structural check finds an error. The public,
       vector-only issuer and resource keys stay fixed across runs; the release
       notes must say explicitly if either public key changes.
+- [ ] Run `scripts/sync-vectors.sh` after the one generator run so the root,
+      npm, and Python copies stay byte-identical.
 - [ ] Confirm the fragment accept fixture and the transport round-trip fixture
       carry the same canonical qv2 body. Confirm the qv2t1 input reconstructs it
       byte for byte.

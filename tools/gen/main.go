@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 
+	"github.com/layervai/qurl-conformance/tools/gen/internal/genkit"
 	"github.com/layervai/qurl-go/qv2"
 )
 
@@ -37,7 +37,7 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	issuerPrivate, err := fixedP256PrivateKey(0x07)
+	issuerPrivate, err := genkit.FixedP256PrivateKey(0x07)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func run() error {
 		return err
 	}
 
-	rpriv, err := fixedP256PrivateKey(0x08)
+	rpriv, err := genkit.FixedP256PrivateKey(0x08)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func run() error {
 	}
 
 	doc := map[string]any{
-		"description":              "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private key is a publicly derivable, fixed test scalar; never admit this key or kid to a production trust store.",
+		"description":              "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private scalar is 32 bytes of 0x07 and the resource private scalar is 32 bytes of 0x08; both are public test material. Never admit either key or this kid to a production trust store.",
 		"algorithm":                "ECC_NIST_P256 / ECDSA_SHA_256, wire = raw r||s (64 bytes), low-S",
 		"domain_separation_prefix": "NHP-QURL-V2-ISSUER",
 		"issuer": map[string]any{
@@ -177,7 +177,7 @@ func run() error {
 		return err
 	}
 	var cfDoc struct {
-		TransportContract transportEncodingContract `json:"transport_contract"`
+		TransportContract genkit.TransportEncodingContract `json:"transport_contract"`
 		Classes           map[string]struct {
 			Vectors []struct {
 				Name              string `json:"name"`
@@ -191,7 +191,7 @@ func run() error {
 	if err := json.Unmarshal(cfBytes, &cfDoc); err != nil {
 		return err
 	}
-	newTransportFragment, err := encodeTransportFragment(newFragment, cfDoc.TransportContract)
+	newTransportFragment, err := genkit.EncodeTransportFragment(newFragment, cfDoc.TransportContract)
 	if err != nil {
 		return err
 	}
@@ -219,116 +219,13 @@ func run() error {
 	if oldCanonicalFragment != oldFragment {
 		return fmt.Errorf("fragment and transport accept fixtures do not share one canonical fragment")
 	}
-	updated, err := replaceExactJSONString(cfBytes, oldFragment, newFragment, 2)
+	updated, err := genkit.ReplaceExactJSONString(cfBytes, oldFragment, newFragment, 2)
 	if err != nil {
 		return err
 	}
-	updated, err = replaceExactJSONString(updated, oldTransportFragment, newTransportFragment, 1)
+	updated, err = genkit.ReplaceExactJSONString(updated, oldTransportFragment, newTransportFragment, 1)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(cfPath, updated, 0o644)
-}
-
-type transportFieldContract struct {
-	MaxEncodedLength int `json:"max_encoded_length"`
-	MaxChunks        int `json:"max_chunks"`
-}
-
-type transportEncodingContract struct {
-	ComponentMax       int `json:"component_max"`
-	MaxTransportLength int `json:"max_transport_length"`
-	Fields             struct {
-		Claims    transportFieldContract `json:"claims"`
-		Secret    transportFieldContract `json:"secret"`
-		Signature transportFieldContract `json:"signature"`
-	} `json:"fields"`
-}
-
-func encodeTransportFragment(fragment string, contract transportEncodingContract) (string, error) {
-	if contract.ComponentMax <= 0 || contract.MaxTransportLength <= 0 {
-		return "", fmt.Errorf("transport size bounds must be positive")
-	}
-	parts := strings.Split(fragment, ".")
-	if len(parts) != 4 || parts[0] != "qv2" {
-		return "", fmt.Errorf("canonical fragment has invalid shape")
-	}
-	fields := []struct {
-		name   string
-		value  string
-		limits transportFieldContract
-	}{
-		{name: "claims", value: parts[1], limits: contract.Fields.Claims},
-		{name: "secret", value: parts[2], limits: contract.Fields.Secret},
-		{name: "signature", value: parts[3], limits: contract.Fields.Signature},
-	}
-	counts := make([]string, 0, 3)
-	chunks := make([]string, 0)
-	for _, field := range fields {
-		if field.limits.MaxEncodedLength <= 0 || field.limits.MaxChunks <= 0 {
-			return "", fmt.Errorf("transport %s bounds must be positive", field.name)
-		}
-		if len(field.value) > field.limits.MaxEncodedLength {
-			return "", fmt.Errorf("transport %s exceeds max_encoded_length", field.name)
-		}
-		fieldChunks := make([]string, 0, (len(field.value)+contract.ComponentMax-1)/contract.ComponentMax)
-		for len(field.value) > contract.ComponentMax {
-			fieldChunks = append(fieldChunks, field.value[:contract.ComponentMax])
-			field.value = field.value[contract.ComponentMax:]
-		}
-		if field.value == "" {
-			return "", fmt.Errorf("canonical fragment has empty field")
-		}
-		fieldChunks = append(fieldChunks, field.value)
-		if len(fieldChunks) > field.limits.MaxChunks {
-			return "", fmt.Errorf("transport %s exceeds max_chunks", field.name)
-		}
-		counts = append(counts, fmt.Sprint(len(fieldChunks)))
-		chunks = append(chunks, fieldChunks...)
-	}
-	transport := "qv2t1." + strings.Join(append(counts, chunks...), ".")
-	if len(transport) > contract.MaxTransportLength {
-		return "", fmt.Errorf("transport fragment exceeds max_transport_length")
-	}
-	return transport, nil
-}
-
-func replaceExactJSONString(data []byte, oldValue, newValue string, wantCount int) ([]byte, error) {
-	oldJSON, err := marshalJSONString(oldValue)
-	if err != nil {
-		return nil, err
-	}
-	newJSON, err := marshalJSONString(newValue)
-	if err != nil {
-		return nil, err
-	}
-	if got := bytes.Count(data, oldJSON); got != wantCount {
-		return nil, fmt.Errorf("JSON string replacement found %d copies, want %d", got, wantCount)
-	}
-	return bytes.ReplaceAll(data, oldJSON, newJSON), nil
-}
-
-func marshalJSONString(value string) ([]byte, error) {
-	var encoded bytes.Buffer
-	encoder := json.NewEncoder(&encoded)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
-	}
-	return bytes.TrimSuffix(encoded.Bytes(), []byte{'\n'}), nil
-}
-
-// fixedP256PrivateKey returns a public, vector-only key. Stable key material
-// keeps a claims-only edit from also rotating the issuer and resource public
-// keys. The committed signatures remain non-reproducible because ECDSA uses a
-// random nonce.
-func fixedP256PrivateKey(fill byte) (*ecdsa.PrivateKey, error) {
-	curve := elliptic.P256()
-	scalarBytes := bytes.Repeat([]byte{fill}, 32)
-	d := new(big.Int).SetBytes(scalarBytes)
-	if d.Sign() <= 0 || d.Cmp(curve.Params().N) >= 0 {
-		return nil, fmt.Errorf("fixed P-256 scalar is out of range")
-	}
-	x, y := curve.ScalarBaseMult(scalarBytes)
-	return &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: curve, X: x, Y: y}, D: d}, nil
 }

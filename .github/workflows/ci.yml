@@ -49,8 +49,11 @@ jobs:
       - name: Generator helper tests
         working-directory: tools/gen
         run: |
-          go test -count=1 ./...
-          go vet ./...
+          # Only the dependency-free helper package runs in CI. The one-shot
+          # generator imports qurl-go, which is a consumer of this artifact and
+          # must never become an authoritative conformance gate.
+          go test -count=1 ./internal/...
+          go vet ./internal/...
 
       - name: Root module must be dependency-free
         run: |
