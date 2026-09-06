@@ -165,6 +165,7 @@ func TestTargetPathSecurityCasesHaveIndependentClassPins(t *testing.T) {
 		"reject_suffix_host":                        TargetPathRejectNotAbsolute,
 		"reject_absolute_url":                       TargetPathRejectNotAbsolute,
 		"reject_relative_path":                      TargetPathRejectNotAbsolute,
+		"reject_query_only":                         TargetPathRejectNotAbsolute,
 		"reject_leading_space":                      TargetPathRejectNotAbsolute,
 		"reject_protocol_relative_authority":        TargetPathRejectAuthority,
 		"reject_authority_semicolon":                TargetPathRejectAuthority,

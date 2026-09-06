@@ -625,11 +625,15 @@ jobs:
               cridValues.reject_trailing_bits.reject_class !== 'non_canonical' ||
               cridValues.reject_checksum.reject_class !== 'checksum' ||
               tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
+              tp.contract.wire_field !== 'target_path' ||
               tp.contract.max_bytes !== 2048 ||
+              tp.contract.omitted_semantics !== 'bare_origin' ||
+              tp.contract.explicit_empty_semantics !== 'reject' ||
               tp.contract.accepted_character_set !== 'raw_ascii_canonical_uri_path_and_query' ||
               tp.contract.allowed_ascii !== "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-" ||
               tp.contract.query_delimiter !== 'first_question_mark' ||
               tp.contract.validation_order.join(',') !== 'presence,whole_value_empty,whole_value_utf8_byte_length,whole_value_leading_slash,whole_value_protocol_relative_authority,whole_value_raw_ascii_character_set,split_path_at_first_query_delimiter,path_semicolon,whole_value_percent_syntax,path_encoded_dot,path_literal_dot_segment,path_escape_or_interior_empty_segment,accept' ||
+              tp.contract.accepted_value_handling !== 'preserve_exact_bytes' ||
               tp.contract.percent_encoding_handling !== 'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode' ||
               tp.cases.length === 0 ||
               !deviceApiKeyCanonical) {
@@ -1191,7 +1195,10 @@ jobs:
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
           assert tp['cases']
+          assert tp['contract']['wire_field'] == 'target_path'
           assert tp['contract']['max_bytes'] == 2048
+          assert tp['contract']['omitted_semantics'] == 'bare_origin'
+          assert tp['contract']['explicit_empty_semantics'] == 'reject'
           assert tp['contract']['accepted_character_set'] == 'raw_ascii_canonical_uri_path_and_query'
           assert tp['contract']['allowed_ascii'] == "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
           assert tp['contract']['query_delimiter'] == 'first_question_mark'
@@ -1202,6 +1209,7 @@ jobs:
               'path_semicolon', 'whole_value_percent_syntax', 'path_encoded_dot',
               'path_literal_dot_segment', 'path_escape_or_interior_empty_segment', 'accept',
           ]
+          assert tp['contract']['accepted_value_handling'] == 'preserve_exact_bytes'
           assert tp['contract']['percent_encoding_handling'] == (
               'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode'
           )

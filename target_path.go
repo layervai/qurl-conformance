@@ -152,6 +152,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_userinfo_origin_concatenation":      {present: true, value: targetPathValue("@evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
+	"reject_query_only":                         {present: true, value: targetPathValue("?a=b")},
 	"reject_leading_space":                      {present: true, value: targetPathValue(" /view/x")},
 	"reject_relative_invalid_character":         {present: true, value: targetPathValue("view/a[b]")},
 	"reject_relative_dot_segment_precedence":    {present: true, value: targetPathValue("../etc/passwd")},

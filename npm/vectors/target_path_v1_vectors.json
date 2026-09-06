@@ -246,6 +246,13 @@
       "reject_class": "not_absolute"
     },
     {
+      "name": "reject_query_only",
+      "present": true,
+      "value": "?a=b",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
       "name": "reject_leading_space",
       "present": true,
       "value": " /view/x",
