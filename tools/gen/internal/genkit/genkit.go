@@ -55,15 +55,16 @@ func EncodeTransportFragment(fragment string, contract TransportEncodingContract
 		if len(field.value) > field.limits.MaxEncodedLength {
 			return "", fmt.Errorf("transport %s exceeds max_encoded_length", field.name)
 		}
-		fieldChunks := make([]string, 0, (len(field.value)+contract.ComponentMax-1)/contract.ComponentMax)
-		for len(field.value) > contract.ComponentMax {
-			fieldChunks = append(fieldChunks, field.value[:contract.ComponentMax])
-			field.value = field.value[contract.ComponentMax:]
+		remaining := field.value
+		fieldChunks := make([]string, 0, (len(remaining)+contract.ComponentMax-1)/contract.ComponentMax)
+		for len(remaining) > contract.ComponentMax {
+			fieldChunks = append(fieldChunks, remaining[:contract.ComponentMax])
+			remaining = remaining[contract.ComponentMax:]
 		}
-		if field.value == "" {
+		if remaining == "" {
 			return "", fmt.Errorf("canonical fragment has empty field")
 		}
-		fieldChunks = append(fieldChunks, field.value)
+		fieldChunks = append(fieldChunks, remaining)
 		if len(fieldChunks) > field.limits.MaxChunks {
 			return "", fmt.Errorf("transport %s exceeds max_chunks", field.name)
 		}
@@ -95,6 +96,9 @@ func ReplaceExactJSONString(data []byte, oldValue, newValue string, wantCount in
 func marshalJSONString(value string) ([]byte, error) {
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)
+	// Vector fragments use the base64url alphabet and never contain HTML
+	// metacharacters. Disable HTML escaping so the byte replacement stays an
+	// exact JSON-string operation if this helper later receives such a value.
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(value); err != nil {
 		return nil, err

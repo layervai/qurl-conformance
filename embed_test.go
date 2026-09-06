@@ -130,6 +130,9 @@ func TestEmbeddedTransportContractAndVectors(t *testing.T) {
 		}
 		byName[v.Name] = v
 
+		// Every accept case passes through the real artifact decoder. This proves
+		// that the committed chunk sequence reconstructs its declared canonical
+		// fragment, including cases that preserve unusual presented order.
 		gotCanonical, decodeErr := decodeConformanceTransport(tc, v.TransportFragment)
 		switch v.Expect {
 		case ExpectAccept:
@@ -173,9 +176,16 @@ func TestEmbeddedTransportContractAndVectors(t *testing.T) {
 		t.Errorf("maximum transport length = %d, want %d", got, want)
 	}
 	realVector := byName["accept_valid_qv2_round_trip"]
+	legacyOuterVector, ok := byName["reject_legacy_qv2_outer_transport"]
+	if !ok {
+		t.Fatal("transport class has no legacy outer-transport reject fixture")
+	}
 	fragmentVector := cf.Classes["fragment"].Vectors[0]
 	if realVector.CanonicalFragment != fragmentVector.Fragment {
 		t.Error("valid qv2t1 round trip does not reconstruct the canonical fragment accept fixture")
+	}
+	if legacyOuterVector.TransportFragment != fragmentVector.Fragment {
+		t.Error("legacy outer-transport reject is not the byte-exact canonical inner fragment")
 	}
 }
 
