@@ -66,6 +66,7 @@ jobs:
           node <<'NODE'
           const assert = require('node:assert/strict');
           const crypto = require('node:crypto');
+          const fs = require('node:fs');
           const net = require('node:net');
           const c = require('./npm');
 
@@ -89,6 +90,10 @@ jobs:
             delegatedMintIssueV1Vectors: 'delegated_mint_issue_v1_vectors.json',
           };
           assert.deepEqual(Object.keys(c).sort(), Object.keys(files).sort());
+          assert.deepEqual(
+            fs.readdirSync('./npm/vectors').filter(file => file.endsWith('.json')).sort(),
+            Object.values(files).sort(),
+          );
           for (const [accessor, file] of Object.entries(files)) {
             assert.deepEqual(c[accessor](), require('./npm/vectors/' + file));
           }
@@ -350,6 +355,7 @@ jobs:
               name for name, value in vars(q).items()
               if name.endswith('_vectors') and callable(value)
           } == set(files)
+          assert {path.name for path in Path('qurl_conformance/_data').glob('*.json')} == set(files.values())
           for accessor, file in files.items():
               expected = json.loads((Path('qurl_conformance/_data') / file).read_text())
               assert getattr(q, accessor)() == expected

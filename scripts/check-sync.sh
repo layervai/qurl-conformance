@@ -10,6 +10,7 @@ for path in vectors/*.json; do
   fi
 done
 for path in npm/vectors/*.json python/qurl_conformance/_data/*.json; do
+  [ -e "$path" ] || continue
   if [ ! -f "vectors/${path##*/}" ]; then
     echo "ORPHAN mirror $path"; fail=1
   fi
