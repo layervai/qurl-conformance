@@ -39,6 +39,7 @@ func run() error {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		return err
 	}
+	file.Contract = conformance.DelegatedMintIssueV1ContractValue()
 	initialKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
@@ -55,10 +56,25 @@ func run() error {
 			return err
 		}
 	}
+	file.WrongEndpointSigned = file.Golden
+	file.WrongEndpointSigned.Authority = "alternate.internal.sandbox.layerv.ai"
+	file.WrongEndpointSigned.Nonce = base64.RawURLEncoding.EncodeToString([]byte{
+		0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+		0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+	})
+	if err := rotateGolden(&file.WrongEndpointSigned, initialKey); err != nil {
+		return err
+	}
+	file.NonceReuseSigned = file.RefreshGolden
+	file.NonceReuseSigned.Nonce = file.Golden.Nonce
+	if err := rotateGolden(&file.NonceReuseSigned, refreshKey); err != nil {
+		return err
+	}
 	file.RejectCases, err = conformance.DelegatedMintIssueV1RejectCases(file.Golden)
 	if err != nil {
 		return err
 	}
+	file.StateCases = conformance.DelegatedMintIssueV1StateCases(file)
 	out, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return err

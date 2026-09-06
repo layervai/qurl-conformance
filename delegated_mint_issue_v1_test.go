@@ -21,7 +21,13 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	if file.Artifact != DelegatedMintIssueV1ArtifactID || file.SchemaVersion != DelegatedMintIssueV1SchemaVersion {
 		t.Fatalf("identity = %q/v%d", file.Artifact, file.SchemaVersion)
 	}
-	for _, golden := range []DelegatedMintIssueV1Golden{file.Golden, file.RetryGolden, file.RefreshGolden} {
+	for _, golden := range []DelegatedMintIssueV1Golden{
+		file.Golden,
+		file.RetryGolden,
+		file.RefreshGolden,
+		file.WrongEndpointSigned,
+		file.NonceReuseSigned,
+	} {
 		canonical, err := DelegatedMintIssueV1CanonicalBytes(golden)
 		if err != nil {
 			t.Fatal(err)
@@ -34,7 +40,8 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		!strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
-	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 600 ||
+	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 900 ||
+		file.Contract.NonceReplayRetentionSeconds <= 2*file.Contract.TimestampMaxSkewSeconds ||
 		file.Contract.AuthorityBindingRule != DelegatedMintIssueV1AuthorityBindingRule ||
 		file.Contract.ExpiryEncoding != DelegatedMintIssueV1ExpiryEncoding ||
 		file.Contract.SuccessReconciliationRule != "authority_expiry_equals_immutable_operation_authority_capability_expiry_is_canonical_and_not_after_authority_expired_capability_advances_generation" ||
@@ -49,11 +56,16 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		!slices.Equal(file.Contract.OperationIdentityFields, []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key"}) ||
 		!slices.Equal(file.Contract.AuthorityFingerprintFields, []string{"upload_request_digest", "content_sha256", "byte_size", "media_type", "display_filename", "audience_key_id", "target_path", "max_batch_size", "max_link_ttl_seconds", "authority_expires_at", "service_owned_issuer_policy_fingerprint"}) ||
 		!slices.Equal(file.Contract.EnvelopeFingerprintFields, []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"}) ||
-		!slices.Equal(file.Contract.RejectClasses, []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar"}) {
+		!slices.Equal(file.Contract.RejectClasses, []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar", "signature_mismatch"}) ||
+		!slices.Equal(file.Contract.StateOutcomes, []string{"issue_new", "return_durable_result", "reject"}) ||
+		!slices.Equal(file.Contract.StateMutations, []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"}) {
 		t.Fatalf("freshness/replay/expiry authority contract drifted: %+v", file.Contract)
 	}
-	if len(file.RejectCases) != 8 {
-		t.Fatalf("reject case count = %d, want 8", len(file.RejectCases))
+	if len(file.RejectCases) != 9 {
+		t.Fatalf("reject case count = %d, want 9", len(file.RejectCases))
+	}
+	if len(file.StateCases) != 7 {
+		t.Fatalf("state case count = %d, want 7", len(file.StateCases))
 	}
 	var body struct {
 		UploadHandle        string `json:"upload_handle"`
@@ -139,14 +151,15 @@ func TestDelegatedMintIssueV1PublishedRejectsFailClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantClasses := map[string]string{
-		"reject_padded_signature":           "signature_encoding",
-		"reject_noncanonical_signature_der": "signature_encoding",
-		"reject_high_s_signature":           "signature_malleability",
-		"reject_zero_r_signature":           "signature_scalar",
-		"reject_oversize_body":              "body_size",
-		"reject_bad_idempotency_key":        "idempotency_key",
-		"reject_uppercase_authority":        "authority",
-		"reject_short_nonce":                "nonce",
+		"reject_padded_signature":             "signature_encoding",
+		"reject_noncanonical_signature_der":   "signature_encoding",
+		"reject_high_s_signature":             "signature_malleability",
+		"reject_zero_r_signature":             "signature_scalar",
+		"reject_oversize_body":                "body_size",
+		"reject_bad_idempotency_key":          "idempotency_key",
+		"reject_uppercase_authority":          "authority",
+		"reject_short_nonce":                  "nonce",
+		"reject_changed_body_stale_signature": "signature_mismatch",
 	}
 	for _, reject := range file.RejectCases {
 		t.Run(reject.Name, func(t *testing.T) {
@@ -157,8 +170,8 @@ func TestDelegatedMintIssueV1PublishedRejectsFailClosed(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := validateDelegatedMintIssueV1Golden(mutated); err == nil {
-				t.Fatal("published reject was accepted")
+			if got := delegatedMintIssueV1RejectClass(mutated); got != reject.RejectClass {
+				t.Fatalf("published reject classified as %q, want %q", got, reject.RejectClass)
 			}
 		})
 	}
@@ -244,10 +257,45 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 		}},
 		{name: "nonce", change: func(file *DelegatedMintIssueV1File) { file.Golden.Nonce = "AA" }},
 		{name: "idempotency", change: func(file *DelegatedMintIssueV1File) { file.Golden.IdempotencyKey = "bad key" }},
+		{name: "signed alternate endpoint", change: func(file *DelegatedMintIssueV1File) {
+			file.WrongEndpointSigned.SignatureDERB64URL = file.Golden.SignatureDERB64URL
+		}},
+		{name: "state case", change: func(file *DelegatedMintIssueV1File) { file.StateCases[0].Outcome = "future" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ParseDelegatedMintIssueV1File(mutate(t, test.change)); err == nil {
 				t.Fatal("mutated artifact unexpectedly accepted")
+			}
+		})
+	}
+}
+
+func TestDelegatedMintIssueV1RelationsRejectKeyRotationDrift(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		change func(*DelegatedMintIssueV1File)
+	}{
+		{name: "rotated kid", change: func(changed *DelegatedMintIssueV1File) {
+			changed.RetryGolden.KID = changed.Golden.KID
+		}},
+		{name: "rotated public key", change: func(changed *DelegatedMintIssueV1File) {
+			changed.RetryGolden.PublicKeyDERB64URL = changed.Golden.PublicKeyDERB64URL
+		}},
+		{name: "nonce reuse key", change: func(changed *DelegatedMintIssueV1File) {
+			changed.NonceReuseSigned.PublicKeyDERB64URL = changed.Golden.PublicKeyDERB64URL
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			changed := *file
+			test.change(&changed)
+			if err := validateDelegatedMintIssueV1Relations(&changed); err == nil {
+				t.Fatal("rotation drift was accepted")
 			}
 		})
 	}
@@ -327,6 +375,9 @@ func TestDelegatedMintIssueV1RenewalCannotWidenAuthority(t *testing.T) {
 		},
 		"fractional expiry": func(golden *DelegatedMintIssueV1Golden) {
 			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"capability_expires_at":"2026-09-06T00:00:00Z"`, `"capability_expires_at":"2026-09-06T00:00:00.000Z"`, 1)
+		},
+		"lowercase-z expiry": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"capability_expires_at":"2026-09-06T00:00:00Z"`, `"capability_expires_at":"2026-09-06T00:00:00z"`, 1)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

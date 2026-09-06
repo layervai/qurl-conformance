@@ -26,12 +26,12 @@ method, route, and authority to equal its configured endpoint. A valid signature
 for a different service authority is not valid for this receiver.
 
 The service accepts a signed request timestamp only within 300 seconds of its
-current UTC time. It stores an accepted nonce for at least 600 seconds from
-first acceptance. This retention covers the full symmetric timestamp window:
-one request can arrive 300 seconds early and a replay can arrive 300 seconds
-late. An exact idempotent replay can return its durable result, but the same
-issuer and key cannot use that nonce for a different operation. These two
-bounds are part of v1 and are not local producer retry settings.
+current UTC time. It stores an accepted nonce for 900 seconds from first
+acceptance. The nonce retention must be strictly greater than twice the
+timestamp skew. An exact idempotent replay can return its durable result after
+nonce retention ends, but the same issuer cannot use a retained nonce for a
+different operation. These bounds are part of v1 and are not local producer
+retry settings.
 
 The service first validates request shape and verifies the signature. It then
 does a durable operation lookup before it applies timestamp freshness. A
@@ -91,8 +91,28 @@ twin. It must not normalize an untrusted signature.
 `reject_cases` publishes concrete cross-language rejection inputs. `replace`
 sets the named golden field to `value`. `ascii_repeat` sets it to `value`
 repeated `repeat` times; v1 uses that recipe to keep the 8,193-byte body case
-compact. Each case uses the `golden` object as its base. A consumer must reject
-each result with the listed closed `reject_class`; it must not repair the input.
+compact. `append` adds `value` to the named field. The changed-body case adds
+valid JSON whitespace but retains the old signature. Each case uses the
+`golden` object as its base. All derived fields in a mutated input, including
+the body hash, canonical bytes, signing digest, and signature result, cease to
+be assertions after a recipe is applied. A consumer recomputes them from the
+mutated request and returns the listed closed `reject_class`. It must not repair
+the input.
+
+`wrong_endpoint_signed` and `nonce_reuse_signed` are complete inputs with valid
+canonical low-S signatures. The first is signed for another authority, so it is
+not valid at the configured receiver. The second uses the initial operation's
+nonce for the distinct generation-two operation. Signature success alone does
+not authorize either request.
+
+`state_cases` publishes the seven required receiver transitions. It covers a
+first issue, an exact stale replay after nonce expiry, a fresh reconciliation,
+an authenticated stale strong miss, an alternate endpoint, a nonce reused by a
+different operation, and a stale non-exact retry. Each case names its complete
+signed input, prior durable operation and nonce state, receiver time, status,
+public error code, state mutation, and response source. The `outcome` and
+`mutation` values are closed by the contract lists. A receiver must not replace
+a listed rejection with a state write.
 
 The Connector selects neither the service-owned resource nor an arbitrary path
 namespace. The issuer service loads both from issuer policy. The signed body

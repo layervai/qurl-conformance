@@ -48,12 +48,14 @@ const (
 	DelegatedMintIssueV1BodyMaxBytes                = 8192
 	DelegatedMintIssueV1SuccessStatus               = 200
 	DelegatedMintIssueV1SuccessContentType          = "application/json"
+	DelegatedMintIssueV1AuthFailureStatus           = 403
+	DelegatedMintIssueV1AuthFailureCode             = "invalid_capability_issue"
 	DelegatedMintIssueV1StaleMissStatus             = 404
 	DelegatedMintIssueV1StaleMissCode               = "issue_operation_not_found"
 	DelegatedMintIssueV1CapabilityTTLSeconds        = 15 * 60
 	DelegatedMintIssueV1AuthorityMaxTTLSeconds      = 24 * 60 * 60
 	DelegatedMintIssueV1TimestampMaxSkewSeconds     = 5 * 60
-	DelegatedMintIssueV1NonceReplayRetentionSeconds = 10 * 60
+	DelegatedMintIssueV1NonceReplayRetentionSeconds = 15 * 60
 	DelegatedMintIssueV1IdempotencyDomain           = "LV-QURL-CAPABILITY-ISSUE-IDEMPOTENCY-V1"
 	DelegatedMintIssueV1IdempotencyDerivation       = "domain_then_zero_then_u32be_length_prefixed_issuer_id_upload_handle_generation_decimal_sha256_base64url_unpadded"
 
@@ -75,14 +77,17 @@ var (
 )
 
 type DelegatedMintIssueV1File struct {
-	Artifact      string                       `json:"artifact"`
-	SchemaVersion int                          `json:"schema_version"`
-	Description   string                       `json:"description"`
-	Contract      DelegatedMintIssueV1Contract `json:"contract"`
-	Golden        DelegatedMintIssueV1Golden   `json:"golden"`
-	RetryGolden   DelegatedMintIssueV1Golden   `json:"retry_golden"`
-	RefreshGolden DelegatedMintIssueV1Golden   `json:"refresh_golden"`
-	RejectCases   []DelegatedMintIssueV1Reject `json:"reject_cases"`
+	Artifact            string                          `json:"artifact"`
+	SchemaVersion       int                             `json:"schema_version"`
+	Description         string                          `json:"description"`
+	Contract            DelegatedMintIssueV1Contract    `json:"contract"`
+	Golden              DelegatedMintIssueV1Golden      `json:"golden"`
+	RetryGolden         DelegatedMintIssueV1Golden      `json:"retry_golden"`
+	RefreshGolden       DelegatedMintIssueV1Golden      `json:"refresh_golden"`
+	WrongEndpointSigned DelegatedMintIssueV1Golden      `json:"wrong_endpoint_signed"`
+	NonceReuseSigned    DelegatedMintIssueV1Golden      `json:"nonce_reuse_signed"`
+	RejectCases         []DelegatedMintIssueV1Reject    `json:"reject_cases"`
+	StateCases          []DelegatedMintIssueV1StateCase `json:"state_cases"`
 }
 
 type DelegatedMintIssueV1Contract struct {
@@ -137,6 +142,8 @@ type DelegatedMintIssueV1Contract struct {
 	IssuerKeyRetentionRule      string   `json:"issuer_key_retention_rule"`
 	ExpiryEncoding              string   `json:"expiry_encoding"`
 	RejectClasses               []string `json:"reject_classes"`
+	StateOutcomes               []string `json:"state_outcomes"`
+	StateMutations              []string `json:"state_mutations"`
 }
 
 type DelegatedMintIssueV1Golden struct {
@@ -168,6 +175,20 @@ type DelegatedMintIssueV1Reject struct {
 	RejectClass string `json:"reject_class"`
 }
 
+type DelegatedMintIssueV1StateCase struct {
+	Name                  string `json:"name"`
+	Input                 string `json:"input"`
+	NowUnix               int64  `json:"now_unix"`
+	PriorOperation        string `json:"prior_operation"`
+	PriorNonce            string `json:"prior_nonce"`
+	Outcome               string `json:"outcome"`
+	Status                int    `json:"status"`
+	ErrorCode             string `json:"error_code"`
+	Mutation              string `json:"mutation"`
+	ResponseSource        string `json:"response_source"`
+	StrongOperationLookup bool   `json:"strong_operation_lookup"`
+}
+
 func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, error) {
 	if !utf8.Valid(data) {
 		return nil, errors.New("conformance: delegated-mint issue file is not valid UTF-8")
@@ -191,6 +212,15 @@ func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, erro
 	if err := validateDelegatedMintIssueV1Golden(file.RefreshGolden); err != nil {
 		return nil, err
 	}
+	if err := validateDelegatedMintIssueV1Golden(file.WrongEndpointSigned); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1Golden(file.NonceReuseSigned); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1Relations(&file); err != nil {
+		return nil, err
+	}
 	if err := validateDelegatedMintIssueV1StaleRetry(file.Golden, file.RetryGolden); err != nil {
 		return nil, err
 	}
@@ -198,6 +228,9 @@ func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, erro
 		return nil, err
 	}
 	if err := validateDelegatedMintIssueV1Rejects(file.Golden, file.RejectCases); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1StateCases(&file); err != nil {
 		return nil, err
 	}
 	return &file, nil
@@ -240,8 +273,10 @@ func DelegatedMintIssueV1CanonicalBytes(golden DelegatedMintIssueV1Golden) ([]by
 	return out, nil
 }
 
-func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract) error {
-	want := DelegatedMintIssueV1Contract{
+// DelegatedMintIssueV1ContractValue returns the exact v1 contract object used
+// by the generator and strict loader.
+func DelegatedMintIssueV1ContractValue() DelegatedMintIssueV1Contract {
+	return DelegatedMintIssueV1Contract{
 		Method: DelegatedMintIssueV1Method, Route: DelegatedMintIssueV1Route,
 		SigningDomainASCII: DelegatedMintIssueV1SigningDomain, SigningDomainSeparator: DelegatedMintIssueV1SigningDomainSeparator,
 		FrameEncoding: DelegatedMintIssueV1FrameEncoding, FieldOrder: delegatedMintIssueV1FieldOrder,
@@ -277,13 +312,19 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		StaleOperationMissCode:      DelegatedMintIssueV1StaleMissCode,
 		IssuerKeyRetentionRule:      "accepted_kid_verifier_retained_until_operation_authority_expires",
 		ExpiryEncoding:              DelegatedMintIssueV1ExpiryEncoding,
-		RejectClasses:               []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar"},
+		RejectClasses:               []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar", "signature_mismatch"},
+		StateOutcomes:               []string{"issue_new", "return_durable_result", "reject"},
+		StateMutations:              []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"},
 	}
+}
+
+func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract) error {
+	want := DelegatedMintIssueV1ContractValue()
 	if !reflect.DeepEqual(contract, want) {
 		return errors.New("conformance: delegated-mint issue contract drift")
 	}
-	if contract.NonceReplayRetentionSeconds < 2*contract.TimestampMaxSkewSeconds {
-		return errors.New("conformance: delegated-mint nonce retention does not cover the timestamp skew window")
+	if contract.NonceReplayRetentionSeconds <= 2*contract.TimestampMaxSkewSeconds {
+		return errors.New("conformance: delegated-mint nonce retention must exceed twice the timestamp skew")
 	}
 	return nil
 }
@@ -378,6 +419,47 @@ func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error
 	}
 	if !ecdsa.Verify(publicKey, digest[:], signature.R, signature.S) {
 		return errors.New("conformance: delegated-mint issue signature verification failed")
+	}
+	return nil
+}
+
+func validateDelegatedMintIssueV1Relations(file *DelegatedMintIssueV1File) error {
+	for _, golden := range []DelegatedMintIssueV1Golden{file.Golden, file.RetryGolden, file.RefreshGolden, file.NonceReuseSigned} {
+		if golden.Method != DelegatedMintIssueV1Method || golden.Authority != file.Golden.Authority ||
+			golden.Route != DelegatedMintIssueV1Route || golden.IssuerID != file.Golden.IssuerID {
+			return errors.New("conformance: delegated-mint configured endpoint relation is invalid")
+		}
+	}
+	if file.WrongEndpointSigned.Method != DelegatedMintIssueV1Method ||
+		file.WrongEndpointSigned.Route != DelegatedMintIssueV1Route ||
+		file.WrongEndpointSigned.Authority == file.Golden.Authority {
+		return errors.New("conformance: delegated-mint alternate endpoint relation is invalid")
+	}
+	if file.WrongEndpointSigned.KID != file.Golden.KID ||
+		file.WrongEndpointSigned.PublicKeyDERB64URL != file.Golden.PublicKeyDERB64URL ||
+		file.WrongEndpointSigned.IssuerID != file.Golden.IssuerID ||
+		file.WrongEndpointSigned.BodyUTF8 != file.Golden.BodyUTF8 ||
+		file.WrongEndpointSigned.IdempotencyKey != file.Golden.IdempotencyKey ||
+		file.WrongEndpointSigned.IdempotencyPreimageHex != file.Golden.IdempotencyPreimageHex ||
+		file.WrongEndpointSigned.TimestampUnix != file.Golden.TimestampUnix ||
+		file.WrongEndpointSigned.Nonce == file.Golden.Nonce {
+		return errors.New("conformance: delegated-mint alternate endpoint signed input drifted")
+	}
+	if file.Golden.KID == file.RetryGolden.KID ||
+		file.Golden.PublicKeyDERB64URL == file.RetryGolden.PublicKeyDERB64URL ||
+		file.RetryGolden.KID != file.RefreshGolden.KID ||
+		file.RetryGolden.PublicKeyDERB64URL != file.RefreshGolden.PublicKeyDERB64URL ||
+		file.NonceReuseSigned.KID != file.RefreshGolden.KID ||
+		file.NonceReuseSigned.PublicKeyDERB64URL != file.RefreshGolden.PublicKeyDERB64URL {
+		return errors.New("conformance: delegated-mint issuer key rotation relation is invalid")
+	}
+	if file.NonceReuseSigned.Nonce != file.Golden.Nonce ||
+		file.NonceReuseSigned.Nonce == file.RefreshGolden.Nonce ||
+		file.NonceReuseSigned.IdempotencyKey != file.RefreshGolden.IdempotencyKey ||
+		file.NonceReuseSigned.IdempotencyPreimageHex != file.RefreshGolden.IdempotencyPreimageHex ||
+		file.NonceReuseSigned.BodyUTF8 != file.RefreshGolden.BodyUTF8 ||
+		file.NonceReuseSigned.TimestampUnix != file.RefreshGolden.TimestampUnix {
+		return errors.New("conformance: delegated-mint signed nonce-reuse input drifted")
 	}
 	return nil
 }
@@ -497,11 +579,71 @@ func validateDelegatedMintIssueV1Rejects(golden DelegatedMintIssueV1Golden, reje
 		if err != nil {
 			return err
 		}
-		if err := validateDelegatedMintIssueV1Golden(mutated); err == nil {
-			return fmt.Errorf("conformance: delegated-mint reject vector %q was accepted", reject.Name)
+		if got := delegatedMintIssueV1RejectClass(mutated); got != reject.RejectClass {
+			return fmt.Errorf("conformance: delegated-mint reject vector %q classified as %q, want %q", reject.Name, got, reject.RejectClass)
 		}
 	}
 	return nil
+}
+
+func validateDelegatedMintIssueV1StateCases(file *DelegatedMintIssueV1File) error {
+	want := DelegatedMintIssueV1StateCases(*file)
+	if !reflect.DeepEqual(file.StateCases, want) {
+		return errors.New("conformance: delegated-mint state vectors drift")
+	}
+	return nil
+}
+
+// DelegatedMintIssueV1StateCases derives the complete v1 receiver state table.
+// The vector generator stores this result with each test-key rotation.
+func DelegatedMintIssueV1StateCases(file DelegatedMintIssueV1File) []DelegatedMintIssueV1StateCase {
+	return []DelegatedMintIssueV1StateCase{
+		{
+			Name: "first_issue", Input: "golden", NowUnix: file.Golden.TimestampUnix,
+			PriorOperation: "absent", PriorNonce: "absent", Outcome: "issue_new",
+			Status: DelegatedMintIssueV1SuccessStatus, Mutation: "store_operation_and_bind_nonce",
+			ResponseSource: "new_durable_result", StrongOperationLookup: true,
+		},
+		{
+			Name: "exact_stale_replay", Input: "golden",
+			NowUnix:        file.Golden.TimestampUnix + int64(DelegatedMintIssueV1NonceReplayRetentionSeconds) + 1,
+			PriorOperation: "golden_committed", PriorNonce: "expired", Outcome: "return_durable_result",
+			Status: DelegatedMintIssueV1SuccessStatus, Mutation: "none",
+			ResponseSource: "golden_durable_result", StrongOperationLookup: true,
+		},
+		{
+			Name: "fresh_reconciliation", Input: "retry_golden", NowUnix: file.RetryGolden.TimestampUnix,
+			PriorOperation: "golden_committed", PriorNonce: "absent", Outcome: "return_durable_result",
+			Status: DelegatedMintIssueV1SuccessStatus, Mutation: "bind_nonce_to_existing_operation",
+			ResponseSource: "golden_durable_result", StrongOperationLookup: true,
+		},
+		{
+			Name: "stale_unseen", Input: "golden",
+			NowUnix:        file.Golden.TimestampUnix + int64(DelegatedMintIssueV1TimestampMaxSkewSeconds) + 1,
+			PriorOperation: "absent", PriorNonce: "absent", Outcome: "reject",
+			Status: DelegatedMintIssueV1StaleMissStatus, ErrorCode: DelegatedMintIssueV1StaleMissCode,
+			Mutation: "none", ResponseSource: "none", StrongOperationLookup: true,
+		},
+		{
+			Name: "alternate_endpoint", Input: "wrong_endpoint_signed", NowUnix: file.WrongEndpointSigned.TimestampUnix,
+			PriorOperation: "absent", PriorNonce: "absent", Outcome: "reject",
+			Status: DelegatedMintIssueV1AuthFailureStatus, ErrorCode: DelegatedMintIssueV1AuthFailureCode,
+			Mutation: "none", ResponseSource: "none", StrongOperationLookup: false,
+		},
+		{
+			Name: "reused_nonce_across_operation", Input: "nonce_reuse_signed", NowUnix: file.NonceReuseSigned.TimestampUnix,
+			PriorOperation: "absent", PriorNonce: "golden_bound_to_golden_operation", Outcome: "reject",
+			Status: DelegatedMintIssueV1AuthFailureStatus, ErrorCode: DelegatedMintIssueV1AuthFailureCode,
+			Mutation: "none", ResponseSource: "none", StrongOperationLookup: true,
+		},
+		{
+			Name: "stale_non_exact_retry", Input: "retry_golden",
+			NowUnix:        file.RetryGolden.TimestampUnix + int64(DelegatedMintIssueV1TimestampMaxSkewSeconds) + 1,
+			PriorOperation: "golden_committed", PriorNonce: "absent", Outcome: "reject",
+			Status: DelegatedMintIssueV1AuthFailureStatus, ErrorCode: DelegatedMintIssueV1AuthFailureCode,
+			Mutation: "none", ResponseSource: "none", StrongOperationLookup: true,
+		},
+	}
 }
 
 // DelegatedMintIssueV1RejectCases derives the frozen negative vectors from an
@@ -543,6 +685,7 @@ func DelegatedMintIssueV1RejectCases(golden DelegatedMintIssueV1Golden) ([]Deleg
 		{Name: "reject_bad_idempotency_key", Base: "golden", Field: "idempotency_key", Operation: "replace", Value: "bad key", Outcome: "reject", RejectClass: "idempotency_key"},
 		{Name: "reject_uppercase_authority", Base: "golden", Field: "authority", Operation: "replace", Value: strings.ToUpper(golden.Authority), Outcome: "reject", RejectClass: "authority"},
 		{Name: "reject_short_nonce", Base: "golden", Field: "nonce", Operation: "replace", Value: "AA", Outcome: "reject", RejectClass: "nonce"},
+		{Name: "reject_changed_body_stale_signature", Base: "golden", Field: "body_utf8", Operation: "append", Value: "\n", Outcome: "reject", RejectClass: "signature_mismatch"},
 	}, nil
 }
 
@@ -561,6 +704,10 @@ func delegatedMintIssueV1ApplyReject(golden DelegatedMintIssueV1Golden, reject D
 			return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an invalid repeat recipe", reject.Name)
 		}
 		value = strings.Repeat(reject.Value, reject.Repeat)
+	case "append":
+		if reject.Value == "" || reject.Repeat != 0 {
+			return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an invalid append recipe", reject.Name)
+		}
 	default:
 		return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an unknown operation", reject.Name)
 	}
@@ -579,6 +726,65 @@ func delegatedMintIssueV1ApplyReject(golden DelegatedMintIssueV1Golden, reject D
 		return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an unknown field", reject.Name)
 	}
 	return golden, nil
+}
+
+func delegatedMintIssueV1RejectClass(golden DelegatedMintIssueV1Golden) string {
+	if len(golden.BodyUTF8) > DelegatedMintIssueV1BodyMaxBytes || !utf8.ValidString(golden.BodyUTF8) {
+		return "body_size"
+	}
+	if !validDelegatedMintIssueV1Authority(golden.Authority) {
+		return "authority"
+	}
+	if !delegatedMintIssueV1IdempotencyPattern.MatchString(golden.IdempotencyKey) ||
+		len(golden.IdempotencyKey) < DelegatedMintIssueV1IdempotencyKeyMinBytes ||
+		len(golden.IdempotencyKey) > DelegatedMintIssueV1IdempotencyKeyMaxBytes {
+		return "idempotency_key"
+	}
+	nonce, err := decodeDelegatedMintIssueV1Base64URL(golden.Nonce)
+	if err != nil || len(nonce) != DelegatedMintIssueV1NonceBytes {
+		return "nonce"
+	}
+	signatureDER, err := decodeDelegatedMintIssueV1Base64URL(golden.SignatureDERB64URL)
+	if err != nil {
+		return "signature_encoding"
+	}
+	var signature struct{ R, S *big.Int }
+	rest, err := asn1.Unmarshal(signatureDER, &signature)
+	if err != nil || len(rest) != 0 || signature.R == nil || signature.S == nil {
+		return "signature_encoding"
+	}
+	canonicalDER, err := asn1.Marshal(signature)
+	if err != nil || !bytes.Equal(canonicalDER, signatureDER) {
+		return "signature_encoding"
+	}
+	n := elliptic.P256().Params().N
+	halfN := new(big.Int).Rsh(new(big.Int).Set(n), 1)
+	if signature.R.Sign() <= 0 || signature.R.Cmp(n) >= 0 || signature.S.Sign() <= 0 || signature.S.Cmp(n) >= 0 {
+		return "signature_scalar"
+	}
+	if signature.S.Cmp(halfN) > 0 {
+		return "signature_malleability"
+	}
+	publicDER, err := decodeDelegatedMintIssueV1Base64URL(golden.PublicKeyDERB64URL)
+	if err != nil {
+		return "signature_mismatch"
+	}
+	parsed, err := x509.ParsePKIXPublicKey(publicDER)
+	publicKey, ok := parsed.(*ecdsa.PublicKey)
+	if err != nil || !ok || publicKey.Curve != elliptic.P256() {
+		return "signature_mismatch"
+	}
+	bodyDigest := sha256.Sum256([]byte(golden.BodyUTF8))
+	golden.BodySHA256 = hex.EncodeToString(bodyDigest[:])
+	canonical, err := DelegatedMintIssueV1CanonicalBytes(golden)
+	if err != nil {
+		return "signature_mismatch"
+	}
+	digest := sha256.Sum256(canonical)
+	if !ecdsa.Verify(publicKey, digest[:], signature.R, signature.S) {
+		return "signature_mismatch"
+	}
+	return ""
 }
 
 func delegatedMintIssueV1CanonicalExpiry(encoded string, parsed time.Time) bool {

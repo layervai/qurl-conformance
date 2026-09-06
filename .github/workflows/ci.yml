@@ -96,6 +96,31 @@ jobs:
             prefix.writeUInt32BE(bytes.length);
             return Buffer.concat([prefix, bytes]);
           };
+          const dmP256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+          const parseDMSignature = encoded => {
+            if (typeof encoded !== 'string' || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+            const der = Buffer.from(encoded, 'base64url');
+            if (der.toString('base64url') !== encoded || der.length > 72 || der.length < 8) return null;
+            let offset = 0;
+            if (der[offset++] !== 0x30) return null;
+            const sequenceLength = der[offset++];
+            if (sequenceLength >= 0x80 || sequenceLength !== der.length - offset) return null;
+            const readInteger = () => {
+              if (der[offset++] !== 0x02) return null;
+              const length = der[offset++];
+              if (length < 1 || length > 33 || offset + length > der.length) return null;
+              const value = der.subarray(offset, offset + length);
+              offset += length;
+              if ((value[0] & 0x80) !== 0 ||
+                  (value.length > 1 && value[0] === 0 && (value[1] & 0x80) === 0)) return null;
+              return BigInt(`0x${value.toString('hex')}`);
+            };
+            const r = readInteger();
+            const s = readInteger();
+            if (r === null || s === null || offset !== der.length ||
+                r <= 0n || r >= dmP256Order || s <= 0n || s > dmP256Order / 2n) return null;
+            return der;
+          };
           const verifyDMGolden = golden => {
             const bodyHash = crypto.createHash('sha256').update(golden.body_utf8, 'utf8').digest('hex');
             const canonical = Buffer.concat([
@@ -112,13 +137,15 @@ jobs:
                 body_sha256: bodyHash,
               }[name])),
             ]);
+            const signature = parseDMSignature(golden.signature_der_b64url);
+            if (signature === null) return false;
             return bodyHash === golden.body_sha256 &&
               canonical.toString('hex') === golden.canonical_hex &&
               crypto.createHash('sha256').update(canonical).digest('hex') === golden.signing_digest_hex &&
               crypto.verify(
                 'sha256', canonical,
                 crypto.createPublicKey({key: Buffer.from(golden.public_key_der_b64url, 'base64url'), format: 'der', type: 'spki'}),
-                Buffer.from(golden.signature_der_b64url, 'base64url'),
+                signature,
               );
           };
           const deriveHubRequestId = vector => {
@@ -682,10 +709,16 @@ jobs:
               dm.golden.body_sha256 === dm.retry_golden.body_sha256 ||
               dm.golden.kid === dm.refresh_golden.kid ||
               dm.golden.public_key_der_b64url === dm.refresh_golden.public_key_der_b64url ||
-              dm.reject_cases.length !== 8 || Object.keys(dmRejects).length !== 8 ||
+              dm.contract.nonce_replay_retention_seconds !== 900 ||
+              dm.contract.nonce_replay_retention_seconds <= 2 * dm.contract.timestamp_max_skew_seconds ||
+              dm.reject_cases.length !== 9 || Object.keys(dmRejects).length !== 9 ||
+              dm.state_cases.length !== 7 ||
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
               !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
+              !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
+              verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects.reject_high_s_signature.value}) ||
+              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry' ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1294,6 +1327,8 @@ jobs:
           assert dm['contract']['success_envelope'] == 'data'
           assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
           assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
+          assert dm['contract']['nonce_replay_retention_seconds'] == 900
+          assert dm['contract']['nonce_replay_retention_seconds'] > 2 * dm['contract']['timestamp_max_skew_seconds']
           assert dm['contract']['external_operation_commit_rule'] == 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request'
           assert dm['contract']['stale_operation_miss_status'] == 404
           assert dm['contract']['stale_operation_miss_code'] == 'issue_operation_not_found'
@@ -1303,10 +1338,22 @@ jobs:
           assert dm['golden']['body_sha256'] != dm['retry_golden']['body_sha256']
           assert dm['golden']['kid'] != dm['refresh_golden']['kid']
           assert dm['golden']['public_key_der_b64url'] != dm['refresh_golden']['public_key_der_b64url']
-          assert len(dm['reject_cases']) == 8 and len(dm_rejects) == 8
+          assert len(dm['reject_cases']) == 9 and len(dm_rejects) == 9
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
-          assert verify_dm_golden(dm['golden']) and verify_dm_golden(dm['retry_golden']) and verify_dm_golden(dm['refresh_golden'])
+          assert len(dm['state_cases']) == 7
+          assert [case['name'] for case in dm['state_cases']] == [
+              'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'stale_unseen',
+              'alternate_endpoint', 'reused_nonce_across_operation', 'stale_non_exact_retry',
+          ]
+          assert dm['wrong_endpoint_signed']['authority'] != dm['golden']['authority']
+          assert dm['wrong_endpoint_signed']['public_key_der_b64url'] == dm['golden']['public_key_der_b64url']
+          assert dm['nonce_reuse_signed']['nonce'] == dm['golden']['nonce']
+          assert dm['nonce_reuse_signed']['idempotency_key'] == dm['refresh_golden']['idempotency_key']
+          assert all(verify_dm_golden(golden) for golden in (
+              dm['golden'], dm['retry_golden'], dm['refresh_golden'],
+              dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'],
+          ))
           print('py ok')
           PY
 
