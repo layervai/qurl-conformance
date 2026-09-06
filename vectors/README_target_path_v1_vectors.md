@@ -141,6 +141,10 @@ For every case, pass `present` and `value` through the real public option gate:
 5. For each accepted value, assert that the HTTP client dispatches the exact
    request-target bytes. In particular, it must not decode query escapes before
    validation, authorization, or transmission.
+6. Rebuild each accepted request-target from the URL API's decoded path, with
+   any retained raw or escaped path cleared, and assert byte equality with the
+   accepted value. This catches a serializer that changes authorization bytes
+   only after parsed raw-path state is discarded.
 
 Because v1 rejects every path escape, it cannot represent a resource path that
 requires percent encoding, such as a path that contains a space or non-ASCII
