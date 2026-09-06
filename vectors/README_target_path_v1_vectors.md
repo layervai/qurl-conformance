@@ -22,8 +22,9 @@ and no invalid request leaves the process.
 - It contains URI path and query characters only. Backslash, whitespace,
   controls, `#`, and non-ASCII characters are rejected in both components.
   `contract.allowed_ascii` is the complete machine-readable raw alphabet. A
-  consumer must compare its character gate with this value; it must not infer
-  the alphabet from the examples.
+  consumer must compare its character gate with this value as an unordered set
+  of ASCII bytes; the string order is not normative. It must not infer the
+  alphabet from the examples.
   The validator uses a whole-value full match. It must not use a regular
   expression end anchor that can match before a trailing line terminator.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
@@ -39,7 +40,8 @@ and no invalid request leaves the process.
   The first literal `?` separates the path from the query. Every later `?` is
   query data. Validators do not decode, normalize, recase, or re-encode query
   escapes. Path authorization does not use the query. Consumers must never
-  decode encoded query controls in this validation or authorization layer.
+  decode encoded query controls before validation, authorization, or HTTP
+  dispatch because decoding can turn accepted data into request separators.
 - Resource-type gating is outside this artifact. The authoritative validator
   accepts `target_path` only for a wire `type: tunnel` resource and returns
   `invalid_target_path` for another resource type.
@@ -79,16 +81,19 @@ Every accepted value has `open_supported: true`. This field remains an explicit
 invariant and a reserved compatibility gate even though every v1 accepted case
 is true. Because v1 has no false vector, consumers must also inject a false case
 in a unit test and prove that the open operation rejects it. Appending the value
-to a fixed trusted origin must preserve the scheme, host, path, and complete
-request target bytes. The authoritative opener ignores the query when it authorizes the
-protected request. A scoped path allows the exact path and descendants at a
-segment boundary. For example, `/view/abc` also allows
+to a fixed trusted origin must preserve the scheme, host, and complete resulting
+request-target bytes. The authoritative opener ignores the query when it
+authorizes the protected request. A scoped path allows the exact path and
+descendants at a segment boundary. For example, `/view/abc` also allows
 `/view/abc/thumbnail`, but it does not allow `/view/abcd`.
 
-The authoritative opener preserves one trailing slash on redirect. Its path authorization
-treats a scoped path with or without that trailing slash as the same boundary.
-Changing `open_supported` requires a coordinated release across the validator,
-SDK consumers, and the protected-resource runtime.
+The authoritative opener preserves one trailing slash on redirect. Its path
+authorization treats a scoped path with or without that trailing slash as the
+same boundary. Scope matching, redirect handling, and resource-type gating are
+runtime rules outside the validation cases in this artifact. Each runtime must
+test them separately. Changing `open_supported`, including adding the first
+false case, requires a coordinated loader and artifact release across the
+validator, SDK consumers, and the protected-resource runtime.
 
 ## Consumer algorithm
 
@@ -104,9 +109,11 @@ For every case, pass `present` and `value` through the real public option gate:
    accepted value is true, so add an injected false-branch unit test. A
    coordinated future contract can gate a subset.
 
-Each strict package loader independently derives every outcome and rejects
-missing, duplicate, unknown, or modified cases. All packaged copies are
-byte-identical.
+The Go `ParseTargetPathFile` loader independently derives every outcome and
+rejects missing, duplicate, unknown, or modified cases. The npm and Python
+package accessors return the parsed artifact without strict validation;
+consumers in those languages must run the cases through their own public gate.
+All packaged JSON copies are byte-identical.
 
 ## Lockstep rule
 
