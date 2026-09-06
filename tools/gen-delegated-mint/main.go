@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 
 	conformance "github.com/layervai/qurl-conformance"
 )
@@ -70,11 +71,26 @@ func run() error {
 	if err := rotateGolden(&file.NonceReuseSigned, refreshKey); err != nil {
 		return err
 	}
+	file.AuthorityConflictSigned = file.Golden
+	file.AuthorityConflictSigned.Nonce = base64.RawURLEncoding.EncodeToString([]byte{
+		0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+		0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	})
+	const oldFilename = `"display_filename":"diagram.png"`
+	const conflictFilename = `"display_filename":"diagram-2.png"`
+	if count := strings.Count(file.AuthorityConflictSigned.BodyUTF8, oldFilename); count != 1 {
+		return fmt.Errorf("authority-conflict source filename count = %d, want 1", count)
+	}
+	file.AuthorityConflictSigned.BodyUTF8 = strings.Replace(file.AuthorityConflictSigned.BodyUTF8, oldFilename, conflictFilename, 1)
+	if err := rotateGolden(&file.AuthorityConflictSigned, initialKey); err != nil {
+		return err
+	}
 	file.RejectCases, err = conformance.DelegatedMintIssueV1RejectCases(file.Golden)
 	if err != nil {
 		return err
 	}
 	file.StateCases = conformance.DelegatedMintIssueV1StateCases(file)
+	file.ResponseCases = conformance.DelegatedMintIssueV1ResponseCases()
 	out, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return err

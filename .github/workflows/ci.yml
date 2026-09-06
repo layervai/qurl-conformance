@@ -700,6 +700,8 @@ jobs:
               dm.contract.nonce_decoded_bytes !== 16 || dm.contract.body_max_bytes !== 8192 ||
               dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
               dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
+              dm.contract.error_content_type !== 'application/problem+json' ||
+              dm.contract.body_authority_fields.join(',') !== 'upload_handle,issue_generation,upload_request_digest,content_sha256,byte_size,media_type,display_filename,audience_key_id,target_path,max_batch_size,max_link_ttl_seconds,capability_expires_at,authority_expires_at' ||
               dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
               dm.contract.external_operation_commit_rule !== 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request' ||
               dm.contract.stale_operation_miss_status !== 404 || dm.contract.stale_operation_miss_code !== 'issue_operation_not_found' ||
@@ -712,13 +714,18 @@ jobs:
               dm.contract.nonce_replay_retention_seconds !== 900 ||
               dm.contract.nonce_replay_retention_seconds <= 2 * dm.contract.timestamp_max_skew_seconds ||
               dm.reject_cases.length !== 9 || Object.keys(dmRejects).length !== 9 ||
-              dm.state_cases.length !== 7 ||
+              dm.state_cases.length !== 8 || dm.response_cases.length !== 8 ||
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
               !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
               !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
+              !verifyDMGolden(dm.authority_conflict_signed) ||
               verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects.reject_high_s_signature.value}) ||
-              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry' ||
+              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
+              dm.response_cases.find(v => v.error_code === 'issue_operation_not_found')?.proves_operation_absent !== true ||
+              dm.response_cases.filter(v => v.proves_operation_absent).length !== 1 ||
+              dm.response_cases.find(v => v.error_code === 'rate_limit_exceeded')?.retry_after !== 'positive_integer_seconds' ||
+              dm.response_cases.find(v => v.error_code === 'mutation_outcome_unknown')?.retry_after !== '1' ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1326,6 +1333,12 @@ jobs:
           assert dm['contract']['success_status'] == 200 and dm['contract']['success_content_type'] == 'application/json'
           assert dm['contract']['success_envelope'] == 'data'
           assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
+          assert dm['contract']['error_content_type'] == 'application/problem+json'
+          assert dm['contract']['body_authority_fields'] == [
+              'upload_handle', 'issue_generation', 'upload_request_digest', 'content_sha256', 'byte_size',
+              'media_type', 'display_filename', 'audience_key_id', 'target_path', 'max_batch_size',
+              'max_link_ttl_seconds', 'capability_expires_at', 'authority_expires_at',
+          ]
           assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
           assert dm['contract']['nonce_replay_retention_seconds'] == 900
           assert dm['contract']['nonce_replay_retention_seconds'] > 2 * dm['contract']['timestamp_max_skew_seconds']
@@ -1341,11 +1354,16 @@ jobs:
           assert len(dm['reject_cases']) == 9 and len(dm_rejects) == 9
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
-          assert len(dm['state_cases']) == 7
+          assert len(dm['state_cases']) == 8
           assert [case['name'] for case in dm['state_cases']] == [
               'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'stale_unseen',
               'alternate_endpoint', 'reused_nonce_across_operation', 'stale_non_exact_retry',
+              'fresh_authority_conflict',
           ]
+          assert len(dm['response_cases']) == 8
+          assert [case['error_code'] for case in dm['response_cases'] if case['proves_operation_absent']] == ['issue_operation_not_found']
+          assert next(case for case in dm['response_cases'] if case['error_code'] == 'rate_limit_exceeded')['retry_after'] == 'positive_integer_seconds'
+          assert next(case for case in dm['response_cases'] if case['error_code'] == 'mutation_outcome_unknown')['retry_after'] == '1'
           assert dm['wrong_endpoint_signed']['authority'] != dm['golden']['authority']
           assert dm['wrong_endpoint_signed']['public_key_der_b64url'] == dm['golden']['public_key_der_b64url']
           assert dm['nonce_reuse_signed']['nonce'] == dm['golden']['nonce']
@@ -1353,6 +1371,7 @@ jobs:
           assert all(verify_dm_golden(golden) for golden in (
               dm['golden'], dm['retry_golden'], dm['refresh_golden'],
               dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'],
+              dm['authority_conflict_signed'],
           ))
           print('py ok')
           PY

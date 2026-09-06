@@ -99,20 +99,35 @@ be assertions after a recipe is applied. A consumer recomputes them from the
 mutated request and returns the listed closed `reject_class`. It must not repair
 the input.
 
-`wrong_endpoint_signed` and `nonce_reuse_signed` are complete inputs with valid
-canonical low-S signatures. The first is signed for another authority, so it is
-not valid at the configured receiver. The second uses the initial operation's
-nonce for the distinct generation-two operation. Signature success alone does
-not authorize either request.
+`wrong_endpoint_signed`, `nonce_reuse_signed`, and
+`authority_conflict_signed` are complete inputs with valid canonical low-S
+signatures. The first is signed for another authority, so it is not valid at
+the configured receiver. The second uses the initial operation's nonce for the
+distinct generation-two operation. The third keeps the initial operation key
+but changes one immutable authority field. Signature success alone does not
+authorize any of these requests.
 
-`state_cases` publishes the seven required receiver transitions. It covers a
+`state_cases` publishes the eight required receiver transitions. It covers a
 first issue, an exact stale replay after nonce expiry, a fresh reconciliation,
 an authenticated stale strong miss, an alternate endpoint, a nonce reused by a
-different operation, and a stale non-exact retry. Each case names its complete
-signed input, prior durable operation and nonce state, receiver time, status,
-public error code, state mutation, and response source. The `outcome` and
-`mutation` values are closed by the contract lists. A receiver must not replace
-a listed rejection with a state write.
+different operation, a stale non-exact retry, and a fresh immutable-authority
+conflict. Each case names its complete signed input, prior durable operation and
+nonce state, receiver time, status, public error code, state mutation, and
+response source. The `outcome` and `mutation` values are closed by the contract
+lists. A receiver must not replace a listed rejection with a state write.
+
+`response_cases` freezes every receiver error status, media type, public code,
+and `Retry-After` rule. Only the authenticated 404
+`issue_operation_not_found` response proves durable operation absence. A
+producer treats all malformed, unknown, proxy-generated, or mismatched
+responses as an unknown mutation outcome.
+
+The signed body is strict JSON. The `body_authority_fields` list is complete,
+and the receiver validates every listed field before state access. This crypto
+artifact freezes the field set, signature, replay, and response rules. The
+receiver service owns input grammar and configured policy ceilings, such as the
+maximum upload size and the issuer path namespace. Exact golden equality is
+not a substitute for this receiver validation.
 
 The Connector selects neither the service-owned resource nor an arbitrary path
 namespace. The issuer service loads both from issuer policy. The signed body

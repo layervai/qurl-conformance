@@ -27,6 +27,7 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		file.RefreshGolden,
 		file.WrongEndpointSigned,
 		file.NonceReuseSigned,
+		file.AuthorityConflictSigned,
 	} {
 		canonical, err := DelegatedMintIssueV1CanonicalBytes(golden)
 		if err != nil {
@@ -45,6 +46,10 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		file.Contract.AuthorityBindingRule != DelegatedMintIssueV1AuthorityBindingRule ||
 		file.Contract.ExpiryEncoding != DelegatedMintIssueV1ExpiryEncoding ||
 		file.Contract.SuccessReconciliationRule != "authority_expiry_equals_immutable_operation_authority_capability_expiry_is_canonical_and_not_after_authority_expired_capability_advances_generation" ||
+		file.Contract.ErrorContentType != DelegatedMintIssueV1ErrorContentType ||
+		file.Contract.ErrorEnvelope != "rfc7807_error_object_plus_meta_request_id_no_unknown_fields" ||
+		file.Contract.BodySemanticValidationRule != "receiver_strictly_decodes_and_validates_every_body_authority_field_before_state_access_service_policy_owns_runtime_ceilings" ||
+		!slices.Equal(file.Contract.BodyAuthorityFields, delegatedMintIssueV1BodyAuthorityFields) ||
 		file.Contract.ExternalOperationCommitRule != "uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request" ||
 		file.Contract.ExpiryAuthorityRule != "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority" ||
 		file.Contract.ExactReplayFreshnessRule != "verify_shape_signature_then_operation_lookup_before_freshness_exact_accepted_envelope_returns_original_same_operation_authority_fresh_envelope_reconciles_changed_authority_conflicts_stale_nonexact_rejects_without_mutation" ||
@@ -64,8 +69,11 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	if len(file.RejectCases) != 9 {
 		t.Fatalf("reject case count = %d, want 9", len(file.RejectCases))
 	}
-	if len(file.StateCases) != 7 {
-		t.Fatalf("state case count = %d, want 7", len(file.StateCases))
+	if len(file.StateCases) != 8 {
+		t.Fatalf("state case count = %d, want 8", len(file.StateCases))
+	}
+	if len(file.ResponseCases) != 8 {
+		t.Fatalf("response case count = %d, want 8", len(file.ResponseCases))
 	}
 	var body struct {
 		UploadHandle        string `json:"upload_handle"`
@@ -260,7 +268,20 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 		{name: "signed alternate endpoint", change: func(file *DelegatedMintIssueV1File) {
 			file.WrongEndpointSigned.SignatureDERB64URL = file.Golden.SignatureDERB64URL
 		}},
+		{name: "signed authority conflict", change: func(file *DelegatedMintIssueV1File) {
+			file.AuthorityConflictSigned.SignatureDERB64URL = file.Golden.SignatureDERB64URL
+		}},
+		{name: "oversized repeat recipe", change: func(file *DelegatedMintIssueV1File) {
+			for i := range file.RejectCases {
+				if file.RejectCases[i].Operation == "ascii_repeat" {
+					file.RejectCases[i].Repeat = DelegatedMintIssueV1BodyMaxBytes + 2
+					return
+				}
+			}
+			t.Fatal("artifact has no ascii_repeat reject case")
+		}},
 		{name: "state case", change: func(file *DelegatedMintIssueV1File) { file.StateCases[0].Outcome = "future" }},
+		{name: "response case", change: func(file *DelegatedMintIssueV1File) { file.ResponseCases[0].Status++ }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ParseDelegatedMintIssueV1File(mutate(t, test.change)); err == nil {
