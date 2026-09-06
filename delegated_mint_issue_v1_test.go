@@ -21,7 +21,7 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	if file.Artifact != DelegatedMintIssueV1ArtifactID || file.SchemaVersion != DelegatedMintIssueV1SchemaVersion {
 		t.Fatalf("identity = %q/v%d", file.Artifact, file.SchemaVersion)
 	}
-	for _, golden := range []DelegatedMintIssueV1Golden{file.Golden, file.RefreshGolden} {
+	for _, golden := range []DelegatedMintIssueV1Golden{file.Golden, file.RetryGolden, file.RefreshGolden} {
 		canonical, err := DelegatedMintIssueV1CanonicalBytes(golden)
 		if err != nil {
 			t.Fatal(err)
@@ -30,18 +30,25 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 			t.Fatal("canonical signature input is empty")
 		}
 	}
-	if len(file.Golden.Nonce) != 22 || len(file.RefreshGolden.Nonce) != 22 ||
+	if len(file.Golden.Nonce) != 22 || len(file.RetryGolden.Nonce) != 22 || len(file.RefreshGolden.Nonce) != 22 ||
 		!strings.HasPrefix(file.Golden.IdempotencyKey, "uci_") || !strings.HasPrefix(file.Golden.BodyUTF8, `{"upload_handle":"upl_`) {
 		t.Fatal("golden Connector identifier shapes drifted")
 	}
 	if file.Contract.TimestampMaxSkewSeconds != 300 || file.Contract.NonceReplayRetentionSeconds != 600 ||
 		file.Contract.AuthorityBindingRule != DelegatedMintIssueV1AuthorityBindingRule ||
 		file.Contract.ExpiryEncoding != DelegatedMintIssueV1ExpiryEncoding ||
+		file.Contract.SuccessReconciliationRule != "authority_expiry_equals_immutable_operation_authority_capability_expiry_is_canonical_and_not_after_authority_expired_capability_advances_generation" ||
+		file.Contract.ExternalOperationCommitRule != "uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request" ||
 		file.Contract.ExpiryAuthorityRule != "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority" ||
-		file.Contract.ExactReplayFreshnessRule != "verify_shape_signature_and_operation_lookup_before_freshness_byte_exact_accepted_envelope_returns_original_changed_operation_conflicts_different_stale_envelope_rejects_without_mutation" ||
-		file.Contract.TransportReplayRule != "byte_exact_accepted_envelope_may_bypass_freshness_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate" ||
+		file.Contract.ExactReplayFreshnessRule != "verify_shape_signature_then_operation_lookup_before_freshness_exact_accepted_envelope_returns_original_same_operation_authority_fresh_envelope_reconciles_changed_authority_conflicts_stale_nonexact_rejects_without_mutation" ||
+		file.Contract.TransportReplayRule != "exact_accepted_envelope_may_bypass_freshness_same_operation_authority_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate" ||
+		file.Contract.StaleOperationMissRule != "authenticated_strongly_consistent_absent_stale_operation_returns_no_mutation_connector_retries_fresh_same_generation" ||
+		file.Contract.StaleOperationMissStatus != DelegatedMintIssueV1StaleMissStatus ||
+		file.Contract.StaleOperationMissCode != DelegatedMintIssueV1StaleMissCode ||
 		file.Contract.IssuerKeyRetentionRule != "accepted_kid_verifier_retained_until_operation_authority_expires" ||
-		!slices.Equal(file.Contract.OperationIdentityFields, []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key", "exact_body_sha256", "authority_fingerprint"}) ||
+		!slices.Equal(file.Contract.OperationIdentityFields, []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key"}) ||
+		!slices.Equal(file.Contract.AuthorityFingerprintFields, []string{"upload_request_digest", "content_sha256", "byte_size", "media_type", "display_filename", "audience_key_id", "target_path", "max_batch_size", "max_link_ttl_seconds", "authority_expires_at", "service_owned_issuer_policy_fingerprint"}) ||
+		!slices.Equal(file.Contract.EnvelopeFingerprintFields, []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"}) ||
 		!slices.Equal(file.Contract.RejectClasses, []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar"}) {
 		t.Fatalf("freshness/replay/expiry authority contract drifted: %+v", file.Contract)
 	}
@@ -66,6 +73,62 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 	initialAuthority, err := time.Parse(time.RFC3339, body.AuthorityExpiresAt)
 	if err != nil || initialAuthority.Sub(time.Unix(file.Golden.TimestampUnix, 0)) != 24*time.Hour {
 		t.Fatalf("golden authority window drifted: %v", err)
+	}
+}
+
+func TestDelegatedMintIssueV1StaleMissRetryKeepsOperationAuthority(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Golden.BodySHA256 == file.RetryGolden.BodySHA256 ||
+		file.Golden.CanonicalHex == file.RetryGolden.CanonicalHex {
+		t.Fatal("fresh stale-miss retry reused its old transport envelope")
+	}
+	if file.Golden.KID == file.RetryGolden.KID ||
+		file.Golden.PublicKeyDERB64URL == file.RetryGolden.PublicKeyDERB64URL {
+		t.Fatal("fresh stale-miss retry did not exercise issuer-key rotation")
+	}
+	if err := validateDelegatedMintIssueV1StaleRetry(file.Golden, file.RetryGolden); err != nil {
+		t.Fatalf("valid fresh same-generation retry rejected: %v", err)
+	}
+}
+
+func TestDelegatedMintIssueV1StaleMissRetryCannotChangeAuthority(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*DelegatedMintIssueV1Golden){
+		"idempotency": func(golden *DelegatedMintIssueV1Golden) { golden.IdempotencyKey += "x" },
+		"nonce reuse": func(golden *DelegatedMintIssueV1Golden) { golden.Nonce = file.Golden.Nonce },
+		"not stale":   func(golden *DelegatedMintIssueV1Golden) { golden.TimestampUnix = file.Golden.TimestampUnix + 300 },
+		"generation": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"issue_generation":1`, `"issue_generation":2`, 1)
+		},
+		"content": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"byte_size":1048576`, `"byte_size":1048577`, 1)
+		},
+		"authority expiry": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"authority_expires_at":"2026-09-06T23:15:00Z"`, `"authority_expires_at":"2026-09-06T23:16:00Z"`, 1)
+		},
+		"capability unchanged": func(golden *DelegatedMintIssueV1Golden) {
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"capability_expires_at":"2026-09-05T23:40:00Z"`, `"capability_expires_at":"2026-09-05T23:30:00Z"`, 1)
+		},
+		"capability past authority": func(golden *DelegatedMintIssueV1Golden) {
+			golden.TimestampUnix = 1788735900
+			golden.BodyUTF8 = strings.Replace(golden.BodyUTF8, `"capability_expires_at":"2026-09-05T23:40:00Z"`, `"capability_expires_at":"2026-09-06T23:20:00Z"`, 1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			retry := file.RetryGolden
+			mutate(&retry)
+			if err := validateDelegatedMintIssueV1StaleRetry(file.Golden, retry); err == nil {
+				t.Fatal("invalid stale-miss retry unexpectedly accepted")
+			}
+		})
 	}
 }
 

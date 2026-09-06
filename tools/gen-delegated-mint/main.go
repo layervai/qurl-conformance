@@ -27,7 +27,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "gen-delegated-mint: FAILED:", err)
 		os.Exit(1)
 	}
-	fmt.Println("gen-delegated-mint: OK - rotated and verified both delegated-mint test keys")
+	fmt.Println("gen-delegated-mint: OK - rotated and verified all delegated-mint goldens")
 }
 
 func run() error {
@@ -39,8 +39,19 @@ func run() error {
 	if err := json.Unmarshal(raw, &file); err != nil {
 		return err
 	}
-	for _, golden := range []*conformance.DelegatedMintIssueV1Golden{&file.Golden, &file.RefreshGolden} {
-		if err := rotateGolden(golden); err != nil {
+	initialKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+	refreshKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+	if err := rotateGolden(&file.Golden, initialKey); err != nil {
+		return err
+	}
+	for _, golden := range []*conformance.DelegatedMintIssueV1Golden{&file.RetryGolden, &file.RefreshGolden} {
+		if err := rotateGolden(golden, refreshKey); err != nil {
 			return err
 		}
 	}
@@ -59,16 +70,14 @@ func run() error {
 	return os.WriteFile(vectorPath, out, 0o644)
 }
 
-func rotateGolden(golden *conformance.DelegatedMintIssueV1Golden) error {
+func rotateGolden(golden *conformance.DelegatedMintIssueV1Golden, privateKey *ecdsa.PrivateKey) error {
+	bodyDigest := sha256.Sum256([]byte(golden.BodyUTF8))
+	golden.BodySHA256 = hex.EncodeToString(bodyDigest[:])
 	canonical, err := conformance.DelegatedMintIssueV1CanonicalBytes(*golden)
 	if err != nil {
 		return err
 	}
 	digest := sha256.Sum256(canonical)
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return err
-	}
 	r, s, err := ecdsa.Sign(rand.Reader, privateKey, digest[:])
 	if err != nil {
 		return err

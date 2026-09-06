@@ -48,6 +48,8 @@ const (
 	DelegatedMintIssueV1BodyMaxBytes                = 8192
 	DelegatedMintIssueV1SuccessStatus               = 200
 	DelegatedMintIssueV1SuccessContentType          = "application/json"
+	DelegatedMintIssueV1StaleMissStatus             = 404
+	DelegatedMintIssueV1StaleMissCode               = "issue_operation_not_found"
 	DelegatedMintIssueV1CapabilityTTLSeconds        = 15 * 60
 	DelegatedMintIssueV1AuthorityMaxTTLSeconds      = 24 * 60 * 60
 	DelegatedMintIssueV1TimestampMaxSkewSeconds     = 5 * 60
@@ -78,6 +80,7 @@ type DelegatedMintIssueV1File struct {
 	Description   string                       `json:"description"`
 	Contract      DelegatedMintIssueV1Contract `json:"contract"`
 	Golden        DelegatedMintIssueV1Golden   `json:"golden"`
+	RetryGolden   DelegatedMintIssueV1Golden   `json:"retry_golden"`
 	RefreshGolden DelegatedMintIssueV1Golden   `json:"refresh_golden"`
 	RejectCases   []DelegatedMintIssueV1Reject `json:"reject_cases"`
 }
@@ -116,6 +119,8 @@ type DelegatedMintIssueV1Contract struct {
 	SuccessContentType          string   `json:"success_content_type"`
 	SuccessEnvelope             string   `json:"success_envelope"`
 	SuccessDataFields           []string `json:"success_data_fields"`
+	SuccessReconciliationRule   string   `json:"success_reconciliation_rule"`
+	ExternalOperationCommitRule string   `json:"external_operation_commit_rule"`
 	CapabilityTTLSeconds        int      `json:"capability_ttl_seconds"`
 	AuthorityMaxTTLSeconds      int      `json:"authority_max_ttl_seconds"`
 	TimestampMaxSkewSeconds     int      `json:"timestamp_max_skew_seconds"`
@@ -123,7 +128,12 @@ type DelegatedMintIssueV1Contract struct {
 	ExpiryAuthorityRule         string   `json:"expiry_authority_rule"`
 	ExactReplayFreshnessRule    string   `json:"exact_replay_freshness_rule"`
 	OperationIdentityFields     []string `json:"operation_identity_fields"`
+	AuthorityFingerprintFields  []string `json:"authority_fingerprint_fields"`
+	EnvelopeFingerprintFields   []string `json:"envelope_fingerprint_fields"`
 	TransportReplayRule         string   `json:"transport_replay_rule"`
+	StaleOperationMissRule      string   `json:"stale_operation_miss_rule"`
+	StaleOperationMissStatus    int      `json:"stale_operation_miss_status"`
+	StaleOperationMissCode      string   `json:"stale_operation_miss_code"`
 	IssuerKeyRetentionRule      string   `json:"issuer_key_retention_rule"`
 	ExpiryEncoding              string   `json:"expiry_encoding"`
 	RejectClasses               []string `json:"reject_classes"`
@@ -175,7 +185,13 @@ func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, erro
 	if err := validateDelegatedMintIssueV1Golden(file.Golden); err != nil {
 		return nil, err
 	}
+	if err := validateDelegatedMintIssueV1Golden(file.RetryGolden); err != nil {
+		return nil, err
+	}
 	if err := validateDelegatedMintIssueV1Golden(file.RefreshGolden); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1StaleRetry(file.Golden, file.RetryGolden); err != nil {
 		return nil, err
 	}
 	if err := validateDelegatedMintIssueV1Renewal(file.Golden, file.RefreshGolden); err != nil {
@@ -245,13 +261,20 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		AuthorityMaxBytes:      DelegatedMintIssueV1AuthorityMaxBytes,
 		SuccessStatus:          DelegatedMintIssueV1SuccessStatus, SuccessContentType: DelegatedMintIssueV1SuccessContentType,
 		SuccessEnvelope: "data", SuccessDataFields: delegatedMintIssueV1SuccessDataFields,
-		CapabilityTTLSeconds: DelegatedMintIssueV1CapabilityTTLSeconds, AuthorityMaxTTLSeconds: DelegatedMintIssueV1AuthorityMaxTTLSeconds,
+		SuccessReconciliationRule:   "authority_expiry_equals_immutable_operation_authority_capability_expiry_is_canonical_and_not_after_authority_expired_capability_advances_generation",
+		ExternalOperationCommitRule: "uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request",
+		CapabilityTTLSeconds:        DelegatedMintIssueV1CapabilityTTLSeconds, AuthorityMaxTTLSeconds: DelegatedMintIssueV1AuthorityMaxTTLSeconds,
 		TimestampMaxSkewSeconds:     DelegatedMintIssueV1TimestampMaxSkewSeconds,
 		NonceReplayRetentionSeconds: DelegatedMintIssueV1NonceReplayRetentionSeconds,
 		ExpiryAuthorityRule:         "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority",
-		ExactReplayFreshnessRule:    "verify_shape_signature_and_operation_lookup_before_freshness_byte_exact_accepted_envelope_returns_original_changed_operation_conflicts_different_stale_envelope_rejects_without_mutation",
-		OperationIdentityFields:     []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key", "exact_body_sha256", "authority_fingerprint"},
-		TransportReplayRule:         "byte_exact_accepted_envelope_may_bypass_freshness_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate",
+		ExactReplayFreshnessRule:    "verify_shape_signature_then_operation_lookup_before_freshness_exact_accepted_envelope_returns_original_same_operation_authority_fresh_envelope_reconciles_changed_authority_conflicts_stale_nonexact_rejects_without_mutation",
+		OperationIdentityFields:     []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key"},
+		AuthorityFingerprintFields:  []string{"upload_request_digest", "content_sha256", "byte_size", "media_type", "display_filename", "audience_key_id", "target_path", "max_batch_size", "max_link_ttl_seconds", "authority_expires_at", "service_owned_issuer_policy_fingerprint"},
+		EnvelopeFingerprintFields:   []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"},
+		TransportReplayRule:         "exact_accepted_envelope_may_bypass_freshness_same_operation_authority_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate",
+		StaleOperationMissRule:      "authenticated_strongly_consistent_absent_stale_operation_returns_no_mutation_connector_retries_fresh_same_generation",
+		StaleOperationMissStatus:    DelegatedMintIssueV1StaleMissStatus,
+		StaleOperationMissCode:      DelegatedMintIssueV1StaleMissCode,
 		IssuerKeyRetentionRule:      "accepted_kid_verifier_retained_until_operation_authority_expires",
 		ExpiryEncoding:              DelegatedMintIssueV1ExpiryEncoding,
 		RejectClasses:               []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar"},
@@ -420,6 +443,43 @@ func validateDelegatedMintIssueV1Renewal(initial, refresh DelegatedMintIssueV1Go
 	initialBody.CapabilityExpiresAt = refreshBody.CapabilityExpiresAt
 	if !reflect.DeepEqual(initialBody, refreshBody) {
 		return errors.New("conformance: delegated-mint refresh widened immutable authority")
+	}
+	return nil
+}
+
+func validateDelegatedMintIssueV1StaleRetry(initial, retry DelegatedMintIssueV1Golden) error {
+	if initial.Method != retry.Method || initial.Authority != retry.Authority || initial.Route != retry.Route ||
+		initial.IssuerID != retry.IssuerID || initial.IdempotencyKey != retry.IdempotencyKey || initial.Nonce == retry.Nonce ||
+		retry.TimestampUnix-initial.TimestampUnix <= int64(DelegatedMintIssueV1TimestampMaxSkewSeconds) {
+		return errors.New("conformance: delegated-mint stale retry transport binding is invalid")
+	}
+	var initialBody, retryBody delegatedMintIssueV1Body
+	if err := strictDecodeArtifact([]byte(initial.BodyUTF8), &initialBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint stale-retry initial body: %w", err)
+	}
+	if err := strictDecodeArtifact([]byte(retry.BodyUTF8), &retryBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint stale-retry body: %w", err)
+	}
+	if initialBody.IssueGeneration != 1 || retryBody.IssueGeneration != 1 ||
+		initial.IdempotencyPreimageHex != retry.IdempotencyPreimageHex {
+		return errors.New("conformance: delegated-mint stale retry changed operation identity")
+	}
+	retryCapabilityExpiry, err := time.Parse(time.RFC3339, retryBody.CapabilityExpiresAt)
+	if err != nil || !delegatedMintIssueV1CanonicalExpiry(retryBody.CapabilityExpiresAt, retryCapabilityExpiry) ||
+		retryCapabilityExpiry.Sub(time.Unix(retry.TimestampUnix, 0)) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second {
+		return errors.New("conformance: delegated-mint stale retry capability expiry is invalid")
+	}
+	authorityExpiry, err := time.Parse(time.RFC3339, retryBody.AuthorityExpiresAt)
+	if err != nil || !delegatedMintIssueV1CanonicalExpiry(retryBody.AuthorityExpiresAt, authorityExpiry) ||
+		retryCapabilityExpiry.After(authorityExpiry) {
+		return errors.New("conformance: delegated-mint stale retry exceeds maximum authority")
+	}
+	if initialBody.CapabilityExpiresAt == retryBody.CapabilityExpiresAt {
+		return errors.New("conformance: delegated-mint stale retry did not move capability expiry")
+	}
+	initialBody.CapabilityExpiresAt = retryBody.CapabilityExpiresAt
+	if !reflect.DeepEqual(initialBody, retryBody) {
+		return errors.New("conformance: delegated-mint stale retry changed immutable authority")
 	}
 	return nil
 }

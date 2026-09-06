@@ -674,12 +674,18 @@ jobs:
               dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
               dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
               dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
+              dm.contract.external_operation_commit_rule !== 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request' ||
+              dm.contract.stale_operation_miss_status !== 404 || dm.contract.stale_operation_miss_code !== 'issue_operation_not_found' ||
+              dm.golden.kid === dm.retry_golden.kid ||
+              dm.golden.public_key_der_b64url === dm.retry_golden.public_key_der_b64url ||
+              dm.golden.idempotency_key !== dm.retry_golden.idempotency_key ||
+              dm.golden.body_sha256 === dm.retry_golden.body_sha256 ||
               dm.golden.kid === dm.refresh_golden.kid ||
               dm.golden.public_key_der_b64url === dm.refresh_golden.public_key_der_b64url ||
               dm.reject_cases.length !== 8 || Object.keys(dmRejects).length !== 8 ||
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
-              !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.refresh_golden) ||
+              !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -1288,12 +1294,19 @@ jobs:
           assert dm['contract']['success_envelope'] == 'data'
           assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
           assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
+          assert dm['contract']['external_operation_commit_rule'] == 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request'
+          assert dm['contract']['stale_operation_miss_status'] == 404
+          assert dm['contract']['stale_operation_miss_code'] == 'issue_operation_not_found'
+          assert dm['golden']['kid'] != dm['retry_golden']['kid']
+          assert dm['golden']['public_key_der_b64url'] != dm['retry_golden']['public_key_der_b64url']
+          assert dm['golden']['idempotency_key'] == dm['retry_golden']['idempotency_key']
+          assert dm['golden']['body_sha256'] != dm['retry_golden']['body_sha256']
           assert dm['golden']['kid'] != dm['refresh_golden']['kid']
           assert dm['golden']['public_key_der_b64url'] != dm['refresh_golden']['public_key_der_b64url']
           assert len(dm['reject_cases']) == 8 and len(dm_rejects) == 8
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
-          assert verify_dm_golden(dm['golden']) and verify_dm_golden(dm['refresh_golden'])
+          assert verify_dm_golden(dm['golden']) and verify_dm_golden(dm['retry_golden']) and verify_dm_golden(dm['refresh_golden'])
           print('py ok')
           PY
 

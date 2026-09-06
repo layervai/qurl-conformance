@@ -43,13 +43,32 @@ without mutation. A stored result can contain an expired capability; the
 Connector uses the signed next generation to refresh it. The same idempotency
 key with different operation bytes is a conflict.
 
-Operation identity consists of the issuer ID, upload handle, issue
-generation, derived idempotency key, exact body SHA-256, and the service's
-immutable authority fingerprint. Nonce, signature, timestamp, and key ID are
-transport authentication, not operation identity. A retry can replay the exact
-accepted envelope or use a fresh valid envelope. The configured issuer key ID
-can rotate. The service binds each accepted nonce to the same issuer operation,
-so that nonce cannot authenticate a different operation later.
+The durable operation key consists of issuer ID, upload handle, issue
+generation, and the derived idempotency key. A separate immutable authority
+fingerprint binds the upload request digest, content digest and size, media type,
+display filename, audience, target path, batch and link limits, original
+authority expiry, and the service-owned issuer policy fingerprint.
+`capability_expires_at` is not part of that authority fingerprint. A fresh retry
+must move it with the new signed request timestamp without changing the durable
+operation or its maximum authority.
+
+The accepted-envelope fingerprint binds the exact method, authority, route,
+issuer ID, key ID, idempotency key, timestamp, nonce, body SHA-256, and signature
+encoding. Nonce, signature, timestamp, key ID, and exact body digest are
+transport authentication, not operation identity. A retry can replay an exact
+accepted envelope or use a fresh valid envelope for the same operation and
+authority. The configured issuer key ID can rotate. The service binds each
+accepted nonce to the same issuer operation, so that nonce cannot authenticate
+a different operation later.
+
+If a valid signed stale request has no operation after a strongly consistent
+lookup, the service returns HTTP 404 with code `issue_operation_not_found` and
+does not mutate state. Only this authenticated stale-miss result lets the
+Connector sign a fresh envelope for the same generation. The Connector persists
+the fresh envelope before it sends it and retains earlier envelopes until one
+reconciles. If an earlier request commits after the miss, a fresh envelope with
+the same authority fingerprint returns that stored result. A changed authority
+fingerprint is a conflict.
 
 The signed authority is a lowercase ASCII DNS name without a port or trailing
 dot. It has at least two labels and at most 253 bytes. Each label is 1 to 63
@@ -86,6 +105,11 @@ lost-response retry name one deterministic authority. The issuer service does
 not trust those times. It requires `capability_expires_at` to be exactly 900
 seconds after the signed request timestamp. It requires the initial
 `authority_expires_at` to be no later than 86,400 seconds after that timestamp.
+A caller signs `authority_expires_at` as its immutable maximum; it does not
+select the short internal capability expiry. The Connector copies that maximum
+without change and computes each internal capability expiry from its request
+timestamp. If fewer than 900 seconds remain, it cannot widen the maximum and
+must end that external operation.
 A signed refresh uses this same route with a higher issue generation. It can
 move only the capability expiry forward, and never after the original authority
 expiry. It must not change the issuer, audience, upload, resource policy,
@@ -106,10 +130,10 @@ authentication, not operation identity. Consumers verify these committed bytes;
 they do not need either matching test private key.
 
 `make gen-delegated-mint-vectors` creates fresh throwaway P-256 test keys,
-rebuilds the canonical bytes and low-S signatures, derives the reject cases,
-and verifies the complete artifact before it writes it. The private keys are
-discarded. Run it only for an intentional test-key rotation and then sync the
-three published mirrors.
+rebuilds the initial, stale-miss retry, and refresh canonical bytes and low-S
+signatures, derives the reject cases, and verifies the complete artifact before
+it writes it. The private keys are discarded. Run it only for an intentional
+test-key rotation and then sync the three published mirrors.
 
 Because signature verification happens before operation lookup, the issuer
 service retains the verifier for each accepted key ID until that operation's
@@ -119,4 +143,16 @@ cannot make an accepted old envelope unverifiable during its replay lifetime.
 A successful first issue, exact replay, reconciliation, or refresh returns
 HTTP 200 and `Content-Type: application/json` without a charset parameter. The
 response data has opaque `capability`, `capability_expires_at`, and
-`authority_expires_at` fields. The Connector does not inspect the capability.
+`authority_expires_at` fields. Reconciliation returns the one durable stored
+result, so its capability expiry does not have to equal the current request's
+proposed expiry. The Connector requires a canonical capability expiry that is
+not after the exact immutable authority expiry. If the stored capability is no
+longer usable, it advances to the next generation. The Connector does not
+inspect the capability.
+
+Issue generation is internal to the Connector-to-issuer-service operation. An
+external Connector operation that has not committed its response can advance
+the internal issue generation under the same immutable signed authority. After
+the Connector commits an external response, exact replay returns those bytes,
+even if the embedded capability has expired. A new outward capability requires
+a new signed external request and request ID.
