@@ -49,6 +49,13 @@
       "open_supported": true
     },
     {
+      "name": "accept_mixed_case_path",
+      "present": true,
+      "value": "/View/AbC",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
       "name": "accept_path_query",
       "present": true,
       "value": "/view/abc123?sig=deadBEEF&exp=1700000000",
@@ -633,6 +640,20 @@
       "name": "reject_non_hex_percent_query",
       "present": true,
       "value": "/view/x?sig=a%ZZ",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_truncated_percent_in_query",
+      "present": true,
+      "value": "/view/x?a=b%",
+      "outcome": "reject",
+      "reject_class": "percent_encoding"
+    },
+    {
+      "name": "reject_short_percent_in_query",
+      "present": true,
+      "value": "/view/x?a=b%2",
       "outcome": "reject",
       "reject_class": "percent_encoding"
     },

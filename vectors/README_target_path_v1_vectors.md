@@ -114,7 +114,9 @@ The Go `ParseTargetPathFile` loader independently derives every outcome and
 rejects missing, duplicate, unknown, or modified cases. The npm and Python
 package accessors return the parsed artifact without strict validation;
 consumers in those languages must run the cases through their own public gate.
-All packaged JSON copies are byte-identical.
+All packaged JSON copies are byte-identical. When a case input changes, update
+the pinned `targetPathFixtures` entry in `target_path.go` before you sync the
+npm and Python mirrors with `scripts/sync-vectors.sh`.
 
 ## Lockstep rule
 
