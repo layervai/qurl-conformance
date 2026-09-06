@@ -509,7 +509,7 @@ func validateDelegatedMintIssueV1Relations(file *DelegatedMintIssueV1File) error
 		file.NonceReuseSigned.IdempotencyKey != file.RefreshGolden.IdempotencyKey ||
 		file.NonceReuseSigned.IdempotencyPreimageHex != file.RefreshGolden.IdempotencyPreimageHex ||
 		file.NonceReuseSigned.TimestampUnix <= file.Golden.TimestampUnix ||
-		file.NonceReuseSigned.TimestampUnix-file.Golden.TimestampUnix > int64(DelegatedMintIssueV1NonceReplayRetentionSeconds) {
+		file.NonceReuseSigned.TimestampUnix-(file.Golden.TimestampUnix-int64(DelegatedMintIssueV1TimestampMaxSkewSeconds)) >= int64(DelegatedMintIssueV1NonceReplayRetentionSeconds) {
 		return errors.New("conformance: delegated-mint signed nonce-reuse input drifted")
 	}
 	var nonceReuseBody, refreshBody delegatedMintIssueV1Body

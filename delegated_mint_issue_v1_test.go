@@ -199,12 +199,13 @@ func TestDelegatedMintIssueV1NonceReuseStateIsReachable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file.NonceReuseSigned.TimestampUnix-file.Golden.TimestampUnix > int64(file.Contract.NonceReplayRetentionSeconds) {
-		t.Fatal("nonce-reuse request occurs after the original nonce retention window")
+	earliestInitialAcceptance := file.Golden.TimestampUnix - int64(file.Contract.TimestampMaxSkewSeconds)
+	if file.NonceReuseSigned.TimestampUnix-earliestInitialAcceptance >= int64(file.Contract.NonceReplayRetentionSeconds) {
+		t.Fatal("nonce-reuse request can occur at or after the original nonce retention boundary")
 	}
 	state := file.StateCases[5]
 	if state.Name != "reused_nonce_across_operation" || state.NowUnix != file.NonceReuseSigned.TimestampUnix ||
-		state.NowUnix-file.Golden.TimestampUnix > int64(file.Contract.NonceReplayRetentionSeconds) ||
+		state.NowUnix-earliestInitialAcceptance >= int64(file.Contract.NonceReplayRetentionSeconds) ||
 		state.NowUnix-file.NonceReuseSigned.TimestampUnix > int64(file.Contract.TimestampMaxSkewSeconds) {
 		t.Fatalf("nonce-reuse state is not reachable: %+v", state)
 	}
