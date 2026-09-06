@@ -44,7 +44,7 @@ var targetPathValidationOrder = []string{
 	"whole_value_protocol_relative_authority",
 	"whole_value_raw_ascii_character_set",
 	"split_path_at_first_query_delimiter",
-	"forbidden_path_ascii",
+	"path_forbidden_ascii",
 	"whole_value_percent_syntax",
 	"path_encoded_dot",
 	"path_literal_dot_segment",

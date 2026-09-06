@@ -37,11 +37,11 @@ and no invalid request leaves the process.
   union of bytes that every language-specific URL serializer can escape.
   Consumers must apply the published set and must not derive a replacement set
   from their local URL API.
-- A raw apostrophe is rejected in both components because rebuilding a Go URL
-  from `url.URL.Path` and the WHATWG special-query percent-encode set can change
-  it to `%27`. The path behavior has a Go standard-library gate. Go appends
-  `RawQuery` verbatim, so each HTTP consumer must verify the WHATWG query
-  behavior in its own client.
+- A raw apostrophe is rejected in both components. Rebuilding a Go URL from
+  `url.URL.Path` can change it to `%27` in the path. The WHATWG special-query
+  percent-encode set can change it to `%27` in the query. The path behavior has
+  a Go standard-library gate. Go appends `RawQuery` verbatim, so each HTTP
+  consumer must verify the WHATWG query behavior in its own client.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.

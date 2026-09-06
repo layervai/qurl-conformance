@@ -507,8 +507,16 @@ func TestTargetPathRejectsApostropheInPathAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.ContainsRune(tf.Contract.AllowedASCII, '\'') {
-		t.Error("apostrophe must not be in allowed_ascii")
+	// Printable ASCII in the WHATWG special-query percent-encode set must not
+	// enter the raw query alphabet. Controls and non-ASCII are already excluded.
+	const whatwgSpecialQueryASCII = " \"#<>'"
+	for _, character := range whatwgSpecialQueryASCII {
+		if strings.ContainsRune(tf.Contract.AllowedASCII, character) {
+			t.Errorf("WHATWG query-drifting byte %q must not be in allowed_ascii", character)
+		}
+	}
+	if serialized := (&url.URL{Path: "/x'y"}).RequestURI(); serialized == "/x'y" {
+		t.Error("apostrophe unexpectedly stayed byte-exact in a Go path")
 	}
 	for name, value := range map[string]string{
 		"reject_apostrophe_in_path":  "/view/a'b",
