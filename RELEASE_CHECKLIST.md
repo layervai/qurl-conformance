@@ -110,7 +110,9 @@ fragment/transport accept fixture changes.
 - [ ] Run the generator exactly once. Do not rerun it to make a test pass: the
       issuer signature uses a random ECDSA nonce, so each run creates a different
       artifact. Fix the generator or the committed result without another key
-      rotation when a post-run structural check finds an error.
+      rotation when a post-run structural check finds an error. The public,
+      vector-only issuer and resource keys stay fixed across runs; the release
+      notes must say explicitly if either public key changes.
 - [ ] Confirm the fragment accept fixture and the transport round-trip fixture
       carry the same canonical qv2 body. Confirm the qv2t1 input reconstructs it
       byte for byte.

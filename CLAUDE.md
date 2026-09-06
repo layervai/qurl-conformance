@@ -27,6 +27,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   keys, KIDs, and signatures. Run a rotation target ONCE per intentional test-key
   rotation. Rotation targets are NEVER run in CI (ECDSA signatures use random
   nonces, so they are not reproducible). The committed JSON is the artifact.
+- `tools/gen` uses fixed public, vector-only issuer and resource keys so a claims
+  edit does not also rotate trust. Run `make gen-vectors` once when its
+  key-dependent artifact must change; its ECDSA signature is not reproducible.
 - `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts.
   `tools/gen-delegated-mint` owns only the delegated-mint signed inputs, state
   and response cases, and reject cases derived from the initial golden. Neither

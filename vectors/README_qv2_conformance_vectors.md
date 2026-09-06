@@ -108,8 +108,9 @@ stored fault survives all the way to the code under test:
 - **`fragment`** — a canonical inner qv2 fragment body fed to the fragment
   parser, which pins wire SHAPE and strict-parses the parts but does **not**
   verify the signature. Its accept fixture carries a real X25519
-  proof-of-possession pair: derive the claims public key from the secret private
-  key before the opening path uses either value.
+  proof-of-possession pair: use the standard RFC 7748 clamped X25519 base-point
+  multiplication to derive the claims public key from the secret private key
+  before the opening path uses either value.
 - **`entries` + `url`** — fed to the relay-URL validator against an allowlist
   built from `entries`.
 - **`cell_public_key_b64` (+ `server_id`)** — the consumer DECODES the key and

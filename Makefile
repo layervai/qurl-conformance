@@ -1,5 +1,5 @@
 .PHONY: gen-vectors gen-delegated-mint-vectors gen-delegated-mint-vectors-rotate
-gen-vectors: ## Regenerate key-dependent vectors with a fresh issuer key (run once per rotation; never in CI)
+gen-vectors: ## Regenerate key-dependent vectors with fixed public keys (run once per rotation; never in CI)
 	cd tools/gen && go run .
 
 gen-delegated-mint-vectors: ## Regenerate delegated-mint metadata while preserving committed test keys

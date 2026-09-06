@@ -1,7 +1,8 @@
-// Command gen regenerates the key-dependent qURL v2 conformance artifacts with a
-// fresh throwaway issuer key. Run once per key rotation via `make gen-vectors`;
-// NEVER in CI (the accept signature uses a random ECDSA nonce, so it is not
-// reproducible). It self-verifies every vector before writing.
+// Command gen regenerates the key-dependent qURL v2 conformance artifacts with
+// fixed public vector keys. Run once per artifact rotation via
+// `make gen-vectors`; NEVER in CI (the accept signature uses a random ECDSA
+// nonce, so it is not reproducible). It self-verifies every vector before
+// writing.
 package main
 
 import (
@@ -10,7 +11,6 @@ import (
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
@@ -37,7 +37,11 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	signer, err := qv2.GenerateLocalSigner("qurl-issuer-vector-key")
+	issuerPrivate, err := fixedP256PrivateKey(0x07)
+	if err != nil {
+		return err
+	}
+	signer, err := qv2.NewLocalSigner(issuerPrivate, "qurl-issuer-vector-key")
 	if err != nil {
 		return err
 	}
@@ -46,7 +50,7 @@ func run() error {
 		return err
 	}
 
-	rpriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	rpriv, err := fixedP256PrivateKey(0x08)
 	if err != nil {
 		return err
 	}
@@ -56,7 +60,6 @@ func run() error {
 	}
 
 	qurlUserPrivateBytes := bytes.Repeat([]byte{0x09}, 32)
-	defer clear(qurlUserPrivateBytes)
 	qurlUserPrivateKey, err := ecdh.X25519().NewPrivateKey(qurlUserPrivateBytes)
 	if err != nil {
 		return fmt.Errorf("parse fixed qURL user private key: %w", err)
@@ -161,7 +164,6 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("decode rebuilt fragment qURL user private key: %w", err)
 	}
-	defer clear(parsedPrivateBytes)
 	parsedPrivateKey, err := ecdh.X25519().NewPrivateKey(parsedPrivateBytes)
 	if err != nil {
 		return fmt.Errorf("parse rebuilt fragment qURL user private key: %w", err)
@@ -169,16 +171,15 @@ func run() error {
 	if got := raw(parsedPrivateKey.PublicKey().Bytes()); got != parsedFragment.Claims.QurlUserPublicKeyB64 {
 		return fmt.Errorf("rebuilt fragment qURL user X25519 keypair mismatch")
 	}
-	newTransportFragment, err := encodeTransportFragment(newFragment)
-	if err != nil {
-		return err
-	}
 	const cfPath = "../../vectors/qv2_conformance_vectors.json"
 	cfBytes, err := os.ReadFile(cfPath)
 	if err != nil {
 		return err
 	}
 	var cfDoc struct {
+		TransportContract struct {
+			ComponentMax int `json:"component_max"`
+		} `json:"transport_contract"`
 		Classes map[string]struct {
 			Vectors []struct {
 				Name              string `json:"name"`
@@ -190,6 +191,10 @@ func run() error {
 		} `json:"classes"`
 	}
 	if err := json.Unmarshal(cfBytes, &cfDoc); err != nil {
+		return err
+	}
+	newTransportFragment, err := encodeTransportFragment(newFragment, cfDoc.TransportContract.ComponentMax)
+	if err != nil {
 		return err
 	}
 	var oldFragment string
@@ -227,7 +232,10 @@ func run() error {
 	return os.WriteFile(cfPath, updated, 0o644)
 }
 
-func encodeTransportFragment(fragment string) (string, error) {
+func encodeTransportFragment(fragment string, componentMax int) (string, error) {
+	if componentMax <= 0 {
+		return "", fmt.Errorf("transport component_max must be positive")
+	}
 	parts := strings.Split(fragment, ".")
 	if len(parts) != 4 || parts[0] != "qv2" {
 		return "", fmt.Errorf("canonical fragment has invalid shape")
@@ -235,10 +243,10 @@ func encodeTransportFragment(fragment string) (string, error) {
 	counts := make([]string, 0, 3)
 	chunks := make([]string, 0)
 	for _, field := range parts[1:] {
-		fieldChunks := make([]string, 0, (len(field)+239)/240)
-		for len(field) > 240 {
-			fieldChunks = append(fieldChunks, field[:240])
-			field = field[240:]
+		fieldChunks := make([]string, 0, (len(field)+componentMax-1)/componentMax)
+		for len(field) > componentMax {
+			fieldChunks = append(fieldChunks, field[:componentMax])
+			field = field[componentMax:]
 		}
 		if field == "" {
 			return "", fmt.Errorf("canonical fragment has empty field")
@@ -251,11 +259,11 @@ func encodeTransportFragment(fragment string) (string, error) {
 }
 
 func replaceExactJSONString(data []byte, oldValue, newValue string, wantCount int) ([]byte, error) {
-	oldJSON, err := json.Marshal(oldValue)
+	oldJSON, err := marshalJSONString(oldValue)
 	if err != nil {
 		return nil, err
 	}
-	newJSON, err := json.Marshal(newValue)
+	newJSON, err := marshalJSONString(newValue)
 	if err != nil {
 		return nil, err
 	}
@@ -263,4 +271,29 @@ func replaceExactJSONString(data []byte, oldValue, newValue string, wantCount in
 		return nil, fmt.Errorf("JSON string replacement found %d copies, want %d", got, wantCount)
 	}
 	return bytes.ReplaceAll(data, oldJSON, newJSON), nil
+}
+
+func marshalJSONString(value string) ([]byte, error) {
+	var encoded bytes.Buffer
+	encoder := json.NewEncoder(&encoded)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(encoded.Bytes(), []byte{'\n'}), nil
+}
+
+// fixedP256PrivateKey returns a public, vector-only key. Stable key material
+// keeps a claims-only edit from also rotating the issuer and resource public
+// keys. The committed signatures remain non-reproducible because ECDSA uses a
+// random nonce.
+func fixedP256PrivateKey(fill byte) (*ecdsa.PrivateKey, error) {
+	curve := elliptic.P256()
+	scalarBytes := bytes.Repeat([]byte{fill}, 32)
+	d := new(big.Int).SetBytes(scalarBytes)
+	if d.Sign() <= 0 || d.Cmp(curve.Params().N) >= 0 {
+		return nil, fmt.Errorf("fixed P-256 scalar is out of range")
+	}
+	x, y := curve.ScalarBaseMult(scalarBytes)
+	return &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: curve, X: x, Y: y}, D: d}, nil
 }
