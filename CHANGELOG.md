@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.0](https://github.com/layervai/qurl-conformance/compare/v0.14.0...v0.15.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** reject URL-drifting target path bytes ([#126](https://github.com/layervai/qurl-conformance/issues/126))
+
+### Bug Fixes
+
+* **vectors:** reject URL-drifting target path bytes ([#126](https://github.com/layervai/qurl-conformance/issues/126)) ([51d4431](https://github.com/layervai/qurl-conformance/commit/51d44317530535ffc6cf49fc544154baed1ffd1b))
+
 ## [0.14.0](https://github.com/layervai/qurl-conformance/compare/v0.13.0...v0.14.0) (2026-09-06)
 
 
