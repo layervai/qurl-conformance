@@ -196,6 +196,7 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		"reject_percent_encoded_dot_lower":         TargetPathRejectDotSegment,
 		"reject_percent_encoded_dot_upper":         TargetPathRejectDotSegment,
 		"reject_percent_encoded_single_dot":        TargetPathRejectDotSegment,
+		"reject_percent_encoded_dot_with_query":    TargetPathRejectDotSegment,
 		"reject_mixed_percent_letter_dot_escape":   TargetPathRejectDotSegment,
 		"reject_literal_dot_with_percent_escape":   TargetPathRejectDotSegment,
 		"reject_percent_encoded_slash_lower":       TargetPathRejectInvalidCharacter,
@@ -349,7 +350,7 @@ func TestTargetPathCanonicalSlashRules(t *testing.T) {
 			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
 		}
 	}
-	for _, name := range []string{"reject_interior_empty_segment", "reject_trailing_double_slash"} {
+	for _, name := range []string{"reject_interior_empty_segment", "reject_interior_empty_segment_with_query", "reject_trailing_double_slash"} {
 		interiorEmpty := targetPathCase(t, tf, name)
 		if interiorEmpty.Outcome != ExpectReject || interiorEmpty.RejectClass != TargetPathRejectInvalidCharacter {
 			t.Errorf("case %q = %+v, want invalid_character rejection", name, *interiorEmpty)
@@ -362,9 +363,11 @@ func TestTargetPathSemicolonIsQueryOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pathCase := targetPathCase(t, tf, "reject_semicolon_in_path")
-	if pathCase.Outcome != ExpectReject || pathCase.RejectClass != TargetPathRejectInvalidCharacter {
-		t.Errorf("path semicolon case = %+v, want invalid_character rejection", *pathCase)
+	for _, name := range []string{"reject_semicolon_in_path", "reject_semicolon_path_with_query"} {
+		pathCase := targetPathCase(t, tf, name)
+		if pathCase.Outcome != ExpectReject || pathCase.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("path semicolon case %q = %+v, want invalid_character rejection", name, *pathCase)
+		}
 	}
 	queryCase := targetPathCase(t, tf, "accept_semicolon_in_query")
 	if queryCase.Outcome != ExpectAccept || queryCase.OpenSupported == nil || !*queryCase.OpenSupported {

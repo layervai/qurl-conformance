@@ -287,6 +287,13 @@
       "reject_class": "invalid_character"
     },
     {
+      "name": "reject_interior_empty_segment_with_query",
+      "present": true,
+      "value": "/a//b?x=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
       "name": "reject_trailing_double_slash",
       "present": true,
       "value": "/a//",
@@ -304,6 +311,13 @@
       "name": "reject_semicolon_in_path",
       "present": true,
       "value": "/view/abc;x=1",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_semicolon_path_with_query",
+      "present": true,
+      "value": "/view/a;b?c=1",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },
@@ -514,6 +528,13 @@
       "name": "reject_percent_encoded_single_dot",
       "present": true,
       "value": "/a%2eb",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_percent_encoded_dot_with_query",
+      "present": true,
+      "value": "/%2e%2e/x?a=b",
       "outcome": "reject",
       "reject_class": "dot_segment"
     },
