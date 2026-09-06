@@ -10,6 +10,12 @@ unchanged inner verify path. Every qURL v2 reader implementation re-runs the
 **same bytes** against its **own** implementation, in whatever language it is
 written.
 
+All private keys in these artifacts are public, fixed test material. Never
+admit the vector issuer key or `kid` to a production trust store. Never use the
+qURL-user or resource keys outside conformance tests. The qURL-user private
+scalar is stored in already-clamped RFC 7748 form, so conforming clamp-on-use
+and raw scalar APIs consume the same committed bytes.
+
 A consumer feeds each class's input through its **real** parser/validator and
 asserts the declared `expect` (and, where the class pins it, `reject_class`). The
 vectors are **behavioral**: a consumer recomputes/re-verifies rather than trusting
@@ -107,7 +113,10 @@ stored fault survives all the way to the code under test:
   must reproduce `canonical_fragment` byte-for-byte. A reject omits the output.
 - **`fragment`** — a canonical inner qv2 fragment body fed to the fragment
   parser, which pins wire SHAPE and strict-parses the parts but does **not**
-  verify the signature.
+  verify the signature. Its accept fixture carries a real X25519
+  proof-of-possession pair: use the standard RFC 7748 clamped X25519 base-point
+  multiplication to derive the claims public key from the secret private key
+  before the opening path uses either value.
 - **`entries` + `url`** — fed to the relay-URL validator against an allowlist
   built from `entries`.
 - **`cell_public_key_b64` (+ `server_id`)** — the consumer DECODES the key and

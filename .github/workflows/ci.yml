@@ -1476,6 +1476,32 @@ jobs:
           print('py ok')
           PY
 
+  generator:
+    name: dependency-free generator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generator module must be dependency-free
+        run: |
+          if grep -qE '^[[:space:]]*require[[:space:]]' tools/gen/go.mod; then
+            echo "::error::tools/gen/go.mod must have no require directive"; grep -n require tools/gen/go.mod; exit 1
+          fi
+      - name: Set up Go for generator module
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: tools/gen/go.mod
+      - name: Generator build, tests, vet, and format
+        working-directory: tools/gen
+        run: |
+          # Compile the one-shot generator so the next intentional rotation
+          # cannot discover a stale build. Do not run it: its ECDSA nonce is
+          # intentionally random.
+          go build ./...
+          go test -count=1 ./...
+          go vet ./...
+          if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi
+
   # Slack build-completion card. Thin shim over the fleet-shared reusable in
   # layervai/ops-routines-workflows (public mirror of private
   # layervai/ops-routines); the Block Kit payload builder and gate-result
@@ -1483,7 +1509,7 @@ jobs:
   # `needs:` + `gates:` here.
   notify:
     name: Notify
-    needs: [conformance]
+    needs: [conformance, generator]
     # `!cancelled()` rather than `always()`: this repo sets
     # concurrency.cancel-in-progress, so a newer push to main cancels the
     # in-flight run. `always()` would still post a yellow "cancelled" card for
@@ -1494,6 +1520,6 @@ jobs:
     uses: layervai/ops-routines-workflows/.github/workflows/notify.yml@d07fa2fe3a103907ff2b1a1a71509a6dcd8e9d32 # v0.13.0
     with:
       header: "qURL Conformance Build"
-      gates: '{"Conformance": "${{ needs.conformance.result }}"}'
+      gates: '{"Conformance": "${{ needs.conformance.result }}", "Generator": "${{ needs.generator.result }}"}'
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
