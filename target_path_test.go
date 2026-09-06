@@ -105,6 +105,18 @@ func TestTargetPathBoundaryAndPresenceSemantics(t *testing.T) {
 	if !strings.HasPrefix(*overlongAuthority.Value, "//") || overlongAuthority.RejectClass != TargetPathRejectTooLong {
 		t.Fatalf("authority boundary case = %+v, want too_long before authority", *overlongAuthority)
 	}
+	for _, name := range []string{
+		"reject_overlong_dot_segment_precedence",
+		"reject_overlong_percent_precedence",
+	} {
+		c := targetPathCase(t, tf, name)
+		if got := len(*c.Value); got != TargetPathMaxBytes+1 {
+			t.Errorf("case %q bytes = %d, want %d", name, got, TargetPathMaxBytes+1)
+		}
+		if c.RejectClass != TargetPathRejectTooLong {
+			t.Errorf("case %q class = %q, want too_long precedence", name, c.RejectClass)
+		}
+	}
 }
 
 func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
@@ -155,6 +167,11 @@ func TestTargetPathSecurityCasesHaveIndependentClassPins(t *testing.T) {
 		"reject_relative_path":                      TargetPathRejectNotAbsolute,
 		"reject_leading_space":                      TargetPathRejectNotAbsolute,
 		"reject_protocol_relative_authority":        TargetPathRejectAuthority,
+		"reject_authority_semicolon":                TargetPathRejectAuthority,
+		"reject_overlong_dot_segment_precedence":    TargetPathRejectTooLong,
+		"reject_overlong_percent_precedence":        TargetPathRejectTooLong,
+		"reject_relative_dot_segment_precedence":    TargetPathRejectNotAbsolute,
+		"reject_relative_malformed_percent":         TargetPathRejectNotAbsolute,
 		"reject_bare_percent":                       TargetPathRejectPercentEncoding,
 		"reject_short_percent":                      TargetPathRejectPercentEncoding,
 		"reject_non_hex_percent_path":               TargetPathRejectPercentEncoding,
@@ -181,6 +198,9 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if c.Outcome != ExpectAccept {
 			continue
 		}
+		if !c.Present {
+			continue
+		}
 		value := ""
 		if c.Value != nil {
 			value = *c.Value
@@ -200,7 +220,7 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if u.Path != wantPath {
 			t.Errorf("case %q changed path to %q, want %q", c.Name, u.Path, wantPath)
 		}
-		if c.Present && u.RequestURI() != value {
+		if u.RequestURI() != value {
 			t.Errorf("case %q changed request target to %q, want exact %q", c.Name, u.RequestURI(), value)
 		}
 		if u.Path != "" && (!strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//")) {

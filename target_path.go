@@ -17,6 +17,7 @@ const (
 	// TargetPathMaxBytes is the complete target_path wire-value limit.
 	TargetPathMaxBytes = 2048
 
+	// TargetPathReject* constants are the closed v1 local reject vocabulary.
 	TargetPathRejectEmpty            = "empty"
 	TargetPathRejectTooLong          = "too_long"
 	TargetPathRejectNotAbsolute      = "not_absolute"
@@ -146,16 +147,21 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_overlong_relative_precedence":       {present: true, value: targetPathValue(strings.Repeat("a", TargetPathMaxBytes+1))},
 	"reject_overlong_authority_precedence":      {present: true, value: targetPathValue("//" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
+	"reject_overlong_dot_segment_precedence":    {present: true, value: targetPathValue("/../" + strings.Repeat("a", TargetPathMaxBytes-3))},
+	"reject_overlong_percent_precedence":        {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1) + "%")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_userinfo_origin_concatenation":      {present: true, value: targetPathValue("@evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
 	"reject_leading_space":                      {present: true, value: targetPathValue(" /view/x")},
 	"reject_relative_invalid_character":         {present: true, value: targetPathValue("view/a[b]")},
+	"reject_relative_dot_segment_precedence":    {present: true, value: targetPathValue("../etc/passwd")},
+	"reject_relative_malformed_percent":         {present: true, value: targetPathValue("a%/b")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},
 	"reject_protocol_relative_authority":        {present: true, value: targetPathValue("//evil.example/path")},
 	"reject_authority_invalid_character":        {present: true, value: targetPathValue("//evil.example/a[b]")},
 	"reject_authority_malformed_percent":        {present: true, value: targetPathValue("//evil.example/b%")},
 	"reject_authority_dot_segment":              {present: true, value: targetPathValue("//evil.example/../b")},
+	"reject_authority_semicolon":                {present: true, value: targetPathValue("//evil.example/a;b")},
 	"reject_interior_empty_segment":             {present: true, value: targetPathValue("/a//b")},
 	"reject_interior_empty_segment_with_query":  {present: true, value: targetPathValue("/a//b?x=1")},
 	"reject_trailing_double_slash":              {present: true, value: targetPathValue("/a//")},

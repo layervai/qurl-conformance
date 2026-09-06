@@ -67,9 +67,10 @@ leading slash, a protocol-relative authority, and the raw ASCII character set.
 Thus, length wins over `not_absolute` and `authority`. The `authority` class
 wins over all later character, percent, and dot checks. The validator then
 splits the path at the first literal `?`. The path-only semicolon check precedes
-the whole-value percent-syntax check. Thus `/view/a;b%` and `/view/a[b]%` are
-`invalid_character`, not `percent_encoding`, while malformed escapes in either
-the path or query are `percent_encoding`. After percent syntax is valid,
+the whole-value percent-syntax check. Thus `/view/a;b%` is `invalid_character`,
+not `percent_encoding`. The earlier whole-value character-set check gives the
+same precedence to `/view/a[b]%`. Malformed escapes in either the path or query
+are `percent_encoding`. After percent syntax is valid,
 `dot_segment` wins when the path contains any case-insensitive `%2e` escape or
 a literal `.` or `..` segment. This stays true when another well-formed path
 escape is also present. Otherwise, any path escape or interior empty segment is
