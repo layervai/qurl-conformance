@@ -32,7 +32,6 @@ loader rebuilds and verifies that golden signature here.
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`
 - [ ] `python3 scripts/check-claude-model-lockstep.py`
-- [ ] `(cd tools/verify-assignment-ticket && go test ./...)`
 - [ ] npm and Python package smokes green (CI job `vectors + go + cross-language`)
 - [ ] `go.mod` still has no `require` line
 
@@ -45,11 +44,14 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       bytes. Update `AgentSessionControlProducerRevision` (`agent_session.go`),
       `AgentAssignmentQURLGoProducerRevision` (`schema.go`), the
       `producer_revision` field in `agent_session_control_vectors.json` and its
-      two mirrors, the two `producer_revision` assertions in
-      `.github/workflows/ci.yml`, and the prose pins in `README.md` and
-      `vectors/README_agent_session_control_vectors.md`. A pin that names a
-      pre-change commit is worse than no pin: the self-consistency tests pass
-      because the pins agree with each other, not because they are true.
+      two mirrors, and the prose pins in `README.md` and
+      `vectors/README_agent_session_control_vectors.md`. CI runs
+      `TestEmbeddedAgentSessionControlLoads`,
+      `TestAgentSessionControlREADMERevisionPin`, and
+      `TestAgentAssignmentREADMERevisionPins` to enforce in-repo consistency.
+      These tests cannot prove that a producer commit emitted the bytes. Verify
+      each producer commit before you update its pin. A pin that names a
+      pre-change commit is worse than no pin.
 - [ ] **Re-pin after the producer merges.** A pre-merge branch commit is a
       legitimate pin — it is pushed and immutable — but a squash-merge mints a
       different SHA and deleting the branch can make the original unreachable.

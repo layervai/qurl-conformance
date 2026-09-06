@@ -64,802 +64,332 @@ jobs:
       - name: npm package smoke
         run: |
           node <<'NODE'
+          const assert = require('node:assert/strict');
           const crypto = require('node:crypto');
+          const fs = require('node:fs');
           const net = require('node:net');
           const c = require('./npm');
-          const qv2 = c.qv2Vectors();
-          const r = c.relayKnockVectors();
-          const a = c.agentRegistrationVectors();
-          const s = c.agentAssignmentVectors();
-          const k = c.agentKnockApplicationVectors();
-          const x = c.agentSessionControlVectors();
-          const i = c.agentApiKeyIdVectors();
-          const t = c.assignmentTicketVectors();
-          const u = c.connectorAuthorityLambdaVectors();
-          const rr = c.connectorResourceLstV1Vectors();
+
+          const files = {
+            qv2Vectors: 'qv2_conformance_vectors.json',
+            issuerSignatureVectors: 'issuer_signature_vectors.json',
+            relayKnockVectors: 'relay_knock_golden.json',
+            agentRegistrationVectors: 'agent_registration_golden.json',
+            agentAssignmentVectors: 'agent_assignment_golden.json',
+            agentKnockApplicationVectors: 'agent_knock_application_vectors.json',
+            agentSessionControlVectors: 'agent_session_control_vectors.json',
+            agentApiKeyIdVectors: 'agent_api_key_id_vectors.json',
+            assignmentTicketVectors: 'assignment_ticket_v1_vectors.json',
+            connectorAuthorityLambdaVectors: 'connector_authority_lambda_v1_vectors.json',
+            connectorResourceLstV1Vectors: 'connector_resource_lst_v1_vectors.json',
+            connectorHubRequestIdVectors: 'connector_hub_request_id_v1_vectors.json',
+            connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
+            agentCredentialRecoveryVectors: 'agent_credential_recovery_v1_vectors.json',
+            cridV1Vectors: 'crid_v1_vectors.json',
+            targetPathV1Vectors: 'target_path_v1_vectors.json',
+            delegatedMintIssueV1Vectors: 'delegated_mint_issue_v1_vectors.json',
+          };
+          assert.deepEqual(Object.keys(c).sort(), Object.keys(files).sort());
+          assert.deepEqual(
+            fs.readdirSync('./npm/vectors').filter(file => file.endsWith('.json')).sort(),
+            Object.values(files).sort(),
+          );
+          for (const [accessor, file] of Object.entries(files)) {
+            assert.deepEqual(c[accessor](), require('./npm/vectors/' + file));
+          }
+
+          const dm = c.delegatedMintIssueV1Vectors();
           const h = c.connectorHubRequestIdVectors();
           const hc = c.connectorHubLstCookieVectors();
-          const cr = c.agentCredentialRecoveryVectors();
+          const rr = c.connectorResourceLstV1Vectors();
+          const u = c.connectorAuthorityLambdaVectors();
           const cd = c.cridV1Vectors();
-          const tp = c.targetPathV1Vectors();
-          const dm = c.delegatedMintIssueV1Vectors();
-          const dmRejects = Object.fromEntries(dm.reject_cases.map(v => [v.name, v]));
-          const dmSignedInputs = [dm.golden, dm.retry_golden, dm.refresh_golden,
-            dm.wrong_endpoint_signed, dm.nonce_reuse_signed, dm.authority_conflict_signed];
-          const dmKIDPublicKeys = new Map();
-          const dmKIDMappingValid = dmSignedInputs.every(v => {
-            const prior = dmKIDPublicKeys.get(v.kid);
-            if (prior !== undefined && prior !== v.public_key_der_b64url) return false;
-            dmKIDPublicKeys.set(v.kid, v.public_key_der_b64url);
-            return true;
-          });
-          const dmNonceReuseState = dm.state_cases.find(v => v.name === 'reused_nonce_across_operation');
-          const dmRejectResponses = {
-            authority: '403/invalid_capability_issue',
-            body_size: '413/payload_too_large',
-            idempotency_key: '403/invalid_capability_issue',
-            nonce: '403/invalid_capability_issue',
-            signature_encoding: '403/invalid_capability_issue',
-            signature_malleability: '403/invalid_capability_issue',
-            signature_scalar: '403/invalid_capability_issue',
-            signature_mismatch: '403/invalid_capability_issue',
+
+          const frame = value => {
+            const bytes = Buffer.from(String(value), 'utf8');
+            const length = Buffer.alloc(4);
+            length.writeUInt32BE(bytes.length);
+            return Buffer.concat([length, bytes]);
           };
-          const hubFrame = (tag, value) => {
+          const tagged = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
             prefix.writeUInt16BE(value.length, 1);
             return Buffer.concat([prefix, value]);
           };
-          const issueFrame = value => {
-            const bytes = Buffer.from(value, 'utf8');
-            const prefix = Buffer.alloc(4);
-            prefix.writeUInt32BE(bytes.length);
-            return Buffer.concat([prefix, bytes]);
-          };
-          const deriveDMIssueIdempotency = golden => {
+          const dmIdempotency = golden => {
             const body = JSON.parse(golden.body_utf8);
-            const frame = value => {
-              const bytes = Buffer.from(String(value), 'utf8');
-              const prefix = Buffer.alloc(4);
-              prefix.writeUInt32BE(bytes.length);
-              return Buffer.concat([prefix, bytes]);
-            };
             const preimage = Buffer.concat([
-              Buffer.from(dm.contract.idempotency_derivation_domain_ascii, 'ascii'), Buffer.from([0]),
-              frame(golden.issuer_id), frame(body.upload_handle), frame(body.issue_generation),
+              Buffer.from(dm.contract.idempotency_derivation_domain_ascii, 'ascii'),
+              Buffer.from([0]),
+              frame(golden.issuer_id),
+              frame(body.upload_handle),
+              frame(body.issue_generation),
             ]);
-            return {
+            return [
               preimage,
-              key: dm.contract.idempotency_key_prefix + crypto.createHash('sha256').update(preimage).digest('base64url'),
-            };
+              dm.contract.idempotency_key_prefix +
+                crypto.createHash('sha256').update(preimage).digest('base64url'),
+            ];
           };
-          const dmP256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
-          const parseDMSignature = encoded => {
-            if (typeof encoded !== 'string' || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+          const p256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+          const strictLowSSignature = encoded => {
+            if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
             const der = Buffer.from(encoded, 'base64url');
-            if (der.toString('base64url') !== encoded || der.length > 72 || der.length < 8) return null;
+            if (der.toString('base64url') !== encoded || der.length < 8 || der.length > 72) return null;
             let offset = 0;
-            if (der[offset++] !== 0x30) return null;
-            const sequenceLength = der[offset++];
-            if (sequenceLength >= 0x80 || sequenceLength !== der.length - offset) return null;
-            const readInteger = () => {
+            if (der[offset++] !== 0x30 || der[offset++] !== der.length - offset) return null;
+            const integer = () => {
               if (der[offset++] !== 0x02) return null;
               const length = der[offset++];
               if (length < 1 || length > 33 || offset + length > der.length) return null;
-              const value = der.subarray(offset, offset + length);
-              offset += length;
-              if ((value[0] & 0x80) !== 0 ||
-                  (value.length > 1 && value[0] === 0 && (value[1] & 0x80) === 0)) return null;
-              return BigInt(`0x${value.toString('hex')}`);
+              const bytes = der.subarray(offset, offset += length);
+              if ((bytes[0] & 0x80) || (bytes.length > 1 && bytes[0] === 0 && !(bytes[1] & 0x80))) return null;
+              return BigInt('0x' + bytes.toString('hex'));
             };
-            const r = readInteger();
-            const s = readInteger();
-            if (r === null || s === null || offset !== der.length ||
-                r <= 0n || r >= dmP256Order || s <= 0n || s > dmP256Order / 2n) return null;
-            return der;
+            const r = integer();
+            const s = integer();
+            return r && s && offset === der.length && r < p256Order && s <= p256Order / 2n ? der : null;
           };
-          const verifyDMGolden = golden => {
-            const bodyHash = crypto.createHash('sha256').update(golden.body_utf8, 'utf8').digest('hex');
+          const verifyDelegatedMint = golden => {
+            const bodyHash = crypto.createHash('sha256').update(golden.body_utf8).digest('hex');
+            const values = {
+              method: golden.method,
+              authority: golden.authority,
+              route: golden.route,
+              issuer_id: golden.issuer_id,
+              kid: golden.kid,
+              idempotency_key: golden.idempotency_key,
+              timestamp_unix_decimal: golden.timestamp_unix,
+              nonce: golden.nonce,
+              body_sha256: bodyHash,
+            };
             const canonical = Buffer.concat([
-              Buffer.from(dm.contract.signing_domain_ascii, 'ascii'), Buffer.from([0]),
-              ...dm.contract.field_order.map(name => issueFrame({
-                method: golden.method,
-                authority: golden.authority,
-                route: golden.route,
-                issuer_id: golden.issuer_id,
-                kid: golden.kid,
-                idempotency_key: golden.idempotency_key,
-                timestamp_unix_decimal: String(golden.timestamp_unix),
-                nonce: golden.nonce,
-                body_sha256: bodyHash,
-              }[name])),
+              Buffer.from(dm.contract.signing_domain_ascii, 'ascii'),
+              Buffer.from([0]),
+              ...dm.contract.field_order.map(name => frame(values[name])),
             ]);
-            const signature = parseDMSignature(golden.signature_der_b64url);
-            if (signature === null) return false;
-            return bodyHash === golden.body_sha256 &&
+            const signature = strictLowSSignature(golden.signature_der_b64url);
+            return signature &&
+              bodyHash === golden.body_sha256 &&
               canonical.toString('hex') === golden.canonical_hex &&
               crypto.createHash('sha256').update(canonical).digest('hex') === golden.signing_digest_hex &&
               crypto.verify(
-                'sha256', canonical,
-                crypto.createPublicKey({key: Buffer.from(golden.public_key_der_b64url, 'base64url'), format: 'der', type: 'spki'}),
+                'sha256',
+                canonical,
+                crypto.createPublicKey({
+                  key: Buffer.from(golden.public_key_der_b64url, 'base64url'),
+                  format: 'der',
+                  type: 'spki',
+                }),
                 signature,
               );
           };
-          const deriveHubRequestId = vector => {
-            const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
-            const nonce = Buffer.from(vector.request_nonce, 'base64url');
+          const verifyHubRequestID = vector => {
             const preimage = Buffer.concat([
-              Buffer.from(`${h.contract.domain_ascii}\0`, 'ascii'),
-              hubFrame(1, Buffer.from(vector.environment, 'ascii')),
-              hubFrame(2, Buffer.from(vector.operation, 'ascii')),
-              hubFrame(3, peer),
-              hubFrame(4, nonce),
+              Buffer.from(h.contract.domain_ascii + '\0', 'ascii'),
+              tagged(1, Buffer.from(vector.environment, 'ascii')),
+              tagged(2, Buffer.from(vector.operation, 'ascii')),
+              tagged(3, Buffer.from(vector.authenticated_peer_public_key_b64, 'base64')),
+              tagged(4, Buffer.from(vector.request_nonce, 'base64url')),
             ]);
-            if (preimage.toString('hex') !== vector.preimage_hex) return false;
-            return crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
+            return preimage.toString('hex') === vector.preimage_hex &&
+              crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
           };
-          const deriveConnectorResourceRequestId = () => {
-            const peer = Buffer.from(rr.fixtures.authenticated_peer_public_key_b64, 'base64');
-            const nonce = Buffer.from(rr.fixtures.create_request_nonce, 'base64url');
+          const connectorResourceRequestID = () => {
             const preimage = Buffer.concat([
-              Buffer.from(`${u.protocol.cell_request_id_domain}\0`, 'ascii'),
-              hubFrame(1, Buffer.from(u.fixtures.environment, 'ascii')),
-              hubFrame(2, peer),
-              hubFrame(3, nonce),
+              Buffer.from(u.protocol.cell_request_id_domain + '\0', 'ascii'),
+              tagged(1, Buffer.from(u.fixtures.environment, 'ascii')),
+              tagged(2, Buffer.from(rr.fixtures.authenticated_peer_public_key_b64, 'base64')),
+              tagged(3, Buffer.from(rr.fixtures.create_request_nonce, 'base64url')),
             ]);
             return crypto.createHash('sha256').update(preimage).digest('hex');
           };
-          const rawHubCookieIp = source => {
-            const unmapped = source.startsWith('::ffff:') ? source.slice(7) : source;
-            if (net.isIPv4(unmapped)) {
-              return {family: 4, raw: Buffer.from(unmapped.split('.').map(Number))};
-            }
-            if (!net.isIPv6(unmapped)) return null;
-            const halves = unmapped.split('::');
-            if (halves.length > 2) return null;
+          const rawIP = source => {
+            const address = source.startsWith('::ffff:') ? source.slice(7) : source;
+            if (net.isIPv4(address)) return [4, Buffer.from(address.split('.').map(Number))];
+            if (!net.isIPv6(address)) return null;
+            const halves = address.split('::');
             const left = halves[0] ? halves[0].split(':') : [];
-            const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
-            const zeroes = 8 - left.length - right.length;
-            if (zeroes < 0 || (halves.length === 1 && zeroes !== 0)) return null;
-            const words = [...left, ...Array(zeroes).fill('0'), ...right];
+            const right = halves[1] ? halves[1].split(':') : [];
+            const words = [...left, ...Array(8 - left.length - right.length).fill('0'), ...right];
             const raw = Buffer.alloc(16);
             words.forEach((word, index) => raw.writeUInt16BE(Number.parseInt(word, 16), index * 2));
-            return {family: 6, raw};
+            return [6, raw];
           };
-          const deriveHubLstCookie = vector => {
-            const ip = rawHubCookieIp(vector.source_ip);
-            if (!ip) return false;
-            const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
-            const rawLength = Buffer.alloc(4);
-            rawLength.writeUInt32BE(ip.raw.length);
+          const verifyHubCookie = vector => {
+            const [family, ip] = rawIP(vector.source_ip);
+            const ipLength = Buffer.alloc(4);
             const peerLength = Buffer.alloc(4);
-            peerLength.writeUInt32BE(peer.length);
             const window = Buffer.alloc(8);
+            const peer = Buffer.from(vector.authenticated_peer_public_key_b64, 'base64');
+            ipLength.writeUInt32BE(ip.length);
+            peerLength.writeUInt32BE(peer.length);
             window.writeBigUInt64BE(BigInt(vector.window_index));
             const preimage = Buffer.concat([
-              Buffer.from(`${hc.contract.cookie_domain_ascii}\0`, 'ascii'),
-              Buffer.from([ip.family]), rawLength, ip.raw,
-              peerLength, peer, window,
+              Buffer.from(hc.contract.cookie_domain_ascii + '\0', 'ascii'),
+              Buffer.from([family]),
+              ipLength,
+              ip,
+              peerLength,
+              peer,
+              window,
             ]);
-            if (preimage.toString('hex') !== vector.preimage_hex) return false;
             const cookie = crypto.createHmac('sha256', Buffer.from(vector.signing_key_hex, 'hex'))
               .update(preimage).digest();
-            return cookie.toString('hex') === vector.cookie_hex && cookie.toString('base64') === vector.cookie_b64;
+            return preimage.toString('hex') === vector.preimage_hex &&
+              cookie.toString('hex') === vector.cookie_hex &&
+              cookie.toString('base64') === vector.cookie_b64;
           };
-          const cridCrc32c = buf => {
+          const crc32c = bytes => {
             let crc = 0xffffffff;
-            for (const byte of buf) {
+            for (const byte of bytes) {
               crc ^= byte;
               for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0x82f63b78 & -(crc & 1));
             }
             return (crc ^ 0xffffffff) >>> 0;
           };
-          const cridBase32 = buf => {
-            let bits = 0, value = 0, out = '';
-            for (const byte of buf) {
+          const base32 = bytes => {
+            let bits = 0, value = 0, output = '';
+            for (const byte of bytes) {
               value = (value << 8) | byte;
               bits += 8;
-              while (bits >= 5) { out += cd.contract.alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+              while (bits >= 5) {
+                output += cd.contract.alphabet[(value >>> (bits - 5)) & 31];
+                bits -= 5;
+              }
             }
-            return bits ? out + cd.contract.alphabet[(value << (5 - bits)) & 31] : out;
+            return bits ? output + cd.contract.alphabet[(value << (5 - bits)) & 31] : output;
           };
-          const deriveCrid = vector => {
+          const verifyCRID = vector => {
             const der = Buffer.from(vector.der_spki_b64url, 'base64url');
             const digest = crypto.createHash('sha256')
-              .update(Buffer.concat([Buffer.from(cd.contract.domain_separation_prefix, 'ascii'), Buffer.from([0]), der]))
-              .digest();
-            if (digest.toString('hex') !== vector.digest_hex) return false;
+              .update(Buffer.concat([
+                Buffer.from(cd.contract.domain_separation_prefix, 'ascii'),
+                Buffer.from([0]),
+                der,
+              ])).digest();
             const payload = Buffer.concat([Buffer.from(vector.version_byte, 'hex'), digest]);
             const crc = Buffer.alloc(4);
-            crc.writeUInt32BE(cridCrc32c(payload));
-            if (crc.toString('hex') !== vector.crc_hex) return false;
+            crc.writeUInt32BE(crc32c(payload));
             const encoded = Buffer.concat([payload, crc]);
-            if (encoded.toString('hex') !== vector.payload_hex) return false;
-            return cridBase32(encoded) === vector.expected_crid;
+            return digest.toString('hex') === vector.digest_hex &&
+              crc.toString('hex') === vector.crc_hex &&
+              encoded.toString('hex') === vector.payload_hex &&
+              base32(encoded) === vector.expected_crid;
           };
-          const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
-          const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
-          const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
-          const recoveryCookieKat = hc.cookie_kats.find(v => v.name === 'ipv4');
-          const authorityRequests = Object.fromEntries(
-            Object.entries(u.operations).map(([name, operation]) => [name, JSON.parse(operation.request_golden.body_json)])
-          );
-          const globalAuthorityOperations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent'];
-          const cellAuthorityOperations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration', 'ResolveConnectorResource'];
-          // Keep proof-mutation assertions in lockstep with the Python package
-          // smoke below; the deliberate re-encoding catches consumer drift.
-          const proofMutationRejectNames = new Set(['reject_unknown_field', 'reject_wrong_type', 'reject_missing_field']);
-          const proofMutationRejects = Object.fromEntries(
-            u.operations.MutateProofAgent.request_rejects
-              .filter(v => proofMutationRejectNames.has(v.name))
-              .map(v => [v.name, JSON.parse(v.body_json)])
-          );
-          const proofMutationReplay = u.operations.MutateProofAgent.replay_contract;
-          const resourceReplay = u.operations.ResolveConnectorResource.resource_replay_contract;
-          const resourceSuccess = JSON.parse(rr.success_exchanges[0].result.body_json).list;
-          const resourceAuthoritySuccess = JSON.parse(u.operations.ResolveConnectorResource.success_golden.body_json).result;
-          const activationUnavailable = u.operations.ActivateRegistration.public_mapping_cases.find(v => v.name === 'unavailable');
-          const replies = Object.fromEntries(k.reply_cases.map(v => [v.name, v]));
-          const requests = Object.fromEntries(k.request_cases.map(v => [v.name, v]));
-          const idResponses = Object.fromEntries(i.consumer_response_cases.map(v => [v.name, v]));
-          const hubCookieChallenges = Object.fromEntries(hc.challenge_cases.map(v => [v.name, v]));
-          const hubCookieChallengeFlags = {
-            accept_initial_challenge: '0000',
-            accept_refresh_challenge: '0000',
-            reject_malformed_body: '0000',
-            reject_unknown_field: '0000',
-            reject_duplicate_field: '0000',
-            reject_wrong_transaction: '0000',
-            reject_cookie_encoding: '0000',
-            reject_cookie_length: '0000',
-            reject_untrusted_server: '0000',
-            reject_compressed_challenge: '0002',
-            reject_unknown_flag_challenge: '0008',
-            reject_second_challenge: '0000',
-          };
-          const hubCookieChallengesComplete =
-            hc.challenge_cases.length === Object.keys(hubCookieChallengeFlags).length &&
-            Object.entries(hubCookieChallengeFlags).every(([name, flags]) =>
-              hubCookieChallenges[name]?.header_flags_hex === flags
-            );
-          const idValuePattern = new RegExp(i.contract.pattern);
-          const idValuesAgree = i.consumer_value_cases.every(
-            v => idValuePattern.test(v.value) === (v.outcome === 'accept')
-          );
-          const canonical = '0123456789abcdef';
-          const resource = 'connector-conformance-01';
-          // Stock JSON parsing is intentionally insufficient for these cases:
-          // duplicate keys collapse last-wins and aliases remain unchecked.
-          const lossyDuplicate = JSON.parse(requests.reject_duplicate_run_id.body_json);
-          const uncheckedAlias = JSON.parse(requests.reject_alias_run_id.body_json);
-          const assignmentInitial = JSON.parse(s.initial_assignment.result.body_json).list;
-          const assignmentRefresh = JSON.parse(s.refresh_assignment.result.body_json).list;
-          const assignmentInitialRequest = JSON.parse(s.initial_assignment.request.body_json);
-          const assignmentRefreshRequest = JSON.parse(s.refresh_assignment.request.body_json);
-          const nonceIsCanonical32 = value => {
-            const decoded = Buffer.from(value, 'base64url');
-            return decoded.length === 32 && decoded.toString('base64url') === value;
-          };
-          // sessId is uint64 authority and the fixture deliberately exceeds
-          // Number.MAX_SAFE_INTEGER. Extract its canonical decimal token from
-          // the already-strict body and compare as BigInt; JSON.parse would
-          // silently make nearby session IDs equal after rounding.
-          const exactSessionID = body => {
-            const match = /"sessId":(0|[1-9][0-9]*)(?=[,}])/.exec(body);
-            if (!match) throw new Error('missing or noncanonical sessId');
-            return BigInt(match[1]);
-          };
-          const assignmentRegister = JSON.parse(s.assigned_cell_registration.request.body_json);
-          const assignmentOtp = JSON.parse(s.account_credential_otp.request.body_json);
-          const assignmentOtpBinding = s.account_credential_otp.enrollment_binding;
-          const assignmentOtpRequests = Object.fromEntries(s.account_credential_otp.request_cases.map(v => [v.name, v]));
-          const assignmentOtpBindings = Object.fromEntries(s.account_credential_otp.binding_cases.map(v => [v.name, v]));
-          const assignmentOtpChallengeBindings = Object.fromEntries(s.account_credential_otp.challenge_binding_cases.map(v => [v.name, v]));
-          const assignmentOtpChallengesAgree = [
-            'reject_challenge_ticket_jti_mismatch',
-            'reject_challenge_peer_public_key_mismatch',
-            'reject_challenge_dev_id_mismatch',
-            'reject_challenge_credential_key_id_mismatch',
-            'reject_challenge_environment_mismatch',
-            'reject_challenge_cell_mismatch',
-          ].every(name => assignmentOtpChallengeBindings[name].reject_class === 'challenge_binding');
-          const assignmentOtpSizes = Object.fromEntries(s.account_credential_otp.packet_size_contract.cases.map(v => [v.name, v]));
-          const assignmentCompletionRequest = JSON.parse(s.registration_completion.request.body_json);
-          const deviceApiKey = assignmentCompletionRequest.usrData.device_api_key;
-          const deviceApiKeyPrefix = 'lv_live_';
-          const deviceApiKeySecretBytes = 32;
-          const deviceApiKeyBody = deviceApiKey.slice(deviceApiKeyPrefix.length);
-          const deviceApiKeyBytes = Buffer.from(deviceApiKeyBody, 'base64url');
-          const deviceApiKeyCanonical = deviceApiKey.startsWith(deviceApiKeyPrefix) &&
-            deviceApiKeyBytes.length === deviceApiKeySecretBytes &&
-            deviceApiKeyBytes.every((value, index) => value === index) &&
-            deviceApiKeyBytes.toString('base64url') === deviceApiKeyBody;
-          const assignmentCompletion = JSON.parse(s.registration_completion.result.body_json).list;
-          const assignmentRequests = Object.fromEntries(s.request_cases.map(v => [v.name, v]));
-          const nullNonce = JSON.parse(assignmentRequests.reject_null_initial_request_nonce.body_json).usrData.request_nonce;
-          const standardBase64Nonce = JSON.parse(assignmentRequests.reject_standard_base64_refresh_request_nonce.body_json).usrData.request_nonce;
-          const nonCanonicalTailNonce = JSON.parse(assignmentRequests.reject_noncanonical_tail_bits_refresh_request_nonce.body_json).usrData.request_nonce;
-          const refreshNonceBytes = Buffer.from(assignmentRefreshRequest.usrData.request_nonce, 'base64url');
-          const assignmentResults = Object.fromEntries(s.success_result_cases.map(v => [v.name, v]));
-          const assignmentErrors = Object.fromEntries(s.error_contract.assignment_cases.map(v => [v.name, v]));
-          const assignmentMalformed = Object.fromEntries(s.error_contract.malformed_cases.map(v => [v.name, v]));
-          const sessionCookie = Buffer.from(x.overload_reknock.cookie_b64, 'base64');
-          const sessionPackets = [
-            x.overload_reknock.knock_request,
-            x.overload_reknock.cookie_reply,
-            x.overload_reknock.reknock_request,
-            x.overload_reknock.ack,
-            x.exact_session_exit.request,
-            x.exact_session_exit.ack,
-            x.denial_acks.knock,
-            x.denial_acks.exit,
+
+          const signed = [
+            dm.golden,
+            dm.retry_golden,
+            dm.refresh_golden,
+            dm.wrong_endpoint_signed,
+            dm.nonce_reuse_signed,
+            dm.authority_conflict_signed,
           ];
-          const sessionKnock = JSON.parse(x.overload_reknock.knock_request.body_json);
-          const sessionACK = JSON.parse(x.overload_reknock.ack.body_json);
-          const exactExitRequest = JSON.parse(x.exact_session_exit.request.body_json);
-          const exactExitAck = JSON.parse(x.exact_session_exit.ack.body_json);
-          const knockDenial = JSON.parse(x.denial_acks.knock.body_json);
-          const exitDenial = JSON.parse(x.denial_acks.exit.body_json);
-          const deniedAuthorityFields = ['cellId', 'sessId', 'sessIssuedAtMillis', 'runId', 'runAttempt', 'closeEventId', 'state'];
-          if (qv2.schema_version !== 2 || qv2.transport_contract.prefix !== 'qv2t1' ||
-              qv2.transport_contract.component_max !== 240 ||
-              qv2.transport_contract.max_transport_length !== 6826 ||
-              qv2.classes.transport.vectors.length !== 39 || !c.issuerSignatureVectors().issuer ||
-              !r.knock.packet_hex || !r.ack.packet_hex || !a.otp.packet_hex || !a.rak_success.packet_hex ||
-              s.schema_version !== 4 || s.initial_assignment.request.header_type !== 5 ||
-              !nonceIsCanonical32(assignmentInitialRequest.usrData.request_nonce) ||
-              !nonceIsCanonical32(assignmentRefreshRequest.usrData.request_nonce) ||
-              assignmentInitialRequest.usrData.request_nonce === assignmentRefreshRequest.usrData.request_nonce ||
-              JSON.stringify(s.public_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'account', 'agent']) ||
-              s.initial_assignment.result.header_type !== 6 ||
-              s.initial_assignment.request.counter !== s.initial_assignment.result.counter ||
-              s.assigned_cell_registration.request.header_type !== 13 ||
-              s.assigned_cell_registration.result.header_type !== 14 ||
-              s.assigned_cell_registration.request.counter !== s.assigned_cell_registration.result.counter ||
-              s.account_credential_otp.producer_revision !== '2072546e1fc76eb76bd7e5c22d37856019ba33e7' ||
-              s.account_credential_otp.raw_body_required !== true ||
-              s.account_credential_otp.authenticated_peer_public_key_required !== true ||
-              JSON.stringify(s.account_credential_otp.otp_registration_key_kinds) !== JSON.stringify(['account']) ||
-              JSON.stringify(s.account_credential_otp.otp_free_registration_key_kinds) !== JSON.stringify(['bootstrap', 'connector_bootstrap', 'agent']) ||
-              s.account_credential_otp.request.header_type !== 12 ||
-              s.account_credential_otp.request.receiver_key !== 'assigned_cell' ||
-              assignmentOtp.usrId !== assignmentOtpBinding.request_registration_key_id ||
-              assignmentOtp.devId !== assignmentOtpBinding.request_agent_id ||
-              assignmentOtp.pass !== assignmentOtpBinding.request_credential ||
-              assignmentOtp.usrData.query !== 'agent_registration_otp' ||
-              assignmentOtp.usrData.version !== 1 ||
-              assignmentOtp.usrData.assignment_ticket !== assignmentOtpBinding.request_assignment_ticket ||
-              assignmentOtpBinding.request_credential_hash_b64 !== assignmentOtpBinding.ticket_credential_key_hash_b64 ||
-              assignmentOtpBinding.recomputed_credential_fence_b64 !== assignmentOtpBinding.ticket_credential_fence_b64 ||
-              s.account_credential_otp.challenge_binding.lookup_key_field !== 'ticket_jti' ||
-              JSON.stringify(s.account_credential_otp.challenge_binding.required_match_fields) !== JSON.stringify(['ticket_jti', 'authenticated_peer_public_key_b64', 'dev_id', 'credential_key_id', 'environment_id', 'cell_id']) ||
-              s.account_credential_otp.challenge_binding.ticket_jti !== assignmentOtpBinding.ticket_jti ||
-              s.account_credential_otp.challenge_binding.authenticated_peer_public_key_b64 !== assignmentOtpBinding.authenticated_peer_public_key_b64 ||
-              s.account_credential_otp.challenge_binding.dev_id !== assignmentOtpBinding.request_agent_id ||
-              s.account_credential_otp.challenge_binding.credential_key_id !== assignmentOtpBinding.request_registration_key_id ||
-              s.account_credential_otp.challenge_binding.environment_id !== assignmentOtpBinding.local_environment_id ||
-              s.account_credential_otp.challenge_binding.cell_id !== assignmentOtpBinding.local_cell_id ||
-              assignmentOtp.pubKey !== undefined ||
-              assignmentOtpBinding.ticket_expires_at_unix - assignmentOtpBinding.evaluated_at_unix !== 630 ||
-              assignmentOtpBinding.minimum_ticket_remaining_seconds !== 630 ||
-              s.account_credential_otp.request_cases.length !== 17 ||
-              assignmentOtpRequests.reject_duplicate_otp_assignment_ticket.reject_class !== 'body_parse' ||
-              assignmentOtpRequests.reject_empty_otp_usr_id.reject_class !== 'semantic' ||
-              assignmentOtpRequests.reject_empty_otp_dev_id.reject_class !== 'semantic' ||
-              assignmentOtpRequests.reject_wrong_otp_asp_id.reject_class !== 'semantic' ||
-              assignmentOtpRequests.reject_unknown_otp_outer_field.reject_class !== 'unknown_field' ||
-              assignmentOtpRequests.reject_null_otp_body.reject_class !== 'wrong_type' ||
-              assignmentOtpRequests.reject_trailing_otp_value.reject_class !== 'body_parse' ||
-              assignmentOtpRequests.reject_wrong_otp_header_phase.reject_class !== 'wrong_phase' ||
-              s.account_credential_otp.binding_cases.length !== 13 ||
-              assignmentOtpBindings.accept_exact_minimum_lifetime.outcome !== 'accept' ||
-              assignmentOtpBindings.reject_different_request_ticket.reject_class !== 'ticket_binding' ||
-              assignmentOtpBindings.reject_peer_public_key_mismatch.reject_class !== 'peer_binding' ||
-              assignmentOtpBindings.reject_ticket_credential_key_hash_mismatch.reject_class !== 'credential_binding' ||
-              assignmentOtpBindings.reject_ticket_credential_fence_mismatch.reject_class !== 'credential_binding' ||
-              assignmentOtpBindings.reject_ticket_remaining_lifetime_629.reject_class !== 'ticket_lifetime' ||
-              s.account_credential_otp.challenge_binding_cases.length !== 7 ||
-              assignmentOtpChallengeBindings.accept_exact_challenge_binding.outcome !== 'accept' ||
-              !assignmentOtpChallengesAgree ||
-              s.account_credential_otp.packet_size_contract.cases.length !== 2 ||
-              s.account_credential_otp.packet_size_contract.max_plaintext_body_bytes !== 3840 ||
-              s.account_credential_otp.packet_size_contract.max_packet_bytes !== 4096 ||
-              assignmentOtpSizes.accept_max_plaintext_body.expected_packet_bytes !== 4096 ||
-              assignmentOtpSizes.reject_plaintext_body_over_max.reject_class !== 'packet_size' ||
-              assignmentRegister.usrData.assignment_ticket !== assignmentInitial.assignment_ticket ||
-              assignmentRegister.otp !== JSON.parse(s.initial_assignment.request.body_json).usrData.credential ||
-              assignmentInitial.registration.masked_email !== undefined ||
-              assignmentRefresh.assignment_ticket !== undefined ||
-              assignmentRefresh.assignment_ticket_expires_at !== undefined ||
-              s.registration_completion.request.receiver_key !== 'assigned_cell' ||
-              assignmentCompletionRequest.usrData.assignment_ticket !== undefined ||
-              JSON.stringify(Object.keys(assignmentCompletion).sort()) !== JSON.stringify(['device_api_key_id', 'query', 'version']) ||
-              s.request_cases.length !== 30 ||
-              assignmentRequests.reject_duplicate_outer_dev_id.reject_class !== 'body_parse' ||
-              assignmentRequests.reject_missing_initial_request_nonce.reject_class !== 'missing_field' ||
-              assignmentRequests.reject_duplicate_initial_request_nonce.reject_class !== 'body_parse' ||
-              assignmentRequests.reject_alias_refresh_request_nonce.reject_class !== 'unknown_field' ||
-              assignmentRequests.reject_null_initial_request_nonce.reject_class !== 'wrong_type' ||
-              assignmentRequests.reject_padded_initial_request_nonce.reject_class !== 'semantic' ||
-              assignmentRequests.reject_short_refresh_request_nonce.reject_class !== 'semantic' ||
-              assignmentRequests.reject_standard_base64_refresh_request_nonce.reject_class !== 'semantic' ||
-              assignmentRequests.reject_noncanonical_tail_bits_refresh_request_nonce.reject_class !== 'semantic' ||
-              nullNonce !== null ||
-              standardBase64Nonce.length !== 43 || !/[+/]/.test(standardBase64Nonce) || nonceIsCanonical32(standardBase64Nonce) ||
-              nonCanonicalTailNonce !== `${assignmentRefreshRequest.usrData.request_nonce.slice(0, -1)}9` ||
-              nonceIsCanonical32(nonCanonicalTailNonce) ||
-              !Buffer.from(nonCanonicalTailNonce, 'base64url').equals(refreshNonceBytes) ||
-              assignmentRequests.reject_alias_outer_dev_id.reject_class !== 'unknown_field' ||
-              assignmentRequests.reject_client_public_key.reject_class !== 'unknown_field' ||
-              assignmentRequests.reject_refresh_assignment_ticket.reject_class !== 'unknown_field' ||
-              assignmentRequests.reject_duplicate_registration_ticket.reject_class !== 'body_parse' ||
-              assignmentRequests.reject_wrong_mode.reject_class !== 'semantic' ||
-              s.success_result_cases.length !== 12 ||
-              assignmentResults.reject_initial_private_key_kind.reject_class !== 'semantic' ||
-              JSON.parse(assignmentResults.reject_initial_private_key_kind.body_json).list.registration.key_kind !== 'tunnel_bootstrap' ||
-              assignmentResults.reject_initial_unknown_key_kind.reject_class !== 'semantic' ||
-              JSON.parse(assignmentResults.reject_initial_unknown_key_kind.body_json).list.registration.key_kind !== 'future_kind' ||
-              assignmentResults.reject_refresh_result_assignment_ticket.reject_class !== 'unknown_field' ||
-              assignmentResults.reject_completion_device_api_key.reject_class !== 'unknown_field' ||
-              assignmentResults.reject_completion_device_api_key_hash.reject_class !== 'unknown_field' ||
-              assignmentResults.reject_completion_device_key_commitment.reject_class !== 'unknown_field' ||
-              s.error_contract.status !== 'ready' || s.error_contract.producer_revision !== '9653fcb185c77629b787ad046c13c760baba88f4' ||
-              assignmentMalformed.reject_unknown_list_error_code.reject_class !== 'unknown_error_code' ||
-              assignmentMalformed.reject_unknown_registration_error_code.reject_class !== 'unknown_error_code' ||
-              s.error_contract.assignment_cases.length !== 6 ||
-              JSON.stringify(assignmentErrors.invalid_assignment_request.accepted_phases) !== JSON.stringify(['initial_assignment', 'refresh_assignment']) ||
-              s.error_contract.initial_credential_cases.length !== 4 ||
-              s.error_contract.completion_cases.length !== 5 ||
-              s.error_contract.registration_cases.length !== 4 ||
-              s.error_contract.rules.cookie_challenge_allowed !== false ||
-              k.schema_version !== 4 || k.request.fields.run_id !== canonical ||
-              JSON.parse(k.request.body_json).runId !== canonical || k.request_cases.length !== 12 ||
-              requests.canonical_run_id.native_connector.parsed_run_id !== canonical ||
-              requests.missing_run_id.generic_parser.parsed_run_id !== '' ||
-              requests.missing_run_id.native_connector.reject_class !== 'missing_run_id' ||
-              requests.reject_uppercase_run_id.generic_parser.reject_class !== 'invalid_run_id' ||
-              requests.reject_alias_run_id.native_connector.reject_class !== 'body_parse' ||
-              lossyDuplicate.runId !== 'fedcba9876543210' ||
-              uncheckedAlias.runID !== canonical || uncheckedAlias.runId !== undefined ||
-              k.reply_cases.length !== 53 || replies.ack_success.outcome !== 'success' ||
-              replies.ack_success.expected_session_id !== '72623859790382856' ||
-              replies.ack_success.expected_open_time !== 900 ||
-              !replies.ack_success.body_json.startsWith('{"sessId":72623859790382856,') ||
-              Object.hasOwn(JSON.parse(replies.ack_deny.body_json), 'sessId') ||
-              replies.reject_success_zero_open_time.reject_class !== 'session_lifetime' ||
-              replies.ack_success_empty_err_code.outcome !== 'success' ||
-              JSON.parse(replies.ack_success_empty_err_code.body_json).errCode !== '' ||
-              replies.ack_deny_51002.reject_class !== 'server_deny' ||
-              JSON.parse(replies.ack_deny_51002.body_json).errCode !== '51002' ||
-              JSON.parse(replies.ack_deny_52025.body_json).errCode !== '52025' ||
-              JSON.parse(replies.ack_success.body_json).preActions[resource] !== null ||
-              replies.ack_success.expected_ac_token !== JSON.parse(replies.ack_success.body_json).acTokens[resource] ||
-              replies.ack_success.expected_resource_host !== JSON.parse(replies.ack_success.body_json).resHost[resource] ||
-              JSON.parse(replies.ack_success_optional_metadata.body_json).aspToken === replies.ack_success_optional_metadata.expected_ac_token ||
-              replies.reject_pre_access_action_requested.reject_class !== 'unsupported_pre_access' ||
-              replies.reject_pre_access_action_other_resource.reject_class !== 'unsupported_pre_access' ||
-              !Array.isArray(JSON.parse(replies.reject_malformed_pre_actions.body_json).preActions) ||
-              replies.reject_malformed_pre_actions.reject_class !== 'body_parse' ||
-              replies.ack_deny.reject_class !== 'server_deny' ||
-              replies.reject_counter_mismatch.request_counter === replies.reject_counter_mismatch.reply_counter ||
-              JSON.parse(replies.reject_malformed_opn_time.body_json).opnTime !== '900' ||
-              replies.reject_malformed_opn_time.reject_class !== 'body_parse' ||
-              JSON.parse(replies.reject_malformed_agent_addr.body_json).agentAddr !== 7 ||
-              replies.reject_malformed_agent_addr.reject_class !== 'body_parse' ||
-              !Array.isArray(JSON.parse(replies.reject_malformed_ac_tokens_map.body_json).acTokens) ||
-              replies.reject_malformed_ac_tokens_map.reject_class !== 'body_parse' ||
-              x.artifact !== 'qurl-agent-session-control-vectors' || x.schema_version !== 4 ||
-              x.producer_revision !== 'b962ee4aa82f643d507ddf75adc3c110df8dff9d' ||
-              x.protocol.cok_wire_counter_correlation !== 'unconstrained' ||
-              x.protocol.cok_body_transaction_correlation !== 'must_equal_knock_counter' ||
-              x.protocol.ack_counter_correlation !== 'must_echo_request' ||
-              x.protocol.knock_run_attempt !== 'positive_uint64_bound_across_knk_rkn' ||
-              x.protocol.success_ack_receipt !== 'exact_cell_session_issuance_run_attempt' ||
-              x.protocol.exit_body !== 'exact_session_receipt' || x.protocol.exit_response !== 'strict_close_ack' ||
-              x.protocol.denial_receipt_fields !== 'must_be_omitted' ||
-              x.protocol.exit_cookie_challenge_allowed !== false ||
-              sessionCookie.length !== 32 || sessionCookie.toString('base64') !== x.overload_reknock.cookie_b64 ||
-              sessionPackets.length !== 8 || sessionPackets.some(v => !v.packet_hex || !v.header_digest_hex || !v.body_hex) ||
-              x.overload_reknock.knock_request.header_type !== 1 ||
-              x.overload_reknock.cookie_reply.header_type !== 7 ||
-              x.overload_reknock.reknock_request.header_type !== 8 ||
-              x.overload_reknock.ack.header_type !== 2 ||
-              x.exact_session_exit.request.header_type !== 16 || x.exact_session_exit.ack.header_type !== 2 ||
-              x.denial_acks.knock.header_type !== 2 || x.denial_acks.exit.header_type !== 2 ||
-              x.exact_session_exit.ack.counter !== x.exact_session_exit.request.counter ||
-              sessionKnock.runAttempt !== 1 || exactExitRequest.headerType !== 16 || exactExitRequest.aspId !== 'agent' ||
-              exactExitRequest.cellId !== sessionACK.cellId ||
-              exactSessionID(x.exact_session_exit.request.body_json) !== exactSessionID(x.overload_reknock.ack.body_json) ||
-              exactExitRequest.sessIssuedAtMillis !== sessionACK.sessIssuedAtMillis ||
-              exactExitRequest.runId !== sessionACK.runId || exactExitRequest.runAttempt !== sessionACK.runAttempt ||
-              exactExitAck.cellId !== exactExitRequest.cellId ||
-              exactSessionID(x.exact_session_exit.ack.body_json) !== exactSessionID(x.exact_session_exit.request.body_json) ||
-              exactExitAck.sessIssuedAtMillis !== exactExitRequest.sessIssuedAtMillis ||
-              exactExitAck.runId !== exactExitRequest.runId || exactExitAck.runAttempt !== exactExitRequest.runAttempt ||
-              !/^[0-9a-f]{32}$/.test(exactExitAck.closeEventId) || !['closing', 'closed'].includes(exactExitAck.state) ||
-              deniedAuthorityFields.some(k => Object.hasOwn(knockDenial, k) || Object.hasOwn(exitDenial, k)) ||
-              JSON.parse(x.overload_reknock.cookie_reply.body_json).trxId !== Number(x.overload_reknock.knock_request.counter) ||
-              x.overload_reknock.ack.counter !== x.overload_reknock.reknock_request.counter ||
-              exactSessionID(x.overload_reknock.ack.body_json) <= 0n ||
-              x.cookie_body_cases.length !== 16 || x.flow_cases.length !== 28 ||
-              i.schema_version !== 1 || i.contract.pattern !== '^key_[A-Za-z0-9]{12}$' ||
-              i.producer_cases.length !== 4 || i.consumer_value_cases.length !== 18 ||
-              i.consumer_response_cases.length !== 26 ||
-              !idValuesAgree ||
-              idResponses.registration_info_accept_canonical.expected_id !== 'key_A1b2C3d4E5f6' ||
-              idResponses.registration_info_accept_with_companion_field.expected_id !== 'key_A1b2C3d4E5f6' ||
-              idResponses.completion_reject_duplicate_field.reject_class !== 'body_parse' ||
-              t.artifact !== 'qurl-assignment-ticket-v1-vectors' || t.schema_version !== 1 ||
-              t.golden.token.split('.').length !== 3 || t.golden.signature_b64url.length !== 86 ||
-              t.golden.lrt_body_bytes > t.contract.nhp_body_max_bytes ||
-              t.golden.complete_nhp_packet_bytes > t.contract.nhp_packet_max_bytes ||
-              t.contract.credential_kinds.includes('tunnel_bootstrap') ||
-              u.artifact !== 'qurl-connector-authority-lambda-v1-vectors' || u.schema_version !== 2 ||
-              Object.keys(u.operations).length !== 7 ||
-              u.protocol.max_assignment_ticket_ascii_bytes !== t.contract.max_ticket_ascii_bytes ||
-              u.protocol.hub_request_id_format !== 'lowercase_sha256_hex' ||
-              u.protocol.cell_request_id_domain !== 'layerv:qurl:connector-resource-request-id:v1' ||
-              deriveConnectorResourceRequestId() !== u.fixtures.cell_request_id ||
-              !/^[0-9a-f]{64}$/.test(u.fixtures.hub_request_id) ||
-              globalAuthorityOperations.some(name => authorityRequests[name].hub_request_id !== u.fixtures.hub_request_id) ||
-              cellAuthorityOperations.some(name => Object.hasOwn(authorityRequests[name], 'hub_request_id')) ||
-              !/^nhp-[1-9][0-9]*-[1-9][0-9]*-(connector|qurl_go)-(pre_removal|post_removal)-[0-9a-f]{32}$/.test(u.fixtures.proof_grant_correlation_id) ||
-              u.operations.MutateProofAgent.additional_request_goldens.length !== 2 ||
-              u.operations.MutateProofAgent.additional_success_goldens.length !== 2 ||
-              u.operations.MutateProofAgent.public_mapping_cases.length !== 0 ||
-              JSON.stringify(Object.keys(proofMutationReplay).sort()) !== JSON.stringify([
-                'changed_replay_outcome',
-                'commit_rule',
-                'exact_replay_outcome',
-                'expired_id_outcome',
-                'fingerprint_fields',
-                'logical_lifetime_seconds',
-                'mutation_fence_rule',
-                'pending_move_resume_rule',
-                'pending_recovery_seconds_after_logical_expiry',
-                'tombstone_seconds_after_logical_expiry',
-              ]) ||
-              proofMutationReplay.logical_lifetime_seconds !== 900 ||
-              proofMutationReplay.tombstone_seconds_after_logical_expiry !== 86400 ||
-              proofMutationReplay.pending_recovery_seconds_after_logical_expiry !== 300 ||
-              JSON.stringify(proofMutationReplay.fingerprint_fields) !== JSON.stringify([
-                'version', 'mutation', 'agent_id', 'grant_correlation_id',
-                'pinned_cell_id_if_arm', 'target_cell_id_if_arm_or_move',
-                'lease_seconds_if_arm_or_expire_lease',
-              ]) ||
-              proofMutationReplay.exact_replay_outcome !== 'byte_identical_success' ||
-              proofMutationReplay.changed_replay_outcome !== 'invalid_request_before_mutation' ||
-              proofMutationReplay.mutation_fence_rule !== 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation' ||
-              proofMutationReplay.commit_rule !== 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic' ||
-              proofMutationReplay.pending_move_resume_rule !== 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window' ||
-              proofMutationReplay.expired_id_outcome !== 'expired_first_seen_or_terminal_unavailable_without_mutation' ||
-              resourceReplay.expected_resource_id_outcome !== 'read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim' ||
-              resourceReplay.exact_replay_outcome !== 'byte_identical_first_response_including_found_existing' ||
-              rr.artifact !== 'qurl-connector-resource-lst-v1-vectors' || rr.schema_version !== 1 ||
-              rr.contract.query !== 'connector_resource' || rr.contract.http_fallback_allowed !== false ||
-              rr.contract.one_resource_per_exchange !== true || rr.contract.real_seal_proof_owner !== 'NHP_reference_codec_integration_test' ||
-              rr.success_exchanges.length !== 3 || rr.replay_cases.length !== 3 ||
-              rr.request_cases.length !== 19 || rr.result_reject_cases.length !== 20 ||
-              rr.error_cases.length !== 8 || rr.error_reject_cases.length !== 14 ||
-              rr.size_cases.length !== 4 ||
-              rr.size_cases.some(v => v.outcome === 'accept' && v.size_budget_bytes > rr.contract.max_packet_bytes) ||
-              Object.entries(resourceAuthoritySuccess).some(([key, value]) => resourceSuccess[key] !== value) ||
-              resourceSuccess.query !== 'connector_resource' || resourceSuccess.version !== 1 ||
-              resourceSuccess.found_existing !== false ||
-              JSON.parse(rr.success_exchanges[1].result.body_json).list.found_existing !== true ||
-              Object.entries(u.operations).some(([name, operation]) =>
-                name !== 'MutateProofAgent' && Object.hasOwn(operation, 'replay_contract')) ||
-              proofMutationRejects.reject_unknown_field.mutation !== 'move' ||
-              !Object.hasOwn(proofMutationRejects.reject_unknown_field, 'pinned_cell_id') ||
-              proofMutationRejects.reject_wrong_type.mutation !== 'expire_lease' ||
-              proofMutationRejects.reject_missing_field.mutation !== 'arm' ||
-              Object.hasOwn(proofMutationRejects.reject_missing_field, 'pinned_cell_id') ||
-              u.fixtures.device_api_key === u.fixtures.credential ||
-              Object.values(u.operations).some(op => JSON.stringify({successes: [op.success_golden, ...(op.additional_success_goldens ?? [])], errors: op.semantic_errors, mappings: op.public_mapping_cases}).includes(u.fixtures.hub_request_id)) ||
-              Object.values(u.operations).some(op => op.public_mapping_cases.some(v => (v.nhp_body_json || '').includes(u.fixtures.device_api_key))) ||
-              !u.operations.RefreshAssignment.public_mapping_cases.some(v => v.mapping_source === 'nhp_preinvoke' && v.name === 'assignment_rate_limited' && v.nhp_body_json.includes('52204')) ||
-              activationUnavailable?.nhp_action !== 'drop_no_reply' ||
-              'nhp_body_json' in activationUnavailable ||
-              h.artifact !== 'qurl-connector-hub-request-id-v1-vectors' || h.schema_version !== 1 ||
-              h.contract.operations.join(',') !== 'IssueAssignment,RefreshAssignment,IssueCredentialRecovery' ||
-              !h.contract.excluded_inputs.includes('nhp_send_timestamp') ||
-              !h.contract.excluded_inputs.includes('exact_body_digest') ||
-              h.cases.length !== 6 || hubRequestIds.size !== h.cases.length ||
-              h.cases.some(v => !deriveHubRequestId(v)) ||
-              assignmentRefreshRequest.usrData.request_nonce !== h.cases[0].request_nonce ||
-              hc.artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' || hc.schema_version !== 1 ||
-              hc.contract.proof_flag_hex !== '0004' || hc.contract.challenge_header_flags_hex !== '0000' ||
-              hc.contract.http_fallback_allowed !== false || !hubCookieChallengesComplete ||
-              !hc.contract.additive_application_profiles.includes('qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition') ||
-              hc.cookie_kats.some(vector => !deriveHubLstCookie(vector)) ||
-              ['reject_compressed_challenge', 'reject_unknown_flag_challenge'].some(name =>
-                hubCookieChallenges[name]?.outcome !== 'reject' ||
-                hubCookieChallenges[name]?.client_action !== 'stop_without_third_lst_or_fallback'
-              ) ||
-              hc.size_cases.find(v => v.name === 'allow_crypto_valid_malformed_application_size')?.size_gate_action !== 'challenge_size_eligible' ||
-              hc.assignment_success_sizes.find(v => v.name === 'initial_max_ticket_envelope')?.result_packet_bytes !== 3076 ||
-              cr.artifact !== 'qurl-agent-credential-recovery-v1-vectors' || cr.schema_version !== 1 ||
-              cr.protocol.transport !== 'NHP_UDP_ONLY' || cr.protocol.http_fallback_allowed !== false ||
-              cr.protocol.relay_fallback_allowed !== false || cr.protocol.client_cell_selection_allowed !== false ||
-              cr.protocol.recovery_grant_lifetime_seconds !== 900 ||
-              cr.protocol.issue_replay_rule !== 'same_hub_request_id_and_semantic_fingerprint_returns_byte_identical_result_else_terminal_fingerprint_conflict' ||
-              !recoveryRequestIdCase || cr.fixtures.environment !== recoveryRequestIdCase.environment ||
-              cr.fixtures.authenticated_peer_public_key_b64 !== recoveryRequestIdCase.authenticated_peer_public_key_b64 ||
-              cr.fixtures.request_nonce !== recoveryRequestIdCase.request_nonce ||
-              cr.fixtures.hub_request_id !== recoveryRequestIdCase.hub_request_id ||
-              Object.keys(cr.public_exchanges).sort().join(',') !== 'assigned_cell_complete_recovery,hub_issue_recovery' ||
-              Object.keys(cr.private_operations).sort().join(',') !== 'CompleteCredentialRecovery,IssueCredentialRecovery' ||
-              cr.issue_replay_cases.length !== 7 || cr.grant_binding_cases.length !== 24 ||
-              cr.hub_cookie_composition.cases.length !== 10 ||
-              cr.hub_cookie_composition.base_contract_artifact !== 'qurl-connector-hub-lst-cookie-v1-vectors' ||
-              !recoveryCookieKat || cr.fixtures.authenticated_peer_public_key_b64 !== recoveryCookieKat.authenticated_peer_public_key_b64 ||
-              cr.hub_cookie_composition.unproven_body_json !== cr.public_exchanges.hub_issue_recovery.request_body_json ||
-              cr.hub_cookie_composition.proof_body_json !== cr.public_exchanges.hub_issue_recovery.request_body_json ||
-              cr.hub_cookie_composition.challenge_body_json !== JSON.stringify({
-                trxId: Number(cr.hub_cookie_composition.unproven_counter),
-                cookie: recoveryCookieKat.cookie_b64,
-              }) ||
-              cr.hub_cookie_composition.challenge_packet_bytes >= cr.hub_cookie_composition.unproven_request_packet_bytes ||
-              cr.private_operations.IssueCredentialRecovery.semantic_errors.length !== 7 ||
-              cr.private_operations.IssueCredentialRecovery.public_mapping_cases.length !== 10 ||
-              cr.private_operations.CompleteCredentialRecovery.semantic_errors.length !== 5 ||
-              cr.private_operations.CompleteCredentialRecovery.public_mapping_cases.length !== 7 ||
-              cr.fixtures.recovery_credential === cr.fixtures.device_api_key_candidate ||
-              cr.public_exchanges.assigned_cell_complete_recovery.success_body_json.includes(cr.fixtures.device_api_key_candidate) ||
-              cd.artifact !== 'qurl-crid-v1-vectors' || cd.schema_version !== 1 ||
-              cd.contract.checksum_polynomial_hex !== '1edc6f41' ||
-              cd.contract.alphabet !== 'abcdefghijklmnopqrstuvwxyz234567' ||
-              cd.versions.length !== 4 || cd.producer_cases.length !== 6 ||
-              cd.consumer_value_cases.length !== 16 || cd.version_cases.length !== 4 ||
-              cd.key_match_cases.length !== 4 ||
-              cd.producer_cases.some(v => !deriveCrid(v)) ||
-              cd.producer_cases.some(v => v.expected_crid.length !== cd.contract.full_crid_length ||
-                v.expected_crid[0] !== (v.environment === 'test' ? 'q' : 'a') ||
-                !['a', 'q'].includes(v.expected_crid[59])) ||
-              cridValues.accept_unknown_version_full.outcome !== 'accept' ||
-              cridValues.accept_unknown_version_truncated.value.length !== cd.contract.truncated_crid_length ||
-              cridValues.reject_version_zero.reject_class !== 'version' ||
-              cridValues.reject_trailing_bits.reject_class !== 'non_canonical' ||
-              cridValues.reject_checksum.reject_class !== 'checksum' ||
-              tp.artifact !== 'qurl-target-path-v1-vectors' || tp.schema_version !== 1 ||
-              tp.contract.wire_field !== 'target_path' ||
-              tp.contract.max_bytes !== 2048 ||
-              tp.contract.omitted_semantics !== 'bare_origin' ||
-              tp.contract.explicit_empty_semantics !== 'reject' ||
-              tp.contract.accepted_character_set !== 'raw_ascii_canonical_uri_path_and_query' ||
-              tp.contract.allowed_ascii !== "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-" ||
-              tp.contract.query_delimiter !== 'first_question_mark' ||
-              tp.contract.validation_order.join(',') !== 'presence,whole_value_empty,whole_value_utf8_byte_length,whole_value_leading_slash,whole_value_protocol_relative_authority,whole_value_raw_ascii_character_set,split_path_at_first_query_delimiter,path_semicolon,whole_value_percent_syntax,path_encoded_dot,path_literal_dot_segment,path_escape_or_interior_empty_segment,accept' ||
-              tp.contract.accepted_value_handling !== 'preserve_exact_bytes' ||
-              tp.contract.percent_encoding_handling !== 'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode' ||
-              tp.cases.length === 0 ||
-              dm.artifact !== 'qurl-delegated-mint-issue-v1-vectors' || dm.schema_version !== 1 ||
-              dm.contract.nonce_decoded_bytes !== 16 || dm.contract.body_max_bytes !== 8192 ||
-              dm.contract.idempotency_key_prefix !== 'uci_' ||
-              dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
-              dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
-              dm.contract.error_content_type !== 'application/problem+json' ||
-              dm.contract.body_authority_fields.join(',') !== 'upload_handle,issue_generation,upload_request_digest,content_sha256,byte_size,media_type,display_filename,audience_key_id,target_path,max_batch_size,max_link_ttl_seconds,capability_expires_at,authority_expires_at' ||
-              dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
-              dm.contract.external_operation_commit_rule !== 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request' ||
-              dm.contract.envelope_fingerprint_fields.join(',') !== 'method,authority,route,issuer_id,kid,idempotency_key,timestamp_unix_decimal,nonce,body_sha256,signature_der_b64url' ||
-              dm.contract.stale_operation_miss_status !== 404 || dm.contract.stale_operation_miss_code !== 'issue_operation_not_found' ||
-              dm.golden.kid === dm.retry_golden.kid ||
-              dm.golden.public_key_der_b64url === dm.retry_golden.public_key_der_b64url ||
-              dm.golden.idempotency_key !== dm.retry_golden.idempotency_key ||
-              dm.golden.body_sha256 === dm.retry_golden.body_sha256 ||
-              dm.golden.kid === dm.refresh_golden.kid ||
-              dm.golden.public_key_der_b64url === dm.refresh_golden.public_key_der_b64url ||
-              dm.contract.nonce_replay_retention_seconds !== 900 ||
-              dm.contract.nonce_replay_retention_seconds <= 2 * dm.contract.timestamp_max_skew_seconds ||
-              dm.contract.retry_after_modes.join(',') !== 'absent,exact_seconds,positive_integer_seconds' ||
-              dm.reject_cases.length !== 9 || Object.keys(dmRejects).length !== 9 ||
-              dm.state_cases.length !== 9 || dm.response_cases.length !== 8 || !dmKIDMappingValid ||
-              new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
-              dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
-              dm.reject_cases.some(v => `${v.status}/${v.error_code}` !== dmRejectResponses[v.reject_class]) ||
-              dmSignedInputs.some(v => {
-                const derived = deriveDMIssueIdempotency(v);
-                return derived.preimage.toString('hex') !== v.idempotency_preimage_hex || derived.key !== v.idempotency_key;
-              }) ||
-              !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
-              !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
-              !verifyDMGolden(dm.authority_conflict_signed) ||
-              ['reject_padded_signature', 'reject_noncanonical_signature_der', 'reject_high_s_signature', 'reject_zero_r_signature']
-                .some(name => parseDMSignature(dmRejects[name].value) !== null ||
-                  verifyDMGolden({...dm.golden, signature_der_b64url: dmRejects[name].value})) ||
-              dm.wrong_endpoint_signed.authority === dm.golden.authority ||
-              dm.wrong_endpoint_signed.public_key_der_b64url !== dm.golden.public_key_der_b64url ||
-              dm.nonce_reuse_signed.nonce !== dm.golden.nonce ||
-              dm.nonce_reuse_signed.idempotency_key !== dm.refresh_golden.idempotency_key ||
-              dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,generation_2_refresh,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
-              dm.response_cases.find(v => v.error_code === 'issue_operation_not_found')?.proves_operation_absent !== true ||
-              dm.response_cases.filter(v => v.proves_operation_absent).length !== 1 ||
-              JSON.stringify(dm.response_cases.find(v => v.error_code === 'rate_limit_exceeded')?.retry_after) !== '{"mode":"positive_integer_seconds"}' ||
-              JSON.stringify(dm.response_cases.find(v => v.error_code === 'mutation_outcome_unknown')?.retry_after) !== '{"mode":"exact_seconds","seconds":1}' ||
-              dm.response_cases.filter(v => !['rate_limit_exceeded', 'mutation_outcome_unknown'].includes(v.error_code)).some(v => JSON.stringify(v.retry_after) !== '{"mode":"absent"}') ||
-              dm.nonce_reuse_signed.timestamp_unix - (dm.golden.timestamp_unix - dm.contract.timestamp_max_skew_seconds) >= dm.contract.nonce_replay_retention_seconds ||
-              !dmNonceReuseState || Math.abs(dmNonceReuseState.now_unix - dm.nonce_reuse_signed.timestamp_unix) > dm.contract.timestamp_max_skew_seconds ||
-              !deviceApiKeyCanonical) {
-            process.exit(1);
-          }
+          assert.ok(signed.every(golden => {
+            const [preimage, key] = dmIdempotency(golden);
+            return verifyDelegatedMint(golden) &&
+              preimage.toString('hex') === golden.idempotency_preimage_hex &&
+              key === golden.idempotency_key;
+          }));
+          assert.ok(h.cases.every(verifyHubRequestID));
+          assert.equal(connectorResourceRequestID(), u.fixtures.cell_request_id);
+          assert.ok(hc.cookie_kats.every(verifyHubCookie));
+          assert.ok(cd.producer_cases.every(verifyCRID));
           console.log('npm ok');
           NODE
 
-      - name: Set up Python for package smoke
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
+          tarball=$(npm pack ./npm --pack-destination "$RUNNER_TEMP" --silent)
+          mkdir "$RUNNER_TEMP/qurl-conformance-npm-smoke"
+          cd "$RUNNER_TEMP/qurl-conformance-npm-smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP/$tarball" >/dev/null
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const c = require('@layervai/qurl-conformance');
+          const crid = require('@layervai/qurl-conformance/crid_v1_vectors.json');
+          assert.deepEqual(c.cridV1Vectors(), crid);
+          console.log('npm tarball exports ok');
+          NODE
 
-      - name: python package smoke
+      - name: Set up Python for package smoke
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Python package smoke
         run: |
           cd python
-          python3 <<'PY'
+          python - <<'PY'
           import base64
           import hashlib
           import hmac
           import ipaddress
           import json
-          import re
+          from pathlib import Path
           import struct
-          import sys
-          sys.path.insert(0, '.')
+
           import qurl_conformance as q
 
-          qv2 = q.qv2_vectors()
-          r = q.relay_knock_vectors()
-          a = q.agent_registration_vectors()
-          s = q.agent_assignment_vectors()
-          k = q.agent_knock_application_vectors()
-          x = q.agent_session_control_vectors()
-          i = q.agent_api_key_id_vectors()
-          t = q.assignment_ticket_vectors()
-          u = q.connector_authority_lambda_vectors()
-          rr = q.connector_resource_lst_v1_vectors()
+          files = {
+              'qv2_vectors': 'qv2_conformance_vectors.json',
+              'issuer_signature_vectors': 'issuer_signature_vectors.json',
+              'relay_knock_vectors': 'relay_knock_golden.json',
+              'agent_registration_vectors': 'agent_registration_golden.json',
+              'agent_assignment_vectors': 'agent_assignment_golden.json',
+              'agent_knock_application_vectors': 'agent_knock_application_vectors.json',
+              'agent_session_control_vectors': 'agent_session_control_vectors.json',
+              'agent_api_key_id_vectors': 'agent_api_key_id_vectors.json',
+              'assignment_ticket_vectors': 'assignment_ticket_v1_vectors.json',
+              'connector_authority_lambda_vectors': 'connector_authority_lambda_v1_vectors.json',
+              'connector_resource_lst_v1_vectors': 'connector_resource_lst_v1_vectors.json',
+              'connector_hub_request_id_vectors': 'connector_hub_request_id_v1_vectors.json',
+              'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
+              'agent_credential_recovery_vectors': 'agent_credential_recovery_v1_vectors.json',
+              'crid_v1_vectors': 'crid_v1_vectors.json',
+              'target_path_v1_vectors': 'target_path_v1_vectors.json',
+              'delegated_mint_issue_v1_vectors': 'delegated_mint_issue_v1_vectors.json',
+          }
+          assert {
+              name for name, value in vars(q).items()
+              if name.endswith('_vectors') and callable(value)
+          } == set(files)
+          assert {path.name for path in Path('qurl_conformance/_data').glob('*.json')} == set(files.values())
+          for accessor, file in files.items():
+              expected = json.loads((Path('qurl_conformance/_data') / file).read_text())
+              assert getattr(q, accessor)() == expected
+
+          dm = q.delegated_mint_issue_v1_vectors()
           h = q.connector_hub_request_id_vectors()
           hc = q.connector_hub_lst_cookie_vectors()
-          cr = q.agent_credential_recovery_vectors()
+          rr = q.connector_resource_lst_v1_vectors()
+          u = q.connector_authority_lambda_vectors()
           cd = q.crid_v1_vectors()
-          tp = q.target_path_v1_vectors()
-          dm = q.delegated_mint_issue_v1_vectors()
-          dm_rejects = {case['name']: case for case in dm['reject_cases']}
-          dm_signed_inputs = [
-              dm['golden'], dm['retry_golden'], dm['refresh_golden'],
-              dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'], dm['authority_conflict_signed'],
-          ]
-          dm_kid_public_keys = {}
-          for signed_input in dm_signed_inputs:
-              prior_key = dm_kid_public_keys.setdefault(signed_input['kid'], signed_input['public_key_der_b64url'])
-              assert prior_key == signed_input['public_key_der_b64url']
-          dm_reject_responses = {
-              'authority': (403, 'invalid_capability_issue'),
-              'body_size': (413, 'payload_too_large'),
-              'idempotency_key': (403, 'invalid_capability_issue'),
-              'nonce': (403, 'invalid_capability_issue'),
-              'signature_encoding': (403, 'invalid_capability_issue'),
-              'signature_malleability': (403, 'invalid_capability_issue'),
-              'signature_scalar': (403, 'invalid_capability_issue'),
-              'signature_mismatch': (403, 'invalid_capability_issue'),
-          }
-          def hub_frame(tag, value):
-              return bytes([tag]) + struct.pack('>H', len(value)) + value
-          def issue_frame(value):
-              encoded = value.encode('utf-8')
+
+          def frame(value):
+              encoded = str(value).encode()
               return struct.pack('>I', len(encoded)) + encoded
-          def derive_dm_issue_idempotency(golden):
+
+          def tagged(tag, value):
+              return bytes([tag]) + struct.pack('>H', len(value)) + value
+
+          def dm_idempotency(golden):
               body = json.loads(golden['body_utf8'])
               preimage = b''.join((
-                  dm['contract']['idempotency_derivation_domain_ascii'].encode('ascii'), b'\0',
-                  issue_frame(golden['issuer_id']),
-                  issue_frame(body['upload_handle']),
-                  issue_frame(str(body['issue_generation'])),
+                  dm['contract']['idempotency_derivation_domain_ascii'].encode('ascii'),
+                  b'\0',
+                  frame(golden['issuer_id']),
+                  frame(body['upload_handle']),
+                  frame(body['issue_generation']),
               ))
               key = dm['contract']['idempotency_key_prefix'] + base64.urlsafe_b64encode(
                   hashlib.sha256(preimage).digest()
-              ).decode('ascii').rstrip('=')
+              ).decode().rstrip('=')
               return preimage, key
-          def verify_dm_framing_and_digest(golden):
-              body_hash = hashlib.sha256(golden['body_utf8'].encode('utf-8')).hexdigest()
+
+          def verify_delegated_mint(golden):
+              body_hash = hashlib.sha256(golden['body_utf8'].encode()).hexdigest()
               values = {
                   'method': golden['method'],
                   'authority': golden['authority'],
@@ -867,641 +397,128 @@ jobs:
                   'issuer_id': golden['issuer_id'],
                   'kid': golden['kid'],
                   'idempotency_key': golden['idempotency_key'],
-                  'timestamp_unix_decimal': str(golden['timestamp_unix']),
+                  'timestamp_unix_decimal': golden['timestamp_unix'],
                   'nonce': golden['nonce'],
                   'body_sha256': body_hash,
               }
-              canonical = b''.join([
-                  dm['contract']['signing_domain_ascii'].encode('ascii'), b'\0',
-                  *(issue_frame(values[name]) for name in dm['contract']['field_order']),
-              ])
-              return (body_hash == golden['body_sha256'] and
-                      canonical.hex() == golden['canonical_hex'] and
-                      hashlib.sha256(canonical).hexdigest() == golden['signing_digest_hex'])
-          def derive_hub_request_id(vector):
-              peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
-              nonce = base64.urlsafe_b64decode(vector['request_nonce'] + '=' * (-len(vector['request_nonce']) % 4))
-              preimage = b''.join((
-                  h['contract']['domain_ascii'].encode('ascii'), b'\0',
-                  hub_frame(1, vector['environment'].encode('ascii')),
-                  hub_frame(2, vector['operation'].encode('ascii')),
-                  hub_frame(3, peer),
-                  hub_frame(4, nonce),
+              canonical = b''.join((
+                  dm['contract']['signing_domain_ascii'].encode('ascii'),
+                  b'\0',
+                  *(frame(values[name]) for name in dm['contract']['field_order']),
               ))
-              return preimage.hex() == vector['preimage_hex'] and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
-          def derive_connector_resource_request_id():
-              peer = base64.b64decode(rr['fixtures']['authenticated_peer_public_key_b64'], validate=True)
-              nonce_value = rr['fixtures']['create_request_nonce']
-              nonce = base64.urlsafe_b64decode(nonce_value + '=' * (-len(nonce_value) % 4))
+              return (
+                  body_hash == golden['body_sha256']
+                  and canonical.hex() == golden['canonical_hex']
+                  and hashlib.sha256(canonical).hexdigest() == golden['signing_digest_hex']
+              )
+
+          def verify_hub_request_id(vector):
               preimage = b''.join((
-                  u['protocol']['cell_request_id_domain'].encode('ascii'), b'\0',
-                  hub_frame(1, u['fixtures']['environment'].encode('ascii')),
-                  hub_frame(2, peer),
-                  hub_frame(3, nonce),
+                  h['contract']['domain_ascii'].encode('ascii'),
+                  b'\0',
+                  tagged(1, vector['environment'].encode('ascii')),
+                  tagged(2, vector['operation'].encode('ascii')),
+                  tagged(3, base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)),
+                  tagged(4, base64.urlsafe_b64decode(vector['request_nonce'] + '==')),
+              ))
+              return (
+                  preimage.hex() == vector['preimage_hex']
+                  and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
+              )
+
+          def connector_resource_request_id():
+              preimage = b''.join((
+                  u['protocol']['cell_request_id_domain'].encode('ascii'),
+                  b'\0',
+                  tagged(1, u['fixtures']['environment'].encode('ascii')),
+                  tagged(2, base64.b64decode(rr['fixtures']['authenticated_peer_public_key_b64'], validate=True)),
+                  tagged(3, base64.urlsafe_b64decode(rr['fixtures']['create_request_nonce'] + '==')),
               ))
               return hashlib.sha256(preimage).hexdigest()
-          def derive_hub_lst_cookie(vector):
+
+          def verify_hub_cookie(vector):
               address = ipaddress.ip_address(vector['source_ip'])
               if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
                   address = address.ipv4_mapped
-              raw_ip = address.packed
-              family = b'\x04' if address.version == 4 else b'\x06'
               peer = base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)
               preimage = b''.join((
-                  hc['contract']['cookie_domain_ascii'].encode('ascii'), b'\0', family,
-                  struct.pack('>I', len(raw_ip)), raw_ip,
-                  struct.pack('>I', len(peer)), peer,
+                  hc['contract']['cookie_domain_ascii'].encode('ascii'),
+                  b'\0',
+                  bytes([address.version]),
+                  struct.pack('>I', len(address.packed)),
+                  address.packed,
+                  struct.pack('>I', len(peer)),
+                  peer,
                   struct.pack('>Q', int(vector['window_index'])),
               ))
-              if preimage.hex() != vector['preimage_hex']:
-                  return False
-              cookie = hmac.new(bytes.fromhex(vector['signing_key_hex']), preimage, hashlib.sha256).digest()
-              return cookie.hex() == vector['cookie_hex'] and base64.b64encode(cookie).decode('ascii') == vector['cookie_b64']
-          def crid_crc32c(data):
+              cookie = hmac.new(
+                  bytes.fromhex(vector['signing_key_hex']),
+                  preimage,
+                  hashlib.sha256,
+              ).digest()
+              return (
+                  preimage.hex() == vector['preimage_hex']
+                  and cookie.hex() == vector['cookie_hex']
+                  and base64.b64encode(cookie).decode() == vector['cookie_b64']
+              )
+
+          def crc32c(data):
               crc = 0xffffffff
               for byte in data:
                   crc ^= byte
                   for _ in range(8):
                       crc = (crc >> 1) ^ (0x82f63b78 * (crc & 1))
               return crc ^ 0xffffffff
-          def derive_crid(vector):
-              der = base64.urlsafe_b64decode(vector['der_spki_b64url'] + '=' * (-len(vector['der_spki_b64url']) % 4))
-              digest = hashlib.sha256(cd['contract']['domain_separation_prefix'].encode('ascii') + b'\0' + der).digest()
-              if digest.hex() != vector['digest_hex']:
-                  return False
+
+          def verify_crid(vector):
+              der = base64.urlsafe_b64decode(vector['der_spki_b64url'] + '==')
+              digest = hashlib.sha256(
+                  cd['contract']['domain_separation_prefix'].encode('ascii') + b'\0' + der
+              ).digest()
               payload = bytes.fromhex(vector['version_byte']) + digest
-              crc = struct.pack('>I', crid_crc32c(payload))
-              if crc.hex() != vector['crc_hex']:
-                  return False
+              crc = struct.pack('>I', crc32c(payload))
               encoded = payload + crc
-              if encoded.hex() != vector['payload_hex']:
-                  return False
-              return base64.b32encode(encoded).decode('ascii').rstrip('=').lower() == vector['expected_crid']
-          authority_requests = {
-              name: json.loads(operation['request_golden']['body_json'])
-              for name, operation in u['operations'].items()
-          }
-          global_authority_operations = ['IssueAssignment', 'RefreshAssignment', 'MutateProofAgent']
-          cell_authority_operations = ['IssueRegistrationOTP', 'ActivateRegistration', 'CompleteRegistration', 'ResolveConnectorResource']
-          # Keep proof-mutation assertions in lockstep with the JavaScript
-          # package smoke above; the deliberate re-encoding catches consumer drift.
-          proof_mutation_rejects = {
-              value['name']: json.loads(value['body_json'])
-              for value in u['operations']['MutateProofAgent']['request_rejects']
-              if value['name'] in {'reject_unknown_field', 'reject_wrong_type', 'reject_missing_field'}
-          }
-          proof_mutation_replay = u['operations']['MutateProofAgent']['replay_contract']
-          resource_replay = u['operations']['ResolveConnectorResource']['resource_replay_contract']
-          resource_success = json.loads(rr['success_exchanges'][0]['result']['body_json'])['list']
-          resource_authority_success = json.loads(u['operations']['ResolveConnectorResource']['success_golden']['body_json'])['result']
-          activation_unavailable = next(v for v in u['operations']['ActivateRegistration']['public_mapping_cases'] if v['name'] == 'unavailable')
-          replies = {v['name']: v for v in k['reply_cases']}
-          requests = {v['name']: v for v in k['request_cases']}
-          id_responses = {v['name']: v for v in i['consumer_response_cases']}
-          hub_cookie_challenges = {v['name']: v for v in hc['challenge_cases']}
-          recovery_request_id_case = next((v for v in h['cases'] if v['operation'] == 'IssueCredentialRecovery'), None)
-          recovery_cookie_kat = next((v for v in hc['cookie_kats'] if v['name'] == 'ipv4'), None)
-          hub_cookie_challenge_flags = {
-              'accept_initial_challenge': '0000',
-              'accept_refresh_challenge': '0000',
-              'reject_malformed_body': '0000',
-              'reject_unknown_field': '0000',
-              'reject_duplicate_field': '0000',
-              'reject_wrong_transaction': '0000',
-              'reject_cookie_encoding': '0000',
-              'reject_cookie_length': '0000',
-              'reject_untrusted_server': '0000',
-              'reject_compressed_challenge': '0002',
-              'reject_unknown_flag_challenge': '0008',
-              'reject_second_challenge': '0000',
-          }
-          canonical = '0123456789abcdef'
-          resource = 'connector-conformance-01'
-          # Stock JSON parsing is intentionally insufficient for these cases:
-          # duplicate keys collapse last-wins and aliases remain unchecked.
-          lossy_duplicate = json.loads(requests['reject_duplicate_run_id']['body_json'])
-          unchecked_alias = json.loads(requests['reject_alias_run_id']['body_json'])
-          assert qv2['schema_version'] == 2
-          assert qv2['transport_contract']['prefix'] == 'qv2t1'
-          assert qv2['transport_contract']['component_max'] == 240
-          assert qv2['transport_contract']['max_transport_length'] == 6826
-          assert len(qv2['classes']['transport']['vectors']) == 39
-          assert q.issuer_signature_vectors()['issuer']
-          assert r['knock']['packet_hex'] and r['ack']['packet_hex']
-          assert a['otp']['packet_hex'] and a['rak_success']['packet_hex']
-          assert s['schema_version'] == 4
-          assert s['public_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'account', 'agent']
-          assert s['initial_assignment']['request']['header_type'] == 5
-          assert s['initial_assignment']['result']['header_type'] == 6
-          assert s['initial_assignment']['request']['counter'] == s['initial_assignment']['result']['counter']
-          initial_assignment = json.loads(s['initial_assignment']['result']['body_json'])['list']
-          refresh_assignment = json.loads(s['refresh_assignment']['result']['body_json'])['list']
-          initial_assignment_request = json.loads(s['initial_assignment']['request']['body_json'])
-          refresh_assignment_request = json.loads(s['refresh_assignment']['request']['body_json'])
-          for request in (initial_assignment_request, refresh_assignment_request):
-              nonce = request['usrData']['request_nonce']
-              decoded_nonce = base64.urlsafe_b64decode(nonce + '=' * (-len(nonce) % 4))
-              assert len(decoded_nonce) == 32
-              assert base64.urlsafe_b64encode(decoded_nonce).decode().rstrip('=') == nonce
-          assert initial_assignment_request['usrData']['request_nonce'] != refresh_assignment_request['usrData']['request_nonce']
-          registration = json.loads(s['assigned_cell_registration']['request']['body_json'])
-          completion_request = json.loads(s['registration_completion']['request']['body_json'])
-          device_api_key = completion_request['usrData']['device_api_key']
-          device_api_key_prefix = 'lv_live_'
-          device_api_key_secret_bytes = 32
-          device_api_key_body = device_api_key.removeprefix(device_api_key_prefix)
-          device_api_key_bytes = base64.urlsafe_b64decode(
-              device_api_key_body + '=' * (-len(device_api_key_body) % 4)
-          )
-          assert device_api_key.startswith(device_api_key_prefix)
-          assert device_api_key_bytes == bytes(range(device_api_key_secret_bytes))
-          assert base64.urlsafe_b64encode(device_api_key_bytes).decode().rstrip('=') == device_api_key_body
-          account_otp = s['account_credential_otp']
-          account_otp_request = json.loads(account_otp['request']['body_json'])
-          account_otp_binding = account_otp['enrollment_binding']
-          account_otp_requests = {v['name']: v for v in account_otp['request_cases']}
-          account_otp_bindings = {v['name']: v for v in account_otp['binding_cases']}
-          account_otp_challenge_bindings = {v['name']: v for v in account_otp['challenge_binding_cases']}
-          account_otp_sizes = {v['name']: v for v in account_otp['packet_size_contract']['cases']}
-          completion = json.loads(s['registration_completion']['result']['body_json'])['list']
-          assignment_requests = {v['name']: v for v in s['request_cases']}
-          null_nonce = json.loads(assignment_requests['reject_null_initial_request_nonce']['body_json'])['usrData']['request_nonce']
-          standard_base64_nonce = json.loads(assignment_requests['reject_standard_base64_refresh_request_nonce']['body_json'])['usrData']['request_nonce']
-          noncanonical_tail_nonce = json.loads(assignment_requests['reject_noncanonical_tail_bits_refresh_request_nonce']['body_json'])['usrData']['request_nonce']
-          refresh_nonce = refresh_assignment_request['usrData']['request_nonce']
-          refresh_nonce_bytes = base64.urlsafe_b64decode(refresh_nonce + '=' * (-len(refresh_nonce) % 4))
-          assignment_results = {v['name']: v for v in s['success_result_cases']}
-          assignment_errors = {v['name']: v for v in s['error_contract']['assignment_cases']}
-          assignment_malformed = {v['name']: v for v in s['error_contract']['malformed_cases']}
-          session_cookie = base64.b64decode(x['overload_reknock']['cookie_b64'], validate=True)
-          session_packets = [
-              x['overload_reknock']['knock_request'],
-              x['overload_reknock']['cookie_reply'],
-              x['overload_reknock']['reknock_request'],
-              x['overload_reknock']['ack'],
-              x['exact_session_exit']['request'],
-              x['exact_session_exit']['ack'],
-              x['denial_acks']['knock'],
-              x['denial_acks']['exit'],
-          ]
-          session_knock = json.loads(x['overload_reknock']['knock_request']['body_json'])
-          session_ack = json.loads(x['overload_reknock']['ack']['body_json'])
-          exact_exit_request = json.loads(x['exact_session_exit']['request']['body_json'])
-          exact_exit_ack = json.loads(x['exact_session_exit']['ack']['body_json'])
-          knock_denial = json.loads(x['denial_acks']['knock']['body_json'])
-          exit_denial = json.loads(x['denial_acks']['exit']['body_json'])
-          assert s['assigned_cell_registration']['request']['header_type'] == 13
-          assert s['assigned_cell_registration']['result']['header_type'] == 14
-          assert s['assigned_cell_registration']['request']['counter'] == s['assigned_cell_registration']['result']['counter']
-          assert account_otp['producer_revision'] == '2072546e1fc76eb76bd7e5c22d37856019ba33e7'
-          assert account_otp['raw_body_required'] is True
-          assert account_otp['authenticated_peer_public_key_required'] is True
-          assert account_otp['otp_registration_key_kinds'] == ['account']
-          assert account_otp['otp_free_registration_key_kinds'] == ['bootstrap', 'connector_bootstrap', 'agent']
-          assert account_otp['request']['header_type'] == 12
-          assert account_otp['request']['receiver_key'] == 'assigned_cell'
-          assert account_otp_request['usrId'] == account_otp_binding['request_registration_key_id']
-          assert account_otp_request['devId'] == account_otp_binding['request_agent_id']
-          assert account_otp_request['pass'] == account_otp_binding['request_credential']
-          assert account_otp_request['usrData']['query'] == 'agent_registration_otp'
-          assert account_otp_request['usrData']['version'] == 1
-          assert account_otp_request['usrData']['assignment_ticket'] == account_otp_binding['request_assignment_ticket']
-          assert account_otp_binding['request_credential_hash_b64'] == account_otp_binding['ticket_credential_key_hash_b64']
-          assert account_otp_binding['recomputed_credential_fence_b64'] == account_otp_binding['ticket_credential_fence_b64']
-          assert account_otp['challenge_binding']['lookup_key_field'] == 'ticket_jti'
-          assert account_otp['challenge_binding']['required_match_fields'] == ['ticket_jti', 'authenticated_peer_public_key_b64', 'dev_id', 'credential_key_id', 'environment_id', 'cell_id']
-          assert account_otp['challenge_binding']['ticket_jti'] == account_otp_binding['ticket_jti']
-          assert account_otp['challenge_binding']['authenticated_peer_public_key_b64'] == account_otp_binding['authenticated_peer_public_key_b64']
-          assert account_otp['challenge_binding']['dev_id'] == account_otp_binding['request_agent_id']
-          assert account_otp['challenge_binding']['credential_key_id'] == account_otp_binding['request_registration_key_id']
-          assert account_otp['challenge_binding']['environment_id'] == account_otp_binding['local_environment_id']
-          assert account_otp['challenge_binding']['cell_id'] == account_otp_binding['local_cell_id']
-          assert 'pubKey' not in account_otp_request
-          assert account_otp_binding['ticket_expires_at_unix'] - account_otp_binding['evaluated_at_unix'] == 630
-          assert account_otp_binding['minimum_ticket_remaining_seconds'] == 630
-          assert len(account_otp['request_cases']) == 17
-          assert account_otp_requests['reject_duplicate_otp_assignment_ticket']['reject_class'] == 'body_parse'
-          assert account_otp_requests['reject_empty_otp_usr_id']['reject_class'] == 'semantic'
-          assert account_otp_requests['reject_empty_otp_dev_id']['reject_class'] == 'semantic'
-          assert account_otp_requests['reject_wrong_otp_asp_id']['reject_class'] == 'semantic'
-          assert account_otp_requests['reject_unknown_otp_outer_field']['reject_class'] == 'unknown_field'
-          assert account_otp_requests['reject_null_otp_body']['reject_class'] == 'wrong_type'
-          assert account_otp_requests['reject_trailing_otp_value']['reject_class'] == 'body_parse'
-          assert account_otp_requests['reject_wrong_otp_header_phase']['reject_class'] == 'wrong_phase'
-          assert len(account_otp['binding_cases']) == 13
-          assert account_otp_bindings['accept_exact_minimum_lifetime']['outcome'] == 'accept'
-          assert account_otp_bindings['reject_different_request_ticket']['reject_class'] == 'ticket_binding'
-          assert account_otp_bindings['reject_peer_public_key_mismatch']['reject_class'] == 'peer_binding'
-          assert account_otp_bindings['reject_ticket_credential_key_hash_mismatch']['reject_class'] == 'credential_binding'
-          assert account_otp_bindings['reject_ticket_credential_fence_mismatch']['reject_class'] == 'credential_binding'
-          assert account_otp_bindings['reject_ticket_remaining_lifetime_629']['reject_class'] == 'ticket_lifetime'
-          assert len(account_otp['challenge_binding_cases']) == 7
-          assert account_otp_challenge_bindings['accept_exact_challenge_binding']['outcome'] == 'accept'
-          for challenge_case in (
-              'reject_challenge_ticket_jti_mismatch',
-              'reject_challenge_peer_public_key_mismatch',
-              'reject_challenge_dev_id_mismatch',
-              'reject_challenge_credential_key_id_mismatch',
-              'reject_challenge_environment_mismatch',
-              'reject_challenge_cell_mismatch',
-          ):
-              assert account_otp_challenge_bindings[challenge_case]['reject_class'] == 'challenge_binding'
-          assert len(account_otp['packet_size_contract']['cases']) == 2
-          assert account_otp['packet_size_contract']['max_plaintext_body_bytes'] == 3840
-          assert account_otp['packet_size_contract']['max_packet_bytes'] == 4096
-          assert account_otp_sizes['accept_max_plaintext_body']['expected_packet_bytes'] == 4096
-          assert account_otp_sizes['reject_plaintext_body_over_max']['reject_class'] == 'packet_size'
-          assert registration['usrData']['assignment_ticket'] == initial_assignment['assignment_ticket']
-          assert registration['otp'] == json.loads(s['initial_assignment']['request']['body_json'])['usrData']['credential']
-          assert 'masked_email' not in initial_assignment['registration']
-          assert 'assignment_ticket' not in refresh_assignment
-          assert 'assignment_ticket_expires_at' not in refresh_assignment
-          assert s['registration_completion']['request']['receiver_key'] == 'assigned_cell'
-          assert 'assignment_ticket' not in completion_request['usrData']
-          assert set(completion) == {'query', 'version', 'device_api_key_id'}
-          assert len(s['request_cases']) == 30
-          assert assignment_requests['reject_duplicate_outer_dev_id']['reject_class'] == 'body_parse'
-          assert assignment_requests['reject_missing_initial_request_nonce']['reject_class'] == 'missing_field'
-          assert assignment_requests['reject_duplicate_initial_request_nonce']['reject_class'] == 'body_parse'
-          assert assignment_requests['reject_alias_refresh_request_nonce']['reject_class'] == 'unknown_field'
-          assert assignment_requests['reject_null_initial_request_nonce']['reject_class'] == 'wrong_type'
-          assert assignment_requests['reject_padded_initial_request_nonce']['reject_class'] == 'semantic'
-          assert assignment_requests['reject_short_refresh_request_nonce']['reject_class'] == 'semantic'
-          assert assignment_requests['reject_standard_base64_refresh_request_nonce']['reject_class'] == 'semantic'
-          assert assignment_requests['reject_noncanonical_tail_bits_refresh_request_nonce']['reject_class'] == 'semantic'
-          assert null_nonce is None
-          assert len(standard_base64_nonce) == 43 and any(v in standard_base64_nonce for v in '+/')
-          standard_base64_nonce_bytes = base64.urlsafe_b64decode(standard_base64_nonce + '=' * (-len(standard_base64_nonce) % 4))
-          assert base64.urlsafe_b64encode(standard_base64_nonce_bytes).decode().rstrip('=') != standard_base64_nonce
-          assert noncanonical_tail_nonce == refresh_nonce[:-1] + '9'
-          noncanonical_tail_bytes = base64.urlsafe_b64decode(noncanonical_tail_nonce + '=' * (-len(noncanonical_tail_nonce) % 4))
-          assert noncanonical_tail_bytes == refresh_nonce_bytes
-          assert base64.urlsafe_b64encode(noncanonical_tail_bytes).decode().rstrip('=') != noncanonical_tail_nonce
-          assert assignment_requests['reject_alias_outer_dev_id']['reject_class'] == 'unknown_field'
-          assert assignment_requests['reject_client_public_key']['reject_class'] == 'unknown_field'
-          assert assignment_requests['reject_refresh_assignment_ticket']['reject_class'] == 'unknown_field'
-          assert assignment_requests['reject_duplicate_registration_ticket']['reject_class'] == 'body_parse'
-          assert assignment_requests['reject_wrong_mode']['reject_class'] == 'semantic'
-          assert len(s['success_result_cases']) == 12
-          assert assignment_results['reject_initial_private_key_kind']['reject_class'] == 'semantic'
-          assert json.loads(assignment_results['reject_initial_private_key_kind']['body_json'])['list']['registration']['key_kind'] == 'tunnel_bootstrap'
-          assert assignment_results['reject_initial_unknown_key_kind']['reject_class'] == 'semantic'
-          assert json.loads(assignment_results['reject_initial_unknown_key_kind']['body_json'])['list']['registration']['key_kind'] == 'future_kind'
-          assert assignment_results['reject_refresh_result_assignment_ticket']['reject_class'] == 'unknown_field'
-          assert assignment_results['reject_completion_device_api_key']['reject_class'] == 'unknown_field'
-          assert assignment_results['reject_completion_device_api_key_hash']['reject_class'] == 'unknown_field'
-          assert assignment_results['reject_completion_device_key_commitment']['reject_class'] == 'unknown_field'
-          assert s['error_contract']['status'] == 'ready'
-          assert s['error_contract']['producer_revision'] == '9653fcb185c77629b787ad046c13c760baba88f4'
-          assert assignment_malformed['reject_unknown_list_error_code']['reject_class'] == 'unknown_error_code'
-          assert assignment_malformed['reject_unknown_registration_error_code']['reject_class'] == 'unknown_error_code'
-          assert len(s['error_contract']['assignment_cases']) == 6
-          assert assignment_errors['invalid_assignment_request']['accepted_phases'] == ['initial_assignment', 'refresh_assignment']
-          assert len(s['error_contract']['initial_credential_cases']) == 4
-          assert len(s['error_contract']['completion_cases']) == 5
-          assert len(s['error_contract']['registration_cases']) == 4
-          assert s['error_contract']['rules']['cookie_challenge_allowed'] is False
-          assert k['schema_version'] == 4 and k['request']['fields']['run_id'] == canonical
-          assert json.loads(k['request']['body_json'])['runId'] == canonical
-          assert len(k['request_cases']) == 12
-          assert requests['canonical_run_id']['native_connector']['parsed_run_id'] == canonical
-          assert requests['missing_run_id']['generic_parser']['parsed_run_id'] == ''
-          assert requests['missing_run_id']['native_connector']['reject_class'] == 'missing_run_id'
-          assert requests['reject_uppercase_run_id']['generic_parser']['reject_class'] == 'invalid_run_id'
-          assert requests['reject_alias_run_id']['native_connector']['reject_class'] == 'body_parse'
-          assert lossy_duplicate['runId'] == 'fedcba9876543210'
-          assert unchecked_alias['runID'] == canonical and 'runId' not in unchecked_alias
-          assert len(k['reply_cases']) == 53 and replies['ack_success']['outcome'] == 'success'
-          assert replies['ack_success']['expected_session_id'] == '72623859790382856'
-          assert replies['ack_success']['expected_open_time'] == 900
-          assert json.loads(replies['ack_success']['body_json'])['sessId'] == int(replies['ack_success']['expected_session_id'])
-          assert 'sessId' not in json.loads(replies['ack_deny']['body_json'])
-          assert replies['reject_success_zero_open_time']['reject_class'] == 'session_lifetime'
-          assert replies['ack_success_empty_err_code']['outcome'] == 'success'
-          assert json.loads(replies['ack_success_empty_err_code']['body_json'])['errCode'] == ''
-          assert replies['ack_deny_51002']['reject_class'] == 'server_deny'
-          assert json.loads(replies['ack_deny_51002']['body_json'])['errCode'] == '51002'
-          assert json.loads(replies['ack_deny_52025']['body_json'])['errCode'] == '52025'
-          success = json.loads(replies['ack_success']['body_json'])
-          optional = json.loads(replies['ack_success_optional_metadata']['body_json'])
-          assert success['preActions'][resource] is None
-          assert replies['ack_success']['expected_ac_token'] == success['acTokens'][resource]
-          assert replies['ack_success']['expected_resource_host'] == success['resHost'][resource]
-          assert optional['aspToken'] != replies['ack_success_optional_metadata']['expected_ac_token']
-          assert replies['reject_pre_access_action_requested']['reject_class'] == 'unsupported_pre_access'
-          assert replies['reject_pre_access_action_other_resource']['reject_class'] == 'unsupported_pre_access'
-          assert isinstance(json.loads(replies['reject_malformed_pre_actions']['body_json'])['preActions'], list)
-          assert replies['reject_malformed_pre_actions']['reject_class'] == 'body_parse'
-          assert replies['ack_deny']['reject_class'] == 'server_deny'
-          assert replies['reject_counter_mismatch']['request_counter'] != replies['reject_counter_mismatch']['reply_counter']
-          assert json.loads(replies['reject_malformed_opn_time']['body_json'])['opnTime'] == '900'
-          assert replies['reject_malformed_opn_time']['reject_class'] == 'body_parse'
-          assert json.loads(replies['reject_malformed_agent_addr']['body_json'])['agentAddr'] == 7
-          assert replies['reject_malformed_agent_addr']['reject_class'] == 'body_parse'
-          assert isinstance(json.loads(replies['reject_malformed_ac_tokens_map']['body_json'])['acTokens'], list)
-          assert replies['reject_malformed_ac_tokens_map']['reject_class'] == 'body_parse'
-          assert x['artifact'] == 'qurl-agent-session-control-vectors' and x['schema_version'] == 4
-          assert x['producer_revision'] == 'b962ee4aa82f643d507ddf75adc3c110df8dff9d'
-          assert x['protocol']['cok_wire_counter_correlation'] == 'unconstrained'
-          assert x['protocol']['cok_body_transaction_correlation'] == 'must_equal_knock_counter'
-          assert x['protocol']['ack_counter_correlation'] == 'must_echo_request'
-          assert x['protocol']['knock_run_attempt'] == 'positive_uint64_bound_across_knk_rkn'
-          assert x['protocol']['success_ack_receipt'] == 'exact_cell_session_issuance_run_attempt'
-          assert x['protocol']['exit_body'] == 'exact_session_receipt'
-          assert x['protocol']['exit_response'] == 'strict_close_ack'
-          assert x['protocol']['denial_receipt_fields'] == 'must_be_omitted'
-          assert x['protocol']['exit_cookie_challenge_allowed'] is False
-          assert len(session_cookie) == 32
-          assert base64.b64encode(session_cookie).decode() == x['overload_reknock']['cookie_b64']
-          assert len(session_packets) == 8
-          assert all(v['packet_hex'] and v['header_digest_hex'] and v['body_hex'] for v in session_packets)
-          assert [v['header_type'] for v in session_packets] == [1, 7, 8, 2, 16, 2, 2, 2]
-          assert x['exact_session_exit']['ack']['counter'] == x['exact_session_exit']['request']['counter']
-          assert session_knock['runAttempt'] == 1
-          assert exact_exit_request['headerType'] == 16 and exact_exit_request['aspId'] == 'agent'
-          receipt_fields = ('cellId', 'sessId', 'sessIssuedAtMillis', 'runId', 'runAttempt')
-          denied_authority_fields = receipt_fields + ('closeEventId', 'state')
-          assert all(exact_exit_request[k] == session_ack[k] for k in receipt_fields)
-          assert all(exact_exit_ack[k] == exact_exit_request[k] for k in receipt_fields)
-          assert re.fullmatch(r'[0-9a-f]{32}', exact_exit_ack['closeEventId'])
-          assert exact_exit_ack['state'] in ('closing', 'closed')
-          assert all(k not in knock_denial for k in denied_authority_fields)
-          assert all(k not in exit_denial for k in denied_authority_fields)
-          assert json.loads(x['overload_reknock']['cookie_reply']['body_json'])['trxId'] == int(x['overload_reknock']['knock_request']['counter'])
-          assert x['overload_reknock']['ack']['counter'] == x['overload_reknock']['reknock_request']['counter']
-          assert json.loads(x['overload_reknock']['ack']['body_json'])['sessId'] > 0
-          assert len(x['cookie_body_cases']) == 16 and len(x['flow_cases']) == 28
-          assert i['schema_version'] == 1 and i['contract']['pattern'] == r'^key_[A-Za-z0-9]{12}$'
-          assert len(i['producer_cases']) == 4 and len(i['consumer_value_cases']) == 18
-          assert len(i['consumer_response_cases']) == 26
-          assert all(
-              (re.fullmatch(i['contract']['pattern'], v['value']) is not None) == (v['outcome'] == 'accept')
-              for v in i['consumer_value_cases']
-          )
-          assert id_responses['registration_info_accept_canonical']['expected_id'] == 'key_A1b2C3d4E5f6'
-          assert id_responses['registration_info_accept_with_companion_field']['expected_id'] == 'key_A1b2C3d4E5f6'
-          assert id_responses['completion_reject_duplicate_field']['reject_class'] == 'body_parse'
-          assert t['artifact'] == 'qurl-assignment-ticket-v1-vectors' and t['schema_version'] == 1
-          assert len(t['golden']['token'].split('.')) == 3 and len(t['golden']['signature_b64url']) == 86
-          assert t['golden']['lrt_body_bytes'] <= t['contract']['nhp_body_max_bytes']
-          assert t['golden']['complete_nhp_packet_bytes'] <= t['contract']['nhp_packet_max_bytes']
-          assert 'tunnel_bootstrap' not in t['contract']['credential_kinds']
-          assert u['artifact'] == 'qurl-connector-authority-lambda-v1-vectors' and u['schema_version'] == 2
-          assert len(u['operations']) == 7
-          assert u['protocol']['max_assignment_ticket_ascii_bytes'] == t['contract']['max_ticket_ascii_bytes']
-          assert u['protocol']['hub_request_id_format'] == 'lowercase_sha256_hex'
-          assert u['protocol']['cell_request_id_domain'] == 'layerv:qurl:connector-resource-request-id:v1'
-          assert derive_connector_resource_request_id() == u['fixtures']['cell_request_id']
-          assert re.fullmatch(r'[0-9a-f]{64}', u['fixtures']['hub_request_id'])
-          assert all(authority_requests[name]['hub_request_id'] == u['fixtures']['hub_request_id'] for name in global_authority_operations)
-          assert all('hub_request_id' not in authority_requests[name] for name in cell_authority_operations)
-          assert re.fullmatch(r'nhp-[1-9][0-9]*-[1-9][0-9]*-(connector|qurl_go)-(pre_removal|post_removal)-[0-9a-f]{32}', u['fixtures']['proof_grant_correlation_id'])
-          assert len(u['operations']['MutateProofAgent']['additional_request_goldens']) == 2
-          assert len(u['operations']['MutateProofAgent']['additional_success_goldens']) == 2
-          assert u['operations']['MutateProofAgent']['public_mapping_cases'] == []
-          assert proof_mutation_replay == {
-              'logical_lifetime_seconds': 900,
-              'tombstone_seconds_after_logical_expiry': 86400,
-              'pending_recovery_seconds_after_logical_expiry': 300,
-              'fingerprint_fields': [
-                  'version',
-                  'mutation',
-                  'agent_id',
-                  'grant_correlation_id',
-                  'pinned_cell_id_if_arm',
-                  'target_cell_id_if_arm_or_move',
-                  'lease_seconds_if_arm_or_expire_lease',
-              ],
-              'exact_replay_outcome': 'byte_identical_success',
-              'changed_replay_outcome': 'invalid_request_before_mutation',
-              'mutation_fence_rule': 'conditional_exact_fingerprint_command_write_atomic_with_first_mutation',
-              'commit_rule': 'arm_expire_mutation_success_atomic_move_mark_pending_and_final_success_atomic',
-              'pending_move_resume_rule': 'accepted_before_logical_expiry_exact_pending_moving_pinned_finishes_success_or_compensates_pinned_active_terminal_unavailable_through_recovery_window',
-              'expired_id_outcome': 'expired_first_seen_or_terminal_unavailable_without_mutation',
-          }
-          assert resource_replay['expected_resource_id_outcome'] == 'read_only_exact_active_match_else_resource_identity_conflict_never_create_or_reclaim'
-          assert resource_replay['exact_replay_outcome'] == 'byte_identical_first_response_including_found_existing'
-          assert rr['artifact'] == 'qurl-connector-resource-lst-v1-vectors' and rr['schema_version'] == 1
-          assert rr['contract']['query'] == 'connector_resource'
-          assert rr['contract']['http_fallback_allowed'] is False
-          assert rr['contract']['one_resource_per_exchange'] is True
-          assert rr['contract']['real_seal_proof_owner'] == 'NHP_reference_codec_integration_test'
-          assert len(rr['success_exchanges']) == 3 and len(rr['replay_cases']) == 3
-          assert len(rr['request_cases']) == 19 and len(rr['result_reject_cases']) == 20
-          assert len(rr['error_cases']) == 8 and len(rr['error_reject_cases']) == 14
-          assert len(rr['size_cases']) == 4
-          assert all(v['size_budget_bytes'] <= rr['contract']['max_packet_bytes'] for v in rr['size_cases'] if v['outcome'] == 'accept')
-          assert next(v for v in rr['size_cases'] if v['outcome'] == 'reject')['body_bytes'] == rr['contract']['max_plaintext_body_bytes'] + 1
-          assert {key: resource_success[key] for key in resource_authority_success} == resource_authority_success
-          assert resource_success['query'] == 'connector_resource' and resource_success['version'] == 1
-          assert resource_success['found_existing'] is False
-          assert json.loads(rr['success_exchanges'][1]['result']['body_json'])['list']['found_existing'] is True
-          assert all(
-              'replay_contract' not in operation
-              for name, operation in u['operations'].items()
-              if name != 'MutateProofAgent'
-          )
-          assert proof_mutation_rejects['reject_unknown_field']['mutation'] == 'move'
-          assert 'pinned_cell_id' in proof_mutation_rejects['reject_unknown_field']
-          assert proof_mutation_rejects['reject_wrong_type']['mutation'] == 'expire_lease'
-          assert proof_mutation_rejects['reject_missing_field']['mutation'] == 'arm'
-          assert 'pinned_cell_id' not in proof_mutation_rejects['reject_missing_field']
-          assert u['fixtures']['device_api_key'] != u['fixtures']['credential']
-          assert all(u['fixtures']['hub_request_id'] not in json.dumps({
-              'successes': [operation['success_golden'], *operation.get('additional_success_goldens', [])],
-              'errors': operation['semantic_errors'],
-              'mappings': operation['public_mapping_cases'],
-          }) for operation in u['operations'].values())
-          assert all(u['fixtures']['device_api_key'] not in v.get('nhp_body_json', '') for op in u['operations'].values() for v in op['public_mapping_cases'])
-          assert any(v['mapping_source'] == 'nhp_preinvoke' and v['name'] == 'assignment_rate_limited' and '52204' in v['nhp_body_json'] for v in u['operations']['RefreshAssignment']['public_mapping_cases'])
-          assert activation_unavailable['nhp_action'] == 'drop_no_reply'
-          assert 'nhp_body_json' not in activation_unavailable
-          assert h['artifact'] == 'qurl-connector-hub-request-id-v1-vectors' and h['schema_version'] == 1
-          assert h['contract']['operations'] == ['IssueAssignment', 'RefreshAssignment', 'IssueCredentialRecovery']
-          assert {'nhp_send_timestamp', 'exact_body_digest'} <= set(h['contract']['excluded_inputs'])
-          assert len(h['cases']) == 6
-          assert len({v['hub_request_id'] for v in h['cases']}) == len(h['cases'])
-          assert all(derive_hub_request_id(v) for v in h['cases'])
-          assert refresh_assignment_request['usrData']['request_nonce'] == h['cases'][0]['request_nonce']
-          assert hc['artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors' and hc['schema_version'] == 1
-          assert hc['contract']['proof_flag_hex'] == '0004'
-          assert hc['contract']['challenge_header_flags_hex'] == '0000'
-          assert hc['contract']['http_fallback_allowed'] is False
-          assert 'qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition' in hc['contract']['additive_application_profiles']
-          assert all(derive_hub_lst_cookie(vector) for vector in hc['cookie_kats'])
-          assert len(hc['challenge_cases']) == len(hub_cookie_challenge_flags)
-          assert set(hub_cookie_challenges) == set(hub_cookie_challenge_flags)
-          assert all(hub_cookie_challenges[name]['header_flags_hex'] == flags for name, flags in hub_cookie_challenge_flags.items())
-          assert all(
-              hub_cookie_challenges[name]['outcome'] == 'reject'
-              and hub_cookie_challenges[name]['client_action'] == 'stop_without_third_lst_or_fallback'
-              for name in ('reject_compressed_challenge', 'reject_unknown_flag_challenge')
-          )
-          hub_cookie_sizes = {v['name']: v for v in hc['size_cases']}
-          assert hub_cookie_sizes['allow_crypto_valid_malformed_application_size']['size_gate_action'] == 'challenge_size_eligible'
-          hub_success_sizes = {v['name']: v for v in hc['assignment_success_sizes']}
-          assert hub_success_sizes['initial_max_ticket_envelope']['result_packet_bytes'] == 3076
-          assert cr['artifact'] == 'qurl-agent-credential-recovery-v1-vectors' and cr['schema_version'] == 1
-          assert cr['protocol']['transport'] == 'NHP_UDP_ONLY'
-          assert cr['protocol']['http_fallback_allowed'] is False
-          assert cr['protocol']['relay_fallback_allowed'] is False
-          assert cr['protocol']['client_cell_selection_allowed'] is False
-          assert cr['protocol']['recovery_grant_lifetime_seconds'] == 900
-          assert cr['protocol']['issue_replay_rule'] == 'same_hub_request_id_and_semantic_fingerprint_returns_byte_identical_result_else_terminal_fingerprint_conflict'
-          assert recovery_request_id_case is not None
-          assert cr['fixtures']['environment'] == recovery_request_id_case['environment']
-          assert cr['fixtures']['authenticated_peer_public_key_b64'] == recovery_request_id_case['authenticated_peer_public_key_b64']
-          assert cr['fixtures']['request_nonce'] == recovery_request_id_case['request_nonce']
-          assert cr['fixtures']['hub_request_id'] == recovery_request_id_case['hub_request_id']
-          assert set(cr['public_exchanges']) == {'hub_issue_recovery', 'assigned_cell_complete_recovery'}
-          assert set(cr['private_operations']) == {'IssueCredentialRecovery', 'CompleteCredentialRecovery'}
-          assert len(cr['issue_replay_cases']) == 7 and len(cr['grant_binding_cases']) == 24
-          assert len(cr['hub_cookie_composition']['cases']) == 10
-          assert cr['hub_cookie_composition']['base_contract_artifact'] == 'qurl-connector-hub-lst-cookie-v1-vectors'
-          assert recovery_cookie_kat is not None
-          assert cr['fixtures']['authenticated_peer_public_key_b64'] == recovery_cookie_kat['authenticated_peer_public_key_b64']
-          assert cr['hub_cookie_composition']['unproven_body_json'] == cr['public_exchanges']['hub_issue_recovery']['request_body_json']
-          assert cr['hub_cookie_composition']['proof_body_json'] == cr['public_exchanges']['hub_issue_recovery']['request_body_json']
-          assert cr['hub_cookie_composition']['challenge_body_json'] == json.dumps({
-              'trxId': int(cr['hub_cookie_composition']['unproven_counter']),
-              'cookie': recovery_cookie_kat['cookie_b64'],
-          }, separators=(',', ':'))
-          assert cr['hub_cookie_composition']['challenge_packet_bytes'] < cr['hub_cookie_composition']['unproven_request_packet_bytes']
-          assert len(cr['private_operations']['IssueCredentialRecovery']['semantic_errors']) == 7
-          assert len(cr['private_operations']['IssueCredentialRecovery']['public_mapping_cases']) == 10
-          assert len(cr['private_operations']['CompleteCredentialRecovery']['semantic_errors']) == 5
-          assert len(cr['private_operations']['CompleteCredentialRecovery']['public_mapping_cases']) == 7
-          assert cr['fixtures']['recovery_credential'] != cr['fixtures']['device_api_key_candidate']
-          assert cr['fixtures']['device_api_key_candidate'] not in cr['public_exchanges']['assigned_cell_complete_recovery']['success_body_json']
-          assert cd['artifact'] == 'qurl-crid-v1-vectors' and cd['schema_version'] == 1
-          assert cd['contract']['checksum_polynomial_hex'] == '1edc6f41'
-          assert cd['contract']['alphabet'] == 'abcdefghijklmnopqrstuvwxyz234567'
-          assert len(cd['versions']) == 4 and len(cd['producer_cases']) == 6
-          assert len(cd['consumer_value_cases']) == 16 and len(cd['version_cases']) == 4
-          assert len(cd['key_match_cases']) == 4
-          assert all(derive_crid(v) for v in cd['producer_cases'])
-          assert all(
-              len(v['expected_crid']) == cd['contract']['full_crid_length']
-              and v['expected_crid'][0] == ('q' if v['environment'] == 'test' else 'a')
-              and v['expected_crid'][59] in 'aq'
-              for v in cd['producer_cases']
-          )
-          crid_values = {v['name']: v for v in cd['consumer_value_cases']}
-          assert crid_values['accept_unknown_version_full']['outcome'] == 'accept'
-          assert len(crid_values['accept_unknown_version_truncated']['value']) == cd['contract']['truncated_crid_length']
-          assert crid_values['reject_version_zero']['reject_class'] == 'version'
-          assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
-          assert crid_values['reject_checksum']['reject_class'] == 'checksum'
-          assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          assert tp['cases']
-          assert tp['contract']['wire_field'] == 'target_path'
-          assert tp['contract']['max_bytes'] == 2048
-          assert tp['contract']['omitted_semantics'] == 'bare_origin'
-          assert tp['contract']['explicit_empty_semantics'] == 'reject'
-          assert tp['contract']['accepted_character_set'] == 'raw_ascii_canonical_uri_path_and_query'
-          assert tp['contract']['allowed_ascii'] == "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
-          assert tp['contract']['query_delimiter'] == 'first_question_mark'
-          assert tp['contract']['validation_order'] == [
-              'presence', 'whole_value_empty', 'whole_value_utf8_byte_length',
-              'whole_value_leading_slash', 'whole_value_protocol_relative_authority',
-              'whole_value_raw_ascii_character_set', 'split_path_at_first_query_delimiter',
-              'path_semicolon', 'whole_value_percent_syntax', 'path_encoded_dot',
-              'path_literal_dot_segment', 'path_escape_or_interior_empty_segment', 'accept',
-          ]
-          assert tp['contract']['accepted_value_handling'] == 'preserve_exact_bytes'
-          assert tp['contract']['percent_encoding_handling'] == (
-              'reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode'
-          )
-          assert dm['artifact'] == 'qurl-delegated-mint-issue-v1-vectors' and dm['schema_version'] == 1
-          assert dm['contract']['nonce_decoded_bytes'] == 16 and dm['contract']['body_max_bytes'] == 8192
-          assert dm['contract']['idempotency_key_prefix'] == 'uci_'
-          assert dm['contract']['success_status'] == 200 and dm['contract']['success_content_type'] == 'application/json'
-          assert dm['contract']['success_envelope'] == 'data'
-          assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
-          assert dm['contract']['error_content_type'] == 'application/problem+json'
-          assert dm['contract']['body_authority_fields'] == [
-              'upload_handle', 'issue_generation', 'upload_request_digest', 'content_sha256', 'byte_size',
-              'media_type', 'display_filename', 'audience_key_id', 'target_path', 'max_batch_size',
-              'max_link_ttl_seconds', 'capability_expires_at', 'authority_expires_at',
-          ]
-          assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
-          assert dm['contract']['nonce_replay_retention_seconds'] == 900
-          assert dm['contract']['nonce_replay_retention_seconds'] > 2 * dm['contract']['timestamp_max_skew_seconds']
-          assert dm['contract']['retry_after_modes'] == ['absent', 'exact_seconds', 'positive_integer_seconds']
-          assert dm['contract']['external_operation_commit_rule'] == 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request'
-          assert dm['contract']['envelope_fingerprint_fields'] == [
-              'method', 'authority', 'route', 'issuer_id', 'kid', 'idempotency_key',
-              'timestamp_unix_decimal', 'nonce', 'body_sha256', 'signature_der_b64url',
-          ]
-          assert dm['contract']['stale_operation_miss_status'] == 404
-          assert dm['contract']['stale_operation_miss_code'] == 'issue_operation_not_found'
-          assert dm['golden']['kid'] != dm['retry_golden']['kid']
-          assert dm['golden']['public_key_der_b64url'] != dm['retry_golden']['public_key_der_b64url']
-          assert dm['golden']['idempotency_key'] == dm['retry_golden']['idempotency_key']
-          assert dm['golden']['body_sha256'] != dm['retry_golden']['body_sha256']
-          assert dm['golden']['kid'] != dm['refresh_golden']['kid']
-          assert dm['golden']['public_key_der_b64url'] != dm['refresh_golden']['public_key_der_b64url']
-          assert len(dm['reject_cases']) == 9 and len(dm_rejects) == 9
-          assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
-          assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
-          assert all((case['status'], case['error_code']) == dm_reject_responses[case['reject_class']] for case in dm['reject_cases'])
-          assert all(
-              derive_dm_issue_idempotency(golden)[0].hex() == golden['idempotency_preimage_hex'] and
-              derive_dm_issue_idempotency(golden)[1] == golden['idempotency_key']
-              for golden in dm_signed_inputs
-          )
-          assert len(dm['state_cases']) == 9
-          assert [case['name'] for case in dm['state_cases']] == [
-              'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'generation_2_refresh', 'stale_unseen',
-              'alternate_endpoint', 'reused_nonce_across_operation', 'stale_non_exact_retry',
-              'fresh_authority_conflict',
-          ]
-          assert len(dm['response_cases']) == 8
-          assert [case['error_code'] for case in dm['response_cases'] if case['proves_operation_absent']] == ['issue_operation_not_found']
-          assert next(case for case in dm['response_cases'] if case['error_code'] == 'rate_limit_exceeded')['retry_after'] == {'mode': 'positive_integer_seconds'}
-          assert next(case for case in dm['response_cases'] if case['error_code'] == 'mutation_outcome_unknown')['retry_after'] == {'mode': 'exact_seconds', 'seconds': 1}
-          assert all(case['retry_after'] == {'mode': 'absent'} for case in dm['response_cases'] if case['error_code'] not in {'rate_limit_exceeded', 'mutation_outcome_unknown'})
-          assert dm['wrong_endpoint_signed']['authority'] != dm['golden']['authority']
-          assert dm['wrong_endpoint_signed']['public_key_der_b64url'] == dm['golden']['public_key_der_b64url']
-          assert dm['nonce_reuse_signed']['nonce'] == dm['golden']['nonce']
-          assert dm['nonce_reuse_signed']['idempotency_key'] == dm['refresh_golden']['idempotency_key']
-          assert dm['nonce_reuse_signed']['timestamp_unix'] - (dm['golden']['timestamp_unix'] - dm['contract']['timestamp_max_skew_seconds']) < dm['contract']['nonce_replay_retention_seconds']
-          nonce_reuse_state = next(case for case in dm['state_cases'] if case['name'] == 'reused_nonce_across_operation')
-          assert abs(nonce_reuse_state['now_unix'] - dm['nonce_reuse_signed']['timestamp_unix']) <= dm['contract']['timestamp_max_skew_seconds']
-          assert all(verify_dm_framing_and_digest(golden) for golden in (
-              dm['golden'], dm['retry_golden'], dm['refresh_golden'],
-              dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'],
+              return (
+                  digest.hex() == vector['digest_hex']
+                  and crc.hex() == vector['crc_hex']
+                  and encoded.hex() == vector['payload_hex']
+                  and base64.b32encode(encoded).decode().rstrip('=').lower() == vector['expected_crid']
+              )
+
+          signed = (
+              dm['golden'],
+              dm['retry_golden'],
+              dm['refresh_golden'],
+              dm['wrong_endpoint_signed'],
+              dm['nonce_reuse_signed'],
               dm['authority_conflict_signed'],
-          ))
+          )
+          for golden in signed:
+              preimage, key = dm_idempotency(golden)
+              assert preimage.hex() == golden['idempotency_preimage_hex']
+              assert key == golden['idempotency_key']
+              assert verify_delegated_mint(golden)
+          assert all(verify_hub_request_id(vector) for vector in h['cases'])
+          assert connector_resource_request_id() == u['fixtures']['cell_request_id']
+          assert all(verify_hub_cookie(vector) for vector in hc['cookie_kats'])
+          assert all(verify_crid(vector) for vector in cd['producer_cases'])
           print('py ok')
           PY
 
-  generator:
-    name: dependency-free generator
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Generator module must be dependency-free
-        run: |
-          if grep -qE '^[[:space:]]*require[[:space:]]' tools/gen/go.mod; then
-            echo "::error::tools/gen/go.mod must have no require directive"; grep -n require tools/gen/go.mod; exit 1
-          fi
-      - name: Set up Go for generator module
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: tools/gen/go.mod
-      - name: Generator build, tests, vet, and format
-        working-directory: tools/gen
-        run: |
-          # Compile the one-shot generator so the next intentional rotation
-          # cannot discover a stale build. Do not run it: its ECDSA nonce is
-          # intentionally random.
-          go build ./...
-          go test -count=1 ./...
-          go vet ./...
-          if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi
+          python -m pip install --quiet .
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          import qurl_conformance as q
 
+          accessors = [
+              value for name, value in vars(q).items()
+              if name.endswith('_vectors') and callable(value)
+          ]
+          assert accessors
+          for accessor in accessors:
+              accessor()
+          print('python wheel ok')
+          PY
   # Slack build-completion card. Thin shim over the fleet-shared reusable in
   # layervai/ops-routines-workflows (public mirror of private
   # layervai/ops-routines); the Block Kit payload builder and gate-result
@@ -1509,7 +526,7 @@ jobs:
   # `needs:` + `gates:` here.
   notify:
     name: Notify
-    needs: [conformance, generator]
+    needs: [conformance]
     # `!cancelled()` rather than `always()`: this repo sets
     # concurrency.cancel-in-progress, so a newer push to main cancels the
     # in-flight run. `always()` would still post a yellow "cancelled" card for
@@ -1520,6 +537,6 @@ jobs:
     uses: layervai/ops-routines-workflows/.github/workflows/notify.yml@d07fa2fe3a103907ff2b1a1a71509a6dcd8e9d32 # v0.13.0
     with:
       header: "qURL Conformance Build"
-      gates: '{"Conformance": "${{ needs.conformance.result }}", "Generator": "${{ needs.generator.result }}"}'
+      gates: '{"Conformance": "${{ needs.conformance.result }}"}'
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -128,16 +128,3 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 		}), "ambiguous")
 	})
 }
-
-func TestOpenAssignmentTicketArtifact(t *testing.T) {
-	want := AssignmentTicketVectors()
-	for _, name := range []string{"assignment_ticket_v1_vectors.json", "vectors/assignment_ticket_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if string(got) != string(want) {
-			t.Fatalf("Open(%q) returned different bytes", name)
-		}
-	}
-}

@@ -79,19 +79,6 @@ func TestConnectorHubRequestIDLinksAssignmentNonceWithoutExposingPrivateID(t *te
 	}
 }
 
-func TestOpenConnectorHubRequestIDArtifact(t *testing.T) {
-	want := ConnectorHubRequestIDVectors()
-	for _, name := range []string{"connector_hub_request_id_v1_vectors.json", "vectors/connector_hub_request_id_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) does not match embedded Connector Hub request-ID vectors", name)
-		}
-	}
-}
-
 func TestDeriveConnectorHubRequestIDRejectsInvalidInputs(t *testing.T) {
 	peer := bytes.Repeat([]byte{1}, ConnectorHubRequestIDPeerBytes)
 	nonce := bytes.Repeat([]byte{2}, ConnectorHubRequestIDNonceBytes)

@@ -3,9 +3,10 @@ package conformance
 import (
 	"embed"
 	"fmt"
+	"strings"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json vectors/target_path_v1_vectors.json vectors/delegated_mint_issue_v1_vectors.json
+//go:embed vectors/*.json
 var vectorsFS embed.FS
 
 const (
@@ -28,28 +29,26 @@ const (
 	delegatedMintIssueV1Name    = "vectors/delegated_mint_issue_v1_vectors.json"
 )
 
+func mustReadVector(name string) []byte {
+	b, err := vectorsFS.ReadFile(name)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", name, err))
+	}
+	return b
+}
+
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
 // (qv2_conformance_vectors.json). The bytes are the canonical wire-truth; a
 // consumer that prefers to drive its own strict parser can feed these directly.
 func QV2Vectors() []byte {
-	b, err := vectorsFS.ReadFile(conformanceVectorsName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", conformanceVectorsName, err))
-	}
-	return b
+	return mustReadVector(conformanceVectorsName)
 }
 
 // IssuerSignatureVectors returns the raw bytes of the embedded issuer-signature
 // golden vectors (issuer_signature_vectors.json), which the signature class
 // composes by reference.
 func IssuerSignatureVectors() []byte {
-	b, err := vectorsFS.ReadFile(issuerSignatureName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", issuerSignatureName, err))
-	}
-	return b
+	return mustReadVector(issuerSignatureName)
 }
 
 // RelayKnockVectors returns the raw bytes of the embedded relay/NHP-handshake
@@ -57,12 +56,7 @@ func IssuerSignatureVectors() []byte {
 // wire-truth; a consumer that prefers to drive its own strict parser can feed
 // these directly.
 func RelayKnockVectors() []byte {
-	b, err := vectorsFS.ReadFile(relayKnockName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", relayKnockName, err))
-	}
-	return b
+	return mustReadVector(relayKnockName)
 }
 
 // AgentRegistrationVectors returns the raw bytes of the embedded NHP
@@ -70,193 +64,104 @@ func RelayKnockVectors() []byte {
 // requests and the RAK replies. The bytes are the canonical wire-truth; a consumer
 // that prefers to drive its own strict parser can feed these directly.
 func AgentRegistrationVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentRegistrationName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentRegistrationName, err))
-	}
-	return b
+	return mustReadVector(agentRegistrationName)
 }
 
 // AgentAssignmentVectors returns the raw bytes of the deterministic NHP LST/LRT
 // assignment and registration-completion packets plus the account-only OTP
 // request contract.
 func AgentAssignmentVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentAssignmentName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentAssignmentName, err))
-	}
-	return b
+	return mustReadVector(agentAssignmentName)
 }
 
 // AgentKnockApplicationVectors returns the raw bytes of the registered-agent
 // knock application-body vectors. Unlike RelayKnockVectors, this artifact starts
 // after Noise decryption and contains no packet bytes.
 func AgentKnockApplicationVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentKnockApplicationName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentKnockApplicationName, err))
-	}
-	return b
+	return mustReadVector(agentKnockApplicationName)
 }
 
 // AgentSessionControlVectors returns the deterministic native-UDP overload
 // re-knock and exact-session retirement packet artifact.
 func AgentSessionControlVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentSessionControlName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentSessionControlName, err))
-	}
-	return b
+	return mustReadVector(agentSessionControlName)
 }
 
 // AgentAPIKeyIDVectors returns the raw bytes of the control-plane API-key ID
 // producer and consumer vectors used by agent registration.
 func AgentAPIKeyIDVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentAPIKeyIDName)
-	if err != nil {
-		// Unreachable: the file is embedded at build time.
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentAPIKeyIDName, err))
-	}
-	return b
+	return mustReadVector(agentAPIKeyIDName)
 }
 
 // AssignmentTicketVectors returns the raw bytes of the standalone qat1
 // cryptographic and fence artifact.
 func AssignmentTicketVectors() []byte {
-	b, err := vectorsFS.ReadFile(assignmentTicketName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", assignmentTicketName, err))
-	}
-	return b
+	return mustReadVector(assignmentTicketName)
 }
 
 // ConnectorAuthorityLambdaVectors returns the raw bytes of the private,
 // operation-specific NHP-to-authority invocation artifact.
 func ConnectorAuthorityLambdaVectors() []byte {
-	b, err := vectorsFS.ReadFile(connectorAuthorityName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorAuthorityName, err))
-	}
-	return b
+	return mustReadVector(connectorAuthorityName)
 }
 
 // ConnectorResourceLSTV1Vectors returns the exact registered-agent NHP_LST and
 // NHP_LRT application bodies for resolving one Connector resource.
 func ConnectorResourceLSTV1Vectors() []byte {
-	b, err := vectorsFS.ReadFile(connectorResourceLSTV1Name)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorResourceLSTV1Name, err))
-	}
-	return b
+	return mustReadVector(connectorResourceLSTV1Name)
 }
 
 // ConnectorHubRequestIDVectors returns the private Hub replay-key derivation
 // KAT shared by Hub worker implementations.
 func ConnectorHubRequestIDVectors() []byte {
-	b, err := vectorsFS.ReadFile(connectorHubRequestIDName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorHubRequestIDName, err))
-	}
-	return b
+	return mustReadVector(connectorHubRequestIDName)
 }
 
 // ConnectorHubLSTCookieVectors returns the Hub assignment return-routability
 // challenge and proof contract.
 func ConnectorHubLSTCookieVectors() []byte {
-	b, err := vectorsFS.ReadFile(connectorHubLSTCookieName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", connectorHubLSTCookieName, err))
-	}
-	return b
+	return mustReadVector(connectorHubLSTCookieName)
 }
 
 // AgentCredentialRecoveryVectors returns the UDP-only same-agent device-
 // credential recovery contract shared by the Hub, assigned cell, Authority,
 // and native SDK.
 func AgentCredentialRecoveryVectors() []byte {
-	b, err := vectorsFS.ReadFile(agentCredentialRecoveryName)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", agentCredentialRecoveryName, err))
-	}
-	return b
+	return mustReadVector(agentCredentialRecoveryName)
 }
 
 // CRIDV1Vectors returns the raw bytes of the CRID v1 derivation and
 // validation vectors shared by every producer and consumer of the
 // cryptographic resource identifier.
 func CRIDV1Vectors() []byte {
-	b, err := vectorsFS.ReadFile(cridV1Name)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", cridV1Name, err))
-	}
-	return b
+	return mustReadVector(cridV1Name)
 }
 
 // TargetPathV1Vectors returns the raw bytes of the canonical target_path
 // request contract shared by the service and SDKs.
 func TargetPathV1Vectors() []byte {
-	b, err := vectorsFS.ReadFile(targetPathV1Name)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", targetPathV1Name, err))
-	}
-	return b
+	return mustReadVector(targetPathV1Name)
 }
 
 // DelegatedMintIssueV1Vectors returns the private Connector-to-service issue
 // signature contract and its byte-exact golden request.
 func DelegatedMintIssueV1Vectors() []byte {
-	b, err := vectorsFS.ReadFile(delegatedMintIssueV1Name)
-	if err != nil {
-		panic(fmt.Sprintf("conformance: embedded %s missing: %v", delegatedMintIssueV1Name, err))
-	}
-	return b
+	return mustReadVector(delegatedMintIssueV1Name)
 }
 
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
 func Open(name string) ([]byte, error) {
-	switch name {
-	case conformanceVectorsName, "qv2_conformance_vectors.json":
-		return vectorsFS.ReadFile(conformanceVectorsName)
-	case issuerSignatureName, "issuer_signature_vectors.json":
-		return vectorsFS.ReadFile(issuerSignatureName)
-	case relayKnockName, "relay_knock_golden.json":
-		return vectorsFS.ReadFile(relayKnockName)
-	case agentRegistrationName, "agent_registration_golden.json":
-		return vectorsFS.ReadFile(agentRegistrationName)
-	case agentAssignmentName, "agent_assignment_golden.json":
-		return vectorsFS.ReadFile(agentAssignmentName)
-	case agentKnockApplicationName, "agent_knock_application_vectors.json":
-		return vectorsFS.ReadFile(agentKnockApplicationName)
-	case agentSessionControlName, "agent_session_control_vectors.json":
-		return vectorsFS.ReadFile(agentSessionControlName)
-	case agentAPIKeyIDName, "agent_api_key_id_vectors.json":
-		return vectorsFS.ReadFile(agentAPIKeyIDName)
-	case assignmentTicketName, "assignment_ticket_v1_vectors.json":
-		return vectorsFS.ReadFile(assignmentTicketName)
-	case connectorAuthorityName, "connector_authority_lambda_v1_vectors.json":
-		return vectorsFS.ReadFile(connectorAuthorityName)
-	case connectorResourceLSTV1Name, "connector_resource_lst_v1_vectors.json":
-		return vectorsFS.ReadFile(connectorResourceLSTV1Name)
-	case connectorHubRequestIDName, "connector_hub_request_id_v1_vectors.json":
-		return vectorsFS.ReadFile(connectorHubRequestIDName)
-	case connectorHubLSTCookieName, "connector_hub_lst_cookie_v1_vectors.json":
-		return vectorsFS.ReadFile(connectorHubLSTCookieName)
-	case agentCredentialRecoveryName, "agent_credential_recovery_v1_vectors.json":
-		return vectorsFS.ReadFile(agentCredentialRecoveryName)
-	case cridV1Name, "crid_v1_vectors.json":
-		return vectorsFS.ReadFile(cridV1Name)
-	case targetPathV1Name, "target_path_v1_vectors.json":
-		return vectorsFS.ReadFile(targetPathV1Name)
-	case delegatedMintIssueV1Name, "delegated_mint_issue_v1_vectors.json":
-		return vectorsFS.ReadFile(delegatedMintIssueV1Name)
-	default:
+	base := strings.TrimPrefix(name, "vectors/")
+	if base == "" || strings.Contains(base, "/") {
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
+	b, err := vectorsFS.ReadFile("vectors/" + base)
+	if err != nil {
+		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
+	}
+	return b, nil
 }
 
 // ConformanceVectors strictly parses the embedded qURL v2 conformance artifact

@@ -31,19 +31,6 @@ func TestEmbeddedConnectorAuthorityLambdaLoads(t *testing.T) {
 	}
 }
 
-func TestOpenConnectorAuthorityLambdaArtifact(t *testing.T) {
-	want := ConnectorAuthorityLambdaVectors()
-	for _, name := range []string{"connector_authority_lambda_v1_vectors.json", "vectors/connector_authority_lambda_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) does not match embedded Connector Authority Lambda vectors", name)
-		}
-	}
-}
-
 func TestConnectorAuthorityResolveConnectorResourceContract(t *testing.T) {
 	file, err := ConnectorAuthorityLambda()
 	if err != nil {
