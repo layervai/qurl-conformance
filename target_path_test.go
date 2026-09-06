@@ -448,6 +448,15 @@ func TestTargetPathForbiddenASCIIIsQueryOnly(t *testing.T) {
 		if !strings.ContainsRune(tf.Contract.AllowedASCII, character) {
 			t.Errorf("query-allowed character %q is missing from allowed_ascii", character)
 		}
+		value := "/view/x?q=" + string(character)
+		outcome, class, openSupported, deriveErr := deriveTargetPathExpectation(true, &value)
+		if deriveErr != nil {
+			t.Errorf("query byte %q derive: %v", character, deriveErr)
+			continue
+		}
+		if outcome != ExpectAccept || class != "" || !openSupported {
+			t.Errorf("query byte %q = (%q, %q, %t), want accepted and open-supported", character, outcome, class, openSupported)
+		}
 	}
 	for name, value := range map[string]string{
 		"accept_allowed_ascii":      "/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;",
@@ -459,6 +468,33 @@ func TestTargetPathForbiddenASCIIIsQueryOnly(t *testing.T) {
 		}
 		if queryCase.Value == nil || *queryCase.Value != value {
 			t.Errorf("query case %q value = %v, want %q", name, queryCase.Value, value)
+		}
+	}
+}
+
+func TestTargetPathForbiddenASCIIIsExactPathOnlySet(t *testing.T) {
+	const stablePathByte = ';'
+	for _, character := range TargetPathForbiddenPathASCII {
+		path := "/x" + string(character) + "y"
+		serialized := (&url.URL{Path: path}).RequestURI()
+		if character == stablePathByte {
+			if serialized != path {
+				t.Errorf("stable path byte %q serialized to %q, want %q", character, serialized, path)
+			}
+			continue
+		}
+		if serialized == path {
+			t.Errorf("URL-drifting path byte %q unexpectedly stayed byte-exact", character)
+		}
+	}
+	for _, character := range []byte(TargetPathAllowedASCII) {
+		if character == '/' || character == '?' || character == '%' ||
+			strings.IndexByte(TargetPathForbiddenPathASCII, character) >= 0 {
+			continue
+		}
+		path := "/x" + string(character) + "y"
+		if serialized := (&url.URL{Path: path}).RequestURI(); serialized != path {
+			t.Errorf("path byte %q serialized to %q but is not forbidden", character, serialized)
 		}
 	}
 }
@@ -475,26 +511,6 @@ func TestTargetPathRejectsApostropheInPathAndQuery(t *testing.T) {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
 			t.Errorf("case %q = %+v, want invalid_character rejection", name, *c)
-		}
-	}
-}
-
-func TestTargetPathForbiddenASCIIIsExactPathOnlySet(t *testing.T) {
-	for _, b := range []byte(TargetPathAllowedASCII) {
-		if b == '/' || b == '?' || b == '%' {
-			continue
-		}
-		value := "/x" + string(b) + "y"
-		outcome, class, _, err := deriveTargetPathExpectation(true, &value)
-		if err != nil {
-			t.Fatalf("derive %q: %v", value, err)
-		}
-		wantReject := strings.IndexByte(TargetPathForbiddenPathASCII, b) >= 0
-		if wantReject && (outcome != ExpectReject || class != TargetPathRejectInvalidCharacter) {
-			t.Errorf("path byte %q = (%q, %q), want invalid_character rejection", b, outcome, class)
-		}
-		if !wantReject && outcome != ExpectAccept {
-			t.Errorf("path byte %q = (%q, %q), want accept", b, outcome, class)
 		}
 	}
 }

@@ -30,8 +30,11 @@ and no invalid request leaves the process.
   expression end anchor that can match before a trailing line terminator.
 - `contract.forbidden_path_ascii` is the complete path-only reject alphabet.
   It is an unordered set of ASCII bytes. Each byte remains valid in the query.
+  The published string is still byte-frozen; consumers compare it as a set but
+  must not rewrite the artifact.
 - A raw apostrophe is rejected in both components because standard whole-URL
-  serializers disagree about whether it must be percent-encoded in a query.
+  serializers disagree about whether it must be percent-encoded in a path or
+  query.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
@@ -62,7 +65,7 @@ The closed local `reject_class` values are:
 | `too_long` | the raw value is longer than 2,048 UTF-8 bytes |
 | `not_absolute` | the value does not start with `/` |
 | `authority` | the value starts with `//` |
-| `invalid_character` | the value contains a character outside the allowed raw ASCII set, a byte from `forbidden_path_ascii` in the path, an interior empty path segment, or a well-formed path escape other than `%2e` |
+| `invalid_character` | the value contains a character outside the allowed raw ASCII set, a byte from `contract.forbidden_path_ascii` in the path, an interior empty path segment, or a well-formed path escape other than `%2e` |
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
@@ -77,14 +80,17 @@ splits the path at the first literal `?`. The path-only forbidden-byte check
 precedes the whole-value percent-syntax check. Thus `/view/a;b%` is
 `invalid_character`, not `percent_encoding`. The earlier whole-value
 character-set check gives the same precedence to `/view/a[b]%`. Malformed
-escapes in either the path or query are `percent_encoding`. After percent syntax
-is valid,
-`dot_segment` wins when the path contains any case-insensitive `%2e` escape or
+escapes in either the path or query are `percent_encoding`. After percent
+syntax is valid, `dot_segment` wins when the path contains any case-insensitive
+`%2e` escape or
 a literal `.` or `..` segment. This stays true when another well-formed path
 escape is also present. Otherwise, any path escape or interior empty segment is
 `invalid_character`. The `%2e` classification deliberately names the escape
 risk; the decoded dot does not have to be a standalone segment. Adding a class
 or changing this order requires a coordinated contract release.
+
+`schema_version` identifies the JSON artifact shape. Package semantic versions
+identify behavior changes within that shape, including validator rule changes.
 
 ## Open behavior
 
@@ -127,7 +133,8 @@ For every case, pass `present` and `value` through the real public option gate:
 
 Because v1 rejects every path escape, it cannot represent a resource path that
 requires percent encoding, such as a path that contains a space or non-ASCII
-text. This is a deliberate closed grammar, not an instruction to decode or
+text. Raw apostrophe, `!`, `(`, `)`, `*`, and `;` are also unrepresentable in a
+path. This is a deliberate closed grammar, not an instruction to decode or
 normalize such a path.
 
 The Go `ParseTargetPathV1File` loader independently derives every outcome and
