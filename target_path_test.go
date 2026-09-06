@@ -76,6 +76,11 @@ func TestTargetPathBoundaryAndPresenceSemantics(t *testing.T) {
 	if len(*atMax.Value) != TargetPathMaxBytes || len(*tooLong.Value) != TargetPathMaxBytes+1 {
 		t.Fatalf("boundary lengths = %d/%d, want %d/%d", len(*atMax.Value), len(*tooLong.Value), TargetPathMaxBytes, TargetPathMaxBytes+1)
 	}
+	atMaxWithQuery := targetPathCase(t, tf, "accept_max_bytes_with_query")
+	tooLongWithQuery := targetPathCase(t, tf, "reject_too_long_with_query")
+	if len(*atMaxWithQuery.Value) != TargetPathMaxBytes || len(*tooLongWithQuery.Value) != TargetPathMaxBytes+1 {
+		t.Fatalf("query boundary lengths = %d/%d, want %d/%d", len(*atMaxWithQuery.Value), len(*tooLongWithQuery.Value), TargetPathMaxBytes, TargetPathMaxBytes+1)
+	}
 	overlongNonASCII := targetPathCase(t, tf, "reject_overlong_non_ascii_precedence")
 	if got := len(*overlongNonASCII.Value); got != TargetPathMaxBytes+1 {
 		t.Fatalf("non-ASCII boundary bytes = %d, want %d", got, TargetPathMaxBytes+1)
@@ -109,6 +114,7 @@ func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
 	}
 	for _, name := range []string{
 		"reject_trailing_line_feed",
+		"reject_trailing_line_feed_after_query",
 		"reject_trailing_carriage_return",
 		"reject_trailing_carriage_return_line_feed",
 	} {

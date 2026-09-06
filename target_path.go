@@ -174,6 +174,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_newline":                            {present: true, value: targetPathValue("/view\n/x")},
 	"reject_carriage_return":                    {present: true, value: targetPathValue("/view\r/x")},
 	"reject_trailing_line_feed":                 {present: true, value: targetPathValue("/view/x\n")},
+	"reject_trailing_line_feed_after_query":     {present: true, value: targetPathValue("/view/x?a=b\n")},
 	"reject_trailing_carriage_return":           {present: true, value: targetPathValue("/view/x\r")},
 	"reject_trailing_carriage_return_line_feed": {present: true, value: targetPathValue("/view/x\r\n")},
 	"reject_nul":                                {present: true, value: targetPathValue("/view\x00/x")},
