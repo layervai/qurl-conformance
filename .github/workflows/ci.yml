@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 83;
+          const expectedTargetPathCaseCount = 85;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -220,6 +220,8 @@ jobs:
           const targetPathMalformedPercentPrecedence = [
             'reject_malformed_percent_with_dot_segment',
             'reject_malformed_percent_with_dot_escape',
+            'reject_malformed_query_with_dot_escape_path',
+            'reject_malformed_query_with_other_path_escape',
           ];
           const hubRequestIds = new Set(h.cases.map(v => v.hub_request_id));
           const recoveryRequestIdCase = h.cases.find(v => v.operation === 'IssueCredentialRecovery');
@@ -1270,7 +1272,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 83
+          expected_target_path_case_count = 85
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1359,6 +1361,8 @@ jobs:
           malformed_percent_precedence = [
               'reject_malformed_percent_with_dot_segment',
               'reject_malformed_percent_with_dot_escape',
+              'reject_malformed_query_with_dot_escape_path',
+              'reject_malformed_query_with_other_path_escape',
           ]
           assert all(target_path_cases[name]['reject_class'] == 'invalid_character' for name in invalid_path_escapes)
           assert all(target_path_cases[name]['reject_class'] == 'dot_segment' for name in dot_path_escapes)
