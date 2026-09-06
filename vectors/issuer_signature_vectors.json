@@ -1,6 +1,6 @@
 {
   "algorithm": "ECC_NIST_P256 / ECDSA_SHA_256, wire = raw r||s (64 bytes), low-S",
-  "description": "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced).",
+  "description": "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private key is a publicly derivable, fixed test scalar; never admit this key or kid to a production trust store.",
   "domain_separation_prefix": "NHP-QURL-V2-ISSUER",
   "issuer": {
     "jwk": {

@@ -125,7 +125,7 @@ func run() error {
 	}
 
 	doc := map[string]any{
-		"description":              "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced).",
+		"description":              "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private key is a publicly derivable, fixed test scalar; never admit this key or kid to a production trust store.",
 		"algorithm":                "ECC_NIST_P256 / ECDSA_SHA_256, wire = raw r||s (64 bytes), low-S",
 		"domain_separation_prefix": "NHP-QURL-V2-ISSUER",
 		"issuer": map[string]any{
@@ -177,10 +177,8 @@ func run() error {
 		return err
 	}
 	var cfDoc struct {
-		TransportContract struct {
-			ComponentMax int `json:"component_max"`
-		} `json:"transport_contract"`
-		Classes map[string]struct {
+		TransportContract transportEncodingContract `json:"transport_contract"`
+		Classes           map[string]struct {
 			Vectors []struct {
 				Name              string `json:"name"`
 				Expect            string `json:"expect"`
@@ -193,7 +191,7 @@ func run() error {
 	if err := json.Unmarshal(cfBytes, &cfDoc); err != nil {
 		return err
 	}
-	newTransportFragment, err := encodeTransportFragment(newFragment, cfDoc.TransportContract.ComponentMax)
+	newTransportFragment, err := encodeTransportFragment(newFragment, cfDoc.TransportContract)
 	if err != nil {
 		return err
 	}
@@ -232,30 +230,67 @@ func run() error {
 	return os.WriteFile(cfPath, updated, 0o644)
 }
 
-func encodeTransportFragment(fragment string, componentMax int) (string, error) {
-	if componentMax <= 0 {
-		return "", fmt.Errorf("transport component_max must be positive")
+type transportFieldContract struct {
+	MaxEncodedLength int `json:"max_encoded_length"`
+	MaxChunks        int `json:"max_chunks"`
+}
+
+type transportEncodingContract struct {
+	ComponentMax       int `json:"component_max"`
+	MaxTransportLength int `json:"max_transport_length"`
+	Fields             struct {
+		Claims    transportFieldContract `json:"claims"`
+		Secret    transportFieldContract `json:"secret"`
+		Signature transportFieldContract `json:"signature"`
+	} `json:"fields"`
+}
+
+func encodeTransportFragment(fragment string, contract transportEncodingContract) (string, error) {
+	if contract.ComponentMax <= 0 || contract.MaxTransportLength <= 0 {
+		return "", fmt.Errorf("transport size bounds must be positive")
 	}
 	parts := strings.Split(fragment, ".")
 	if len(parts) != 4 || parts[0] != "qv2" {
 		return "", fmt.Errorf("canonical fragment has invalid shape")
 	}
+	fields := []struct {
+		name   string
+		value  string
+		limits transportFieldContract
+	}{
+		{name: "claims", value: parts[1], limits: contract.Fields.Claims},
+		{name: "secret", value: parts[2], limits: contract.Fields.Secret},
+		{name: "signature", value: parts[3], limits: contract.Fields.Signature},
+	}
 	counts := make([]string, 0, 3)
 	chunks := make([]string, 0)
-	for _, field := range parts[1:] {
-		fieldChunks := make([]string, 0, (len(field)+componentMax-1)/componentMax)
-		for len(field) > componentMax {
-			fieldChunks = append(fieldChunks, field[:componentMax])
-			field = field[componentMax:]
+	for _, field := range fields {
+		if field.limits.MaxEncodedLength <= 0 || field.limits.MaxChunks <= 0 {
+			return "", fmt.Errorf("transport %s bounds must be positive", field.name)
 		}
-		if field == "" {
+		if len(field.value) > field.limits.MaxEncodedLength {
+			return "", fmt.Errorf("transport %s exceeds max_encoded_length", field.name)
+		}
+		fieldChunks := make([]string, 0, (len(field.value)+contract.ComponentMax-1)/contract.ComponentMax)
+		for len(field.value) > contract.ComponentMax {
+			fieldChunks = append(fieldChunks, field.value[:contract.ComponentMax])
+			field.value = field.value[contract.ComponentMax:]
+		}
+		if field.value == "" {
 			return "", fmt.Errorf("canonical fragment has empty field")
 		}
-		fieldChunks = append(fieldChunks, field)
+		fieldChunks = append(fieldChunks, field.value)
+		if len(fieldChunks) > field.limits.MaxChunks {
+			return "", fmt.Errorf("transport %s exceeds max_chunks", field.name)
+		}
 		counts = append(counts, fmt.Sprint(len(fieldChunks)))
 		chunks = append(chunks, fieldChunks...)
 	}
-	return "qv2t1." + strings.Join(append(counts, chunks...), "."), nil
+	transport := "qv2t1." + strings.Join(append(counts, chunks...), ".")
+	if len(transport) > contract.MaxTransportLength {
+		return "", fmt.Errorf("transport fragment exceeds max_transport_length")
+	}
+	return transport, nil
 }
 
 func replaceExactJSONString(data []byte, oldValue, newValue string, wantCount int) ([]byte, error) {

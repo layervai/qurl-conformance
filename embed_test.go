@@ -173,8 +173,8 @@ func TestEmbeddedTransportContractAndVectors(t *testing.T) {
 	}
 }
 
-// TestFragmentAcceptQURLUserX25519KeyPair proves that the committed fragment
-// accept fixture carries one real proof-of-possession keypair. Shape-only
+// TestFragmentAcceptQURLUserX25519KeyPair proves that both committed copies of
+// the accept fixture carry one real proof-of-possession keypair. Shape-only
 // fragment parsers do not derive this relationship, so the artifact must catch
 // a generator or transcription error before consumers pin the bytes.
 func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
@@ -195,8 +195,30 @@ func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
 	if acceptFragment == "" {
 		t.Fatal("fragment class has no accept fixture")
 	}
+	var transportCanonical string
+	for _, vector := range cf.Classes["transport"].Vectors {
+		if vector.Name == "accept_valid_qv2_round_trip" && vector.Expect == ExpectAccept {
+			transportCanonical = vector.CanonicalFragment
+			break
+		}
+	}
+	if transportCanonical == "" {
+		t.Fatal("transport class has no canonical round-trip accept fixture")
+	}
+	if transportCanonical != acceptFragment {
+		t.Fatal("fragment and transport classes do not share one canonical accept fixture")
+	}
+	for name, fragment := range map[string]string{
+		"fragment":  acceptFragment,
+		"transport": transportCanonical,
+	} {
+		t.Run(name, func(t *testing.T) { assertQURLUserX25519KeyPair(t, fragment) })
+	}
+}
 
-	parts := strings.Split(acceptFragment, ".")
+func assertQURLUserX25519KeyPair(t *testing.T, fragment string) {
+	t.Helper()
+	parts := strings.Split(fragment, ".")
 	if len(parts) != 4 || parts[0] != "qv2" {
 		t.Fatalf("fragment accept fixture has invalid shape: prefix=%q parts=%d", parts[0], len(parts))
 	}
@@ -233,7 +255,7 @@ func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
 		t.Fatalf("decode qURL user public key: %v", err)
 	}
 	if !bytes.Equal(privateKey.PublicKey().Bytes(), publicBytes) {
-		t.Fatal("fragment accept fixture qURL user private/public keys do not form an X25519 pair")
+		t.Fatal("accept fixture qURL user private/public keys do not form an X25519 pair")
 	}
 }
 

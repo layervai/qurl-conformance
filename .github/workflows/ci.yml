@@ -41,6 +41,12 @@ jobs:
           go vet ./...
           if [ -n "$(gofmt -l .)" ]; then echo "::error::gofmt"; gofmt -l .; exit 1; fi
 
+      - name: Generator helper tests
+        working-directory: tools/gen
+        run: |
+          go test -count=1 ./...
+          go vet ./...
+
       - name: Root module must be dependency-free
         run: |
           if grep -qE '^[[:space:]]*require[[:space:]]' go.mod; then

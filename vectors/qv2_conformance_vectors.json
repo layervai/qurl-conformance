@@ -4,6 +4,7 @@
   "description": "Language-agnostic qURL v2 conformance vectors: the single wire-truth every qURL v2 reader re-runs against its own implementation, including the share-safe qv2t1 outer transport and the unchanged canonical qv2 security grammar. Each class names the entry point it targets and the input shape it consumes; consumers feed the input through their real parser/validator and assert the declared accept/reject outcome and reject_class.",
   "source_of_truth": "layervai/qurl-conformance",
   "notes": [
+    "All private keys in this artifact are public, fixed test material. Never admit the vector issuer key or kid to a production trust store, and never use the qURL-user or resource key outside conformance tests.",
     "Every committed input is deterministic: keys are fixed bytes, derived from fixed bytes where a real keypair is required, or the exact keys carried by the composed signature fixture; none is freshly minted by a consumer.",
     "claims_json / secret_json values are RAW JSON TEXT (ASCII), fed directly to parseClaims/parseSecret -- NOT base64. Duplicate keys and other JSON-layer faults survive because they live inside a JSON string value, not as object members a re-serializer would normalize away.",
     "strict_base64 inputs are the base64url string VERBATIM (the fault is in the encoding layer); a consumer feeds them straight to its strict base64url decoder.",

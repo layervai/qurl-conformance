@@ -10,6 +10,10 @@ unchanged inner verify path. Every qURL v2 reader implementation re-runs the
 **same bytes** against its **own** implementation, in whatever language it is
 written.
 
+All private keys in these artifacts are public, fixed test material. Never
+admit the vector issuer key or `kid` to a production trust store. Never use the
+qURL-user or resource keys outside conformance tests.
+
 A consumer feeds each class's input through its **real** parser/validator and
 asserts the declared `expect` (and, where the class pins it, `reject_class`). The
 vectors are **behavioral**: a consumer recomputes/re-verifies rather than trusting

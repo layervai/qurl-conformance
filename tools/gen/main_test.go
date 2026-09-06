@@ -7,7 +7,7 @@ import (
 
 func TestEncodeTransportFragmentPreservesFieldsAndChunkOrder(t *testing.T) {
 	claims := strings.Repeat("A", 241)
-	got, err := encodeTransportFragment("qv2."+claims+".B.C", 240)
+	got, err := encodeTransportFragment("qv2."+claims+".B.C", testTransportEncodingContract())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,12 +19,44 @@ func TestEncodeTransportFragmentPreservesFieldsAndChunkOrder(t *testing.T) {
 
 func TestEncodeTransportFragmentRejectsMalformedCanonicalInput(t *testing.T) {
 	for _, input := range []string{"qv2.A.B", "qv1.A.B.C", "qv2.A..C"} {
-		if _, err := encodeTransportFragment(input, 240); err == nil {
+		if _, err := encodeTransportFragment(input, testTransportEncodingContract()); err == nil {
 			t.Fatalf("encodeTransportFragment(%q) accepted malformed input", input)
 		}
 	}
-	if _, err := encodeTransportFragment("qv2.A.B.C", 0); err == nil {
+	invalid := testTransportEncodingContract()
+	invalid.ComponentMax = 0
+	if _, err := encodeTransportFragment("qv2.A.B.C", invalid); err == nil {
 		t.Fatal("encodeTransportFragment accepted a non-positive component maximum")
+	}
+}
+
+func TestEncodeTransportFragmentEnforcesAllPublishedBounds(t *testing.T) {
+	for name, mutate := range map[string]func(*transportEncodingContract, *string){
+		"claims encoded length": func(_ *transportEncodingContract, fragment *string) {
+			*fragment = "qv2." + strings.Repeat("A", 6_145) + ".B.C"
+		},
+		"secret encoded length": func(_ *transportEncodingContract, fragment *string) {
+			*fragment = "qv2.A." + strings.Repeat("B", 513) + ".C"
+		},
+		"signature encoded length": func(_ *transportEncodingContract, fragment *string) {
+			*fragment = "qv2.A.B." + strings.Repeat("C", 129)
+		},
+		"field chunk count": func(contract *transportEncodingContract, fragment *string) {
+			contract.Fields.Claims.MaxChunks = 1
+			*fragment = "qv2." + strings.Repeat("A", 241) + ".B.C"
+		},
+		"total transport length": func(contract *transportEncodingContract, _ *string) {
+			contract.MaxTransportLength = len("qv2t1.1.1.1.A.B.C") - 1
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			contract := testTransportEncodingContract()
+			fragment := "qv2.A.B.C"
+			mutate(&contract, &fragment)
+			if _, err := encodeTransportFragment(fragment, contract); err == nil {
+				t.Fatalf("encodeTransportFragment accepted input outside %s", name)
+			}
+		})
 	}
 }
 
@@ -66,7 +98,15 @@ func TestFixedP256PrivateKeysAreStableAndDistinct(t *testing.T) {
 	if issuer.D.Cmp(again.D) != 0 || issuer.X.Cmp(again.X) != 0 || issuer.Y.Cmp(again.Y) != 0 {
 		t.Fatal("fixed issuer key is not stable")
 	}
-	if issuer.D.Cmp(resource.D) == 0 || issuer.X.Cmp(resource.X) == 0 && issuer.Y.Cmp(resource.Y) == 0 {
+	if issuer.D.Cmp(resource.D) == 0 || (issuer.X.Cmp(resource.X) == 0 && issuer.Y.Cmp(resource.Y) == 0) {
 		t.Fatal("fixed issuer and resource keys are not distinct")
 	}
+}
+
+func testTransportEncodingContract() transportEncodingContract {
+	contract := transportEncodingContract{ComponentMax: 240, MaxTransportLength: 6_826}
+	contract.Fields.Claims = transportFieldContract{MaxEncodedLength: 6_144, MaxChunks: 26}
+	contract.Fields.Secret = transportFieldContract{MaxEncodedLength: 512, MaxChunks: 3}
+	contract.Fields.Signature = transportFieldContract{MaxEncodedLength: 128, MaxChunks: 1}
+	return contract
 }
