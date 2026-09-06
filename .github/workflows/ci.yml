@@ -504,6 +504,21 @@ jobs:
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
           print('py ok')
           PY
+
+          python -m pip install --quiet .
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          import qurl_conformance as q
+
+          accessors = [
+              value for name, value in vars(q).items()
+              if name.endswith('_vectors') and callable(value)
+          ]
+          assert accessors
+          for accessor in accessors:
+              accessor()
+          print('python wheel ok')
+          PY
   # Slack build-completion card. Thin shim over the fleet-shared reusable in
   # layervai/ops-routines-workflows (public mirror of private
   # layervai/ops-routines); the Block Kit payload builder and gate-result

@@ -4,10 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
 for path in vectors/*.json; do
+  [ -e "$path" ] || continue
   file=${path##*/}
-  if ! cmp -s "$path" "npm/vectors/$file" || ! cmp -s "$path" "python/qurl_conformance/_data/$file"; then
-    echo "DRIFT in $file"; fail=1
-  fi
+  for mirror in "npm/vectors/$file" "python/qurl_conformance/_data/$file"; do
+    cmp -s "$path" "$mirror" || { echo "DRIFT: $mirror differs from $path"; fail=1; }
+  done
 done
 for path in npm/vectors/*.json python/qurl_conformance/_data/*.json; do
   [ -e "$path" ] || continue
