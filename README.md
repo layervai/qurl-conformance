@@ -7,8 +7,9 @@ path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, private Connector Authority invocations, private
 Connector Hub replay identifiers, Hub LST return-routability cookies,
-same-agent device-credential recovery, CRID v1 resource identifiers, and qURL
-Connector target paths decoupled by layer.
+same-agent device-credential recovery, CRID v1 resource identifiers, qURL
+Connector target paths, and the private delegated-mint capability issue
+signature decoupled by layer.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -48,6 +49,8 @@ trust.
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
 | `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
+| `vectors/delegated_mint_issue_v1_vectors.json` | private Connector-to-service delegated-mint capability issue signature contract and byte-exact golden request |
+| `vectors/README_delegated_mint_issue_v1_vectors.md` | signature framing, canonical encodings, replay inputs, and trust boundaries |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -72,6 +75,7 @@ hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST re
 cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
 tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
+dm, err := conformance.DelegatedMintIssueV1()         // strict-parsed private capability-issue signature vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -384,12 +388,23 @@ artifact has its own `artifact` id:
   and segments before dispatch, and preserve accepted bytes without decoding or
   normalization. Every accepted value is safe to open. See
   `vectors/README_target_path_v1_vectors.md`.
+- **Delegated-mint capability issue v1**
+  (`qurl-delegated-mint-issue-v1-vectors`,
+  `delegated_mint_issue_v1_vectors.json`) — exact private Connector-to-service
+  request signing over method, lowercase authority, fixed route, configured
+  issuer and key IDs, idempotency key, 16-byte replay nonce, timestamp, and the
+  SHA-256 of the exact body bytes. The strict loader rebuilds the framed digest
+  and verifies the canonical low-S DER P-256 signature. It does not publish or
+  parse the opaque capability. See
+  `vectors/README_delegated_mint_issue_v1_vectors.md`.
 
-This module is intentionally dependency-free (stdlib only). The generator that
-produces the verify-path vectors lives at `tools/gen` and is run via
-`make gen-vectors` once per issuer-key rotation; it is never run in CI (the accept
-signature uses a random nonce, so it is not reproducible). The committed JSON is
-the artifact. Vectors are edited under `vectors/`.
+This module is intentionally dependency-free (stdlib only). The generators for
+key-dependent vectors live at `tools/gen` and `tools/gen-delegated-mint`. Run the
+explicit rotation Make target once per test-key and KID rotation. The default
+delegated-mint target preserves existing keys and signatures while it rebuilds
+derived metadata. Rotation targets never run in CI because ECDSA signatures use
+random nonces and are not reproducible. The committed JSON is the artifact.
+Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 
@@ -414,13 +429,14 @@ compatible release cannot strand deployed clients.
 
 ## Who authenticates these bytes
 
-This repository publishes wire truth; it does not authenticate it. The module is
-stdlib-only by rule (`go.mod` carries no `require`), so no BLAKE2s or AEAD
-primitive exists here and no in-repo check can recompute a packet, a header
-digest, or the Hub proof digest. The in-repo gates are **structural**: framing,
-lengths, canonical hex/base64, key roles, counter and version bytes, cross-field
-correlation. A transcription error inside an otherwise well-formed regenerated
-`packet_hex` would pass CI here.
+This repository publishes wire truth. The module is stdlib-only by rule
+(`go.mod` carries no `require`), so no BLAKE2s or AEAD primitive exists here and
+no in-repo check can recompute an NHP packet, a header digest, or the Hub proof
+digest. Those in-repo gates are **structural**: framing, lengths, canonical
+hex/base64, key roles, counter and version bytes, and cross-field correlation. A
+transcription error inside an otherwise well-formed regenerated `packet_hex`
+would pass CI here. The delegated-mint issue artifact uses stdlib P-256, so its
+strict loader does rebuild the digest and verify the golden signature.
 
 Cryptographic verification belongs to the consumers, which rebuild and open
 these exact bytes against their real codecs in their own CI. Regenerating any

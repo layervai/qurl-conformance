@@ -34,7 +34,8 @@
     "./connector_hub_lst_cookie_v1_vectors.json": "./vectors/connector_hub_lst_cookie_v1_vectors.json",
     "./agent_credential_recovery_v1_vectors.json": "./vectors/agent_credential_recovery_v1_vectors.json",
     "./crid_v1_vectors.json": "./vectors/crid_v1_vectors.json",
-    "./target_path_v1_vectors.json": "./vectors/target_path_v1_vectors.json"
+    "./target_path_v1_vectors.json": "./vectors/target_path_v1_vectors.json",
+    "./delegated_mint_issue_v1_vectors.json": "./vectors/delegated_mint_issue_v1_vectors.json"
   },
   "repository": {
     "type": "git",

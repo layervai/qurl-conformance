@@ -21,4 +21,5 @@ module.exports = {
   agentCredentialRecoveryVectors: () => load("agent_credential_recovery_v1_vectors.json"),
   cridV1Vectors: () => load("crid_v1_vectors.json"),
   targetPathV1Vectors: () => load("target_path_v1_vectors.json"),
+  delegatedMintIssueV1Vectors: () => load("delegated_mint_issue_v1_vectors.json"),
 };

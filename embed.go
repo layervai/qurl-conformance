@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json vectors/target_path_v1_vectors.json
+//go:embed vectors/qv2_conformance_vectors.json vectors/issuer_signature_vectors.json vectors/relay_knock_golden.json vectors/agent_registration_golden.json vectors/agent_assignment_golden.json vectors/agent_knock_application_vectors.json vectors/agent_session_control_vectors.json vectors/agent_api_key_id_vectors.json vectors/assignment_ticket_v1_vectors.json vectors/connector_authority_lambda_v1_vectors.json vectors/connector_resource_lst_v1_vectors.json vectors/connector_hub_request_id_v1_vectors.json vectors/connector_hub_lst_cookie_v1_vectors.json vectors/agent_credential_recovery_v1_vectors.json vectors/crid_v1_vectors.json vectors/target_path_v1_vectors.json vectors/delegated_mint_issue_v1_vectors.json
 var vectorsFS embed.FS
 
 const (
@@ -25,6 +25,7 @@ const (
 	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
 	cridV1Name                  = "vectors/crid_v1_vectors.json"
 	targetPathV1Name            = "vectors/target_path_v1_vectors.json"
+	delegatedMintIssueV1Name    = "vectors/delegated_mint_issue_v1_vectors.json"
 )
 
 // QV2Vectors returns the raw bytes of the embedded qURL v2 conformance vectors
@@ -204,6 +205,16 @@ func TargetPathV1Vectors() []byte {
 	return b
 }
 
+// DelegatedMintIssueV1Vectors returns the private Connector-to-service issue
+// signature contract and its byte-exact golden request.
+func DelegatedMintIssueV1Vectors() []byte {
+	b, err := vectorsFS.ReadFile(delegatedMintIssueV1Name)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: embedded %s missing: %v", delegatedMintIssueV1Name, err))
+	}
+	return b
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -241,6 +252,8 @@ func Open(name string) ([]byte, error) {
 		return vectorsFS.ReadFile(cridV1Name)
 	case targetPathV1Name, "target_path_v1_vectors.json":
 		return vectorsFS.ReadFile(targetPathV1Name)
+	case delegatedMintIssueV1Name, "delegated_mint_issue_v1_vectors.json":
+		return vectorsFS.ReadFile(delegatedMintIssueV1Name)
 	default:
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
@@ -340,4 +353,10 @@ func CRIDV1() (*CRIDV1File, error) {
 // TargetPathV1 strictly parses the embedded target_path contract artifact.
 func TargetPathV1() (*TargetPathV1File, error) {
 	return ParseTargetPathV1File(TargetPathV1Vectors())
+}
+
+// DelegatedMintIssueV1 strictly parses and verifies the private Connector
+// capability-issue signature artifact.
+func DelegatedMintIssueV1() (*DelegatedMintIssueV1File, error) {
+	return ParseDelegatedMintIssueV1File(DelegatedMintIssueV1Vectors())
 }
