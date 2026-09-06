@@ -21,23 +21,27 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 
 ## Hard rules
 
-- The generator that produces the vectors lives at `tools/gen` and is run via
-  `make gen-vectors` ONCE per issuer-key rotation. It is NEVER run in CI (the
-  accept signature uses a random nonce, so it is not reproducible). The committed
-  JSON is the artifact.
-- `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts. It
-  does not rewrite the frozen NHP packet families.
+- The generators that produce key-dependent vectors live at `tools/gen` and
+  `tools/gen-delegated-mint`. Run the matching Make target ONCE per test-key
+  rotation. They are NEVER run in CI (ECDSA signatures use random nonces, so
+  they are not reproducible). The committed JSON is the artifact.
+- `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts.
+  `tools/gen-delegated-mint` owns only the two delegated-mint accept goldens and
+  the reject cases derived from the initial golden. Neither generator rewrites
+  the frozen NHP packet families.
 - This repo does NOT verify its vectors by rebuilding them with a consumer SDK.
   Doing so made the vector artifact depend on its own consumers, and every wire
   change deadlocked: the cross-check could not pass until a consumer spoke the
   new protocol, and no consumer could adopt it until the vectors shipped.
   Consumers verify themselves against the published vectors in their own CI.
 - Because the module is stdlib-only there is no BLAKE2s/AEAD primitive here, so
-  nothing in this repo can recompute a packet, header digest, or proof digest.
-  The in-repo gates are structural only and a transcription error inside a
-  well-formed `packet_hex` would pass CI. Regenerating packet bytes hands
-  verification to `RELEASE_CHECKLIST.md`; work through it and keep it current
-  rather than adding a crypto check here.
+  nothing in this repo can recompute an NHP packet, header digest, or Hub proof
+  digest. The in-repo gates for those NHP packet families are structural only,
+  and a transcription error inside a well-formed `packet_hex` would pass CI.
+  Stdlib-verifiable families such as CRID and delegated-mint P-256 signatures
+  must rebuild and verify their derivations here. Regenerating NHP packet bytes
+  hands verification to `RELEASE_CHECKLIST.md`; work through it and keep it
+  current rather than adding a consumer codec here.
 - Producer-revision pins name the commit that emitted the committed bytes. Never
   leave one pointing at a pre-change commit — the self-consistency tests pass
   when the pins agree with each other, not when they are true.

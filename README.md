@@ -398,11 +398,11 @@ artifact has its own `artifact` id:
   parse the opaque capability. See
   `vectors/README_delegated_mint_issue_v1_vectors.md`.
 
-This module is intentionally dependency-free (stdlib only). The generator that
-produces the verify-path vectors lives at `tools/gen` and is run via
-`make gen-vectors` once per issuer-key rotation; it is never run in CI (the accept
-signature uses a random nonce, so it is not reproducible). The committed JSON is
-the artifact. Vectors are edited under `vectors/`.
+This module is intentionally dependency-free (stdlib only). The generators for
+key-dependent vectors live at `tools/gen` and `tools/gen-delegated-mint`. Run the
+matching Make target once per test-key rotation. They never run in CI because
+ECDSA signatures use random nonces and are not reproducible. The committed JSON
+is the artifact. Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 

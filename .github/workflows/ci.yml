@@ -83,6 +83,7 @@ jobs:
           const cd = c.cridV1Vectors();
           const tp = c.targetPathV1Vectors();
           const dm = c.delegatedMintIssueV1Vectors();
+          const dmRejects = Object.fromEntries(dm.reject_cases.map(v => [v.name, v]));
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
@@ -673,6 +674,11 @@ jobs:
               dm.contract.success_status !== 200 || dm.contract.success_content_type !== 'application/json' ||
               dm.contract.success_envelope !== 'data' || dm.contract.success_data_fields.join(',') !== 'capability,capability_expires_at,authority_expires_at' ||
               dm.contract.capability_ttl_seconds !== 900 || dm.contract.authority_max_ttl_seconds !== 86400 ||
+              dm.golden.kid === dm.refresh_golden.kid ||
+              dm.golden.public_key_der_b64url === dm.refresh_golden.public_key_der_b64url ||
+              dm.reject_cases.length !== 8 || Object.keys(dmRejects).length !== 8 ||
+              new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
+              dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
               !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.refresh_golden) ||
               !deviceApiKeyCanonical) {
             process.exit(1);
@@ -716,6 +722,7 @@ jobs:
           cd = q.crid_v1_vectors()
           tp = q.target_path_v1_vectors()
           dm = q.delegated_mint_issue_v1_vectors()
+          dm_rejects = {case['name']: case for case in dm['reject_cases']}
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
           def issue_frame(value):
@@ -1281,6 +1288,11 @@ jobs:
           assert dm['contract']['success_envelope'] == 'data'
           assert dm['contract']['success_data_fields'] == ['capability', 'capability_expires_at', 'authority_expires_at']
           assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
+          assert dm['golden']['kid'] != dm['refresh_golden']['kid']
+          assert dm['golden']['public_key_der_b64url'] != dm['refresh_golden']['public_key_der_b64url']
+          assert len(dm['reject_cases']) == 8 and len(dm_rejects) == 8
+          assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
+          assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
           assert verify_dm_golden(dm['golden']) and verify_dm_golden(dm['refresh_golden'])
           print('py ok')
           PY

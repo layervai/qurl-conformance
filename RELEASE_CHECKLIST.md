@@ -86,6 +86,20 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       servers next, clients last, and the 7-day dependency-age quarantine makes
       each step a separate pass roughly a week apart.
 
+## When a release rotates delegated-mint test keys
+
+- [ ] Run `make gen-delegated-mint-vectors` once. Confirm that it self-verifies
+      both low-S signatures and derives the published reject cases.
+- [ ] Run `scripts/sync-vectors.sh`, then all gates in **Every release**. Confirm
+      that the Node package verifies both signatures and that all three
+      published JSON files are byte-identical.
+- [ ] Run the real Connector producer tests against this exact artifact. They
+      must rebuild the same canonical digest with a new private key and verify
+      the result. Record the producing repository and exact commit in the PR.
+- [ ] Confirm that the issuing service accepts both goldens, rejects every
+      published reject case, retains accepted key verifiers through operation
+      authority expiry, and permits a fresh-envelope key rotation.
+
 ## After the release
 
 - [ ] Consumers bump to the published version and adopt the new wire in their

@@ -25,7 +25,7 @@ import (
 const (
 	DelegatedMintIssueV1ArtifactID    = "qurl-delegated-mint-issue-v1-vectors"
 	DelegatedMintIssueV1SchemaVersion = 1
-	DelegatedMintIssueV1Description   = "Byte-exact private Connector-to-qurl-service authentication contract for delegated-mint capability issuance. The signature binds the configured issuer identity, exact request body, route, authority, replay nonce, and idempotency key. Capability claims and public redemption remain separate service-owned contracts."
+	DelegatedMintIssueV1Description   = "Byte-exact private Connector-to-issuer-service authentication contract for delegated-mint capability issuance. The signature binds the configured issuer identity, exact request body, route, authority, replay nonce, and idempotency key. Capability claims and public redemption remain separate service-owned contracts."
 
 	DelegatedMintIssueV1Method                      = "POST"
 	DelegatedMintIssueV1Route                       = "/internal/v1/delegated-mint-capabilities"
@@ -42,7 +42,9 @@ const (
 	DelegatedMintIssueV1IdempotencyKeyMinBytes      = 1
 	DelegatedMintIssueV1IdempotencyKeyMaxBytes      = 128
 	DelegatedMintIssueV1AuthorityNormalization      = "lowercase_dns_name_no_port"
+	DelegatedMintIssueV1AuthorityBindingRule        = "receiver_requires_method_route_and_authority_to_equal_its_configured_endpoint"
 	DelegatedMintIssueV1AuthorityMaxBytes           = 253
+	DelegatedMintIssueV1ExpiryEncoding              = "rfc3339_utc_second_precision_literal_Z"
 	DelegatedMintIssueV1BodyMaxBytes                = 8192
 	DelegatedMintIssueV1SuccessStatus               = 200
 	DelegatedMintIssueV1SuccessContentType          = "application/json"
@@ -77,6 +79,7 @@ type DelegatedMintIssueV1File struct {
 	Contract      DelegatedMintIssueV1Contract `json:"contract"`
 	Golden        DelegatedMintIssueV1Golden   `json:"golden"`
 	RefreshGolden DelegatedMintIssueV1Golden   `json:"refresh_golden"`
+	RejectCases   []DelegatedMintIssueV1Reject `json:"reject_cases"`
 }
 
 type DelegatedMintIssueV1Contract struct {
@@ -107,6 +110,7 @@ type DelegatedMintIssueV1Contract struct {
 	NonceHeader                 string   `json:"nonce_header"`
 	SignatureHeader             string   `json:"signature_header"`
 	AuthorityNormalization      string   `json:"authority_normalization"`
+	AuthorityBindingRule        string   `json:"authority_binding_rule"`
 	AuthorityMaxBytes           int      `json:"authority_max_bytes"`
 	SuccessStatus               int      `json:"success_status"`
 	SuccessContentType          string   `json:"success_content_type"`
@@ -118,6 +122,11 @@ type DelegatedMintIssueV1Contract struct {
 	NonceReplayRetentionSeconds int      `json:"nonce_replay_retention_seconds"`
 	ExpiryAuthorityRule         string   `json:"expiry_authority_rule"`
 	ExactReplayFreshnessRule    string   `json:"exact_replay_freshness_rule"`
+	OperationIdentityFields     []string `json:"operation_identity_fields"`
+	TransportReplayRule         string   `json:"transport_replay_rule"`
+	IssuerKeyRetentionRule      string   `json:"issuer_key_retention_rule"`
+	ExpiryEncoding              string   `json:"expiry_encoding"`
+	RejectClasses               []string `json:"reject_classes"`
 }
 
 type DelegatedMintIssueV1Golden struct {
@@ -136,6 +145,17 @@ type DelegatedMintIssueV1Golden struct {
 	SigningDigestHex       string `json:"signing_digest_hex"`
 	PublicKeyDERB64URL     string `json:"public_key_der_b64url"`
 	SignatureDERB64URL     string `json:"signature_der_b64url"`
+}
+
+type DelegatedMintIssueV1Reject struct {
+	Name        string `json:"name"`
+	Base        string `json:"base"`
+	Field       string `json:"field"`
+	Operation   string `json:"operation"`
+	Value       string `json:"value,omitempty"`
+	Repeat      int    `json:"repeat,omitempty"`
+	Outcome     string `json:"outcome"`
+	RejectClass string `json:"reject_class"`
 }
 
 func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, error) {
@@ -159,6 +179,9 @@ func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, erro
 		return nil, err
 	}
 	if err := validateDelegatedMintIssueV1Renewal(file.Golden, file.RefreshGolden); err != nil {
+		return nil, err
+	}
+	if err := validateDelegatedMintIssueV1Rejects(file.Golden, file.RejectCases); err != nil {
 		return nil, err
 	}
 	return &file, nil
@@ -217,17 +240,27 @@ func validateDelegatedMintIssueV1Contract(contract DelegatedMintIssueV1Contract)
 		IssuerFieldPattern:   delegatedMintIssueV1IssuerFieldPattern.String(), IssuerIDHeader: DelegatedMintIssueV1IssuerIDHeader,
 		KIDHeader: DelegatedMintIssueV1KIDHeader, TimestampHeader: DelegatedMintIssueV1TimestampHeader,
 		NonceHeader: DelegatedMintIssueV1NonceHeader, SignatureHeader: DelegatedMintIssueV1SignatureHeader,
-		AuthorityNormalization: DelegatedMintIssueV1AuthorityNormalization, AuthorityMaxBytes: DelegatedMintIssueV1AuthorityMaxBytes,
-		SuccessStatus: DelegatedMintIssueV1SuccessStatus, SuccessContentType: DelegatedMintIssueV1SuccessContentType,
+		AuthorityNormalization: DelegatedMintIssueV1AuthorityNormalization,
+		AuthorityBindingRule:   DelegatedMintIssueV1AuthorityBindingRule,
+		AuthorityMaxBytes:      DelegatedMintIssueV1AuthorityMaxBytes,
+		SuccessStatus:          DelegatedMintIssueV1SuccessStatus, SuccessContentType: DelegatedMintIssueV1SuccessContentType,
 		SuccessEnvelope: "data", SuccessDataFields: delegatedMintIssueV1SuccessDataFields,
 		CapabilityTTLSeconds: DelegatedMintIssueV1CapabilityTTLSeconds, AuthorityMaxTTLSeconds: DelegatedMintIssueV1AuthorityMaxTTLSeconds,
 		TimestampMaxSkewSeconds:     DelegatedMintIssueV1TimestampMaxSkewSeconds,
 		NonceReplayRetentionSeconds: DelegatedMintIssueV1NonceReplayRetentionSeconds,
 		ExpiryAuthorityRule:         "caller_supplies_signed_values_service_requires_capability_timestamp_plus_900_and_initial_authority_at_most_timestamp_plus_86400_refresh_preserves_authority",
-		ExactReplayFreshnessRule:    "verify_shape_and_signature_then_exact_durable_lookup_before_freshness_stale_exact_returns_original_changed_conflicts_absent_rejects",
+		ExactReplayFreshnessRule:    "verify_shape_signature_and_operation_lookup_before_freshness_byte_exact_accepted_envelope_returns_original_changed_operation_conflicts_different_stale_envelope_rejects_without_mutation",
+		OperationIdentityFields:     []string{"issuer_id", "upload_handle", "issue_generation", "idempotency_key", "exact_body_sha256", "authority_fingerprint"},
+		TransportReplayRule:         "byte_exact_accepted_envelope_may_bypass_freshness_different_envelope_requires_fresh_timestamp_and_nonce_binding_issuer_kid_may_rotate",
+		IssuerKeyRetentionRule:      "accepted_kid_verifier_retained_until_operation_authority_expires",
+		ExpiryEncoding:              DelegatedMintIssueV1ExpiryEncoding,
+		RejectClasses:               []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar"},
 	}
 	if !reflect.DeepEqual(contract, want) {
 		return errors.New("conformance: delegated-mint issue contract drift")
+	}
+	if contract.NonceReplayRetentionSeconds < 2*contract.TimestampMaxSkewSeconds {
+		return errors.New("conformance: delegated-mint nonce retention does not cover the timestamp skew window")
 	}
 	return nil
 }
@@ -299,7 +332,7 @@ func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error
 		return errors.New("conformance: delegated-mint issue public key is invalid")
 	}
 	publicKey, ok := parsed.(*ecdsa.PublicKey)
-	if !ok || publicKey.Curve != elliptic.P256() || publicKey.X == nil || publicKey.Y == nil || !publicKey.Curve.IsOnCurve(publicKey.X, publicKey.Y) {
+	if !ok || publicKey.Curve != elliptic.P256() || publicKey.X == nil || publicKey.Y == nil {
 		return errors.New("conformance: delegated-mint issue public key is not P-256")
 	}
 	signatureDER, err := decodeDelegatedMintIssueV1Base64URL(golden.SignatureDERB64URL)
@@ -328,9 +361,8 @@ func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error
 
 func validateDelegatedMintIssueV1Renewal(initial, refresh DelegatedMintIssueV1Golden) error {
 	if initial.Method != refresh.Method || initial.Authority != refresh.Authority || initial.Route != refresh.Route ||
-		initial.IssuerID != refresh.IssuerID || initial.KID != refresh.KID ||
-		initial.PublicKeyDERB64URL != refresh.PublicKeyDERB64URL || initial.Nonce == refresh.Nonce {
-		return errors.New("conformance: delegated-mint refresh signer binding is invalid")
+		initial.IssuerID != refresh.IssuerID || initial.Nonce == refresh.Nonce {
+		return errors.New("conformance: delegated-mint refresh transport binding is invalid")
 	}
 	var initialBody, refreshBody delegatedMintIssueV1Body
 	if err := strictDecodeArtifact([]byte(initial.BodyUTF8), &initialBody); err != nil {
@@ -372,12 +404,16 @@ func validateDelegatedMintIssueV1Renewal(initial, refresh DelegatedMintIssueV1Go
 	}
 	initialIssuedAt := time.Unix(initial.TimestampUnix, 0)
 	refreshIssuedAt := time.Unix(refresh.TimestampUnix, 0)
-	if !initialCapabilityExpiry.After(initialIssuedAt) || !refreshCapabilityExpiry.After(refreshIssuedAt) ||
+	if !delegatedMintIssueV1CanonicalExpiry(initialBody.CapabilityExpiresAt, initialCapabilityExpiry) ||
+		!delegatedMintIssueV1CanonicalExpiry(refreshBody.CapabilityExpiresAt, refreshCapabilityExpiry) ||
+		!delegatedMintIssueV1CanonicalExpiry(initialBody.AuthorityExpiresAt, authorityExpiry) ||
+		!initialCapabilityExpiry.After(initialIssuedAt) || !refreshCapabilityExpiry.After(refreshIssuedAt) ||
 		!refreshIssuedAt.After(initialIssuedAt) || !refreshCapabilityExpiry.After(initialCapabilityExpiry) ||
 		refreshCapabilityExpiry.After(authorityExpiry) ||
 		initialCapabilityExpiry.Sub(initialIssuedAt) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second ||
 		refreshCapabilityExpiry.Sub(refreshIssuedAt) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second ||
-		authorityExpiry.Sub(initialIssuedAt) != time.Duration(DelegatedMintIssueV1AuthorityMaxTTLSeconds)*time.Second {
+		authorityExpiry.Sub(initialIssuedAt) <= 0 ||
+		authorityExpiry.Sub(initialIssuedAt) > time.Duration(DelegatedMintIssueV1AuthorityMaxTTLSeconds)*time.Second {
 		return errors.New("conformance: delegated-mint capability expiry exceeds its renewal bounds")
 	}
 	initialBody.IssueGeneration = refreshBody.IssueGeneration
@@ -386,6 +422,108 @@ func validateDelegatedMintIssueV1Renewal(initial, refresh DelegatedMintIssueV1Go
 		return errors.New("conformance: delegated-mint refresh widened immutable authority")
 	}
 	return nil
+}
+
+func validateDelegatedMintIssueV1Rejects(golden DelegatedMintIssueV1Golden, rejects []DelegatedMintIssueV1Reject) error {
+	want, err := DelegatedMintIssueV1RejectCases(golden)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(rejects, want) {
+		return errors.New("conformance: delegated-mint reject vectors drift")
+	}
+	for _, reject := range rejects {
+		mutated, err := delegatedMintIssueV1ApplyReject(golden, reject)
+		if err != nil {
+			return err
+		}
+		if err := validateDelegatedMintIssueV1Golden(mutated); err == nil {
+			return fmt.Errorf("conformance: delegated-mint reject vector %q was accepted", reject.Name)
+		}
+	}
+	return nil
+}
+
+// DelegatedMintIssueV1RejectCases derives the frozen negative vectors from an
+// initial golden. The vector generator uses this after it rotates the test key.
+func DelegatedMintIssueV1RejectCases(golden DelegatedMintIssueV1Golden) ([]DelegatedMintIssueV1Reject, error) {
+	signatureDER, err := decodeDelegatedMintIssueV1Base64URL(golden.SignatureDERB64URL)
+	if err != nil {
+		return nil, errors.New("conformance: cannot derive delegated-mint reject vectors from invalid signature")
+	}
+	var signature struct{ R, S *big.Int }
+	rest, err := asn1.Unmarshal(signatureDER, &signature)
+	if err != nil || len(rest) != 0 || signature.R == nil || signature.S == nil {
+		return nil, errors.New("conformance: cannot derive delegated-mint reject vectors from invalid DER")
+	}
+	highS := new(big.Int).Sub(elliptic.P256().Params().N, signature.S)
+	highDER, err := asn1.Marshal(struct{ R, S *big.Int }{signature.R, highS})
+	if err != nil {
+		return nil, fmt.Errorf("conformance: derive high-S delegated-mint reject: %w", err)
+	}
+	zeroRDER, err := asn1.Marshal(struct{ R, S *big.Int }{big.NewInt(0), signature.S})
+	if err != nil {
+		return nil, fmt.Errorf("conformance: derive zero-R delegated-mint reject: %w", err)
+	}
+	if len(signatureDER) < 6 || signatureDER[0] != 0x30 || signatureDER[1] >= 0x80 ||
+		signatureDER[2] != 0x02 || signatureDER[3] >= 0x80 || int(signatureDER[1])+2 != len(signatureDER) ||
+		int(signatureDER[3])+4 >= len(signatureDER) {
+		return nil, errors.New("conformance: delegated-mint golden DER cannot produce the non-canonical reject")
+	}
+	nonCanonicalDER := make([]byte, 0, len(signatureDER)+1)
+	nonCanonicalDER = append(nonCanonicalDER, 0x30, signatureDER[1]+1, 0x02, signatureDER[3]+1, 0)
+	nonCanonicalDER = append(nonCanonicalDER, signatureDER[4:]...)
+	encode := base64.RawURLEncoding.EncodeToString
+	return []DelegatedMintIssueV1Reject{
+		{Name: "reject_padded_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: golden.SignatureDERB64URL + "=", Outcome: "reject", RejectClass: "signature_encoding"},
+		{Name: "reject_noncanonical_signature_der", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(nonCanonicalDER), Outcome: "reject", RejectClass: "signature_encoding"},
+		{Name: "reject_high_s_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(highDER), Outcome: "reject", RejectClass: "signature_malleability"},
+		{Name: "reject_zero_r_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(zeroRDER), Outcome: "reject", RejectClass: "signature_scalar"},
+		{Name: "reject_oversize_body", Base: "golden", Field: "body_utf8", Operation: "ascii_repeat", Value: "a", Repeat: DelegatedMintIssueV1BodyMaxBytes + 1, Outcome: "reject", RejectClass: "body_size"},
+		{Name: "reject_bad_idempotency_key", Base: "golden", Field: "idempotency_key", Operation: "replace", Value: "bad key", Outcome: "reject", RejectClass: "idempotency_key"},
+		{Name: "reject_uppercase_authority", Base: "golden", Field: "authority", Operation: "replace", Value: strings.ToUpper(golden.Authority), Outcome: "reject", RejectClass: "authority"},
+		{Name: "reject_short_nonce", Base: "golden", Field: "nonce", Operation: "replace", Value: "AA", Outcome: "reject", RejectClass: "nonce"},
+	}, nil
+}
+
+func delegatedMintIssueV1ApplyReject(golden DelegatedMintIssueV1Golden, reject DelegatedMintIssueV1Reject) (DelegatedMintIssueV1Golden, error) {
+	if reject.Base != "golden" || reject.Outcome != "reject" {
+		return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has invalid base or outcome", reject.Name)
+	}
+	value := reject.Value
+	switch reject.Operation {
+	case "replace":
+		if reject.Repeat != 0 {
+			return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an invalid repeat", reject.Name)
+		}
+	case "ascii_repeat":
+		if len(reject.Value) != 1 || reject.Value[0] > 0x7f || reject.Repeat <= 0 {
+			return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an invalid repeat recipe", reject.Name)
+		}
+		value = strings.Repeat(reject.Value, reject.Repeat)
+	default:
+		return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an unknown operation", reject.Name)
+	}
+	switch reject.Field {
+	case "signature_der_b64url":
+		golden.SignatureDERB64URL = value
+	case "body_utf8":
+		golden.BodyUTF8 = value
+	case "idempotency_key":
+		golden.IdempotencyKey = value
+	case "authority":
+		golden.Authority = value
+	case "nonce":
+		golden.Nonce = value
+	default:
+		return DelegatedMintIssueV1Golden{}, fmt.Errorf("conformance: delegated-mint reject %q has an unknown field", reject.Name)
+	}
+	return golden, nil
+}
+
+func delegatedMintIssueV1CanonicalExpiry(encoded string, parsed time.Time) bool {
+	return parsed.Nanosecond() == 0 && parsed.Location() == time.UTC &&
+		parsed.Format(time.RFC3339) == encoded
 }
 
 func decodeDelegatedMintIssueV1Base64URL(value string) ([]byte, error) {
