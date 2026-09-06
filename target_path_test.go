@@ -93,6 +93,13 @@ func TestTargetPathBoundaryAndPresenceSemantics(t *testing.T) {
 	if strings.HasPrefix(*overlongRelative.Value, "/") || overlongRelative.RejectClass != TargetPathRejectTooLong {
 		t.Fatalf("relative boundary case = %+v, want too_long before not_absolute", *overlongRelative)
 	}
+	overlongAuthority := targetPathCase(t, tf, "reject_overlong_authority_precedence")
+	if got := len(*overlongAuthority.Value); got != TargetPathMaxBytes+1 {
+		t.Fatalf("authority boundary bytes = %d, want %d", got, TargetPathMaxBytes+1)
+	}
+	if !strings.HasPrefix(*overlongAuthority.Value, "//") || overlongAuthority.RejectClass != TargetPathRejectTooLong {
+		t.Fatalf("authority boundary case = %+v, want too_long before authority", *overlongAuthority)
+	}
 }
 
 func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {

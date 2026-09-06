@@ -61,8 +61,9 @@ The closed local `reject_class` values are:
 `contract.query_delimiter` pins the first literal `?` as the path/query split.
 `contract.validation_order` is the complete normative order. After presence,
 the validator checks empty, UTF-8 byte length, the leading slash, and a
-protocol-relative authority. Thus, length wins over `not_absolute`, and
-`authority` wins over all later character, percent, and dot checks. The
+protocol-relative authority. Thus, length wins over `not_absolute` and
+`authority`. The `authority` class wins over all later character, percent, and
+dot checks. The
 whole-value character-set and path-semicolon checks then precede percent-syntax
 classification. Thus `/view/a;b%` and `/view/a[b]%` are `invalid_character`,
 not `percent_encoding`. After those checks, malformed percent encoding is

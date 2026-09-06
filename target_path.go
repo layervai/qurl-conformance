@@ -142,6 +142,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
 	"reject_too_long_with_query":                {present: true, value: targetPathValue("/v?q=" + strings.Repeat("a", TargetPathMaxBytes-4))},
 	"reject_overlong_relative_precedence":       {present: true, value: targetPathValue(strings.Repeat("a", TargetPathMaxBytes+1))},
+	"reject_overlong_authority_precedence":      {present: true, value: targetPathValue("//" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
 	"reject_userinfo_origin_concatenation":      {present: true, value: targetPathValue("@evil.example/x")},
