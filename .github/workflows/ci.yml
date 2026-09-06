@@ -303,11 +303,8 @@ jobs:
           node - <<'NODE'
           const assert = require('node:assert/strict');
           const c = require('@layervai/qurl-conformance');
-          assert.equal(Object.values(c).filter(value => typeof value === 'function').length, 17);
-          assert.equal(
-            require('@layervai/qurl-conformance/crid_v1_vectors.json').artifact,
-            'qurl-crid-v1-vectors',
-          );
+          const crid = require('@layervai/qurl-conformance/crid_v1_vectors.json');
+          assert.deepEqual(c.cridV1Vectors(), crid);
           console.log('npm tarball exports ok');
           NODE
 

@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p npm/vectors python/qurl_conformance/_data
+find npm/vectors python/qurl_conformance/_data -type f -name '*.json' -delete
 for path in vectors/*.json; do
   file=${path##*/}
   cp "$path" "npm/vectors/$file"
