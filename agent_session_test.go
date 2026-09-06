@@ -40,7 +40,6 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 	if af.ExactSessionExit.Request.HeaderType != AgentSessionHeaderEXT || af.ExactSessionExit.ACK.HeaderType != AgentSessionHeaderACK {
 		t.Fatalf("invalid exact-session exit exchange %+v", af.ExactSessionExit)
 	}
-
 }
 
 func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {

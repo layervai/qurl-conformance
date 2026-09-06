@@ -2509,6 +2509,22 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		{targetPathV1Name, TargetPathV1Vectors},
 		{delegatedMintIssueV1Name, DelegatedMintIssueV1Vectors},
 	}
+	known := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		known[file.name] = struct{}{}
+	}
+	entries, err := vectorsFS.ReadDir("vectors")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != len(files) {
+		t.Fatalf("embedded vector count = %d, want %d", len(entries), len(files))
+	}
+	for _, entry := range entries {
+		if _, ok := known["vectors/"+entry.Name()]; !ok {
+			t.Errorf("unexpected embedded vector %q", entry.Name())
+		}
+	}
 	for _, file := range files {
 		for _, name := range []string{file.name, strings.TrimPrefix(file.name, "vectors/")} {
 			got, err := Open(name)

@@ -9,9 +9,14 @@ for path in vectors/*.json; do
     echo "DRIFT in $file"; fail=1
   fi
 done
+for path in npm/vectors/*.json python/qurl_conformance/_data/*.json; do
+  if [ ! -f "vectors/${path##*/}" ]; then
+    echo "ORPHAN mirror $path"; fail=1
+  fi
+done
 if [ "$fail" = 0 ]; then
   echo "vectors byte-identical across root/npm/python"
 else
-  echo "run scripts/sync-vectors.sh and commit"
+  echo "sync changed vectors, remove reported orphans, and commit"
   exit 1
 fi

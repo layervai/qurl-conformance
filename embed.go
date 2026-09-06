@@ -154,7 +154,7 @@ func DelegatedMintIssueV1Vectors() []byte {
 // by its full "vectors/..." path. It returns an error for any other name.
 func Open(name string) ([]byte, error) {
 	base := strings.TrimPrefix(name, "vectors/")
-	if base == "" || strings.Contains(base, "/") || (name != base && name != "vectors/"+base) {
+	if base == "" || strings.Contains(base, "/") {
 		return nil, fmt.Errorf("conformance: unknown embedded file %q", name)
 	}
 	b, err := vectorsFS.ReadFile("vectors/" + base)
