@@ -2487,40 +2487,46 @@ func TestParseAgentKnockApplicationFileFailsClosed(t *testing.T) {
 }
 
 func TestOpenKnownAndUnknown(t *testing.T) {
-	for _, name := range []string{
-		"qv2_conformance_vectors.json",
-		"vectors/qv2_conformance_vectors.json",
-		"issuer_signature_vectors.json",
-		"vectors/issuer_signature_vectors.json",
-		"relay_knock_golden.json",
-		"vectors/relay_knock_golden.json",
-		"agent_registration_golden.json",
-		"vectors/agent_registration_golden.json",
-		"agent_assignment_golden.json",
-		"vectors/agent_assignment_golden.json",
-		"agent_knock_application_vectors.json",
-		"vectors/agent_knock_application_vectors.json",
-		"agent_session_control_vectors.json",
-		"vectors/agent_session_control_vectors.json",
-		"agent_api_key_id_vectors.json",
-		"vectors/agent_api_key_id_vectors.json",
-		"connector_resource_lst_v1_vectors.json",
-		"vectors/connector_resource_lst_v1_vectors.json",
-		"crid_v1_vectors.json",
-		"vectors/crid_v1_vectors.json",
-		"target_path_v1_vectors.json",
-		"vectors/target_path_v1_vectors.json",
-	} {
-		b, err := Open(name)
-		if err != nil {
-			t.Errorf("Open(%q): %v", name, err)
-		}
-		if len(b) == 0 {
-			t.Errorf("Open(%q): empty bytes", name)
+	files := []struct {
+		name string
+		read func() []byte
+	}{
+		{conformanceVectorsName, QV2Vectors},
+		{issuerSignatureName, IssuerSignatureVectors},
+		{relayKnockName, RelayKnockVectors},
+		{agentRegistrationName, AgentRegistrationVectors},
+		{agentAssignmentName, AgentAssignmentVectors},
+		{agentKnockApplicationName, AgentKnockApplicationVectors},
+		{agentSessionControlName, AgentSessionControlVectors},
+		{agentAPIKeyIDName, AgentAPIKeyIDVectors},
+		{assignmentTicketName, AssignmentTicketVectors},
+		{connectorAuthorityName, ConnectorAuthorityLambdaVectors},
+		{connectorResourceLSTV1Name, ConnectorResourceLSTV1Vectors},
+		{connectorHubRequestIDName, ConnectorHubRequestIDVectors},
+		{connectorHubLSTCookieName, ConnectorHubLSTCookieVectors},
+		{agentCredentialRecoveryName, AgentCredentialRecoveryVectors},
+		{cridV1Name, CRIDV1Vectors},
+		{targetPathV1Name, TargetPathV1Vectors},
+		{delegatedMintIssueV1Name, DelegatedMintIssueV1Vectors},
+	}
+	for _, file := range files {
+		for _, name := range []string{file.name, strings.TrimPrefix(file.name, "vectors/")} {
+			got, err := Open(name)
+			if err != nil {
+				t.Errorf("Open(%q): %v", name, err)
+			} else if !bytes.Equal(got, file.read()) {
+				t.Errorf("Open(%q): returned different bytes", name)
+			}
 		}
 	}
-	if _, err := Open("does_not_exist.json"); err == nil {
-		t.Errorf("Open(unknown): want error, got nil")
+	for _, name := range []string{
+		"does_not_exist.json",
+		"nested/qv2_conformance_vectors.json",
+		"vectors/../vectors/qv2_conformance_vectors.json",
+	} {
+		if _, err := Open(name); err == nil {
+			t.Errorf("Open(%q): want error, got nil", name)
+		}
 	}
 }
 

@@ -22,7 +22,7 @@
   ],
   "packages": {
     ".": { "release-type": "go", "include-component-in-tag": false },
-    "npm": { "release-type": "node", "component": "npm" },
-    "python": { "release-type": "python", "component": "python" }
+    "npm": { "release-type": "node", "component": "npm", "skip-changelog": true },
+    "python": { "release-type": "python", "component": "python", "skip-changelog": true }
   }
 }

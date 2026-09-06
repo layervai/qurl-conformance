@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -358,22 +359,6 @@ func ValidateConnectorResourceLSTV1ConnectorID(value string) bool {
 	return connectorResourceLSTV1ConnectorIDPattern.MatchString(value)
 }
 
-func ValidateConnectorResourceLSTV1Nonce(value string) error {
-	return validateConnectorResourceLSTV1Nonce(value)
-}
-
-func ValidateConnectorResourceLSTV1ResourceID(value string) error {
-	return validateConnectorResourceLSTV1ResourceID(value)
-}
-
-func ValidateConnectorResourceLSTV1RoutingID(value string) error {
-	return validateConnectorResourceLSTV1RoutingID(value)
-}
-
-func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
-	return validateConnectorResourceLSTV1KnockID(value)
-}
-
 // DeriveConnectorResourceLSTV1CellRequestID derives the private Authority
 // replay key from server-owned environment scope and authenticated public inputs.
 // The public nonce itself never becomes an Authority persistence key.
@@ -414,17 +399,6 @@ func ValidateConnectorResourceLSTV1CellRequestID(value string) error {
 		return errors.New("conformance: invalid Connector resource cell_request_id")
 	}
 	return nil
-}
-
-type connectorResourceLSTV1RejectError struct {
-	class string
-	err   error
-}
-
-func (e *connectorResourceLSTV1RejectError) Error() string { return e.err.Error() }
-
-func connectorResourceLSTV1Reject(class, format string, args ...any) error {
-	return &connectorResourceLSTV1RejectError{class: class, err: fmt.Errorf(format, args...)}
 }
 
 // ParseConnectorResourceLSTV1File strictly parses the embedded Connector
@@ -534,13 +508,13 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if err != nil || len(peer) != 32 || base64.StdEncoding.EncodeToString(peer) != fixtures.AuthenticatedPeerPublicKeyB64 {
 		return errors.New("conformance: Connector resource LST fixture peer key is not canonical padded base64 X25519")
 	}
-	if err := validateConnectorResourceLSTV1ResourceID(fixtures.ResourceID); err != nil {
+	if err := ValidateConnectorResourceLSTV1ResourceID(fixtures.ResourceID); err != nil {
 		return fmt.Errorf("conformance: Connector resource LST fixture resource_id: %w", err)
 	}
-	if err := validateConnectorResourceLSTV1RoutingID(fixtures.ConnectorRoutingID); err != nil {
+	if err := ValidateConnectorResourceLSTV1RoutingID(fixtures.ConnectorRoutingID); err != nil {
 		return fmt.Errorf("conformance: Connector resource LST fixture connector_routing_id: %w", err)
 	}
-	if err := validateConnectorResourceLSTV1KnockID(fixtures.KnockResourceID); err != nil {
+	if err := ValidateConnectorResourceLSTV1KnockResourceID(fixtures.KnockResourceID); err != nil {
 		return fmt.Errorf("conformance: Connector resource LST fixture knock_resource_id: %w", err)
 	}
 	if fixtures.ResourceID == fixtures.KnockResourceID || fixtures.ConnectorRoutingID == fixtures.KnockResourceID {
@@ -550,7 +524,7 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_id")
 	}
 	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.NoCRIDRequestNonce} {
-		if err := validateConnectorResourceLSTV1Nonce(nonce); err != nil {
+		if err := ValidateConnectorResourceLSTV1Nonce(nonce); err != nil {
 			return fmt.Errorf("conformance: Connector resource LST fixture nonce: %w", err)
 		}
 	}
@@ -571,7 +545,7 @@ func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourc
 			return fmt.Errorf("conformance: duplicate Connector resource LST exchange %q", exchange.Name)
 		}
 		seen[exchange.Name] = struct{}{}
-		if !containsString(required, exchange.Name) {
+		if !slices.Contains(required, exchange.Name) {
 			return fmt.Errorf("conformance: unknown Connector resource LST exchange %q", exchange.Name)
 		}
 		if err := validateConnectorResourceLSTV1BodySize(exchange.Name+" request", exchange.Request, ConnectorResourceLSTV1RequestHeaderName, ConnectorResourceLSTV1RequestHeaderType); err != nil {
@@ -737,7 +711,7 @@ func validateConnectorResourceLSTV1ErrorCases(cases []ConnectorResourceLSTV1Erro
 	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, test := range cases {
-		if !containsString(required, test.Name) {
+		if !slices.Contains(required, test.Name) {
 			return fmt.Errorf("conformance: unknown Connector resource LST error case %q", test.Name)
 		}
 		if _, duplicate := seen[test.Name]; duplicate {
@@ -821,7 +795,7 @@ func validateConnectorResourceLSTV1SizeCases(cases []ConnectorResourceLSTV1SizeC
 	}
 	seen := make(map[string]struct{}, len(cases))
 	for _, test := range cases {
-		if !containsString(required, test.Name) {
+		if !slices.Contains(required, test.Name) {
 			return fmt.Errorf("conformance: unknown Connector resource LST size case %q", test.Name)
 		}
 		if _, duplicate := seen[test.Name]; duplicate {
@@ -940,14 +914,14 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 	if request.AspID != ConnectorResourceLSTV1AspID || request.UsrData.Query != ConnectorResourceLSTV1Query || request.UsrData.Version != ConnectorResourceLSTV1Version {
 		return nil, ConnectorResourceLSTV1RejectSemantic, errors.New("request discriminator is invalid")
 	}
-	if err := validateConnectorResourceLSTV1Nonce(request.UsrData.RequestNonce); err != nil {
+	if err := ValidateConnectorResourceLSTV1Nonce(request.UsrData.RequestNonce); err != nil {
 		return nil, ConnectorResourceLSTV1RejectSemantic, err
 	}
 	if !connectorResourceLSTV1ConnectorIDPattern.MatchString(request.UsrData.ConnectorID) {
 		return nil, ConnectorResourceLSTV1RejectSemantic, errors.New("connector_id is invalid")
 	}
 	if request.UsrData.ExpectedResourceID != nil {
-		if err := validateConnectorResourceLSTV1ResourceID(*request.UsrData.ExpectedResourceID); err != nil {
+		if err := ValidateConnectorResourceLSTV1ResourceID(*request.UsrData.ExpectedResourceID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
 	}
@@ -1019,13 +993,13 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 		if !connectorResourceLSTV1AgentIDPattern.MatchString(result.List.AgentID) || !connectorResourceLSTV1ConnectorIDPattern.MatchString(result.List.ConnectorID) {
 			return nil, ConnectorResourceLSTV1RejectSemantic, errors.New("success identity is invalid")
 		}
-		if err := validateConnectorResourceLSTV1ResourceID(result.List.ResourceID); err != nil {
+		if err := ValidateConnectorResourceLSTV1ResourceID(result.List.ResourceID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
-		if err := validateConnectorResourceLSTV1RoutingID(result.List.ConnectorRoutingID); err != nil {
+		if err := ValidateConnectorResourceLSTV1RoutingID(result.List.ConnectorRoutingID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
-		if err := validateConnectorResourceLSTV1KnockID(result.List.KnockResourceID); err != nil {
+		if err := ValidateConnectorResourceLSTV1KnockResourceID(result.List.KnockResourceID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
 		if result.List.ResourceID == result.List.KnockResourceID || result.List.ConnectorRoutingID == result.List.KnockResourceID {
@@ -1147,7 +1121,7 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 	return object, "", nil
 }
 
-func validateConnectorResourceLSTV1Nonce(value string) error {
+func ValidateConnectorResourceLSTV1Nonce(value string) error {
 	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
 	if err != nil || len(decoded) != ConnectorResourceLSTV1NonceBytes || base64.RawURLEncoding.EncodeToString(decoded) != value {
 		return errors.New("request_nonce must be canonical unpadded base64url for exactly 32 bytes")
@@ -1155,7 +1129,7 @@ func validateConnectorResourceLSTV1Nonce(value string) error {
 	return nil
 }
 
-func validateConnectorResourceLSTV1ResourceID(value string) error {
+func ValidateConnectorResourceLSTV1ResourceID(value string) error {
 	if len(value) != ConnectorResourceLSTV1ResourceIDChars {
 		return errors.New("resource_id has invalid encoded length")
 	}
@@ -1178,7 +1152,7 @@ func validateConnectorResourceLSTV1ResourceID(value string) error {
 	return nil
 }
 
-func validateConnectorResourceLSTV1RoutingID(value string) error {
+func ValidateConnectorResourceLSTV1RoutingID(value string) error {
 	if len(value) != ConnectorResourceLSTV1RoutingIDChars || !strings.HasPrefix(value, ConnectorResourceLSTV1RoutingIDPrefix) {
 		return errors.New("connector_routing_id has invalid shape")
 	}
@@ -1190,30 +1164,9 @@ func validateConnectorResourceLSTV1RoutingID(value string) error {
 	return nil
 }
 
-func validateConnectorResourceLSTV1KnockID(value string) error {
+func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
 	if value == "" || len([]byte(value)) > ConnectorResourceLSTV1KnockResourceIDMax || !utf8.ValidString(value) || strings.TrimSpace(value) != value || strings.IndexFunc(value, unicode.IsControl) >= 0 {
 		return errors.New("knock_resource_id is not a transport-safe opaque identifier")
 	}
 	return nil
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-// deriveConnectorResourceLSTV1RoutingFixture derives only the synthetic vector
-// fixture. Runtime consumers must treat connector_routing_id as opaque and use
-// the authenticated producer value verbatim.
-func deriveConnectorResourceLSTV1RoutingFixture(resourceID string) (string, error) {
-	der, err := base64.RawURLEncoding.Strict().DecodeString(resourceID)
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(der)
-	return ConnectorResourceLSTV1RoutingIDPrefix + strings.ToLower(connectorResourceLSTV1RoutingEncoding.EncodeToString(digest[:])), nil
 }

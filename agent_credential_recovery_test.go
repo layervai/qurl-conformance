@@ -27,19 +27,6 @@ func TestEmbeddedAgentCredentialRecoveryLoads(t *testing.T) {
 	}
 }
 
-func TestOpenAgentCredentialRecoveryArtifact(t *testing.T) {
-	want := AgentCredentialRecoveryVectors()
-	for _, name := range []string{"agent_credential_recovery_v1_vectors.json", "vectors/agent_credential_recovery_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) does not match the embedded recovery vectors", name)
-		}
-	}
-}
-
 func TestAgentCredentialRecoveryComposesWithClosedAuthorityV1Artifact(t *testing.T) {
 	authority, err := ConnectorAuthorityLambda()
 	if err != nil {

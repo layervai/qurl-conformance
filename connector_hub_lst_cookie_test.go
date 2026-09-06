@@ -216,16 +216,3 @@ func TestParseConnectorHubLSTCookieFileFailsClosed(t *testing.T) {
 	assertRejects(t, bytes.Replace(raw, []byte(`"artifact":`), []byte(`"future":true,"artifact":`), 1), "unknown field")
 	assertRejects(t, append(append([]byte(nil), raw...), []byte("{}")...), "multiple JSON values")
 }
-
-func TestOpenConnectorHubLSTCookieArtifact(t *testing.T) {
-	want := ConnectorHubLSTCookieVectors()
-	for _, name := range []string{"connector_hub_lst_cookie_v1_vectors.json", "vectors/connector_hub_lst_cookie_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) returned different bytes", name)
-		}
-	}
-}

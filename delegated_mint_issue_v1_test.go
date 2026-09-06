@@ -280,19 +280,6 @@ func TestDelegatedMintIssueV1ResponseRetryAfterRules(t *testing.T) {
 	}
 }
 
-func TestOpenDelegatedMintIssueV1Artifact(t *testing.T) {
-	want := DelegatedMintIssueV1Vectors()
-	for _, name := range []string{"delegated_mint_issue_v1_vectors.json", "vectors/delegated_mint_issue_v1_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) does not match embedded vectors", name)
-		}
-	}
-}
-
 func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 	raw := DelegatedMintIssueV1Vectors()
 	for name, invalid := range map[string][]byte{

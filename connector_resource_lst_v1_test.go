@@ -47,19 +47,6 @@ func TestEmbeddedConnectorResourceLSTV1Loads(t *testing.T) {
 	}
 }
 
-func TestOpenConnectorResourceLSTV1Artifact(t *testing.T) {
-	want := ConnectorResourceLSTV1Vectors()
-	for _, name := range []string{"connector_resource_lst_v1_vectors.json", connectorResourceLSTV1Name} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("Open(%q) returned different bytes", name)
-		}
-	}
-}
-
 func TestConnectorResourceLSTV1CellRequestIDKAT(t *testing.T) {
 	file, err := ConnectorResourceLSTV1()
 	if err != nil {

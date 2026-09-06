@@ -19,23 +19,7 @@
       "types": "./index.d.ts",
       "default": "./index.js"
     },
-    "./qv2_conformance_vectors.json": "./vectors/qv2_conformance_vectors.json",
-    "./issuer_signature_vectors.json": "./vectors/issuer_signature_vectors.json",
-    "./relay_knock_golden.json": "./vectors/relay_knock_golden.json",
-    "./agent_registration_golden.json": "./vectors/agent_registration_golden.json",
-    "./agent_assignment_golden.json": "./vectors/agent_assignment_golden.json",
-    "./agent_knock_application_vectors.json": "./vectors/agent_knock_application_vectors.json",
-    "./agent_session_control_vectors.json": "./vectors/agent_session_control_vectors.json",
-    "./agent_api_key_id_vectors.json": "./vectors/agent_api_key_id_vectors.json",
-    "./assignment_ticket_v1_vectors.json": "./vectors/assignment_ticket_v1_vectors.json",
-    "./connector_authority_lambda_v1_vectors.json": "./vectors/connector_authority_lambda_v1_vectors.json",
-    "./connector_resource_lst_v1_vectors.json": "./vectors/connector_resource_lst_v1_vectors.json",
-    "./connector_hub_request_id_v1_vectors.json": "./vectors/connector_hub_request_id_v1_vectors.json",
-    "./connector_hub_lst_cookie_v1_vectors.json": "./vectors/connector_hub_lst_cookie_v1_vectors.json",
-    "./agent_credential_recovery_v1_vectors.json": "./vectors/agent_credential_recovery_v1_vectors.json",
-    "./crid_v1_vectors.json": "./vectors/crid_v1_vectors.json",
-    "./target_path_v1_vectors.json": "./vectors/target_path_v1_vectors.json",
-    "./delegated_mint_issue_v1_vectors.json": "./vectors/delegated_mint_issue_v1_vectors.json"
+    "./*.json": "./vectors/*.json"
   },
   "repository": {
     "type": "git",

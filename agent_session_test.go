@@ -41,16 +41,6 @@ func TestEmbeddedAgentSessionControlLoads(t *testing.T) {
 		t.Fatalf("invalid exact-session exit exchange %+v", af.ExactSessionExit)
 	}
 
-	raw := AgentSessionControlVectors()
-	for _, name := range []string{"agent_session_control_vectors.json", "vectors/agent_session_control_vectors.json"} {
-		got, err := Open(name)
-		if err != nil {
-			t.Fatalf("Open(%q): %v", name, err)
-		}
-		if !bytes.Equal(got, raw) {
-			t.Fatalf("Open(%q) did not return canonical bytes", name)
-		}
-	}
 }
 
 func TestParseAgentSessionControlFileFailsClosed(t *testing.T) {
