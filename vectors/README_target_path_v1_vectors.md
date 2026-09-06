@@ -31,19 +31,22 @@ and no invalid request leaves the process.
 - `contract.forbidden_path_ascii` is the complete path-only reject alphabet.
   It is an unordered set of ASCII bytes. Each byte remains valid in the query.
   The published string is still byte-frozen; consumers compare it as a set but
-  must not rewrite the artifact. The `!()*` members are derived from Go
-  `net/url.URL.RequestURI` serialization. They are not the union of bytes that
-  every language-specific URL serializer can escape. Consumers must apply the
-  published set and must not derive a replacement set from their local URL API.
-- A raw apostrophe is rejected in both components because Go path escaping and
-  the WHATWG special-query percent-encode set can change it to `%27`. The path
-  behavior has a Go standard-library gate. Go appends `RawQuery` verbatim, so
-  each HTTP consumer must verify the WHATWG query behavior in its own client.
+  must not rewrite the artifact. The `!()*` members protect against a Go
+  consumer that rebuilds a request-target from `url.URL.Path` after it discards
+  `RawPath`; `net/url.URL.RequestURI` then percent-encodes them. They are not the
+  union of bytes that every language-specific URL serializer can escape.
+  Consumers must apply the published set and must not derive a replacement set
+  from their local URL API.
+- A raw apostrophe is rejected in both components because rebuilding a Go URL
+  from `url.URL.Path` and the WHATWG special-query percent-encode set can change
+  it to `%27`. The path behavior has a Go standard-library gate. Go appends
+  `RawQuery` verbatim, so each HTTP consumer must verify the WHATWG query
+  behavior in its own client.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
-- The path rejects raw `!`, `(`, `)`, and `*` because Go
-  `net/url.URL.RequestURI` percent-encodes them and can change the authorized
+- The path rejects raw `!`, `(`, `)`, and `*` because a Go consumer that
+  rebuilds from `url.URL.Path` can percent-encode them and change the authorized
   request-target. It also rejects a literal `;` because proxies and origin
   frameworks can strip matrix parameters after authorization. All five bytes
   remain valid and byte-exact in the query, which does not take part in path
