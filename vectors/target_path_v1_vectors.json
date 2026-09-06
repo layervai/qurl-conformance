@@ -1,13 +1,13 @@
 {
   "artifact": "qurl-target-path-v1-vectors",
-  "schema_version": 1,
+  "schema_version": 2,
   "description": "Shared canonical target_path request grammar for qURL Connector mints.",
   "contract": {
     "wire_field": "target_path",
     "max_bytes": 2048,
     "omitted_semantics": "bare_origin",
     "explicit_empty_semantics": "reject",
-    "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
+    "accepted_character_set": "raw_ascii_target_path_v1",
     "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&()*+,;=:@%/?-",
     "forbidden_path_ascii": "!()*;",
     "query_delimiter": "first_question_mark",
@@ -65,9 +65,16 @@
       "open_supported": true
     },
     {
-      "name": "accept_allowed_ascii",
+      "name": "accept_allowed_path_ascii",
       "present": true,
-      "value": "/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;",
+      "value": "/a-b_c.d~e$f&g+h,i=j:k@l",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_allowed_query_ascii",
+      "present": true,
+      "value": "/view/x?q=!()*;",
       "outcome": "accept",
       "open_supported": true
     },

@@ -459,8 +459,8 @@ func TestTargetPathForbiddenASCIIIsQueryOnly(t *testing.T) {
 		}
 	}
 	for name, value := range map[string]string{
-		"accept_allowed_ascii":      "/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;",
-		"accept_semicolon_in_query": "/view/abc?x=1;y=2",
+		"accept_allowed_query_ascii": "/view/x?q=!()*;",
+		"accept_semicolon_in_query":  "/view/abc?x=1;y=2",
 	} {
 		queryCase := targetPathCase(t, tf, name)
 		if queryCase.Outcome != ExpectAccept || queryCase.OpenSupported == nil || !*queryCase.OpenSupported {
@@ -509,10 +509,16 @@ func TestTargetPathRejectsApostropheInPathAndQuery(t *testing.T) {
 	if strings.ContainsRune(tf.Contract.AllowedASCII, '\'') {
 		t.Error("apostrophe must not be in allowed_ascii")
 	}
-	for _, name := range []string{"reject_apostrophe_in_path", "reject_apostrophe_in_query"} {
+	for name, value := range map[string]string{
+		"reject_apostrophe_in_path":  "/view/a'b",
+		"reject_apostrophe_in_query": "/view/a?q='b",
+	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
 			t.Errorf("case %q = %+v, want invalid_character rejection", name, *c)
+		}
+		if c.Value == nil || *c.Value != value {
+			t.Errorf("case %q value = %v, want %q", name, c.Value, value)
 		}
 	}
 }
@@ -559,11 +565,11 @@ func TestParseTargetPathV1FileFailsClosed(t *testing.T) {
 	}
 
 	t.Run("duplicate field", func(t *testing.T) {
-		body := strings.Replace(string(raw), `"schema_version": 1,`, `"schema_version": 1, "schema_version": 1,`, 1)
+		body := strings.Replace(string(raw), `"schema_version": 2,`, `"schema_version": 2, "schema_version": 2,`, 1)
 		assertRejects(t, []byte(body), "duplicate")
 	})
 	t.Run("unknown field", func(t *testing.T) {
-		body := strings.Replace(string(raw), `"schema_version": 1,`, `"schema_version": 1, "future": true,`, 1)
+		body := strings.Replace(string(raw), `"schema_version": 2,`, `"schema_version": 2, "future": true,`, 1)
 		assertRejects(t, []byte(body), "unknown field")
 	})
 	t.Run("artifact", func(t *testing.T) {

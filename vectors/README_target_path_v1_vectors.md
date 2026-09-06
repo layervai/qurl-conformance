@@ -31,14 +31,17 @@ and no invalid request leaves the process.
 - `contract.forbidden_path_ascii` is the complete path-only reject alphabet.
   It is an unordered set of ASCII bytes. Each byte remains valid in the query.
   The published string is still byte-frozen; consumers compare it as a set but
-  must not rewrite the artifact.
+  must not rewrite the artifact. The `!()*` members are derived from Go
+  `net/url.URL.RequestURI` serialization. They are not the union of bytes that
+  every language-specific URL serializer can escape. Consumers must apply the
+  published set and must not derive a replacement set from their local URL API.
 - A raw apostrophe is rejected in both components because Go path escaping and
   the WHATWG special-query percent-encode set can change it to `%27`.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
-- The path rejects raw `!`, `(`, `)`, and `*` because whole-URL serializers can
-  percent-encode these RFC 3986 sub-delimiters and change the authorized
+- The path rejects raw `!`, `(`, `)`, and `*` because Go
+  `net/url.URL.RequestURI` percent-encodes them and can change the authorized
   request-target. It also rejects a literal `;` because proxies and origin
   frameworks can strip matrix parameters after authorization. All five bytes
   remain valid and byte-exact in the query, which does not take part in path
@@ -88,9 +91,10 @@ escape is also present. Otherwise, any path escape or interior empty segment is
 risk; the decoded dot does not have to be a standalone segment. Adding a class
 or changing this order requires a coordinated contract release.
 
-`schema_version` identifies the target-path artifact generation, not each
-additive `contract` field. Package semantic versions identify added fields and
-validator behavior changes within that generation.
+`schema_version: 2` adds the path-only reject alphabet. Strict consumers must
+upgrade their loader and the artifact together. They must continue to reject
+unknown fields and unsupported schema versions. The `v1` artifact name refers
+to the target-path grammar generation; it is separate from the artifact schema.
 
 ## Open behavior
 

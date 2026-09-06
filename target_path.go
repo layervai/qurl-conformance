@@ -13,7 +13,7 @@ const (
 	// TargetPathArtifactID identifies the shared Connector target-path input contract.
 	TargetPathArtifactID = "qurl-target-path-v1-vectors"
 	// TargetPathSchemaVersion is the only schema accepted by this release.
-	TargetPathSchemaVersion = 1
+	TargetPathSchemaVersion = 2
 	// TargetPathMaxBytes is the complete target_path wire-value limit.
 	TargetPathMaxBytes = 2048
 
@@ -131,7 +131,8 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_simple_path":                        {present: true, value: targetPathValue("/view/abc123")},
 	"accept_mixed_case_path":                    {present: true, value: targetPathValue("/View/AbC")},
 	"accept_path_query":                         {present: true, value: targetPathValue("/view/abc123?sig=deadBEEF&exp=1700000000")},
-	"accept_allowed_ascii":                      {present: true, value: targetPathValue("/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;")},
+	"accept_allowed_path_ascii":                 {present: true, value: targetPathValue("/a-b_c.d~e$f&g+h,i=j:k@l")},
+	"accept_allowed_query_ascii":                {present: true, value: targetPathValue("/view/x?q=!()*;")},
 	"accept_deep_path":                          {present: true, value: targetPathValue("/a/b/c/d/e/f")},
 	"accept_dotdot_substring":                   {present: true, value: targetPathValue("/view/a..b")},
 	"accept_three_dot_segment":                  {present: true, value: targetPathValue("/view/...")},
@@ -292,7 +293,7 @@ func ParseTargetPathV1File(data []byte) (*TargetPathV1File, error) {
 		MaxBytes:                TargetPathMaxBytes,
 		OmittedSemantics:        "bare_origin",
 		ExplicitEmptySemantics:  "reject",
-		AcceptedCharacterSet:    "raw_ascii_canonical_uri_path_and_query",
+		AcceptedCharacterSet:    "raw_ascii_target_path_v1",
 		AllowedASCII:            TargetPathAllowedASCII,
 		ForbiddenPathASCII:      TargetPathForbiddenPathASCII,
 		QueryDelimiter:          "first_question_mark",
