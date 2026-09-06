@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.14.0](https://github.com/layervai/qurl-conformance/compare/v0.13.0...v0.14.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** qv2 conformance proof-of-possession fixtures now require a real X25519 keypair and use the new synthetic issuer identity.
+
+### Features
+
+* add delegated mint issuer vectors ([#124](https://github.com/layervai/qurl-conformance/issues/124)) ([36cbf0f](https://github.com/layervai/qurl-conformance/commit/36cbf0f6068615b9658014ed57bd11620d60744a))
+* **vectors:** add shared target path contract ([#123](https://github.com/layervai/qurl-conformance/issues/123)) ([a0974bb](https://github.com/layervai/qurl-conformance/commit/a0974bba99d83c4893dbf7896262a699ee13e52a))
+* **vectors:** rotate qv2 proof-of-possession fixtures ([#125](https://github.com/layervai/qurl-conformance/issues/125)) ([c029835](https://github.com/layervai/qurl-conformance/commit/c029835542c17a66534f48908b0e211ba607c032))
+
+
+### Bug Fixes
+
+* **ci:** assert the review origin's destination, not an exact URL ([#122](https://github.com/layervai/qurl-conformance/issues/122)) ([a86ebef](https://github.com/layervai/qurl-conformance/commit/a86ebef7d8dd48d668e16f6da68fc062fbf11983))
+
+
+### Continuous Integration
+
+* **deps:** bump age-check-actions reusable to v0.13.0 ([#120](https://github.com/layervai/qurl-conformance/issues/120)) ([b46efd4](https://github.com/layervai/qurl-conformance/commit/b46efd4c9a51b628b1ca0b87a6074e70177ee922))
+* **deps:** bump remaining ops-routines-workflows shims to v0.13.0 ([#121](https://github.com/layervai/qurl-conformance/issues/121)) ([0af598d](https://github.com/layervai/qurl-conformance/commit/0af598d016be2b2bd94642252ae63132f5cf4fdb))
+* drop Task from the review, keep code search ([#114](https://github.com/layervai/qurl-conformance/issues/114)) ([38605b8](https://github.com/layervai/qurl-conformance/commit/38605b84a7461656ab5c12eea3cebe04cbf4450d))
+* enable code search and delegation in the PR review ([#113](https://github.com/layervai/qurl-conformance/issues/113)) ([b5c8b4b](https://github.com/layervai/qurl-conformance/commit/b5c8b4bd810965b0ecffddb7457472838fd539ad))
+* move Claude PR review to Opus 5 ([#111](https://github.com/layervai/qurl-conformance/issues/111)) ([6e84366](https://github.com/layervai/qurl-conformance/commit/6e8436671adca1702daa26af6cf1986153570bc0))
+
 ## [0.13.0](https://github.com/layervai/qurl-conformance/compare/v0.12.6...v0.13.0) (2026-08-23)
 
 

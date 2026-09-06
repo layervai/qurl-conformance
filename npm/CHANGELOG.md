@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.13.0...npm-v0.14.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** qv2 conformance proof-of-possession fixtures now require a real X25519 keypair and use the new synthetic issuer identity.
+
+### Features
+
+* add delegated mint issuer vectors ([#124](https://github.com/layervai/qurl-conformance/issues/124)) ([36cbf0f](https://github.com/layervai/qurl-conformance/commit/36cbf0f6068615b9658014ed57bd11620d60744a))
+* **vectors:** add shared target path contract ([#123](https://github.com/layervai/qurl-conformance/issues/123)) ([a0974bb](https://github.com/layervai/qurl-conformance/commit/a0974bba99d83c4893dbf7896262a699ee13e52a))
+* **vectors:** rotate qv2 proof-of-possession fixtures ([#125](https://github.com/layervai/qurl-conformance/issues/125)) ([c029835](https://github.com/layervai/qurl-conformance/commit/c029835542c17a66534f48908b0e211ba607c032))
+
 ## [0.13.0](https://github.com/layervai/qurl-conformance/compare/npm-v0.12.4...npm-v0.13.0) (2026-08-23)
 
 
