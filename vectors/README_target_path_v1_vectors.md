@@ -32,9 +32,8 @@ and no invalid request leaves the process.
   It is an unordered set of ASCII bytes. Each byte remains valid in the query.
   The published string is still byte-frozen; consumers compare it as a set but
   must not rewrite the artifact.
-- A raw apostrophe is rejected in both components because standard whole-URL
-  serializers disagree about whether it must be percent-encoded in a path or
-  query.
+- A raw apostrophe is rejected in both components because Go path escaping and
+  the WHATWG special-query percent-encode set can change it to `%27`.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
@@ -89,8 +88,9 @@ escape is also present. Otherwise, any path escape or interior empty segment is
 risk; the decoded dot does not have to be a standalone segment. Adding a class
 or changing this order requires a coordinated contract release.
 
-`schema_version` identifies the JSON artifact shape. Package semantic versions
-identify behavior changes within that shape, including validator rule changes.
+`schema_version` identifies the target-path artifact generation, not each
+additive `contract` field. Package semantic versions identify added fields and
+validator behavior changes within that generation.
 
 ## Open behavior
 
@@ -133,9 +133,9 @@ For every case, pass `present` and `value` through the real public option gate:
 
 Because v1 rejects every path escape, it cannot represent a resource path that
 requires percent encoding, such as a path that contains a space or non-ASCII
-text. Raw apostrophe, `!`, `(`, `)`, `*`, and `;` are also unrepresentable in a
-path. This is a deliberate closed grammar, not an instruction to decode or
-normalize such a path.
+text. A raw apostrophe is unrepresentable in both the path and query. Raw `!`,
+`(`, `)`, `*`, and `;` are also unrepresentable in a path. This is a deliberate
+closed grammar, not an instruction to decode or normalize such a path.
 
 The Go `ParseTargetPathV1File` loader independently derives every outcome and
 rejects missing, duplicate, unknown, or modified cases. The npm and Python

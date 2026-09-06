@@ -226,9 +226,9 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 			t.Errorf("case %q changed request target to %q, want exact %q", c.Name, u.RequestURI(), value)
 		}
 		pathPart, rawQuery, hasQuery := strings.Cut(value, "?")
+		// The parsed URL can retain RawPath. A fresh URL forces Go to escape the
+		// accepted path again; v1 has no accepted path escapes to preserve.
 		serialized := (&url.URL{
-			Scheme:     "https",
-			Host:       wantHost,
 			Path:       pathPart,
 			RawQuery:   rawQuery,
 			ForceQuery: hasQuery && rawQuery == "",
@@ -488,7 +488,9 @@ func TestTargetPathForbiddenASCIIIsExactPathOnlySet(t *testing.T) {
 		}
 	}
 	for _, character := range []byte(TargetPathAllowedASCII) {
-		if character == '/' || character == '?' || character == '%' ||
+		// '?' delimits the query and '%' starts an escape, so neither can be a
+		// raw byte inside an accepted path segment.
+		if character == '?' || character == '%' ||
 			strings.IndexByte(TargetPathForbiddenPathASCII, character) >= 0 {
 			continue
 		}
