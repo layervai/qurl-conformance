@@ -127,6 +127,12 @@ fragment/transport accept fixture changes.
       exact pre-release vector bytes through their real verify/open paths. A
       structural parse or package-accessor smoke does not satisfy this gate.
 
+## When the target-path alphabet changes
+
+- [ ] Run the Go path round-trip gate and one real WHATWG consumer against the
+      exact artifact. Confirm that every accepted byte stays byte-exact in its
+      component and record both consumer revisions in the release handoff.
+
 ## After the release
 
 - [ ] Consumers bump to the published version and adopt the new wire in their

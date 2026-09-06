@@ -386,7 +386,9 @@ artifact has its own `artifact` id:
   vectors keep omission distinct from explicit empty, cover the exact 2,048-byte
   boundary and all closed rejection classes, reject non-canonical path escapes
   and segments before dispatch, and preserve accepted bytes without decoding or
-  normalization. Every accepted value is safe to open. See
+  normalization. Schema version 2 removes apostrophe from the whole-value
+  alphabet and adds the path-only `forbidden_path_ascii` set. Every accepted
+  value is safe to open. See
   `vectors/README_target_path_v1_vectors.md`.
 - **Delegated-mint capability issue v1**
   (`qurl-delegated-mint-issue-v1-vectors`,
