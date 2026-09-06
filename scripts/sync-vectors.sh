@@ -3,6 +3,7 @@
 # Run after editing anything under /vectors, and commit all copies together.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+compgen -G 'vectors/*.json' >/dev/null || { echo "no canonical vectors found" >&2; exit 1; }
 mkdir -p npm/vectors python/qurl_conformance/_data
 find npm/vectors python/qurl_conformance/_data -type f -name '*.json' -delete
 for path in vectors/*.json; do
