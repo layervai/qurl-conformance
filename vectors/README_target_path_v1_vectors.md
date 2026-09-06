@@ -113,6 +113,14 @@ For every case, pass `present` and `value` through the real public option gate:
 4. Branch on `open_supported` rather than assuming it is true. Every v1
    accepted value is true, so add an injected false-branch unit test. A
    coordinated future contract can gate a subset.
+5. For each accepted value, assert that the HTTP client dispatches the exact
+   request-target bytes. In particular, it must not decode query escapes before
+   validation, authorization, or transmission.
+
+Because v1 rejects every path escape, it cannot represent a resource path that
+requires percent encoding, such as a path that contains a space or non-ASCII
+text. This is a deliberate closed grammar, not an instruction to decode or
+normalize such a path.
 
 The Go `ParseTargetPathV1File` loader independently derives every outcome and
 rejects missing, duplicate, unknown, or modified cases. The npm and Python

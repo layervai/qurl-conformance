@@ -32,6 +32,7 @@ const (
 	TargetPathAllowedASCII = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
 )
 
+// Keep this order in lockstep with the gates in deriveTargetPathExpectation.
 var targetPathValidationOrder = []string{
 	"presence",
 	"whole_value_empty",
@@ -133,6 +134,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_dotdot_in_query":                    {present: true, value: targetPathValue("/view/x?redir=../../etc")},
 	"accept_authority_text_in_query":            {present: true, value: targetPathValue("/path?next=//evil.example")},
 	"accept_trailing_slash":                     {present: true, value: targetPathValue("/view/")},
+	"accept_trailing_slash_with_query":          {present: true, value: targetPathValue("/view/?a=b")},
 	"accept_empty_query":                        {present: true, value: targetPathValue("/?")},
 	"accept_percent_only_in_query":              {present: true, value: targetPathValue("/view/x?sig=a%20b")},
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
@@ -185,6 +187,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_carriage_return":                    {present: true, value: targetPathValue("/view\r/x")},
 	"reject_trailing_line_feed":                 {present: true, value: targetPathValue("/view/x\n")},
 	"reject_trailing_line_feed_after_query":     {present: true, value: targetPathValue("/view/x?a=b\n")},
+	"reject_line_feed_in_query":                 {present: true, value: targetPathValue("/view/x?a=b\nc")},
 	"reject_trailing_carriage_return":           {present: true, value: targetPathValue("/view/x\r")},
 	"reject_trailing_carriage_return_line_feed": {present: true, value: targetPathValue("/view/x\r\n")},
 	"reject_nul":                                {present: true, value: targetPathValue("/view\x00/x")},
@@ -232,6 +235,9 @@ var targetPathFixtures = map[string]targetPathFixture{
 	},
 	"reject_malformed_query_with_other_path_escape": {
 		present: true, value: targetPathValue("/view/a%41b?c=%ZZ"),
+	},
+	"reject_malformed_query_before_interior_empty": {
+		present: true, value: targetPathValue("/a//b?c=%ZZ"),
 	},
 }
 
@@ -349,6 +355,8 @@ func equalOptionalString(a, b *string) bool {
 }
 
 func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectClass string, openSupported bool, err error) {
+	// Gate order is a published part of the v1 contract. Keep each return below
+	// in lockstep with targetPathValidationOrder and its overlap vectors.
 	if !present {
 		if value != nil {
 			return "", "", false, errors.New("omitted input must not carry value")

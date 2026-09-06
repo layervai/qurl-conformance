@@ -127,6 +127,7 @@ func TestTargetPathWholeValueAndAuthorityPrecedence(t *testing.T) {
 	for _, name := range []string{
 		"reject_trailing_line_feed",
 		"reject_trailing_line_feed_after_query",
+		"reject_line_feed_in_query",
 		"reject_trailing_carriage_return",
 		"reject_trailing_carriage_return_line_feed",
 	} {
@@ -345,6 +346,7 @@ func TestTargetPathMalformedPercentPrecedence(t *testing.T) {
 		"reject_malformed_percent_with_dot_escape",
 		"reject_malformed_query_with_dot_escape_path",
 		"reject_malformed_query_with_other_path_escape",
+		"reject_malformed_query_before_interior_empty",
 	} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectPercentEncoding {
@@ -393,7 +395,7 @@ func TestTargetPathCanonicalSlashRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"accept_root", "accept_trailing_slash"} {
+	for _, name := range []string{"accept_root", "accept_trailing_slash", "accept_trailing_slash_with_query"} {
 		c := targetPathCase(t, tf, name)
 		if c.Outcome != ExpectAccept || c.OpenSupported == nil || !*c.OpenSupported {
 			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
