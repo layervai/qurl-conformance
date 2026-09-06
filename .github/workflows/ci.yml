@@ -182,7 +182,7 @@ jobs:
           };
           const cridValues = Object.fromEntries(cd.consumer_value_cases.map(v => [v.name, v]));
           const targetPathCases = Object.fromEntries(tp.cases.map(v => [v.name, v]));
-          const expectedTargetPathCaseCount = 87;
+          const expectedTargetPathCaseCount = 88;
           if (tp.cases.length !== expectedTargetPathCaseCount) {
             console.error(
               `target-path case count ${tp.cases.length}, want ${expectedTargetPathCaseCount}`,
@@ -683,6 +683,7 @@ jobs:
               Buffer.byteLength(targetPathCases.reject_overlong_relative_precedence?.value ?? '', 'utf8') !== 2049 ||
               targetPathCases.reject_overlong_relative_precedence?.value?.startsWith('/') !== false ||
               targetPathCases.reject_overlong_relative_precedence?.reject_class !== 'too_long' ||
+              targetPathCases.reject_userinfo_origin_concatenation?.reject_class !== 'not_absolute' ||
               targetPathCases.reject_authority_invalid_character?.reject_class !== 'authority' ||
               targetPathCases.accept_dotdot_substring?.value !== '/view/a..b' ||
               targetPathCases.accept_dotdot_substring?.open_supported !== true ||
@@ -1274,7 +1275,7 @@ jobs:
           assert crid_values['reject_trailing_bits']['reject_class'] == 'non_canonical'
           assert crid_values['reject_checksum']['reject_class'] == 'checksum'
           assert tp['artifact'] == 'qurl-target-path-v1-vectors' and tp['schema_version'] == 1
-          expected_target_path_case_count = 87
+          expected_target_path_case_count = 88
           assert len(tp['cases']) == expected_target_path_case_count, (
               f"target-path case count {len(tp['cases'])}, want {expected_target_path_case_count}"
           )
@@ -1301,6 +1302,7 @@ jobs:
           assert len(target_path_cases['reject_overlong_relative_precedence']['value'].encode()) == 2049
           assert not target_path_cases['reject_overlong_relative_precedence']['value'].startswith('/')
           assert target_path_cases['reject_overlong_relative_precedence']['reject_class'] == 'too_long'
+          assert target_path_cases['reject_userinfo_origin_concatenation']['reject_class'] == 'not_absolute'
           assert target_path_cases['reject_authority_invalid_character']['reject_class'] == 'authority'
           assert target_path_cases['accept_dotdot_substring'] == {
               'name': 'accept_dotdot_substring',

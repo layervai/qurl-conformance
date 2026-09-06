@@ -142,6 +142,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_overlong_relative_precedence":       {present: true, value: targetPathValue(strings.Repeat("a", TargetPathMaxBytes+1))},
 	"reject_overlong_non_ascii_precedence":      {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-2) + "é")},
 	"reject_suffix_host":                        {present: true, value: targetPathValue(".evil.example/x")},
+	"reject_userinfo_origin_concatenation":      {present: true, value: targetPathValue("@evil.example/x")},
 	"reject_relative_path":                      {present: true, value: targetPathValue("view/abc")},
 	"reject_relative_invalid_character":         {present: true, value: targetPathValue("view/a[b]")},
 	"reject_absolute_url":                       {present: true, value: targetPathValue("https://evil.example/x")},

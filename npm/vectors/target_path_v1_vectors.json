@@ -189,6 +189,13 @@
       "reject_class": "not_absolute"
     },
     {
+      "name": "reject_userinfo_origin_concatenation",
+      "present": true,
+      "value": "@evil.example/x",
+      "outcome": "reject",
+      "reject_class": "not_absolute"
+    },
+    {
       "name": "reject_relative_path",
       "present": true,
       "value": "view/abc",
