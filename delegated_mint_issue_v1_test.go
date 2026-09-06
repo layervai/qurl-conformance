@@ -247,6 +247,9 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 			file.Golden.SignatureDERB64URL = file.Golden.SignatureDERB64URL[:len(file.Golden.SignatureDERB64URL)-1] + replacement
 		}},
 		{name: "padded signature", change: func(file *DelegatedMintIssueV1File) { file.Golden.SignatureDERB64URL += "=" }},
+		{name: "oversized signature", change: func(file *DelegatedMintIssueV1File) {
+			file.Golden.SignatureDERB64URL = strings.Repeat("A", base64.RawURLEncoding.EncodedLen(DelegatedMintIssueV1SignatureDERMaxBytes)+1)
+		}},
 		{name: "high-S signature", change: func(file *DelegatedMintIssueV1File) {
 			der, err := base64.RawURLEncoding.Strict().DecodeString(file.Golden.SignatureDERB64URL)
 			if err != nil {

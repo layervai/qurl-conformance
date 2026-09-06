@@ -36,6 +36,7 @@ const (
 	DelegatedMintIssueV1BodyDigestEncoding          = "lowercase_hex"
 	DelegatedMintIssueV1SignatureAlgorithm          = "ECDSA_P-256_SHA-256"
 	DelegatedMintIssueV1SignatureEncoding           = "canonical_der_base64url_unpadded_low_s"
+	DelegatedMintIssueV1SignatureDERMaxBytes        = 72
 	DelegatedMintIssueV1PublicKeyEncoding           = "der_spki_base64url_unpadded"
 	DelegatedMintIssueV1NonceEncoding               = "base64url_unpadded"
 	DelegatedMintIssueV1NonceBytes                  = 16
@@ -429,9 +430,15 @@ func validateDelegatedMintIssueV1Golden(golden DelegatedMintIssueV1Golden) error
 	if !ok || publicKey.Curve != elliptic.P256() || publicKey.X == nil || publicKey.Y == nil {
 		return errors.New("conformance: delegated-mint issue public key is not P-256")
 	}
+	if len(golden.SignatureDERB64URL) > base64.RawURLEncoding.EncodedLen(DelegatedMintIssueV1SignatureDERMaxBytes) {
+		return errors.New("conformance: delegated-mint issue signature encoding is too long")
+	}
 	signatureDER, err := decodeDelegatedMintIssueV1Base64URL(golden.SignatureDERB64URL)
 	if err != nil {
 		return errors.New("conformance: delegated-mint issue signature encoding is invalid")
+	}
+	if len(signatureDER) > DelegatedMintIssueV1SignatureDERMaxBytes {
+		return errors.New("conformance: delegated-mint issue signature DER is too long")
 	}
 	var signature struct{ R, S *big.Int }
 	rest, err := asn1.Unmarshal(signatureDER, &signature)
@@ -729,9 +736,15 @@ func DelegatedMintIssueV1ResponseCases() []DelegatedMintIssueV1ResponseCase {
 // DelegatedMintIssueV1RejectCases derives the frozen negative vectors from an
 // initial golden. The vector generator uses this after it rotates the test key.
 func DelegatedMintIssueV1RejectCases(golden DelegatedMintIssueV1Golden) ([]DelegatedMintIssueV1Reject, error) {
+	if len(golden.SignatureDERB64URL) > base64.RawURLEncoding.EncodedLen(DelegatedMintIssueV1SignatureDERMaxBytes) {
+		return nil, errors.New("conformance: cannot derive delegated-mint reject vectors from oversized signature")
+	}
 	signatureDER, err := decodeDelegatedMintIssueV1Base64URL(golden.SignatureDERB64URL)
 	if err != nil {
 		return nil, errors.New("conformance: cannot derive delegated-mint reject vectors from invalid signature")
+	}
+	if len(signatureDER) > DelegatedMintIssueV1SignatureDERMaxBytes {
+		return nil, errors.New("conformance: cannot derive delegated-mint reject vectors from oversized DER")
 	}
 	var signature struct{ R, S *big.Int }
 	rest, err := asn1.Unmarshal(signatureDER, &signature)
