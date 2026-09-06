@@ -245,6 +245,13 @@
       "reject_class": "invalid_character"
     },
     {
+      "name": "reject_trailing_double_slash",
+      "present": true,
+      "value": "/a//",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
       "name": "reject_dot_segment_after_interior_empty",
       "present": true,
       "value": "/a//../b",
@@ -500,6 +507,13 @@
       "name": "reject_percent_encoded_letter_41_path",
       "present": true,
       "value": "/view/a%41b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_path_escape_with_valid_query",
+      "present": true,
+      "value": "/view/a%41b?c=1",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },

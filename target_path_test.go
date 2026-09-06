@@ -190,6 +190,7 @@ func TestTargetPathRejectsPathEscapesAndPreservesQueryEscapes(t *testing.T) {
 		"reject_percent_encoded_letter_upper_path": TargetPathRejectInvalidCharacter,
 		"reject_percent_encoded_letter_lower_path": TargetPathRejectInvalidCharacter,
 		"reject_percent_encoded_letter_41_path":    TargetPathRejectInvalidCharacter,
+		"reject_path_escape_with_valid_query":      TargetPathRejectInvalidCharacter,
 		"reject_double_encoded_dot_path":           TargetPathRejectInvalidCharacter,
 		"reject_encoded_backslash_lower_path":      TargetPathRejectInvalidCharacter,
 		"reject_encoded_backslash_upper_path":      TargetPathRejectInvalidCharacter,
@@ -335,9 +336,11 @@ func TestTargetPathCanonicalSlashRules(t *testing.T) {
 			t.Errorf("case %q = %+v, want accepted and open-supported", name, *c)
 		}
 	}
-	interiorEmpty := targetPathCase(t, tf, "reject_interior_empty_segment")
-	if interiorEmpty.Outcome != ExpectReject || interiorEmpty.RejectClass != TargetPathRejectInvalidCharacter {
-		t.Errorf("interior empty segment = %+v, want invalid_character rejection", *interiorEmpty)
+	for _, name := range []string{"reject_interior_empty_segment", "reject_trailing_double_slash"} {
+		interiorEmpty := targetPathCase(t, tf, name)
+		if interiorEmpty.Outcome != ExpectReject || interiorEmpty.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("case %q = %+v, want invalid_character rejection", name, *interiorEmpty)
+		}
 	}
 }
 
