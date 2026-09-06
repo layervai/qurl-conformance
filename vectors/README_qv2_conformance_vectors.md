@@ -12,7 +12,9 @@ written.
 
 All private keys in these artifacts are public, fixed test material. Never
 admit the vector issuer key or `kid` to a production trust store. Never use the
-qURL-user or resource keys outside conformance tests.
+qURL-user or resource keys outside conformance tests. The qURL-user private
+scalar is stored in already-clamped RFC 7748 form, so conforming clamp-on-use
+and raw scalar APIs consume the same committed bytes.
 
 A consumer feeds each class's input through its **real** parser/validator and
 asserts the declared `expect` (and, where the class pins it, `reject_class`). The

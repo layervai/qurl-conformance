@@ -9,12 +9,13 @@ import (
 )
 
 func TestEncodeTransportFragmentPreservesFieldsAndChunkOrder(t *testing.T) {
-	claims := strings.Repeat("A", 241)
-	got, err := EncodeTransportFragment("qv2."+claims+".B.C", publishedTransportEncodingContract(t))
+	contract := publishedTransportEncodingContract(t)
+	claims := strings.Repeat("A", contract.ComponentMax+1)
+	got, err := EncodeTransportFragment("qv2."+claims+".B.C", contract)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "qv2t1.2.1.1." + strings.Repeat("A", 240) + ".A.B.C"
+	want := "qv2t1.2.1.1." + strings.Repeat("A", contract.ComponentMax) + ".A.B.C"
 	if got != want {
 		t.Fatalf("transport fragment = %q, want %q", got, want)
 	}
@@ -106,8 +107,21 @@ func TestFixedP256PrivateKeysAreStableAndDistinct(t *testing.T) {
 	}
 }
 
+func TestFixedX25519PrivateKeyIsStableAndAlreadyClamped(t *testing.T) {
+	privateKey := FixedX25519PrivateKey(0x09)
+	again := FixedX25519PrivateKey(0x09)
+	if !bytes.Equal(privateKey, again) {
+		t.Fatal("fixed qURL-user private key is not stable")
+	}
+	if len(privateKey) != 32 || privateKey[0]&7 != 0 || privateKey[31]&0x80 != 0 || privateKey[31]&0x40 == 0 {
+		t.Fatalf("fixed qURL-user private key is not in canonical clamped form: %x", privateKey)
+	}
+}
+
 func publishedTransportEncodingContract(t *testing.T) TransportEncodingContract {
 	t.Helper()
+	// The helper tests intentionally read the published root contract instead
+	// of a module-local copy. This makes contract drift change the test inputs.
 	raw, err := os.ReadFile("../../../../vectors/qv2_conformance_vectors.json")
 	if err != nil {
 		t.Fatal(err)

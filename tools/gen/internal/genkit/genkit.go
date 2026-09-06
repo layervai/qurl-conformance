@@ -116,3 +116,14 @@ func FixedP256PrivateKey(fill byte) (*ecdsa.PrivateKey, error) {
 	x, y := curve.ScalarBaseMult(scalarBytes)
 	return &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: curve, X: x, Y: y}, D: d}, nil
 }
+
+// FixedX25519PrivateKey returns a public, vector-only scalar in canonical
+// clamped form. Returning already-clamped bytes makes clamping idempotent for
+// consumers that parse, export, or use a raw scalar-multiplication API.
+func FixedX25519PrivateKey(fill byte) []byte {
+	privateKey := bytes.Repeat([]byte{fill}, 32)
+	privateKey[0] &= 248
+	privateKey[31] &= 127
+	privateKey[31] |= 64
+	return privateKey
+}

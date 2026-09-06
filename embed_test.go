@@ -214,11 +214,35 @@ func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
 	if transportCanonical != acceptFragment {
 		t.Fatal("fragment and transport classes do not share one canonical accept fixture")
 	}
-	for name, fragment := range map[string]string{
-		"fragment":  acceptFragment,
-		"transport": transportCanonical,
-	} {
-		t.Run(name, func(t *testing.T) { assertQURLUserX25519KeyPair(t, fragment) })
+	assertQURLUserX25519KeyPair(t, acceptFragment)
+}
+
+func TestPublishedPrivateKeyWarningsRemainProminent(t *testing.T) {
+	cf, err := ConformanceVectors()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vf, err := ParseVectorFile(IssuerSignatureVectors())
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme, err := os.ReadFile("vectors/README_qv2_conformance_vectors.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts := map[string]string{
+		"qv2 notes":   strings.Join(cf.Notes, " "),
+		"issuer JSON": vf.Description,
+		"README":      strings.Join(strings.Fields(string(readme)), " "),
+	}
+	for name, text := range texts {
+		lower := strings.ToLower(text)
+		if !strings.Contains(lower, "never admit") || !strings.Contains(lower, "production trust store") {
+			t.Errorf("%s lost the production trust-store warning", name)
+		}
+	}
+	if !strings.Contains(strings.ToLower(texts["qv2 notes"]), "never use the qurl-user or resource key outside conformance tests") {
+		t.Error("qv2 notes lost the qURL-user/resource private-key warning")
 	}
 }
 
@@ -408,6 +432,13 @@ func assertQURLUserX25519KeyPair(t *testing.T, fragment string) {
 	privateKey, err := ecdh.X25519().NewPrivateKey(privateBytes)
 	if err != nil {
 		t.Fatalf("parse qURL user private key: %v", err)
+	}
+	clamped := append([]byte(nil), privateBytes...)
+	clamped[0] &= 248
+	clamped[31] &= 127
+	clamped[31] |= 64
+	if !bytes.Equal(privateBytes, clamped) {
+		t.Fatal("accept fixture qURL-user private key is not already RFC 7748 clamped")
 	}
 	publicBytes, err := base64.RawURLEncoding.DecodeString(claims.QURLUserPublicKeyB64)
 	if err != nil {

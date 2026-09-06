@@ -26,6 +26,12 @@ import (
 
 func raw(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
+const (
+	issuerPrivateScalarFill   byte = 0x07
+	resourcePrivateScalarFill byte = 0x08
+	qurlUserPrivateScalarFill byte = 0x09
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "gen: FAILED:", err)
@@ -37,7 +43,7 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	issuerPrivate, err := genkit.FixedP256PrivateKey(0x07)
+	issuerPrivate, err := genkit.FixedP256PrivateKey(issuerPrivateScalarFill)
 	if err != nil {
 		return err
 	}
@@ -50,7 +56,7 @@ func run() error {
 		return err
 	}
 
-	rpriv, err := genkit.FixedP256PrivateKey(0x08)
+	rpriv, err := genkit.FixedP256PrivateKey(resourcePrivateScalarFill)
 	if err != nil {
 		return err
 	}
@@ -59,7 +65,7 @@ func run() error {
 		return err
 	}
 
-	qurlUserPrivateBytes := bytes.Repeat([]byte{0x09}, 32)
+	qurlUserPrivateBytes := genkit.FixedX25519PrivateKey(qurlUserPrivateScalarFill)
 	qurlUserPrivateKey, err := ecdh.X25519().NewPrivateKey(qurlUserPrivateBytes)
 	if err != nil {
 		return fmt.Errorf("parse fixed qURL user private key: %w", err)
@@ -125,7 +131,7 @@ func run() error {
 	}
 
 	doc := map[string]any{
-		"description":              "qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private scalar is 32 bytes of 0x07 and the resource private scalar is 32 bytes of 0x08; both are public test material. Never admit either key or this kid to a production trust store.",
+		"description":              fmt.Sprintf("qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private scalar is 32 bytes of 0x%02x and the resource private scalar is 32 bytes of 0x%02x; both are public test material. Never admit either key or this kid to a production trust store.", issuerPrivateScalarFill, resourcePrivateScalarFill),
 		"algorithm":                "ECC_NIST_P256 / ECDSA_SHA_256, wire = raw r||s (64 bytes), low-S",
 		"domain_separation_prefix": "NHP-QURL-V2-ISSUER",
 		"issuer": map[string]any{

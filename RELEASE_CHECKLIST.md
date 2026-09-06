@@ -119,7 +119,8 @@ fragment/transport accept fixture changes.
       carry the same canonical qv2 body. Confirm the qv2t1 input reconstructs it
       byte for byte.
 - [ ] Confirm the fragment accept fixture carries a real X25519 proof-of-
-      possession pair: derive the claims public key from the secret private key.
+      possession pair: confirm the secret is already in canonical clamped form,
+      then derive the claims public key from that exact secret private key.
 - [ ] Run both `layervai/qurl-go` and `layervai/qurl-typescript` against these
       exact pre-release vector bytes through their real verify/open paths. A
       structural parse or package-accessor smoke does not satisfy this gate.
