@@ -225,6 +225,17 @@ func TestTargetPathAcceptedValuesKeepHostFixed(t *testing.T) {
 		if u.RequestURI() != value {
 			t.Errorf("case %q changed request target to %q, want exact %q", c.Name, u.RequestURI(), value)
 		}
+		pathPart, rawQuery, hasQuery := strings.Cut(value, "?")
+		serialized := (&url.URL{
+			Scheme:     "https",
+			Host:       wantHost,
+			Path:       pathPart,
+			RawQuery:   rawQuery,
+			ForceQuery: hasQuery && rawQuery == "",
+		}).RequestURI()
+		if serialized != value {
+			t.Errorf("case %q serialized request target to %q, want exact %q", c.Name, serialized, value)
+		}
 		if u.Path != "" && (!strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//")) {
 			t.Errorf("case %q produced unsafe decoded path %q", c.Name, u.Path)
 		}
@@ -409,23 +420,82 @@ func TestTargetPathCanonicalSlashRules(t *testing.T) {
 	}
 }
 
-func TestTargetPathSemicolonIsQueryOnly(t *testing.T) {
+func TestTargetPathForbiddenASCIIIsQueryOnly(t *testing.T) {
 	tf, err := TargetPathV1()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"reject_semicolon_in_path", "reject_semicolon_path_with_query"} {
+	if tf.Contract.ForbiddenPathASCII != TargetPathForbiddenPathASCII {
+		t.Fatalf("forbidden path ASCII = %q, want %q", tf.Contract.ForbiddenPathASCII, TargetPathForbiddenPathASCII)
+	}
+	for name, value := range map[string]string{
+		"reject_exclamation_in_path":       "/view/a!b",
+		"reject_left_parenthesis_in_path":  "/view/a(b",
+		"reject_right_parenthesis_in_path": "/view/a)b",
+		"reject_asterisk_in_path":          "/view/a*b",
+		"reject_semicolon_in_path":         "/view/abc;x=1",
+		"reject_semicolon_path_with_query": "/view/a;b?c=1",
+	} {
 		pathCase := targetPathCase(t, tf, name)
 		if pathCase.Outcome != ExpectReject || pathCase.RejectClass != TargetPathRejectInvalidCharacter {
-			t.Errorf("path semicolon case %q = %+v, want invalid_character rejection", name, *pathCase)
+			t.Errorf("forbidden path ASCII case %q = %+v, want invalid_character rejection", name, *pathCase)
+		}
+		if pathCase.Value == nil || *pathCase.Value != value {
+			t.Errorf("forbidden path ASCII case %q value = %v, want %q", name, pathCase.Value, value)
 		}
 	}
-	queryCase := targetPathCase(t, tf, "accept_semicolon_in_query")
-	if queryCase.Outcome != ExpectAccept || queryCase.OpenSupported == nil || !*queryCase.OpenSupported {
-		t.Errorf("query semicolon case = %+v, want accepted and open-supported", *queryCase)
+	for _, character := range TargetPathForbiddenPathASCII {
+		if !strings.ContainsRune(tf.Contract.AllowedASCII, character) {
+			t.Errorf("query-allowed character %q is missing from allowed_ascii", character)
+		}
 	}
-	if queryCase.Value == nil || *queryCase.Value != "/view/abc?x=1;y=2" {
-		t.Errorf("query semicolon value = %v, want byte-exact", queryCase.Value)
+	for name, value := range map[string]string{
+		"accept_allowed_ascii":      "/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;",
+		"accept_semicolon_in_query": "/view/abc?x=1;y=2",
+	} {
+		queryCase := targetPathCase(t, tf, name)
+		if queryCase.Outcome != ExpectAccept || queryCase.OpenSupported == nil || !*queryCase.OpenSupported {
+			t.Errorf("query case %q = %+v, want accepted and open-supported", name, *queryCase)
+		}
+		if queryCase.Value == nil || *queryCase.Value != value {
+			t.Errorf("query case %q value = %v, want %q", name, queryCase.Value, value)
+		}
+	}
+}
+
+func TestTargetPathRejectsApostropheInPathAndQuery(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsRune(tf.Contract.AllowedASCII, '\'') {
+		t.Error("apostrophe must not be in allowed_ascii")
+	}
+	for _, name := range []string{"reject_apostrophe_in_path", "reject_apostrophe_in_query"} {
+		c := targetPathCase(t, tf, name)
+		if c.Outcome != ExpectReject || c.RejectClass != TargetPathRejectInvalidCharacter {
+			t.Errorf("case %q = %+v, want invalid_character rejection", name, *c)
+		}
+	}
+}
+
+func TestTargetPathForbiddenASCIIIsExactPathOnlySet(t *testing.T) {
+	for _, b := range []byte(TargetPathAllowedASCII) {
+		if b == '/' || b == '?' || b == '%' {
+			continue
+		}
+		value := "/x" + string(b) + "y"
+		outcome, class, _, err := deriveTargetPathExpectation(true, &value)
+		if err != nil {
+			t.Fatalf("derive %q: %v", value, err)
+		}
+		wantReject := strings.IndexByte(TargetPathForbiddenPathASCII, b) >= 0
+		if wantReject && (outcome != ExpectReject || class != TargetPathRejectInvalidCharacter) {
+			t.Errorf("path byte %q = (%q, %q), want invalid_character rejection", b, outcome, class)
+		}
+		if !wantReject && outcome != ExpectAccept {
+			t.Errorf("path byte %q = (%q, %q), want accept", b, outcome, class)
+		}
 	}
 }
 
@@ -489,6 +559,9 @@ func TestParseTargetPathV1FileFailsClosed(t *testing.T) {
 	})
 	t.Run("allowed ASCII", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.AllowedASCII += "<" }), "contract")
+	})
+	t.Run("forbidden path ASCII", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.ForbiddenPathASCII = ";" }), "contract")
 	})
 	t.Run("query delimiter", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathV1File) { tf.Contract.QueryDelimiter = "last_question_mark" }), "contract")

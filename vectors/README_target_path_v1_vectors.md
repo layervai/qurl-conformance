@@ -28,12 +28,19 @@ and no invalid request leaves the process.
   the unordered-set rule applies to consumer comparison, not artifact rewrites.
   The validator uses a whole-value full match. It must not use a regular
   expression end anchor that can match before a trailing line terminator.
+- `contract.forbidden_path_ascii` is the complete path-only reject alphabet.
+  It is an unordered set of ASCII bytes. Each byte remains valid in the query.
+- A raw apostrophe is rejected in both components because standard whole-URL
+  serializers disagree about whether it must be percent-encoded in a query.
 - The path has no `.` or `..` segment and no interior empty segment. Dot text
   inside a segment, such as `a..b` or `...`, is allowed. Root `/` and one
   trailing slash are allowed and preserved.
-- A literal `;` is rejected in the path because proxies and origin frameworks
-  can strip matrix parameters after authorization. It remains valid and
-  byte-exact in the query, which does not take part in path authorization.
+- The path rejects raw `!`, `(`, `)`, and `*` because whole-URL serializers can
+  percent-encode these RFC 3986 sub-delimiters and change the authorized
+  request-target. It also rejects a literal `;` because proxies and origin
+  frameworks can strip matrix parameters after authorization. All five bytes
+  remain valid and byte-exact in the query, which does not take part in path
+  authorization.
 - Every percent escape in the path is rejected. A case-insensitive `%2e` path
   escape is `dot_segment`. Every other well-formed path escape, including
   `%2f`, is `invalid_character`.
@@ -55,7 +62,7 @@ The closed local `reject_class` values are:
 | `too_long` | the raw value is longer than 2,048 UTF-8 bytes |
 | `not_absolute` | the value does not start with `/` |
 | `authority` | the value starts with `//` |
-| `invalid_character` | the value contains a character outside the allowed raw ASCII set, a path semicolon, an interior empty path segment, or a well-formed path escape other than `%2e` |
+| `invalid_character` | the value contains a character outside the allowed raw ASCII set, a byte from `forbidden_path_ascii` in the path, an interior empty path segment, or a well-formed path escape other than `%2e` |
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
@@ -66,11 +73,12 @@ presence, the validator checks whole-value emptiness, UTF-8 byte length, the
 leading slash, a protocol-relative authority, and the raw ASCII character set.
 Thus, length wins over `not_absolute` and `authority`. The `authority` class
 wins over all later character, percent, and dot checks. The validator then
-splits the path at the first literal `?`. The path-only semicolon check precedes
-the whole-value percent-syntax check. Thus `/view/a;b%` is `invalid_character`,
-not `percent_encoding`. The earlier whole-value character-set check gives the
-same precedence to `/view/a[b]%`. Malformed escapes in either the path or query
-are `percent_encoding`. After percent syntax is valid,
+splits the path at the first literal `?`. The path-only forbidden-byte check
+precedes the whole-value percent-syntax check. Thus `/view/a;b%` is
+`invalid_character`, not `percent_encoding`. The earlier whole-value
+character-set check gives the same precedence to `/view/a[b]%`. Malformed
+escapes in either the path or query are `percent_encoding`. After percent syntax
+is valid,
 `dot_segment` wins when the path contains any case-insensitive `%2e` escape or
 a literal `.` or `..` segment. This stays true when another well-formed path
 escape is also present. Otherwise, any path escape or interior empty segment is

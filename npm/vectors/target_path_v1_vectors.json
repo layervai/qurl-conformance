@@ -8,7 +8,8 @@
     "omitted_semantics": "bare_origin",
     "explicit_empty_semantics": "reject",
     "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
-    "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-",
+    "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&()*+,;=:@%/?-",
+    "forbidden_path_ascii": "!()*;",
     "query_delimiter": "first_question_mark",
     "validation_order": [
       "presence",
@@ -18,7 +19,7 @@
       "whole_value_protocol_relative_authority",
       "whole_value_raw_ascii_character_set",
       "split_path_at_first_query_delimiter",
-      "path_semicolon",
+      "forbidden_path_ascii",
       "whole_value_percent_syntax",
       "path_encoded_dot",
       "path_literal_dot_segment",
@@ -66,7 +67,7 @@
     {
       "name": "accept_allowed_ascii",
       "present": true,
-      "value": "/a-b_c.d~e!f$g&h'i(j)k*l+m,n=o:p@q",
+      "value": "/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;",
       "outcome": "accept",
       "open_supported": true
     },
@@ -375,6 +376,48 @@
       "name": "reject_semicolon_malformed_percent",
       "present": true,
       "value": "/view/a;b%",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_exclamation_in_path",
+      "present": true,
+      "value": "/view/a!b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_apostrophe_in_path",
+      "present": true,
+      "value": "/view/a'b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_apostrophe_in_query",
+      "present": true,
+      "value": "/view/a?q='b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_left_parenthesis_in_path",
+      "present": true,
+      "value": "/view/a(b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_right_parenthesis_in_path",
+      "present": true,
+      "value": "/view/a)b",
+      "outcome": "reject",
+      "reject_class": "invalid_character"
+    },
+    {
+      "name": "reject_asterisk_in_path",
+      "present": true,
+      "value": "/view/a*b",
       "outcome": "reject",
       "reject_class": "invalid_character"
     },

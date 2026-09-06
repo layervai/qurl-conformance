@@ -28,8 +28,11 @@ const (
 
 	// TargetPathAllowedASCII is the complete raw ASCII alphabet accepted by
 	// the whole-value character gate. Later ordered gates further restrict
-	// semicolons and percent escapes in the path component.
-	TargetPathAllowedASCII = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-"
+	// characters and percent escapes in the path component.
+	TargetPathAllowedASCII = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&()*+,;=:@%/?-"
+	// TargetPathForbiddenPathASCII is the complete set of raw ASCII characters
+	// accepted in the query but rejected in the path component.
+	TargetPathForbiddenPathASCII = "!()*;"
 )
 
 // Keep this order in lockstep with the gates in deriveTargetPathExpectation.
@@ -41,7 +44,7 @@ var targetPathValidationOrder = []string{
 	"whole_value_protocol_relative_authority",
 	"whole_value_raw_ascii_character_set",
 	"split_path_at_first_query_delimiter",
-	"path_semicolon",
+	"forbidden_path_ascii",
 	"whole_value_percent_syntax",
 	"path_encoded_dot",
 	"path_literal_dot_segment",
@@ -68,6 +71,7 @@ type TargetPathContract struct {
 	ExplicitEmptySemantics  string   `json:"explicit_empty_semantics"`
 	AcceptedCharacterSet    string   `json:"accepted_character_set"`
 	AllowedASCII            string   `json:"allowed_ascii"`
+	ForbiddenPathASCII      string   `json:"forbidden_path_ascii"`
 	QueryDelimiter          string   `json:"query_delimiter"`
 	ValidationOrder         []string `json:"validation_order"`
 	AcceptedValueHandling   string   `json:"accepted_value_handling"`
@@ -127,7 +131,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_simple_path":                        {present: true, value: targetPathValue("/view/abc123")},
 	"accept_mixed_case_path":                    {present: true, value: targetPathValue("/View/AbC")},
 	"accept_path_query":                         {present: true, value: targetPathValue("/view/abc123?sig=deadBEEF&exp=1700000000")},
-	"accept_allowed_ascii":                      {present: true, value: targetPathValue("/a-b_c.d~e!f$g&h'i(j)k*l+m,n=o:p@q")},
+	"accept_allowed_ascii":                      {present: true, value: targetPathValue("/a-b_c.d~e$f&g+h,i=j:k@l?q=!()*;")},
 	"accept_deep_path":                          {present: true, value: targetPathValue("/a/b/c/d/e/f")},
 	"accept_dotdot_substring":                   {present: true, value: targetPathValue("/view/a..b")},
 	"accept_three_dot_segment":                  {present: true, value: targetPathValue("/view/...")},
@@ -172,6 +176,12 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_semicolon_in_path":                  {present: true, value: targetPathValue("/view/abc;x=1")},
 	"reject_semicolon_path_with_query":          {present: true, value: targetPathValue("/view/a;b?c=1")},
 	"reject_semicolon_malformed_percent":        {present: true, value: targetPathValue("/view/a;b%")},
+	"reject_exclamation_in_path":                {present: true, value: targetPathValue("/view/a!b")},
+	"reject_apostrophe_in_path":                 {present: true, value: targetPathValue("/view/a'b")},
+	"reject_apostrophe_in_query":                {present: true, value: targetPathValue("/view/a?q='b")},
+	"reject_left_parenthesis_in_path":           {present: true, value: targetPathValue("/view/a(b")},
+	"reject_right_parenthesis_in_path":          {present: true, value: targetPathValue("/view/a)b")},
+	"reject_asterisk_in_path":                   {present: true, value: targetPathValue("/view/a*b")},
 	"reject_leading_backslash":                  {present: true, value: targetPathValue("/\\evil.example")},
 	"reject_backslash_in_path":                  {present: true, value: targetPathValue("/view\\..\\x")},
 	"reject_fragment":                           {present: true, value: targetPathValue("/view/x#fragment")},
@@ -243,7 +253,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 
 // Use \z instead of $ so every consumer implements a whole-value full match.
 // Some regex engines let $ match before a final line terminator.
-var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*\z`)
+var targetPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._~!$&()*+,;=:@%/?-]*\z`)
 
 func targetPathHasMalformedPercentEscape(value string) bool {
 	for i := 0; i < len(value); i++ {
@@ -284,6 +294,7 @@ func ParseTargetPathV1File(data []byte) (*TargetPathV1File, error) {
 		ExplicitEmptySemantics:  "reject",
 		AcceptedCharacterSet:    "raw_ascii_canonical_uri_path_and_query",
 		AllowedASCII:            TargetPathAllowedASCII,
+		ForbiddenPathASCII:      TargetPathForbiddenPathASCII,
 		QueryDelimiter:          "first_question_mark",
 		ValidationOrder:         targetPathValidationOrder,
 		AcceptedValueHandling:   "preserve_exact_bytes",
@@ -386,11 +397,10 @@ func deriveTargetPathExpectation(present bool, value *string) (outcome, rejectCl
 	if i := strings.IndexByte(p, '?'); i >= 0 {
 		pathPart = p[:i]
 	}
-	// Matrix-parameter processing is not consistent across proxies and origin
-	// frameworks. Reject a literal semicolon in the authorized path so a later
-	// layer cannot strip it and widen the selected resource. Query semicolons do
-	// not take part in path authorization and remain byte-exact.
-	if strings.Contains(pathPart, ";") {
+	// URL serializers disagree about these raw path bytes. Reject them before
+	// authorization so a later layer cannot change the selected resource. They
+	// remain valid and byte-exact in the query, which is not path-authorized.
+	if strings.ContainsAny(pathPart, TargetPathForbiddenPathASCII) {
 		return ExpectReject, TargetPathRejectInvalidCharacter, false, nil
 	}
 	if targetPathHasMalformedPercentEscape(p) {
