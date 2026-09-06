@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"bytes"
+	"crypto/ecdh"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -169,6 +170,70 @@ func TestEmbeddedTransportContractAndVectors(t *testing.T) {
 	fragmentVector := cf.Classes["fragment"].Vectors[0]
 	if realVector.CanonicalFragment != fragmentVector.Fragment {
 		t.Error("valid qv2t1 round trip does not reconstruct the canonical fragment accept fixture")
+	}
+}
+
+// TestFragmentAcceptQURLUserX25519KeyPair proves that the committed fragment
+// accept fixture carries one real proof-of-possession keypair. Shape-only
+// fragment parsers do not derive this relationship, so the artifact must catch
+// a generator or transcription error before consumers pin the bytes.
+func TestFragmentAcceptQURLUserX25519KeyPair(t *testing.T) {
+	cf, err := ConformanceVectors()
+	if err != nil {
+		t.Fatalf("ConformanceVectors(): %v", err)
+	}
+	fragmentClass := cf.Classes["fragment"]
+	var acceptFragment string
+	for _, vector := range fragmentClass.Vectors {
+		if vector.Expect == ExpectAccept {
+			if acceptFragment != "" {
+				t.Fatal("fragment class has more than one accept fixture")
+			}
+			acceptFragment = vector.Fragment
+		}
+	}
+	if acceptFragment == "" {
+		t.Fatal("fragment class has no accept fixture")
+	}
+
+	parts := strings.Split(acceptFragment, ".")
+	if len(parts) != 4 || parts[0] != "qv2" {
+		t.Fatalf("fragment accept fixture has invalid shape: prefix=%q parts=%d", parts[0], len(parts))
+	}
+	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode fragment claims: %v", err)
+	}
+	secretJSON, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode fragment secret: %v", err)
+	}
+	var claims struct {
+		QURLUserPublicKeyB64 string `json:"qurl_user_public_key_b64"`
+	}
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		t.Fatalf("parse fragment claims: %v", err)
+	}
+	var secret struct {
+		QURLUserPrivateKeyB64 string `json:"qurl_user_private_key_b64"`
+	}
+	if err := json.Unmarshal(secretJSON, &secret); err != nil {
+		t.Fatalf("parse fragment secret: %v", err)
+	}
+	privateBytes, err := base64.RawURLEncoding.DecodeString(secret.QURLUserPrivateKeyB64)
+	if err != nil {
+		t.Fatalf("decode qURL user private key: %v", err)
+	}
+	privateKey, err := ecdh.X25519().NewPrivateKey(privateBytes)
+	if err != nil {
+		t.Fatalf("parse qURL user private key: %v", err)
+	}
+	publicBytes, err := base64.RawURLEncoding.DecodeString(claims.QURLUserPublicKeyB64)
+	if err != nil {
+		t.Fatalf("decode qURL user public key: %v", err)
+	}
+	if !bytes.Equal(privateKey.PublicKey().Bytes(), publicBytes) {
+		t.Fatal("fragment accept fixture qURL user private/public keys do not form an X25519 pair")
 	}
 }
 

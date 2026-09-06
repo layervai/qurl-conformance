@@ -102,6 +102,24 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       published reject case, retains accepted key verifiers through operation
       authority expiry, and permits a fresh-envelope key rotation.
 
+## When a release regenerates qURL v2 issuer or fragment bytes
+
+Applies whenever `issuer_signature_vectors.json` changes or the canonical qv2
+fragment/transport accept fixture changes.
+
+- [ ] Run the generator exactly once. Do not rerun it to make a test pass: the
+      issuer signature uses a random ECDSA nonce, so each run creates a different
+      artifact. Fix the generator or the committed result without another key
+      rotation when a post-run structural check finds an error.
+- [ ] Confirm the fragment accept fixture and the transport round-trip fixture
+      carry the same canonical qv2 body. Confirm the qv2t1 input reconstructs it
+      byte for byte.
+- [ ] Confirm the fragment accept fixture carries a real X25519 proof-of-
+      possession pair: derive the claims public key from the secret private key.
+- [ ] Run both `layervai/qurl-go` and `layervai/qurl-typescript` against these
+      exact pre-release vector bytes through their real verify/open paths. A
+      structural parse or package-accessor smoke does not satisfy this gate.
+
 ## After the release
 
 - [ ] Consumers bump to the published version and adopt the new wire in their

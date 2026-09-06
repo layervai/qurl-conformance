@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -18,6 +19,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/layervai/qurl-go/qv2"
 )
@@ -29,7 +31,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "gen: FAILED:", err)
 		os.Exit(1)
 	}
-	fmt.Println("gen: OK — regenerated issuer_signature_vectors.json + fragment accept vector (selfVerify passed)")
+	fmt.Println("gen: OK — regenerated issuer signature + fragment/transport accept vectors (selfVerify passed)")
 }
 
 func run() error {
@@ -53,6 +55,14 @@ func run() error {
 		return err
 	}
 
+	qurlUserPrivateBytes := bytes.Repeat([]byte{0x09}, 32)
+	defer clear(qurlUserPrivateBytes)
+	qurlUserPrivateKey, err := ecdh.X25519().NewPrivateKey(qurlUserPrivateBytes)
+	if err != nil {
+		return fmt.Errorf("parse fixed qURL user private key: %w", err)
+	}
+	qurlUserPublicB64 := raw(qurlUserPrivateKey.PublicKey().Bytes())
+
 	claims := &qv2.Claims{
 		V: 2, Iss: "qurl-service", Kid: "qurl-issuer-vector-key",
 		Iat: 1781910000, Nbf: 1781910000, Exp: 1781910300,
@@ -61,7 +71,7 @@ func run() error {
 		CellID:               "vector-cell",
 		RelayURL:             "https://relay.example.com",
 		ResourcePublicKeyB64: raw(resourceDER),
-		QurlUserPublicKeyB64: raw(bytes.Repeat([]byte{0x55}, 32)),
+		QurlUserPublicKeyB64: qurlUserPublicB64,
 	}
 	claimsB64, rawSig, err := qv2.SignClaims(ctx, signer, claims)
 	if err != nil {
@@ -134,18 +144,34 @@ func run() error {
 		return err
 	}
 
-	// Rebuild the fragment-class accept vector from the fresh claims/sig + a fixed
-	// throwaway secret. The fragment class is shape-only (ParseFragment does not
-	// verify the signature), so a stale signature would otherwise survive a key
-	// rotation undetected. Locate the old value and text-replace it so the file's
-	// curated formatting/ordering is preserved.
-	secretJSON, err := json.Marshal(map[string]string{"qurl_user_private_key_b64": raw(bytes.Repeat([]byte{0x09}, 32))})
+	// Rebuild the fragment and transport accept vectors from the fresh claims/sig
+	// plus a fixed throwaway secret. ParseFragment does not verify the signature,
+	// so a stale signature would otherwise survive a key rotation undetected. The
+	// transport fixture must reconstruct the same canonical fragment byte for byte.
+	secretJSON, err := json.Marshal(map[string]string{"qurl_user_private_key_b64": raw(qurlUserPrivateBytes)})
 	if err != nil {
 		return err
 	}
 	newFragment := "qv2." + claimsB64 + "." + raw(secretJSON) + "." + raw(rawSig)
-	if _, err := qv2.ParseFragment(newFragment); err != nil {
+	parsedFragment, err := qv2.ParseFragment(newFragment)
+	if err != nil {
 		return fmt.Errorf("rebuilt fragment must parse: %w", err)
+	}
+	parsedPrivateBytes, err := base64.RawURLEncoding.DecodeString(parsedFragment.Secret.QurlUserPrivateKeyB64)
+	if err != nil {
+		return fmt.Errorf("decode rebuilt fragment qURL user private key: %w", err)
+	}
+	defer clear(parsedPrivateBytes)
+	parsedPrivateKey, err := ecdh.X25519().NewPrivateKey(parsedPrivateBytes)
+	if err != nil {
+		return fmt.Errorf("parse rebuilt fragment qURL user private key: %w", err)
+	}
+	if got := raw(parsedPrivateKey.PublicKey().Bytes()); got != parsedFragment.Claims.QurlUserPublicKeyB64 {
+		return fmt.Errorf("rebuilt fragment qURL user X25519 keypair mismatch")
+	}
+	newTransportFragment, err := encodeTransportFragment(newFragment)
+	if err != nil {
+		return err
 	}
 	const cfPath = "../../vectors/qv2_conformance_vectors.json"
 	cfBytes, err := os.ReadFile(cfPath)
@@ -155,8 +181,11 @@ func run() error {
 	var cfDoc struct {
 		Classes map[string]struct {
 			Vectors []struct {
-				Expect   string `json:"expect"`
-				Fragment string `json:"fragment"`
+				Name              string `json:"name"`
+				Expect            string `json:"expect"`
+				Fragment          string `json:"fragment"`
+				TransportFragment string `json:"transport_fragment"`
+				CanonicalFragment string `json:"canonical_fragment"`
 			} `json:"vectors"`
 		} `json:"classes"`
 	}
@@ -173,9 +202,65 @@ func run() error {
 	if oldFragment == "" {
 		return fmt.Errorf("no fragment-class accept vector with a fragment field found")
 	}
-	updated := bytes.Replace(cfBytes, []byte(oldFragment), []byte(newFragment), 1)
-	if bytes.Equal(updated, cfBytes) {
-		return fmt.Errorf("fragment replacement made no change (old value not found verbatim)")
+	var oldTransportFragment, oldCanonicalFragment string
+	for _, v := range cfDoc.Classes["transport"].Vectors {
+		if v.Name == "accept_valid_qv2_round_trip" && v.Expect == "accept" {
+			oldTransportFragment = v.TransportFragment
+			oldCanonicalFragment = v.CanonicalFragment
+			break
+		}
+	}
+	if oldTransportFragment == "" || oldCanonicalFragment == "" {
+		return fmt.Errorf("no transport-class round-trip accept vector found")
+	}
+	if oldCanonicalFragment != oldFragment {
+		return fmt.Errorf("fragment and transport accept fixtures do not share one canonical fragment")
+	}
+	updated, err := replaceExactJSONString(cfBytes, oldFragment, newFragment, 2)
+	if err != nil {
+		return err
+	}
+	updated, err = replaceExactJSONString(updated, oldTransportFragment, newTransportFragment, 1)
+	if err != nil {
+		return err
 	}
 	return os.WriteFile(cfPath, updated, 0o644)
+}
+
+func encodeTransportFragment(fragment string) (string, error) {
+	parts := strings.Split(fragment, ".")
+	if len(parts) != 4 || parts[0] != "qv2" {
+		return "", fmt.Errorf("canonical fragment has invalid shape")
+	}
+	counts := make([]string, 0, 3)
+	chunks := make([]string, 0)
+	for _, field := range parts[1:] {
+		fieldChunks := make([]string, 0, (len(field)+239)/240)
+		for len(field) > 240 {
+			fieldChunks = append(fieldChunks, field[:240])
+			field = field[240:]
+		}
+		if field == "" {
+			return "", fmt.Errorf("canonical fragment has empty field")
+		}
+		fieldChunks = append(fieldChunks, field)
+		counts = append(counts, fmt.Sprint(len(fieldChunks)))
+		chunks = append(chunks, fieldChunks...)
+	}
+	return "qv2t1." + strings.Join(append(counts, chunks...), "."), nil
+}
+
+func replaceExactJSONString(data []byte, oldValue, newValue string, wantCount int) ([]byte, error) {
+	oldJSON, err := json.Marshal(oldValue)
+	if err != nil {
+		return nil, err
+	}
+	newJSON, err := json.Marshal(newValue)
+	if err != nil {
+		return nil, err
+	}
+	if got := bytes.Count(data, oldJSON); got != wantCount {
+		return nil, fmt.Errorf("JSON string replacement found %d copies, want %d", got, wantCount)
+	}
+	return bytes.ReplaceAll(data, oldJSON, newJSON), nil
 }
