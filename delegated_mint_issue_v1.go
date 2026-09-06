@@ -54,6 +54,9 @@ const (
 	DelegatedMintIssueV1AuthFailureCode             = "invalid_capability_issue"
 	DelegatedMintIssueV1StaleMissStatus             = 404
 	DelegatedMintIssueV1StaleMissCode               = "issue_operation_not_found"
+	DelegatedMintIssueV1RetryAfterAbsent            = "absent"
+	DelegatedMintIssueV1RetryAfterExactSeconds      = "exact_seconds"
+	DelegatedMintIssueV1RetryAfterPositiveSeconds   = "positive_integer_seconds"
 	DelegatedMintIssueV1CapabilityTTLSeconds        = 15 * 60
 	DelegatedMintIssueV1AuthorityMaxTTLSeconds      = 24 * 60 * 60
 	DelegatedMintIssueV1TimestampMaxSkewSeconds     = 5 * 60
@@ -153,6 +156,7 @@ type DelegatedMintIssueV1Contract struct {
 	RejectClasses               []string `json:"reject_classes"`
 	StateOutcomes               []string `json:"state_outcomes"`
 	StateMutations              []string `json:"state_mutations"`
+	RetryAfterModes             []string `json:"retry_after_modes"`
 }
 
 type DelegatedMintIssueV1Golden struct {
@@ -182,6 +186,8 @@ type DelegatedMintIssueV1Reject struct {
 	Repeat      int    `json:"repeat,omitempty"`
 	Outcome     string `json:"outcome"`
 	RejectClass string `json:"reject_class"`
+	Status      int    `json:"status"`
+	ErrorCode   string `json:"error_code"`
 }
 
 type DelegatedMintIssueV1StateCase struct {
@@ -201,13 +207,20 @@ type DelegatedMintIssueV1StateCase struct {
 // DelegatedMintIssueV1ResponseCase freezes the public receiver response that a
 // producer can use for retry and mutation-recovery decisions.
 type DelegatedMintIssueV1ResponseCase struct {
-	Name                  string `json:"name"`
-	Trigger               string `json:"trigger"`
-	Status                int    `json:"status"`
-	ContentType           string `json:"content_type"`
-	ErrorCode             string `json:"error_code"`
-	RetryAfter            string `json:"retry_after"`
-	ProvesOperationAbsent bool   `json:"proves_operation_absent"`
+	Name                  string                         `json:"name"`
+	Trigger               string                         `json:"trigger"`
+	Status                int                            `json:"status"`
+	ContentType           string                         `json:"content_type"`
+	ErrorCode             string                         `json:"error_code"`
+	RetryAfter            DelegatedMintIssueV1RetryAfter `json:"retry_after"`
+	ProvesOperationAbsent bool                           `json:"proves_operation_absent"`
+}
+
+// DelegatedMintIssueV1RetryAfter separates an absent header, an exact value,
+// and the positive-integer rule used for receiver admission control.
+type DelegatedMintIssueV1RetryAfter struct {
+	Mode    string `json:"mode"`
+	Seconds int    `json:"seconds,omitempty"`
 }
 
 func ParseDelegatedMintIssueV1File(data []byte) (*DelegatedMintIssueV1File, error) {
@@ -346,6 +359,7 @@ func DelegatedMintIssueV1ContractValue() DelegatedMintIssueV1Contract {
 		RejectClasses:               []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar", "signature_mismatch"},
 		StateOutcomes:               []string{"issue_new", "return_durable_result", "reject"},
 		StateMutations:              []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"},
+		RetryAfterModes:             []string{DelegatedMintIssueV1RetryAfterAbsent, DelegatedMintIssueV1RetryAfterExactSeconds, DelegatedMintIssueV1RetryAfterPositiveSeconds},
 	}
 }
 
@@ -494,9 +508,24 @@ func validateDelegatedMintIssueV1Relations(file *DelegatedMintIssueV1File) error
 		file.NonceReuseSigned.Nonce == file.RefreshGolden.Nonce ||
 		file.NonceReuseSigned.IdempotencyKey != file.RefreshGolden.IdempotencyKey ||
 		file.NonceReuseSigned.IdempotencyPreimageHex != file.RefreshGolden.IdempotencyPreimageHex ||
-		file.NonceReuseSigned.BodyUTF8 != file.RefreshGolden.BodyUTF8 ||
-		file.NonceReuseSigned.TimestampUnix != file.RefreshGolden.TimestampUnix {
+		file.NonceReuseSigned.TimestampUnix <= file.Golden.TimestampUnix ||
+		file.NonceReuseSigned.TimestampUnix-file.Golden.TimestampUnix > int64(DelegatedMintIssueV1NonceReplayRetentionSeconds) {
 		return errors.New("conformance: delegated-mint signed nonce-reuse input drifted")
+	}
+	var nonceReuseBody, refreshBody delegatedMintIssueV1Body
+	if err := strictDecodeArtifact([]byte(file.NonceReuseSigned.BodyUTF8), &nonceReuseBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint nonce-reuse body: %w", err)
+	}
+	if err := strictDecodeArtifact([]byte(file.RefreshGolden.BodyUTF8), &refreshBody); err != nil {
+		return fmt.Errorf("conformance: parse delegated-mint refresh body for nonce reuse: %w", err)
+	}
+	nonceReuseCapabilityExpiry, err := time.Parse(time.RFC3339, nonceReuseBody.CapabilityExpiresAt)
+	if err != nil || nonceReuseCapabilityExpiry.Sub(time.Unix(file.NonceReuseSigned.TimestampUnix, 0)) != time.Duration(DelegatedMintIssueV1CapabilityTTLSeconds)*time.Second {
+		return errors.New("conformance: delegated-mint nonce-reuse capability expiry is invalid")
+	}
+	nonceReuseBody.CapabilityExpiresAt = refreshBody.CapabilityExpiresAt
+	if !reflect.DeepEqual(nonceReuseBody, refreshBody) {
+		return errors.New("conformance: delegated-mint nonce-reuse input changed immutable generation authority")
 	}
 	var initialBody, conflictBody delegatedMintIssueV1Body
 	if err := strictDecodeArtifact([]byte(file.Golden.BodyUTF8), &initialBody); err != nil {
@@ -715,6 +744,20 @@ func validateDelegatedMintIssueV1ResponseCases(file *DelegatedMintIssueV1File) e
 	if !reflect.DeepEqual(file.ResponseCases, want) {
 		return errors.New("conformance: delegated-mint response vectors drift")
 	}
+	for _, response := range file.ResponseCases {
+		switch response.RetryAfter.Mode {
+		case DelegatedMintIssueV1RetryAfterAbsent, DelegatedMintIssueV1RetryAfterPositiveSeconds:
+			if response.RetryAfter.Seconds != 0 {
+				return fmt.Errorf("conformance: delegated-mint response %q has an unexpected exact Retry-After", response.Name)
+			}
+		case DelegatedMintIssueV1RetryAfterExactSeconds:
+			if response.RetryAfter.Seconds <= 0 {
+				return fmt.Errorf("conformance: delegated-mint response %q has an invalid exact Retry-After", response.Name)
+			}
+		default:
+			return fmt.Errorf("conformance: delegated-mint response %q has an unknown Retry-After mode", response.Name)
+		}
+	}
 	return nil
 }
 
@@ -722,14 +765,14 @@ func validateDelegatedMintIssueV1ResponseCases(file *DelegatedMintIssueV1File) e
 // producer retry, conflict, and mutation-recovery behavior.
 func DelegatedMintIssueV1ResponseCases() []DelegatedMintIssueV1ResponseCase {
 	return []DelegatedMintIssueV1ResponseCase{
-		{Name: "invalid_request", Trigger: "strict_shape_or_semantic_body_rejection_before_state", Status: 400, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "invalid_request", RetryAfter: "absent"},
-		{Name: "invalid_capability_issue", Trigger: "signature_authority_freshness_or_nonce_rejection", Status: 403, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: DelegatedMintIssueV1AuthFailureCode, RetryAfter: "absent"},
-		{Name: "issue_operation_not_found", Trigger: "authenticated_stale_strong_operation_miss", Status: DelegatedMintIssueV1StaleMissStatus, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: DelegatedMintIssueV1StaleMissCode, RetryAfter: "absent", ProvesOperationAbsent: true},
-		{Name: "idempotency_conflict", Trigger: "same_operation_different_immutable_authority", Status: 409, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "idempotency_conflict", RetryAfter: "absent"},
-		{Name: "payload_too_large", Trigger: "request_body_exceeds_8192_bytes_before_state", Status: 413, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "payload_too_large", RetryAfter: "absent"},
-		{Name: "rate_limit_exceeded", Trigger: "bounded_pre_auth_admission_rejection", Status: 429, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "rate_limit_exceeded", RetryAfter: "positive_integer_seconds"},
-		{Name: "internal_error", Trigger: "receiver_configuration_or_internal_failure", Status: 500, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "internal_error", RetryAfter: "absent"},
-		{Name: "mutation_outcome_unknown", Trigger: "durable_write_outcome_cannot_be_reconciled", Status: 503, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "mutation_outcome_unknown", RetryAfter: "1"},
+		{Name: "invalid_request", Trigger: "strict_shape_or_semantic_body_rejection_before_state", Status: 400, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "invalid_request", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}},
+		{Name: "invalid_capability_issue", Trigger: "signature_authority_freshness_or_nonce_rejection", Status: 403, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: DelegatedMintIssueV1AuthFailureCode, RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}},
+		{Name: "issue_operation_not_found", Trigger: "authenticated_stale_strong_operation_miss", Status: DelegatedMintIssueV1StaleMissStatus, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: DelegatedMintIssueV1StaleMissCode, RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}, ProvesOperationAbsent: true},
+		{Name: "idempotency_conflict", Trigger: "same_operation_different_immutable_authority", Status: 409, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "idempotency_conflict", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}},
+		{Name: "payload_too_large", Trigger: "request_body_exceeds_8192_bytes_before_state", Status: 413, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "payload_too_large", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}},
+		{Name: "rate_limit_exceeded", Trigger: "bounded_pre_auth_admission_rejection", Status: 429, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "rate_limit_exceeded", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterPositiveSeconds}},
+		{Name: "internal_error", Trigger: "receiver_configuration_or_internal_failure", Status: 500, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "internal_error", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterAbsent}},
+		{Name: "mutation_outcome_unknown", Trigger: "durable_write_outcome_cannot_be_reconciled", Status: 503, ContentType: DelegatedMintIssueV1ErrorContentType, ErrorCode: "mutation_outcome_unknown", RetryAfter: DelegatedMintIssueV1RetryAfter{Mode: DelegatedMintIssueV1RetryAfterExactSeconds, Seconds: 1}},
 	}
 }
 
@@ -770,15 +813,15 @@ func DelegatedMintIssueV1RejectCases(golden DelegatedMintIssueV1Golden) ([]Deleg
 	nonCanonicalDER = append(nonCanonicalDER, signatureDER[4:]...)
 	encode := base64.RawURLEncoding.EncodeToString
 	return []DelegatedMintIssueV1Reject{
-		{Name: "reject_padded_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: golden.SignatureDERB64URL + "=", Outcome: "reject", RejectClass: "signature_encoding"},
-		{Name: "reject_noncanonical_signature_der", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(nonCanonicalDER), Outcome: "reject", RejectClass: "signature_encoding"},
-		{Name: "reject_high_s_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(highDER), Outcome: "reject", RejectClass: "signature_malleability"},
-		{Name: "reject_zero_r_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(zeroRDER), Outcome: "reject", RejectClass: "signature_scalar"},
-		{Name: "reject_oversize_body", Base: "golden", Field: "body_utf8", Operation: "ascii_repeat", Value: "a", Repeat: DelegatedMintIssueV1BodyMaxBytes + 1, Outcome: "reject", RejectClass: "body_size"},
-		{Name: "reject_bad_idempotency_key", Base: "golden", Field: "idempotency_key", Operation: "replace", Value: "bad key", Outcome: "reject", RejectClass: "idempotency_key"},
-		{Name: "reject_uppercase_authority", Base: "golden", Field: "authority", Operation: "replace", Value: strings.ToUpper(golden.Authority), Outcome: "reject", RejectClass: "authority"},
-		{Name: "reject_short_nonce", Base: "golden", Field: "nonce", Operation: "replace", Value: "AA", Outcome: "reject", RejectClass: "nonce"},
-		{Name: "reject_changed_body_stale_signature", Base: "golden", Field: "body_utf8", Operation: "append", Value: "\n", Outcome: "reject", RejectClass: "signature_mismatch"},
+		{Name: "reject_padded_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: golden.SignatureDERB64URL + "=", Outcome: "reject", RejectClass: "signature_encoding", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_noncanonical_signature_der", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(nonCanonicalDER), Outcome: "reject", RejectClass: "signature_encoding", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_high_s_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(highDER), Outcome: "reject", RejectClass: "signature_malleability", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_zero_r_signature", Base: "golden", Field: "signature_der_b64url", Operation: "replace", Value: encode(zeroRDER), Outcome: "reject", RejectClass: "signature_scalar", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_oversize_body", Base: "golden", Field: "body_utf8", Operation: "ascii_repeat", Value: "a", Repeat: DelegatedMintIssueV1BodyMaxBytes + 1, Outcome: "reject", RejectClass: "body_size", Status: 413, ErrorCode: "payload_too_large"},
+		{Name: "reject_bad_idempotency_key", Base: "golden", Field: "idempotency_key", Operation: "replace", Value: "bad key", Outcome: "reject", RejectClass: "idempotency_key", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_uppercase_authority", Base: "golden", Field: "authority", Operation: "replace", Value: strings.ToUpper(golden.Authority), Outcome: "reject", RejectClass: "authority", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_short_nonce", Base: "golden", Field: "nonce", Operation: "replace", Value: "AA", Outcome: "reject", RejectClass: "nonce", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
+		{Name: "reject_changed_body_stale_signature", Base: "golden", Field: "body_utf8", Operation: "append", Value: "\n", Outcome: "reject", RejectClass: "signature_mismatch", Status: 403, ErrorCode: DelegatedMintIssueV1AuthFailureCode},
 	}, nil
 }
 

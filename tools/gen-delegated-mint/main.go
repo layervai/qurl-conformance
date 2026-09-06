@@ -68,6 +68,14 @@ func run() error {
 	}
 	file.NonceReuseSigned = file.RefreshGolden
 	file.NonceReuseSigned.Nonce = file.Golden.Nonce
+	file.NonceReuseSigned.TimestampUnix = file.RetryGolden.TimestampUnix
+	const refreshCapabilityExpiry = `"capability_expires_at":"2026-09-06T00:00:00Z"`
+	const nonceReuseCapabilityExpiry = `"capability_expires_at":"2026-09-05T23:40:00Z"`
+	if count := strings.Count(file.NonceReuseSigned.BodyUTF8, refreshCapabilityExpiry); count != 1 {
+		return fmt.Errorf("nonce-reuse capability expiry count = %d, want 1", count)
+	}
+	file.NonceReuseSigned.BodyUTF8 = strings.Replace(file.NonceReuseSigned.BodyUTF8,
+		refreshCapabilityExpiry, nonceReuseCapabilityExpiry, 1)
 	if err := rotateGolden(&file.NonceReuseSigned, refreshKey); err != nil {
 		return err
 	}

@@ -96,14 +96,15 @@ valid JSON whitespace but retains the old signature. Each case uses the
 `golden` object as its base. All derived fields in a mutated input, including
 the body hash, canonical bytes, signing digest, and signature result, cease to
 be assertions after a recipe is applied. A consumer recomputes them from the
-mutated request and returns the listed closed `reject_class`. It must not repair
-the input.
+mutated request and returns the listed closed `reject_class`, HTTP status, and
+public error code. It must not repair the input.
 
 `wrong_endpoint_signed`, `nonce_reuse_signed`, and
 `authority_conflict_signed` are complete inputs with valid canonical low-S
 signatures. The first is signed for another authority, so it is not valid at
 the configured receiver. The second uses the initial operation's nonce for the
-distinct generation-two operation. The third keeps the initial operation key
+distinct generation-two operation while that nonce is still retained and its
+new transport timestamp is fresh. The third keeps the initial operation key
 but changes one immutable authority field. Signature success alone does not
 authorize any of these requests.
 
@@ -117,7 +118,10 @@ response source. The `outcome` and `mutation` values are closed by the contract
 lists. A receiver must not replace a listed rejection with a state write.
 
 `response_cases` freezes every receiver error status, media type, public code,
-and `Retry-After` rule. Only the authenticated 404
+and `Retry-After` rule. Each rule has one closed `mode`: `absent` forbids the
+header, `exact_seconds` requires the positive `seconds` value, and
+`positive_integer_seconds` requires any positive decimal-seconds value. Only
+the authenticated 404
 `issue_operation_not_found` response proves durable operation absence. A
 producer treats all malformed, unknown, proxy-generated, or mismatched
 responses as an unknown mutation outcome.

@@ -26,9 +26,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   rotation. They are NEVER run in CI (ECDSA signatures use random nonces, so
   they are not reproducible). The committed JSON is the artifact.
 - `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts.
-  `tools/gen-delegated-mint` owns only the two delegated-mint accept goldens and
-  the reject cases derived from the initial golden. Neither generator rewrites
-  the frozen NHP packet families.
+  `tools/gen-delegated-mint` owns only the delegated-mint signed inputs, state
+  and response cases, and reject cases derived from the initial golden. Neither
+  generator rewrites the frozen NHP packet families.
 - This repo does NOT verify its vectors by rebuilding them with a consumer SDK.
   Doing so made the vector artifact depend on its own consumers, and every wire
   change deadlocked: the cross-check could not pass until a consumer spoke the
@@ -45,8 +45,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - Producer-revision pins name the commit that emitted the committed bytes. Never
   leave one pointing at a pre-change commit — the self-consistency tests pass
   when the pins agree with each other, not when they are true.
-- Do not regenerate keys or signatures here; the committed key/signature bytes are
-  the contract.
+- Do not regenerate keys or signatures outside an intentional,
+  checklist-driven rotation. At all other times, the committed bytes are the
+  contract.
 - Keep the module dependency-free (stdlib only): no `require` lines in `go.mod`.
 - Keep the description/README consumer-neutral: this artifact is consumed by
   verifiers in multiple languages, so prose must not name any one implementation's

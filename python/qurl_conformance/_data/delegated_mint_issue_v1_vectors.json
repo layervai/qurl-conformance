@@ -132,6 +132,11 @@
       "store_operation_and_bind_nonce",
       "bind_nonce_to_existing_operation",
       "none"
+    ],
+    "retry_after_modes": [
+      "absent",
+      "exact_seconds",
+      "positive_integer_seconds"
     ]
   },
   "golden": {
@@ -148,8 +153,8 @@
     "body_sha256": "cc1b0753fb4743b05d22d5f8d121064d7193a7216cdaa1252d151ed9f4a89d12",
     "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d30390000002f7563695f6e324867377a4b4a546944384c4567395849734d7a5267704f677437356e4559687762366e773630346a450000000a313738383635303130300000001641414543417751464267634943516f4c4441304f44770000004063633162303735336662343734336230356432326435663864313231303634643731393361373231366364616131323532643135316564396634613839643132",
     "signing_digest_hex": "2e9a1fb64ca3d1c16affeb22e006ef74118b963260978772cb6eb7f24bd28562",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQfZOGKu3YQsSxBLpWZL790Fxn713yKj926-kr76LfVqczjoEF_702FE-XlKLklBQqEm68jWJMgVpNZ5zPwB6JQ",
-    "signature_der_b64url": "MEUCIQDu4mWywRlBICwnpeAWnV7u0BqFHFd9ZK1dka-ekG4mlgIgTGJqnVAgFb5k3O9ewkFK0MXvpO_S9rkPrx559ZimwJ0"
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETadSnJokvKErhxMCkJynIdoI92qh1UfBdmhaz6dkVNL5M39_lA0lM5yq2AO27MyVtFgXJIxTgeavXUTQdp7BQw",
+    "signature_der_b64url": "MEQCIDpPPStFCg-LEZT0_h9D1adtCOJ_D9PoR15jUupjNbTXAiAhssC3y1JBKpZsGEF71NRbgmDWPd4iq22SoUpXiuODbQ"
   },
   "retry_golden": {
     "method": "POST",
@@ -165,8 +170,8 @@
     "body_sha256": "c27ea85b38c4d80eec3f7eb3b018a46e0034d1c6fa26edd477e03d5ff7bbaebe",
     "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d31300000002f7563695f6e324867377a4b4a546944384c4567395849734d7a5267704f677437356e4559687762366e773630346a450000000a3137383836353037303000000016494345694979516c4a69636f4b536f724c4330754c770000004063323765613835623338633464383065656333663765623362303138613436653030333464316336666132366564643437376530336435666637626261656265",
     "signing_digest_hex": "69fe27b047f5935e896c195da88ec638c59e95062577fc1082f50411f9d4f806",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2xuGBlZgC9phIyzYi6ZYACuA2XuhvDLzwk4EM4ZCgT2vJ1xl8mBL95vyZnoUdYVl0BlsTC0SMYFOxagYTbqjow",
-    "signature_der_b64url": "MEQCICqh7caLL4UUE54C5pc32dXo4pGyOJ1F3I8rEz4KMANvAiBV1QxrLP7Hyi45H2J1ihA3GAoepWHo5Xa3W_TLbwm8Vg"
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0htfrIEZbE5Y3r7MyjYaFm2VAUgmQBF4z5z8ZhZZoz6Sl53v3GVjm41IYXTEmJmRFmrozXAXHm1yAYU0KNI29A",
+    "signature_der_b64url": "MEUCIQCT2mKJn6ArqvTsUC03oTsAea6CWdiMIe_EShHhmwW_7QIgWkqp5TtrMoeDpvaWtT0-y0NBQVMbXevjJl0Lzle38Dk"
   },
   "refresh_golden": {
     "method": "POST",
@@ -182,8 +187,8 @@
     "body_sha256": "f7c5ac4ea4da612d9aa77be8415240e2364437c66638477be0a65b5b7efc65f2",
     "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d31300000002f7563695f4c334932697a5350794577536d416c7573634a41656d61457a376d2d70784c4b6558466b416d7432626a6f0000000a313738383635313930300000001645424553457851564668635947526f624842306548770000004066376335616334656134646136313264396161373762653834313532343065323336343433376336363633383437376265306136356235623765666336356632",
     "signing_digest_hex": "a84e47b2f782b092df01eb014fb90507f415ff534d1750ec057599e91bf6c493",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2xuGBlZgC9phIyzYi6ZYACuA2XuhvDLzwk4EM4ZCgT2vJ1xl8mBL95vyZnoUdYVl0BlsTC0SMYFOxagYTbqjow",
-    "signature_der_b64url": "MEUCIQC655OJygqe0LFR8y4DD1Y7sLd1PupsTz8INPADak_J8QIgDjN4xvP_uwAG2w5eWmoPGt6OvWwIlJn0pCHyk8oVnGc"
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0htfrIEZbE5Y3r7MyjYaFm2VAUgmQBF4z5z8ZhZZoz6Sl53v3GVjm41IYXTEmJmRFmrozXAXHm1yAYU0KNI29A",
+    "signature_der_b64url": "MEUCIQDlm3xK1W3cmyow7cXgqtu24y1vigwpuZLZEdbCEgr0fAIgIfMULzeGgFO4nLsOibW-EbYGwjKyEqQ_yRLscv3-I4s"
   },
   "wrong_endpoint_signed": {
     "method": "POST",
@@ -199,8 +204,8 @@
     "body_sha256": "cc1b0753fb4743b05d22d5f8d121064d7193a7216cdaa1252d151ed9f4a89d12",
     "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f535400000024616c7465726e6174652e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d30390000002f7563695f6e324867377a4b4a546944384c4567395849734d7a5267704f677437356e4559687762366e773630346a450000000a31373838363530313030000000164d4445794d7a51314e6a63344f546f375044302d50770000004063633162303735336662343734336230356432326435663864313231303634643731393361373231366364616131323532643135316564396634613839643132",
     "signing_digest_hex": "2271225b9839125b600d95994542281fd40331a022be3a7c625746682d60d5ae",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQfZOGKu3YQsSxBLpWZL790Fxn713yKj926-kr76LfVqczjoEF_702FE-XlKLklBQqEm68jWJMgVpNZ5zPwB6JQ",
-    "signature_der_b64url": "MEQCID8ESFsDA5blkiLcpOoy6RLGECNk3lp8_idi6WUJ5bkrAiB1Hx85AMB5cJQJGUB7Ts9H22IqqU5q9kO6xZwqRTOLyQ"
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETadSnJokvKErhxMCkJynIdoI92qh1UfBdmhaz6dkVNL5M39_lA0lM5yq2AO27MyVtFgXJIxTgeavXUTQdp7BQw",
+    "signature_der_b64url": "MEQCICzjVz2q1CnerwureTxsqdv9ocu1M5_D3kE5YQvn_29rAiATwGVieoHMUyx3XZ8yljkQlD7fDpSIFwxDtKm16uaUwA"
   },
   "nonce_reuse_signed": {
     "method": "POST",
@@ -210,14 +215,14 @@
     "kid": "issuer-2026-10",
     "idempotency_key": "uci_L3I2izSPyEwSmAluscJAemaEz7m-pxLKeXFkAmt2bjo",
     "idempotency_preimage_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d4944454d504f54454e43592d5631000000001266696c657669657765722d73616e64626f780000002f75706c5f5647576546784838666b5f7a6e4b74796c456f5a566b52623841586c546249533033596a357373564f37300000000132",
-    "timestamp_unix": 1788651900,
+    "timestamp_unix": 1788650700,
     "nonce": "AAECAwQFBgcICQoLDA0ODw",
-    "body_utf8": "{\"upload_handle\":\"upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70\",\"issue_generation\":2,\"upload_request_digest\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"content_sha256\":\"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\",\"byte_size\":1048576,\"media_type\":\"image/png\",\"display_filename\":\"diagram.png\",\"audience_key_id\":\"key_A1b2C3d4E5f6\",\"target_path\":\"/files/upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70\",\"max_batch_size\":100,\"max_link_ttl_seconds\":86400,\"capability_expires_at\":\"2026-09-06T00:00:00Z\",\"authority_expires_at\":\"2026-09-06T23:15:00Z\"}",
-    "body_sha256": "f7c5ac4ea4da612d9aa77be8415240e2364437c66638477be0a65b5b7efc65f2",
-    "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d31300000002f7563695f4c334932697a5350794577536d416c7573634a41656d61457a376d2d70784c4b6558466b416d7432626a6f0000000a313738383635313930300000001641414543417751464267634943516f4c4441304f44770000004066376335616334656134646136313264396161373762653834313532343065323336343433376336363633383437376265306136356235623765666336356632",
-    "signing_digest_hex": "1fee7c51b4a9af0b54da92517202794747706a24619503eea01301cde5e1e534",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2xuGBlZgC9phIyzYi6ZYACuA2XuhvDLzwk4EM4ZCgT2vJ1xl8mBL95vyZnoUdYVl0BlsTC0SMYFOxagYTbqjow",
-    "signature_der_b64url": "MEQCIDXVkLE-cKzPGTdbCgWVzRY09qIp0ZfBgphgYrC8ZpNbAiB7kIu530P5HUlj1a_ckD8g51NMskp7jx1zFr3gUZPIig"
+    "body_utf8": "{\"upload_handle\":\"upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70\",\"issue_generation\":2,\"upload_request_digest\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"content_sha256\":\"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\",\"byte_size\":1048576,\"media_type\":\"image/png\",\"display_filename\":\"diagram.png\",\"audience_key_id\":\"key_A1b2C3d4E5f6\",\"target_path\":\"/files/upl_VGWeFxH8fk_znKtylEoZVkRb8AXlTbIS03Yj5ssVO70\",\"max_batch_size\":100,\"max_link_ttl_seconds\":86400,\"capability_expires_at\":\"2026-09-05T23:40:00Z\",\"authority_expires_at\":\"2026-09-06T23:15:00Z\"}",
+    "body_sha256": "25d2c7c7e4eb83301dec7b9694140c9000f4046cb86c51fde7ae79a867d4cc01",
+    "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d31300000002f7563695f4c334932697a5350794577536d416c7573634a41656d61457a376d2d70784c4b6558466b416d7432626a6f0000000a313738383635303730300000001641414543417751464267634943516f4c4441304f44770000004032356432633763376534656238333330316465633762393639343134306339303030663430343663623836633531666465376165373961383637643463633031",
+    "signing_digest_hex": "7eacc964431ec8a45ddf606bdc795143f6fde54f0af0a5a1f76fedaadc510a66",
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0htfrIEZbE5Y3r7MyjYaFm2VAUgmQBF4z5z8ZhZZoz6Sl53v3GVjm41IYXTEmJmRFmrozXAXHm1yAYU0KNI29A",
+    "signature_der_b64url": "MEQCIGK79YTL4eNUIWFfkqnbidAnB4lABdTT8D09ZyyHiYQRAiBLIDIohCY9z-dn7xffRRriaMB2nq8vYVt3FsL7jObERQ"
   },
   "authority_conflict_signed": {
     "method": "POST",
@@ -233,8 +238,8 @@
     "body_sha256": "8ed38ace938a2f9305697fb9289adeed8ba0d6ea871b66d75993db59837ade94",
     "canonical_hex": "4c562d5155524c2d4341504142494c4954592d49535355452d56310000000004504f53540000001e6170692e696e7465726e616c2e73616e64626f782e6c61796572762e6169000000282f696e7465726e616c2f76312f64656c6567617465642d6d696e742d6361706162696c69746965730000001266696c657669657765722d73616e64626f780000000e6973737565722d323032362d30390000002f7563695f6e324867377a4b4a546944384c4567395849734d7a5267704f677437356e4559687762366e773630346a450000000a31373838363530313030000000165145464351305246526b64495355704c5445314f54770000004038656433386163653933386132663933303536393766623932383961646565643862613064366561383731623636643735393933646235393833376164653934",
     "signing_digest_hex": "49d625139845a7111a9c58a88e39adb95baa01cca5b44b9f82b4e8eb9bd0e172",
-    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQfZOGKu3YQsSxBLpWZL790Fxn713yKj926-kr76LfVqczjoEF_702FE-XlKLklBQqEm68jWJMgVpNZ5zPwB6JQ",
-    "signature_der_b64url": "MEQCIF4DfdErk0qaqnnR0u1gjxnWFvnoiF93v_NKFQJfr66cAiBwaKZw76KKuhYRlPzXrqPWmigPmw6jCvaXE-gb2GnBAQ"
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETadSnJokvKErhxMCkJynIdoI92qh1UfBdmhaz6dkVNL5M39_lA0lM5yq2AO27MyVtFgXJIxTgeavXUTQdp7BQw",
+    "signature_der_b64url": "MEUCIQDuKJdaSx25_vPQQ6D08g9gGEbvX2-3fooOsPp7dB6mLQIgAnOYwIBL26vTfiCRpO8CiTr-QU0JpMMDPf2f0TALRjE"
   },
   "reject_cases": [
     {
@@ -242,36 +247,44 @@
       "base": "golden",
       "field": "signature_der_b64url",
       "operation": "replace",
-      "value": "MEUCIQDu4mWywRlBICwnpeAWnV7u0BqFHFd9ZK1dka-ekG4mlgIgTGJqnVAgFb5k3O9ewkFK0MXvpO_S9rkPrx559ZimwJ0=",
+      "value": "MEQCIDpPPStFCg-LEZT0_h9D1adtCOJ_D9PoR15jUupjNbTXAiAhssC3y1JBKpZsGEF71NRbgmDWPd4iq22SoUpXiuODbQ=",
       "outcome": "reject",
-      "reject_class": "signature_encoding"
+      "reject_class": "signature_encoding",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_noncanonical_signature_der",
       "base": "golden",
       "field": "signature_der_b64url",
       "operation": "replace",
-      "value": "MEYCIgAA7uJlssEZQSAsJ6XgFp1e7tAahRxXfWStXZGvnpBuJpYCIExiap1QIBW-ZNzvXsJBStDF76Tv0va5D68eefWYpsCd",
+      "value": "MEUCIQA6Tz0rRQoPixGU9P4fQ9WnbQjifw_T6EdeY1LqYzW01wIgIbLAt8tSQSqWbBhBe9TUW4Jg1j3eIqttkqFKV4rjg20",
       "outcome": "reject",
-      "reject_class": "signature_encoding"
+      "reject_class": "signature_encoding",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_high_s_signature",
       "base": "golden",
       "field": "signature_der_b64url",
       "operation": "replace",
-      "value": "MEYCIQDu4mWywRlBICwnpeAWnV7u0BqFHFd9ZK1dka-ekG4mlgIhALOdlWGv3-pCmyMQoT2-tS7291W91CDldUSbUM1jvGS0",
+      "value": "MEUCIDpPPStFCg-LEZT0_h9D1adtCOJ_D9PoR15jUupjNbTXAiEA3k0_RzStvtZpk-e-hCsrpDqGJG_I9PMXYRiAa3F_oeQ",
       "outcome": "reject",
-      "reject_class": "signature_malleability"
+      "reject_class": "signature_malleability",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_zero_r_signature",
       "base": "golden",
       "field": "signature_der_b64url",
       "operation": "replace",
-      "value": "MCUCAQACIExiap1QIBW-ZNzvXsJBStDF76Tv0va5D68eefWYpsCd",
+      "value": "MCUCAQACICGywLfLUkEqlmwYQXvU1FuCYNY93iKrbZKhSleK44Nt",
       "outcome": "reject",
-      "reject_class": "signature_scalar"
+      "reject_class": "signature_scalar",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_oversize_body",
@@ -281,7 +294,9 @@
       "value": "a",
       "repeat": 8193,
       "outcome": "reject",
-      "reject_class": "body_size"
+      "reject_class": "body_size",
+      "status": 413,
+      "error_code": "payload_too_large"
     },
     {
       "name": "reject_bad_idempotency_key",
@@ -290,7 +305,9 @@
       "operation": "replace",
       "value": "bad key",
       "outcome": "reject",
-      "reject_class": "idempotency_key"
+      "reject_class": "idempotency_key",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_uppercase_authority",
@@ -299,7 +316,9 @@
       "operation": "replace",
       "value": "API.INTERNAL.SANDBOX.LAYERV.AI",
       "outcome": "reject",
-      "reject_class": "authority"
+      "reject_class": "authority",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_short_nonce",
@@ -308,7 +327,9 @@
       "operation": "replace",
       "value": "AA",
       "outcome": "reject",
-      "reject_class": "nonce"
+      "reject_class": "nonce",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     },
     {
       "name": "reject_changed_body_stale_signature",
@@ -317,7 +338,9 @@
       "operation": "append",
       "value": "\n",
       "outcome": "reject",
-      "reject_class": "signature_mismatch"
+      "reject_class": "signature_mismatch",
+      "status": 403,
+      "error_code": "invalid_capability_issue"
     }
   ],
   "state_cases": [
@@ -389,7 +412,7 @@
     {
       "name": "reused_nonce_across_operation",
       "input": "nonce_reuse_signed",
-      "now_unix": 1788651900,
+      "now_unix": 1788650700,
       "prior_operation": "absent",
       "prior_nonce": "golden_bound_to_golden_operation",
       "outcome": "reject",
@@ -433,7 +456,9 @@
       "status": 400,
       "content_type": "application/problem+json",
       "error_code": "invalid_request",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": false
     },
     {
@@ -442,7 +467,9 @@
       "status": 403,
       "content_type": "application/problem+json",
       "error_code": "invalid_capability_issue",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": false
     },
     {
@@ -451,7 +478,9 @@
       "status": 404,
       "content_type": "application/problem+json",
       "error_code": "issue_operation_not_found",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": true
     },
     {
@@ -460,7 +489,9 @@
       "status": 409,
       "content_type": "application/problem+json",
       "error_code": "idempotency_conflict",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": false
     },
     {
@@ -469,7 +500,9 @@
       "status": 413,
       "content_type": "application/problem+json",
       "error_code": "payload_too_large",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": false
     },
     {
@@ -478,7 +511,9 @@
       "status": 429,
       "content_type": "application/problem+json",
       "error_code": "rate_limit_exceeded",
-      "retry_after": "positive_integer_seconds",
+      "retry_after": {
+        "mode": "positive_integer_seconds"
+      },
       "proves_operation_absent": false
     },
     {
@@ -487,7 +522,9 @@
       "status": 500,
       "content_type": "application/problem+json",
       "error_code": "internal_error",
-      "retry_after": "absent",
+      "retry_after": {
+        "mode": "absent"
+      },
       "proves_operation_absent": false
     },
     {
@@ -496,7 +533,10 @@
       "status": 503,
       "content_type": "application/problem+json",
       "error_code": "mutation_outcome_unknown",
-      "retry_after": "1",
+      "retry_after": {
+        "mode": "exact_seconds",
+        "seconds": 1
+      },
       "proves_operation_absent": false
     }
   ]

@@ -63,7 +63,8 @@ func TestEmbeddedDelegatedMintIssueV1LoadsAndVerifies(t *testing.T) {
 		!slices.Equal(file.Contract.EnvelopeFingerprintFields, []string{"method", "authority", "route", "issuer_id", "kid", "idempotency_key", "timestamp_unix_decimal", "nonce", "exact_body_sha256", "signature_der_b64url"}) ||
 		!slices.Equal(file.Contract.RejectClasses, []string{"authority", "body_size", "idempotency_key", "nonce", "signature_encoding", "signature_malleability", "signature_scalar", "signature_mismatch"}) ||
 		!slices.Equal(file.Contract.StateOutcomes, []string{"issue_new", "return_durable_result", "reject"}) ||
-		!slices.Equal(file.Contract.StateMutations, []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"}) {
+		!slices.Equal(file.Contract.StateMutations, []string{"store_operation_and_bind_nonce", "bind_nonce_to_existing_operation", "none"}) ||
+		!slices.Equal(file.Contract.RetryAfterModes, []string{"absent", "exact_seconds", "positive_integer_seconds"}) {
 		t.Fatalf("freshness/replay/expiry authority contract drifted: %+v", file.Contract)
 	}
 	if len(file.RejectCases) != 9 {
@@ -181,7 +182,55 @@ func TestDelegatedMintIssueV1PublishedRejectsFailClosed(t *testing.T) {
 			if got := delegatedMintIssueV1RejectClass(mutated); got != reject.RejectClass {
 				t.Fatalf("published reject classified as %q, want %q", got, reject.RejectClass)
 			}
+			wantStatus, wantCode := 403, DelegatedMintIssueV1AuthFailureCode
+			if reject.RejectClass == "body_size" {
+				wantStatus, wantCode = 413, "payload_too_large"
+			}
+			if reject.Status != wantStatus || reject.ErrorCode != wantCode {
+				t.Fatalf("published reject response = %d/%q, want %d/%q", reject.Status, reject.ErrorCode, wantStatus, wantCode)
+			}
 		})
+	}
+}
+
+func TestDelegatedMintIssueV1NonceReuseStateIsReachable(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.NonceReuseSigned.TimestampUnix-file.Golden.TimestampUnix > int64(file.Contract.NonceReplayRetentionSeconds) {
+		t.Fatal("nonce-reuse request occurs after the original nonce retention window")
+	}
+	state := file.StateCases[5]
+	if state.Name != "reused_nonce_across_operation" || state.NowUnix != file.NonceReuseSigned.TimestampUnix ||
+		state.NowUnix-file.Golden.TimestampUnix > int64(file.Contract.NonceReplayRetentionSeconds) ||
+		state.NowUnix-file.NonceReuseSigned.TimestampUnix > int64(file.Contract.TimestampMaxSkewSeconds) {
+		t.Fatalf("nonce-reuse state is not reachable: %+v", state)
+	}
+}
+
+func TestDelegatedMintIssueV1ResponseRetryAfterRules(t *testing.T) {
+	t.Parallel()
+	file, err := DelegatedMintIssueV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, response := range file.ResponseCases {
+		switch response.Name {
+		case "rate_limit_exceeded":
+			if response.RetryAfter.Mode != DelegatedMintIssueV1RetryAfterPositiveSeconds || response.RetryAfter.Seconds != 0 {
+				t.Fatalf("rate-limit Retry-After = %+v", response.RetryAfter)
+			}
+		case "mutation_outcome_unknown":
+			if response.RetryAfter.Mode != DelegatedMintIssueV1RetryAfterExactSeconds || response.RetryAfter.Seconds != 1 {
+				t.Fatalf("mutation-unknown Retry-After = %+v", response.RetryAfter)
+			}
+		default:
+			if response.RetryAfter.Mode != DelegatedMintIssueV1RetryAfterAbsent || response.RetryAfter.Seconds != 0 {
+				t.Fatalf("%s Retry-After = %+v", response.Name, response.RetryAfter)
+			}
+		}
 	}
 }
 
@@ -285,6 +334,8 @@ func TestParseDelegatedMintIssueV1FileFailsClosed(t *testing.T) {
 		}},
 		{name: "state case", change: func(file *DelegatedMintIssueV1File) { file.StateCases[0].Outcome = "future" }},
 		{name: "response case", change: func(file *DelegatedMintIssueV1File) { file.ResponseCases[0].Status++ }},
+		{name: "retry mode", change: func(file *DelegatedMintIssueV1File) { file.ResponseCases[0].RetryAfter.Mode = "future" }},
+		{name: "reject response", change: func(file *DelegatedMintIssueV1File) { file.RejectCases[0].Status = 400 }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ParseDelegatedMintIssueV1File(mutate(t, test.change)); err == nil {

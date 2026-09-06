@@ -84,6 +84,16 @@ jobs:
           const tp = c.targetPathV1Vectors();
           const dm = c.delegatedMintIssueV1Vectors();
           const dmRejects = Object.fromEntries(dm.reject_cases.map(v => [v.name, v]));
+          const dmRejectResponses = {
+            authority: '403/invalid_capability_issue',
+            body_size: '413/payload_too_large',
+            idempotency_key: '403/invalid_capability_issue',
+            nonce: '403/invalid_capability_issue',
+            signature_encoding: '403/invalid_capability_issue',
+            signature_malleability: '403/invalid_capability_issue',
+            signature_scalar: '403/invalid_capability_issue',
+            signature_mismatch: '403/invalid_capability_issue',
+          };
           const hubFrame = (tag, value) => {
             const prefix = Buffer.alloc(3);
             prefix[0] = tag;
@@ -713,10 +723,12 @@ jobs:
               dm.golden.public_key_der_b64url === dm.refresh_golden.public_key_der_b64url ||
               dm.contract.nonce_replay_retention_seconds !== 900 ||
               dm.contract.nonce_replay_retention_seconds <= 2 * dm.contract.timestamp_max_skew_seconds ||
+              dm.contract.retry_after_modes.join(',') !== 'absent,exact_seconds,positive_integer_seconds' ||
               dm.reject_cases.length !== 9 || Object.keys(dmRejects).length !== 9 ||
               dm.state_cases.length !== 8 || dm.response_cases.length !== 8 ||
               new Set(dm.reject_cases.map(v => v.reject_class)).size !== dm.contract.reject_classes.length ||
               dm.reject_cases.some(v => v.outcome !== 'reject' || !dm.contract.reject_classes.includes(v.reject_class)) ||
+              dm.reject_cases.some(v => `${v.status}/${v.error_code}` !== dmRejectResponses[v.reject_class]) ||
               !verifyDMGolden(dm.golden) || !verifyDMGolden(dm.retry_golden) || !verifyDMGolden(dm.refresh_golden) ||
               !verifyDMGolden(dm.wrong_endpoint_signed) || !verifyDMGolden(dm.nonce_reuse_signed) ||
               !verifyDMGolden(dm.authority_conflict_signed) ||
@@ -724,8 +736,10 @@ jobs:
               dm.state_cases.map(v => v.name).join(',') !== 'first_issue,exact_stale_replay,fresh_reconciliation,stale_unseen,alternate_endpoint,reused_nonce_across_operation,stale_non_exact_retry,fresh_authority_conflict' ||
               dm.response_cases.find(v => v.error_code === 'issue_operation_not_found')?.proves_operation_absent !== true ||
               dm.response_cases.filter(v => v.proves_operation_absent).length !== 1 ||
-              dm.response_cases.find(v => v.error_code === 'rate_limit_exceeded')?.retry_after !== 'positive_integer_seconds' ||
-              dm.response_cases.find(v => v.error_code === 'mutation_outcome_unknown')?.retry_after !== '1' ||
+              JSON.stringify(dm.response_cases.find(v => v.error_code === 'rate_limit_exceeded')?.retry_after) !== '{"mode":"positive_integer_seconds"}' ||
+              JSON.stringify(dm.response_cases.find(v => v.error_code === 'mutation_outcome_unknown')?.retry_after) !== '{"mode":"exact_seconds","seconds":1}' ||
+              dm.response_cases.filter(v => !['rate_limit_exceeded', 'mutation_outcome_unknown'].includes(v.error_code)).some(v => JSON.stringify(v.retry_after) !== '{"mode":"absent"}') ||
+              dm.nonce_reuse_signed.timestamp_unix - dm.golden.timestamp_unix > dm.contract.nonce_replay_retention_seconds ||
               !deviceApiKeyCanonical) {
             process.exit(1);
           }
@@ -769,12 +783,22 @@ jobs:
           tp = q.target_path_v1_vectors()
           dm = q.delegated_mint_issue_v1_vectors()
           dm_rejects = {case['name']: case for case in dm['reject_cases']}
+          dm_reject_responses = {
+              'authority': (403, 'invalid_capability_issue'),
+              'body_size': (413, 'payload_too_large'),
+              'idempotency_key': (403, 'invalid_capability_issue'),
+              'nonce': (403, 'invalid_capability_issue'),
+              'signature_encoding': (403, 'invalid_capability_issue'),
+              'signature_malleability': (403, 'invalid_capability_issue'),
+              'signature_scalar': (403, 'invalid_capability_issue'),
+              'signature_mismatch': (403, 'invalid_capability_issue'),
+          }
           def hub_frame(tag, value):
               return bytes([tag]) + struct.pack('>H', len(value)) + value
           def issue_frame(value):
               encoded = value.encode('utf-8')
               return struct.pack('>I', len(encoded)) + encoded
-          def verify_dm_golden(golden):
+          def verify_dm_framing_and_digest(golden):
               body_hash = hashlib.sha256(golden['body_utf8'].encode('utf-8')).hexdigest()
               values = {
                   'method': golden['method'],
@@ -1342,6 +1366,7 @@ jobs:
           assert dm['contract']['capability_ttl_seconds'] == 900 and dm['contract']['authority_max_ttl_seconds'] == 86400
           assert dm['contract']['nonce_replay_retention_seconds'] == 900
           assert dm['contract']['nonce_replay_retention_seconds'] > 2 * dm['contract']['timestamp_max_skew_seconds']
+          assert dm['contract']['retry_after_modes'] == ['absent', 'exact_seconds', 'positive_integer_seconds']
           assert dm['contract']['external_operation_commit_rule'] == 'uncommitted_external_operation_may_advance_internal_issue_generation_within_same_authority_committed_external_response_replays_byte_exact_new_outward_capability_requires_new_signed_external_request'
           assert dm['contract']['stale_operation_miss_status'] == 404
           assert dm['contract']['stale_operation_miss_code'] == 'issue_operation_not_found'
@@ -1354,6 +1379,7 @@ jobs:
           assert len(dm['reject_cases']) == 9 and len(dm_rejects) == 9
           assert {case['reject_class'] for case in dm['reject_cases']} == set(dm['contract']['reject_classes'])
           assert all(case['outcome'] == 'reject' for case in dm['reject_cases'])
+          assert all((case['status'], case['error_code']) == dm_reject_responses[case['reject_class']] for case in dm['reject_cases'])
           assert len(dm['state_cases']) == 8
           assert [case['name'] for case in dm['state_cases']] == [
               'first_issue', 'exact_stale_replay', 'fresh_reconciliation', 'stale_unseen',
@@ -1362,13 +1388,15 @@ jobs:
           ]
           assert len(dm['response_cases']) == 8
           assert [case['error_code'] for case in dm['response_cases'] if case['proves_operation_absent']] == ['issue_operation_not_found']
-          assert next(case for case in dm['response_cases'] if case['error_code'] == 'rate_limit_exceeded')['retry_after'] == 'positive_integer_seconds'
-          assert next(case for case in dm['response_cases'] if case['error_code'] == 'mutation_outcome_unknown')['retry_after'] == '1'
+          assert next(case for case in dm['response_cases'] if case['error_code'] == 'rate_limit_exceeded')['retry_after'] == {'mode': 'positive_integer_seconds'}
+          assert next(case for case in dm['response_cases'] if case['error_code'] == 'mutation_outcome_unknown')['retry_after'] == {'mode': 'exact_seconds', 'seconds': 1}
+          assert all(case['retry_after'] == {'mode': 'absent'} for case in dm['response_cases'] if case['error_code'] not in {'rate_limit_exceeded', 'mutation_outcome_unknown'})
           assert dm['wrong_endpoint_signed']['authority'] != dm['golden']['authority']
           assert dm['wrong_endpoint_signed']['public_key_der_b64url'] == dm['golden']['public_key_der_b64url']
           assert dm['nonce_reuse_signed']['nonce'] == dm['golden']['nonce']
           assert dm['nonce_reuse_signed']['idempotency_key'] == dm['refresh_golden']['idempotency_key']
-          assert all(verify_dm_golden(golden) for golden in (
+          assert dm['nonce_reuse_signed']['timestamp_unix'] - dm['golden']['timestamp_unix'] <= dm['contract']['nonce_replay_retention_seconds']
+          assert all(verify_dm_framing_and_digest(golden) for golden in (
               dm['golden'], dm['retry_golden'], dm['refresh_golden'],
               dm['wrong_endpoint_signed'], dm['nonce_reuse_signed'],
               dm['authority_conflict_signed'],

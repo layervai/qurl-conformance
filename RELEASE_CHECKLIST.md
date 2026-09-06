@@ -89,10 +89,12 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 ## When a release rotates delegated-mint test keys
 
 - [ ] Run `make gen-delegated-mint-vectors` once. Confirm that it self-verifies
-      both low-S signatures and derives the published reject cases.
+      every low-S signature and derives the published reject cases.
 - [ ] Run `scripts/sync-vectors.sh`, then all gates in **Every release**. Confirm
-      that the Node package verifies both signatures and that all three
-      published JSON files are byte-identical.
+      that the Node smoke verifies every P-256 signature, the Python smoke
+      rebuilds every canonical frame and digest, and all three published JSON
+      files are byte-identical. The Python standard library does not verify the
+      P-256 signatures.
 - [ ] Run the real Connector producer tests against this exact artifact. They
       must rebuild the same canonical digest with a new private key and verify
       the result. Record the producing repository and exact commit in the PR.
