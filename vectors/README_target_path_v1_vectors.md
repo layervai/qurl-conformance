@@ -1,14 +1,14 @@
 # qURL Connector target-path vectors
 
 `target_path_v1_vectors.json` is the shared request grammar for an optional
-per-qURL destination on a qURL Connector resource. The service appends the
+per-qURL destination on a tunnel resource. The authoritative opener appends an
 accepted value to the trusted `qurl_site` origin after a successful knock. One
-Connector resource can issue independent qURLs for distinct fileviewer objects
-without exposing the Connector origin.
+resource can issue independent qURLs for distinct protected objects without
+exposing the resource origin.
 
-The service is authoritative. Go and TypeScript SDKs must also apply the same
-local gate before dispatch. Thus, callers get the same deterministic error and
-no invalid request leaves the process.
+The authoritative validator is the final boundary. Every SDK also applies the
+same local gate before dispatch. Thus, callers get the same deterministic error
+and no invalid request leaves the process.
 
 ## Input contract
 
@@ -36,11 +36,12 @@ no invalid request leaves the process.
   escape is `dot_segment`. Every other well-formed path escape, including
   `%2f`, is `invalid_character`.
 - Well-formed percent escapes in the query are accepted and preserved exactly.
-  Validators do not decode, normalize, recase, or re-encode them. The service
-  does not use the query for path authorization. Consumers must never decode
-  encoded query controls in this validation or authorization layer.
-- Resource-type gating is outside this artifact. The service is authoritative:
-  it accepts `target_path` only for a wire `type: tunnel` resource and returns
+  The first literal `?` separates the path from the query. Every later `?` is
+  query data. Validators do not decode, normalize, recase, or re-encode query
+  escapes. Path authorization does not use the query. Consumers must never
+  decode encoded query controls in this validation or authorization layer.
+- Resource-type gating is outside this artifact. The authoritative validator
+  accepts `target_path` only for a wire `type: tunnel` resource and returns
   `invalid_target_path` for another resource type.
 
 The closed local `reject_class` values are:
@@ -55,6 +56,7 @@ The closed local `reject_class` values are:
 | `dot_segment` | the path contains a literal `.` or `..` segment or a case-insensitive `%2e` escape |
 | `percent_encoding` | a `%` escape in the path or query is incomplete or is not hexadecimal |
 
+`contract.query_delimiter` pins the first literal `?` as the path/query split.
 `contract.validation_order` is the complete normative order. After presence,
 the validator checks empty, UTF-8 byte length, the leading slash, and a
 protocol-relative authority. Thus, length wins over `not_absolute`, and
@@ -78,15 +80,15 @@ invariant and a reserved compatibility gate even though every v1 accepted case
 is true. Because v1 has no false vector, consumers must also inject a false case
 in a unit test and prove that the open operation rejects it. Appending the value
 to a fixed trusted origin must preserve the scheme, host, path, and complete
-request target bytes. The service ignores the query when it authorizes the
+request target bytes. The authoritative opener ignores the query when it authorizes the
 protected request. A scoped path allows the exact path and descendants at a
 segment boundary. For example, `/view/abc` also allows
 `/view/abc/thumbnail`, but it does not allow `/view/abcd`.
 
-The service preserves one trailing slash on redirect. Its path authorization
+The authoritative opener preserves one trailing slash on redirect. Its path authorization
 treats a scoped path with or without that trailing slash as the same boundary.
-Changing `open_supported` requires a coordinated release across the service,
-both SDKs, and the Connector.
+Changing `open_supported` requires a coordinated release across the validator,
+SDK consumers, and the protected-resource runtime.
 
 ## Consumer algorithm
 
@@ -102,12 +104,12 @@ For every case, pass `present` and `value` through the real public option gate:
    accepted value is true, so add an injected false-branch unit test. A
    coordinated future contract can gate a subset.
 
-The strict Go loader independently derives every outcome and rejects missing,
-duplicate, unknown, or modified cases. The npm and Python packages carry
-byte-identical copies.
+Each strict package loader independently derives every outcome and rejects
+missing, duplicate, unknown, or modified cases. All packaged copies are
+byte-identical.
 
 ## Lockstep rule
 
-Neither SDK ships this public capability until both SDKs consume the same
-released vector artifact and pass every case. qurl-service remains the final
-validation and resource-type boundary.
+No SDK ships this public capability until all SDK consumers use the same
+released vector artifact and pass every case. The authoritative validator
+remains the final validation and resource-type boundary.

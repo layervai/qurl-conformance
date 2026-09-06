@@ -65,6 +65,7 @@ type TargetPathContract struct {
 	ExplicitEmptySemantics  string   `json:"explicit_empty_semantics"`
 	AcceptedCharacterSet    string   `json:"accepted_character_set"`
 	AllowedASCII            string   `json:"allowed_ascii"`
+	QueryDelimiter          string   `json:"query_delimiter"`
 	ValidationOrder         []string `json:"validation_order"`
 	AcceptedValueHandling   string   `json:"accepted_value_handling"`
 	PercentEncodingHandling string   `json:"percent_encoding_handling"`
@@ -134,6 +135,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"accept_encoded_dot_slash_in_query":         {present: true, value: targetPathValue("/view/x?next=%2e%2E%2f%2F")},
 	"accept_encoded_controls_in_query":          {present: true, value: targetPathValue("/view/x?a=%0d%0a%00")},
 	"accept_semicolon_in_query":                 {present: true, value: targetPathValue("/view/abc?x=1;y=2")},
+	"accept_second_question_mark_in_query":      {present: true, value: targetPathValue("/view/x?next=http://e.example/p?q=1")},
 	"accept_max_bytes":                          {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes-1))},
 	"reject_explicit_empty":                     {present: true, value: targetPathValue("")},
 	"reject_too_long":                           {present: true, value: targetPathValue("/" + strings.Repeat("a", TargetPathMaxBytes))},
@@ -174,6 +176,7 @@ var targetPathFixtures = map[string]targetPathFixture{
 	"reject_dotdot_leading":                     {present: true, value: targetPathValue("/../etc/passwd")},
 	"reject_dotdot_middle":                      {present: true, value: targetPathValue("/view/../../secret")},
 	"reject_dotdot_trailing":                    {present: true, value: targetPathValue("/view/..")},
+	"reject_dot_segment_before_two_queries":     {present: true, value: targetPathValue("/a/..?b?c")},
 	"reject_percent_encoded_dot_lower":          {present: true, value: targetPathValue("/%2e%2e/secret")},
 	"reject_percent_encoded_dot_upper":          {present: true, value: targetPathValue("/%2E%2E/secret")},
 	"reject_percent_encoded_single_dot":         {present: true, value: targetPathValue("/a%2eb")},
@@ -244,6 +247,7 @@ func ParseTargetPathFile(data []byte) (*TargetPathFile, error) {
 		ExplicitEmptySemantics:  "reject",
 		AcceptedCharacterSet:    "raw_ascii_canonical_uri_path_and_query",
 		AllowedASCII:            TargetPathAllowedASCII,
+		QueryDelimiter:          "first_question_mark",
 		ValidationOrder:         targetPathValidationOrder,
 		AcceptedValueHandling:   "preserve_exact_bytes",
 		PercentEncodingHandling: "reject_all_path_escapes_accept_well_formed_query_escapes_without_normalize_or_decode",

@@ -9,6 +9,7 @@
     "explicit_empty_semantics": "reject",
     "accepted_character_set": "raw_ascii_canonical_uri_path_and_query",
     "allowed_ascii": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~!$&'()*+,;=:@%/?-",
+    "query_delimiter": "first_question_mark",
     "validation_order": [
       "presence",
       "empty",
@@ -135,6 +136,13 @@
       "name": "accept_semicolon_in_query",
       "present": true,
       "value": "/view/abc?x=1;y=2",
+      "outcome": "accept",
+      "open_supported": true
+    },
+    {
+      "name": "accept_second_question_mark_in_query",
+      "present": true,
+      "value": "/view/x?next=http://e.example/p?q=1",
       "outcome": "accept",
       "open_supported": true
     },
@@ -415,6 +423,13 @@
       "name": "reject_dotdot_trailing",
       "present": true,
       "value": "/view/..",
+      "outcome": "reject",
+      "reject_class": "dot_segment"
+    },
+    {
+      "name": "reject_dot_segment_before_two_queries",
+      "present": true,
+      "value": "/a/..?b?c",
       "outcome": "reject",
       "reject_class": "dot_segment"
     },

@@ -357,6 +357,25 @@ func TestTargetPathSemicolonIsQueryOnly(t *testing.T) {
 	}
 }
 
+func TestTargetPathUsesFirstQuestionMarkAsQueryDelimiter(t *testing.T) {
+	tf, err := TargetPathV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tf.Contract.QueryDelimiter != "first_question_mark" {
+		t.Fatalf("query delimiter = %q, want first_question_mark", tf.Contract.QueryDelimiter)
+	}
+	accepted := targetPathCase(t, tf, "accept_second_question_mark_in_query")
+	if accepted.Outcome != ExpectAccept || accepted.Value == nil ||
+		*accepted.Value != "/view/x?next=http://e.example/p?q=1" {
+		t.Errorf("second query marker case = %+v, want byte-exact acceptance", *accepted)
+	}
+	rejected := targetPathCase(t, tf, "reject_dot_segment_before_two_queries")
+	if rejected.Outcome != ExpectReject || rejected.RejectClass != TargetPathRejectDotSegment {
+		t.Errorf("dot segment before two queries = %+v, want dot_segment", *rejected)
+	}
+}
+
 func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	raw := TargetPathV1Vectors()
 	mutate := func(t *testing.T, change func(*TargetPathFile)) []byte {
@@ -398,6 +417,9 @@ func TestParseTargetPathFileFailsClosed(t *testing.T) {
 	})
 	t.Run("allowed ASCII", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.AllowedASCII += "<" }), "contract")
+	})
+	t.Run("query delimiter", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(tf *TargetPathFile) { tf.Contract.QueryDelimiter = "last_question_mark" }), "contract")
 	})
 	t.Run("validation order", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(tf *TargetPathFile) {
