@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.0](https://github.com/layervai/qurl-conformance/compare/v0.16.0...v0.17.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* require CRID for Connector continuity ([#137](https://github.com/layervai/qurl-conformance/issues/137))
+
+### Features
+
+* require CRID for Connector continuity ([#137](https://github.com/layervai/qurl-conformance/issues/137)) ([13dc202](https://github.com/layervai/qurl-conformance/commit/13dc20265a2735a59e0ffac8145322ab635c8497))
+
 ## [0.16.0](https://github.com/layervai/qurl-conformance/compare/v0.15.0...v0.16.0) (2026-09-07)
 
 

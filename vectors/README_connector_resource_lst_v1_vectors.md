@@ -162,3 +162,6 @@ budget before adding any success field.
 `crid_binding` rejects a CRID that does not match its delivered key.
 `resource_binding` rejects a self-consistent CRID that differs from the pinned
 CRID, or other cross-wired resource values.
+
+Both the 60-character full form and the 47-character truncated CRID form
+are valid in this profile. The 60-character form sets the maximum size budget.
