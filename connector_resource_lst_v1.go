@@ -36,7 +36,7 @@ const (
 	ConnectorResourceLSTV1ResultHeaderName  = "NHP_LRT"
 	ConnectorResourceLSTV1ResultHeaderType  = 6
 
-	ConnectorResourceLSTV1NonceBytes         = 32
+	ConnectorResourceLSTV1NonceBytes         = ConnectorHubRequestNonceBytes
 	ConnectorResourceLSTV1ResourceIDBytes    = 91
 	ConnectorResourceLSTV1ResourceIDChars    = 122
 	ConnectorResourceLSTV1RoutingDigestBytes = 32
@@ -1073,9 +1073,10 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 	return object, "", nil
 }
 
+// ValidateConnectorResourceLSTV1Nonce applies the one shared request_nonce
+// grammar (DecodeConnectorHubRequestNonce) to a Connector resource request.
 func ValidateConnectorResourceLSTV1Nonce(value string) error {
-	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil || len(decoded) != ConnectorResourceLSTV1NonceBytes || base64.RawURLEncoding.EncodeToString(decoded) != value {
+	if _, err := DecodeConnectorHubRequestNonce(value); err != nil {
 		return errors.New("request_nonce must be canonical unpadded base64url for exactly 32 bytes")
 	}
 	return nil
@@ -1130,7 +1131,7 @@ func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
 // gate rather than a copied pattern.
 func ValidateConnectorResourceLSTV1Environment(value string) error {
 	if !connectorResourceLSTV1EnvironmentPattern.MatchString(value) {
-		return errors.New("environment is not a canonical Connector environment label")
+		return errors.New("conformance: environment is not a canonical Connector environment label")
 	}
 	return nil
 }

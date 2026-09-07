@@ -33,17 +33,20 @@ func TestDecodeConnectorHubRequestNonceRejects(t *testing.T) {
 	}
 	canonical := base64.RawURLEncoding.EncodeToString(raw)
 	cases := map[string]string{
-		"empty":                   "",
-		"padded":                  canonical + "=",
-		"short":                   canonical[:len(canonical)-1],
-		"long":                    canonical + "A",
-		"standard alphabet plus":  "+" + canonical[1:],
-		"standard alphabet slash": "/" + canonical[1:],
-		"whitespace":              " " + canonical[1:],
-		"non-canonical tail bits": canonical[:len(canonical)-1] + "B",
-		"31 bytes":                base64.RawURLEncoding.EncodeToString(raw[:31]),
-		"33 bytes":                base64.RawURLEncoding.EncodeToString(append(append([]byte{}, raw...), 0)),
-		"non-ascii":               strings.Repeat("\u00e9", 22),
+		"empty":                    "",
+		"padded":                   canonical + "=",
+		"short":                    canonical[:len(canonical)-1],
+		"long":                     canonical + "A",
+		"standard alphabet plus":   "+" + canonical[1:],
+		"standard alphabet slash":  "/" + canonical[1:],
+		"whitespace":               " " + canonical[1:],
+		"non-canonical tail bits":  canonical[:len(canonical)-1] + "B",
+		"31 bytes":                 base64.RawURLEncoding.EncodeToString(raw[:31]),
+		"33 bytes":                 base64.RawURLEncoding.EncodeToString(append(append([]byte{}, raw...), 0)),
+		"non-ascii":                strings.Repeat("\u00e9", 22),
+		"embedded newline":         canonical[:20] + "\n" + canonical[20:],
+		"trailing newline":         canonical + "\n",
+		"embedded carriage return": canonical[:20] + "\r" + canonical[20:],
 	}
 	for name, value := range cases {
 		if _, err := DecodeConnectorHubRequestNonce(value); !errors.Is(err, ErrConnectorHubRequestNonce) {
