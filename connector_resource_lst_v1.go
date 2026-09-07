@@ -36,7 +36,7 @@ const (
 	ConnectorResourceLSTV1ResultHeaderName  = "NHP_LRT"
 	ConnectorResourceLSTV1ResultHeaderType  = 6
 
-	ConnectorResourceLSTV1NonceBytes         = ConnectorHubRequestNonceBytes
+	ConnectorResourceLSTV1NonceBytes         = RequestNonceBytes
 	ConnectorResourceLSTV1ResourceIDBytes    = 91
 	ConnectorResourceLSTV1ResourceIDChars    = 122
 	ConnectorResourceLSTV1RoutingDigestBytes = 32
@@ -1074,9 +1074,9 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 }
 
 // ValidateConnectorResourceLSTV1Nonce applies the one shared request_nonce
-// grammar (DecodeConnectorHubRequestNonce) to a Connector resource request.
+// grammar (DecodeRequestNonce) to a Connector resource request.
 func ValidateConnectorResourceLSTV1Nonce(value string) error {
-	if _, err := DecodeConnectorHubRequestNonce(value); err != nil {
+	if _, err := DecodeRequestNonce(value); err != nil {
 		return fmt.Errorf("request_nonce must be canonical unpadded base64url for exactly %d bytes", ConnectorResourceLSTV1NonceBytes)
 	}
 	return nil

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestDecodeConnectorHubRequestNonceAcceptsCommittedFixtures(t *testing.T) {
+func TestDecodeRequestNonceAcceptsCommittedFixtures(t *testing.T) {
 	resource, err := ConnectorResourceLSTV1()
 	if err != nil {
 		t.Fatal(err)
@@ -18,18 +18,18 @@ func TestDecodeConnectorHubRequestNonceAcceptsCommittedFixtures(t *testing.T) {
 		"resource existing nonce":    resource.Fixtures.ExistingRequestNonce,
 		"resource no-CRID nonce":     resource.Fixtures.NoCRIDRequestNonce,
 	} {
-		nonce, err := DecodeConnectorHubRequestNonce(value)
+		nonce, err := DecodeRequestNonce(value)
 		if err != nil {
-			t.Fatalf("%s: DecodeConnectorHubRequestNonce(%q) = %v, want accept", name, value, err)
+			t.Fatalf("%s: DecodeRequestNonce(%q) = %v, want accept", name, value, err)
 		}
-		if len(nonce) != ConnectorHubRequestNonceBytes {
-			t.Fatalf("%s: decoded %d bytes, want %d", name, len(nonce), ConnectorHubRequestNonceBytes)
+		if len(nonce) != RequestNonceBytes {
+			t.Fatalf("%s: decoded %d bytes, want %d", name, len(nonce), RequestNonceBytes)
 		}
 	}
 }
 
-func TestDecodeConnectorHubRequestNonceRejects(t *testing.T) {
-	raw := make([]byte, ConnectorHubRequestNonceBytes)
+func TestDecodeRequestNonceRejects(t *testing.T) {
+	raw := make([]byte, RequestNonceBytes)
 	for i := range raw {
 		raw[i] = byte(0xa0 + i)
 	}
@@ -51,11 +51,11 @@ func TestDecodeConnectorHubRequestNonceRejects(t *testing.T) {
 		"embedded carriage return": canonical[:20] + "\r" + canonical[20:],
 	}
 	for name, value := range cases {
-		if _, err := DecodeConnectorHubRequestNonce(value); !errors.Is(err, ErrConnectorHubRequestNonce) {
-			t.Errorf("%s: DecodeConnectorHubRequestNonce(%q) = %v, want ErrConnectorHubRequestNonce", name, value, err)
+		if _, err := DecodeRequestNonce(value); !errors.Is(err, ErrRequestNonce) {
+			t.Errorf("%s: DecodeRequestNonce(%q) = %v, want ErrRequestNonce", name, value, err)
 		}
 	}
-	if got, err := DecodeConnectorHubRequestNonce(canonical); err != nil || base64.RawURLEncoding.EncodeToString(got) != canonical {
+	if got, err := DecodeRequestNonce(canonical); err != nil || base64.RawURLEncoding.EncodeToString(got) != canonical {
 		t.Fatalf("canonical nonce = %x, %v; want round trip", got, err)
 	}
 }

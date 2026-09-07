@@ -1819,7 +1819,7 @@ func classifyAgentAssignmentRequest(c AgentAssignmentRequestCase) string {
 		if data.Query != "cell_assignment" || data.Version != 1 || data.Mode != "enroll" || data.Credential == "" {
 			return AgentAssignmentRejectSemantic
 		}
-		if _, err := DecodeConnectorHubRequestNonce(data.RequestNonce); err != nil {
+		if _, err := DecodeRequestNonce(data.RequestNonce); err != nil {
 			return AgentAssignmentRejectSemantic
 		}
 	case "refresh_assignment":
@@ -1830,7 +1830,7 @@ func classifyAgentAssignmentRequest(c AgentAssignmentRequestCase) string {
 		if data.Query != "cell_assignment" || data.Version != 1 || data.Mode != "refresh" {
 			return AgentAssignmentRejectSemantic
 		}
-		if _, err := DecodeConnectorHubRequestNonce(data.RequestNonce); err != nil {
+		if _, err := DecodeRequestNonce(data.RequestNonce); err != nil {
 			return AgentAssignmentRejectSemantic
 		}
 	case "registration_completion":
@@ -2049,7 +2049,7 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if initialRequest.UsrID != "" || initialRequest.DevID == "" || initialRequest.AspID != "agent" || initialData.Query != "cell_assignment" || initialData.Version != 1 || initialData.Mode != "enroll" || initialData.RequestNonce != AgentAssignmentInitialRequestNonceFixture || initialData.Credential != AgentAssignmentBootstrapCredentialFixture {
 		return errors.New("conformance: initial_assignment.request semantic fields drifted")
 	}
-	if _, err := DecodeConnectorHubRequestNonce(initialData.RequestNonce); err != nil {
+	if _, err := DecodeRequestNonce(initialData.RequestNonce); err != nil {
 		return fmt.Errorf("conformance: initial_assignment.request request_nonce: %w", err)
 	}
 
@@ -2085,7 +2085,7 @@ func validateAgentAssignmentSuccessBodies(af *AgentAssignmentFile) error {
 	if refreshRequest.UsrID != "" || refreshRequest.DevID != initialRequest.DevID || refreshRequest.AspID != "agent" || refreshData.Query != "cell_assignment" || refreshData.Version != 1 || refreshData.Mode != "refresh" || refreshData.RequestNonce != AgentAssignmentRefreshRequestNonceFixture {
 		return errors.New("conformance: refresh_assignment.request semantic fields drifted")
 	}
-	if _, err := DecodeConnectorHubRequestNonce(refreshData.RequestNonce); err != nil {
+	if _, err := DecodeRequestNonce(refreshData.RequestNonce); err != nil {
 		return fmt.Errorf("conformance: refresh_assignment.request request_nonce: %w", err)
 	}
 	refreshList, err := decodeAgentAssignmentListSuccess("refresh_assignment.result", af.RefreshAssignment.Result.BodyJSON)
