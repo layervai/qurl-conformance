@@ -210,7 +210,7 @@ type ConnectorResourceLSTV1Fixtures struct {
 	CRID                          string `json:"crid"`
 	CreateRequestNonce            string `json:"create_request_nonce"`
 	ExistingRequestNonce          string `json:"existing_request_nonce"`
-	NoCRIDRequestNonce            string `json:"no_crid_request_nonce"`
+	UnpinnedRequestNonce          string `json:"unpinned_request_nonce"`
 }
 
 type ConnectorResourceLSTV1Body struct {
@@ -475,12 +475,12 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if outcome, err := CRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourcePublicKey); err != nil || outcome != CRIDV1OutcomeMatch {
 		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_public_key")
 	}
-	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.NoCRIDRequestNonce} {
+	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.UnpinnedRequestNonce} {
 		if err := ValidateConnectorResourceLSTV1Nonce(nonce); err != nil {
 			return fmt.Errorf("conformance: Connector resource LST fixture nonce: %w", err)
 		}
 	}
-	if fixtures.CreateRequestNonce == fixtures.ExistingRequestNonce || fixtures.CreateRequestNonce == fixtures.NoCRIDRequestNonce || fixtures.ExistingRequestNonce == fixtures.NoCRIDRequestNonce {
+	if fixtures.CreateRequestNonce == fixtures.ExistingRequestNonce || fixtures.CreateRequestNonce == fixtures.UnpinnedRequestNonce || fixtures.ExistingRequestNonce == fixtures.UnpinnedRequestNonce {
 		return errors.New("conformance: Connector resource LST fixture nonces must be distinct")
 	}
 	return nil
@@ -625,6 +625,8 @@ func validateConnectorResourceLSTV1ResultRejectCases(cases []ConnectorResourceLS
 	baseline := &connectorResourceLSTV1RequestWire{UsrID: fixtures.AgentID, DevID: fixtures.AgentID, AspID: ConnectorResourceLSTV1AspID,
 		UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: fixtures.ConnectorID, ExpectedCRID: &fixtures.CRID}}
 	required := map[string]string{
+		"reject_success_missing_crid":                ConnectorResourceLSTV1RejectMissingField,
+		"reject_success_null_crid":                   ConnectorResourceLSTV1RejectWrongType,
 		"reject_success_missing_list":                ConnectorResourceLSTV1RejectMissingField,
 		"reject_success_null_list":                   ConnectorResourceLSTV1RejectWrongType,
 		"reject_success_err_msg":                     ConnectorResourceLSTV1RejectUnknownField,
@@ -634,7 +636,7 @@ func validateConnectorResourceLSTV1ResultRejectCases(cases []ConnectorResourceLS
 		"reject_success_wrong_version":               ConnectorResourceLSTV1RejectSemantic,
 		"reject_success_agent_mismatch":              ConnectorResourceLSTV1RejectRequestBinding,
 		"reject_success_connector_mismatch":          ConnectorResourceLSTV1RejectRequestBinding,
-		"reject_success_expected_resource_mismatch":  ConnectorResourceLSTV1RejectResourceBinding,
+		"reject_success_expected_crid_mismatch":      ConnectorResourceLSTV1RejectResourceBinding,
 		"reject_success_invalid_resource_public_key": ConnectorResourceLSTV1RejectSemantic,
 		"reject_success_invalid_routing_id":          ConnectorResourceLSTV1RejectSemantic,
 		"reject_success_blank_knock_id":              ConnectorResourceLSTV1RejectSemantic,
@@ -790,8 +792,11 @@ func validateConnectorResourceLSTV1SizeCases(cases []ConnectorResourceLSTV1SizeC
 			}
 		case "result":
 			var result connectorResourceLSTV1ResultWire
-			if err := strictDecodeArtifact(body, &result); err != nil || result.List == nil || result.List.CRID == nil {
+			if err := strictDecodeArtifact(body, &result); err != nil {
 				return fmt.Errorf("conformance: Connector resource LST max result decode: %v", err)
+			}
+			if result.List == nil || result.List.CRID == nil {
+				return errors.New("conformance: Connector resource LST max result requires list and crid")
 			}
 			expected := *result.List.CRID
 			request := &connectorResourceLSTV1RequestWire{UsrID: result.List.AgentID, DevID: result.List.AgentID, AspID: ConnectorResourceLSTV1AspID,
@@ -957,16 +962,14 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 		if result.List.CRID == nil {
 			return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("crid must be a string")
 		}
-		{
-			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourcePublicKey)
-			if matchErr != nil {
-				return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
-			}
-			if outcome != CRIDV1OutcomeMatch {
-				return nil, ConnectorResourceLSTV1RejectCRIDBinding, errors.New("crid does not match resource_public_key")
-			}
+		outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourcePublicKey)
+		if matchErr != nil {
+			return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
 		}
-		if request != nil && request.UsrData.ExpectedCRID != nil && (result.List.CRID == nil || *result.List.CRID != *request.UsrData.ExpectedCRID) {
+		if outcome != CRIDV1OutcomeMatch {
+			return nil, ConnectorResourceLSTV1RejectCRIDBinding, errors.New("crid does not match resource_public_key")
+		}
+		if request != nil && request.UsrData.ExpectedCRID != nil && *result.List.CRID != *request.UsrData.ExpectedCRID {
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success violates expected_crid continuity")
 		}
 		return &result, "", nil

@@ -226,7 +226,7 @@ artifact has its own `artifact` id:
   It contains no Noise packets or key material; consumers compose it with their
   real body serializer, request-policy gates, reply parser, and transport
   correlation gates. Its `resId` semantic is the placement-neutral NHP
-  `knock_resource_id`, not the public-key management `resource_id`. See
+  `knock_resource_id`, not the verification key `resource_public_key`. See
   `vectors/README_agent_knock_application_vectors.md`.
 - **Registered-agent session control**
   (`qurl-agent-session-control-vectors`,
@@ -274,8 +274,8 @@ artifact has its own `artifact` id:
   `connector_resource` v1 exchange over standard NHP_LST/NHP_LRT. The
   authenticated peer binds exact `usrId=devId=agent_id`; owner and entitlement
   remain server-side. One request resolves one connector and returns exact
-  resource, routing, knock, optional CRID, and `found_existing` values. The
-  optional `expected_resource_id` is read-only fail-closed continuity: only the
+  resource, routing, knock, required CRID, and `found_existing` values. The
+  optional `expected_crid` is read-only fail-closed continuity: only the
   same active resource succeeds; absent, revoked, tombstoned, or different
   state returns terminal 52503 without creating or reclaiming a replacement.
   Replay preserves the byte-identical first result, while a fresh nonce
