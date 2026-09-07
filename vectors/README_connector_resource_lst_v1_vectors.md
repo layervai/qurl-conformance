@@ -108,18 +108,13 @@ Errors omit `list` and use exact messages:
 Unknown codes, message drift, a `list` on error, or any retry member that
 violates the table reject.
 
-## Private Authority boundary
+## Cell request identity
 
-The authenticated cell converts a valid public request into the private
-`ResolveConnectorResource` Authority operation, whose contract is frozen in the
-private conformance module. Its exact request is:
-
-```json
-{"version":1,"cell_request_id":"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a","agent_id":"agent-conform","authenticated_peer_public_key_b64":"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=","connector_id":"prod-dashboard"}
-```
-
-The private request optionally carries the same `expected_resource_id`. The
-cell derives `cell_request_id`; it is not client-supplied. Let `frame(tag,
+The authenticated cell converts a valid public request into one private
+Authority operation whose request, result, and error contract are frozen in the
+private conformance module, not here. The one value that crosses that boundary
+and is implemented by this module is `cell_request_id`. The cell derives it; it
+is not client-supplied. Let `frame(tag,
 value)` be one tag byte, a two-byte big-endian length, then the value. The exact
 preimage is:
 
@@ -140,11 +135,8 @@ frame(0x03, decoded public nonce raw 32 bytes)
 and the result is
 `57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a`.
 
-Private errors are `invalid_request`, `identity_rejected`,
-`entitlement_denied`, `resource_identity_conflict`, `quota`, `rate_limited`,
-and `unavailable`. `rate_limited` requires `retry_after_seconds`; `unavailable`
-allows it; all other errors forbid it. The Authority artifact freezes their
-exact public mappings.
+The private Authority's error vocabulary and its exact mappings onto the public
+`52500`-series codes above are frozen with the private artifact.
 
 ## Size accounting
 
@@ -164,8 +156,8 @@ bytes without fragmentation.
    `usrId=devId` to the authenticated agent.
 3. Decode the nonce and derive `cell_request_id` from server-owned environment,
    authenticated peer bytes, and the decoded nonce.
-4. Invoke only `ResolveConnectorResource`; validate its closed response before
-   mapping it to the public result.
+4. Invoke only the private resource-resolution Authority operation; validate
+   its closed response before mapping it to the public result.
 5. Seal exactly one result under `NHP_LRT`. Never fall back to HTTP and never
    infer placement from a hostname.
 6. On the consumer side, correlate success with the originating request and

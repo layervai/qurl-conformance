@@ -56,7 +56,7 @@ func TestConnectorResourceLSTV1CellRequestIDKAT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nonce, err := base64.RawURLEncoding.Strict().DecodeString(file.Fixtures.CreateRequestNonce)
+	nonce, err := DecodeConnectorHubRequestNonce(file.Fixtures.CreateRequestNonce)
 	if err != nil {
 		t.Fatal(err)
 	}

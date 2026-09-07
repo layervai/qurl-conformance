@@ -95,40 +95,8 @@ jobs:
           }
 
           const hc = c.connectorHubLstCookieVectors();
-          const rr = c.connectorResourceLstV1Vectors();
           const cd = c.cridV1Vectors();
 
-          const frame = value => {
-            const bytes = Buffer.from(String(value), 'utf8');
-            const length = Buffer.alloc(4);
-            length.writeUInt32BE(bytes.length);
-            return Buffer.concat([length, bytes]);
-          };
-          const tagged = (tag, value) => {
-            const prefix = Buffer.alloc(3);
-            prefix[0] = tag;
-            prefix.writeUInt16BE(value.length, 1);
-            return Buffer.concat([prefix, value]);
-          };
-          const p256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
-          const strictLowSSignature = encoded => {
-            if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
-            const der = Buffer.from(encoded, 'base64url');
-            if (der.toString('base64url') !== encoded || der.length < 8 || der.length > 72) return null;
-            let offset = 0;
-            if (der[offset++] !== 0x30 || der[offset++] !== der.length - offset) return null;
-            const integer = () => {
-              if (der[offset++] !== 0x02) return null;
-              const length = der[offset++];
-              if (length < 1 || length > 33 || offset + length > der.length) return null;
-              const bytes = der.subarray(offset, offset += length);
-              if ((bytes[0] & 0x80) || (bytes.length > 1 && bytes[0] === 0 && !(bytes[1] & 0x80))) return null;
-              return BigInt('0x' + bytes.toString('hex'));
-            };
-            const r = integer();
-            const s = integer();
-            return r && s && offset === der.length && r < p256Order && s <= p256Order / 2n ? der : null;
-          };
           const rawIP = source => {
             const address = source.startsWith('::ffff:') ? source.slice(7) : source;
             if (net.isIPv4(address)) return [4, Buffer.from(address.split('.').map(Number))];
@@ -265,15 +233,7 @@ jobs:
               assert getattr(q, accessor)() == expected
 
           hc = q.connector_hub_lst_cookie_vectors()
-          rr = q.connector_resource_lst_v1_vectors()
           cd = q.crid_v1_vectors()
-
-          def frame(value):
-              encoded = str(value).encode()
-              return struct.pack('>I', len(encoded)) + encoded
-
-          def tagged(tag, value):
-              return bytes([tag]) + struct.pack('>H', len(value)) + value
 
           def verify_hub_cookie(vector):
               address = ipaddress.ip_address(vector['source_ip'])

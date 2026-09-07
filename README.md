@@ -309,10 +309,10 @@ artifact has its own `artifact` id:
   `vectors/README_target_path_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator for
-key-dependent vectors lives at `tools/gen`. Run the explicit rotation Make
-target once per test-key rotation. Rotation targets never run in CI because
-ECDSA signatures use random nonces and are not reproducible. The committed JSON
-is the artifact. Vectors are edited under `vectors/`.
+key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once per
+intentional test-key rotation. It never runs in CI because ECDSA signatures use
+random nonces and are not reproducible. The committed JSON is the artifact.
+Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 

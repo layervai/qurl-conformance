@@ -86,7 +86,6 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       servers next, clients last, and the 7-day dependency-age quarantine makes
       each step a separate pass roughly a week apart.
 
-
 ## When a release regenerates qURL v2 issuer or fragment bytes
 
 Applies whenever `issuer_signature_vectors.json` changes or the canonical qv2
