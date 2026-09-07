@@ -44,7 +44,7 @@ const (
 	ConnectorResourceLSTV1RoutingIDChars         = 54
 	// ConnectorResourceLSTV1KnockResourceIDMax is deliberately 64 bytes: even
 	// when every byte expands to a six-byte JSON escape, the maximal success
-	// object is 952 bytes with its required 60-character CRID, leaving 24 bytes
+	// object is 952 bytes with the maximum 60-character CRID, leaving 24 bytes
 	// inside ConnectorResourceLSTV1MaxPlaintextBodyBytes.
 	ConnectorResourceLSTV1KnockResourceIDMax          = 64
 	ConnectorResourceLSTV1ConservativeSealBudgetBytes = 256
