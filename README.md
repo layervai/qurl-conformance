@@ -6,8 +6,9 @@ against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, assignment tickets, Hub LST return-routability
-cookies, Connector resource discovery, CRID v1 resource identifiers, and qURL
-Connector target paths decoupled by layer.
+cookies, Connector resource discovery, CRID v1 resource identifiers, qURL
+Connector target paths, and private upload application signatures decoupled by
+layer.
 
 Everything here is a contract a third-party SDK implements. Platform-internal
 contracts between the NHP runtime, the Connector Hub, and the Connector
@@ -45,6 +46,8 @@ trust.
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
 | `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
+| `vectors/private_upload_v1_vectors.json` | private upload and refresh application-signing contract with byte-exact goldens and rejects |
+| `vectors/README_private_upload_v1_vectors.md` | protected-authority binding, framing, canonical signatures, and consumer algorithm |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -66,6 +69,7 @@ rr, err := conformance.ConnectorResourceLSTV1()      // strict-parsed Connector 
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
 tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
+pu, err := conformance.PrivateUploadV1()              // strict-parsed private upload/refresh signature vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -84,11 +88,13 @@ schema and vocabulary. For target-path validation, consume
 `target_path_v1_vectors.json` through the real SDK option gate; do not copy its
 rules into a private fixture. qURL v2 schema version 2 is a deliberate breaking shape:
 typed consumers must update their loader for `transport_contract` and the
-`transport` class before adopting this release.
+`transport` class before adopting this release. Private upload clients consume
+`private_upload_v1_vectors.json` through their real request signer and run each
+mutation against the same preflight used in production.
 
 ## Scope
 
-This module hosts twelve artifacts across eleven protocol families. Each
+This module hosts thirteen artifacts across twelve protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -307,6 +313,17 @@ artifact has its own `artifact` id:
   alphabet and adds the path-only `forbidden_path_ascii` set. Every accepted
   value is safe to open. See
   `vectors/README_target_path_v1_vectors.md`.
+- **Private upload application signing v1**
+  (`qurl-private-upload-v1-vectors`, `private_upload_v1_vectors.json`) — exact
+  POST and PATCH application signatures for the private upload path reached
+  after an authenticated NHP 1.1 ACK. The signature binds the protected ACK URL
+  authority, exact method and path, body digest and length, caller key, and
+  request ID. Upload also binds the audience key, media type, filename, and
+  authority horizon. The artifact publishes strict request construction rules,
+  byte-exact goldens, stable request digests, canonical low-S DER signatures,
+  and executable HTTP and client-preflight rejects. It adds no NHP packet
+  format and defines no CLI or OAuth credential path. See
+  `vectors/README_private_upload_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator for
 key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once when

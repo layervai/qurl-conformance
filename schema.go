@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Eleven families live here, each under its own artifact id so they stay decoupled
+// Twelve families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -45,6 +45,9 @@
 //   - The qURL Connector target-path contract
 //     (target_path_v1_vectors.json): shared local input validation, exact wire
 //     preservation, and canonical open-safe paths.
+//   - The private upload application-signing contract
+//     (private_upload_v1_vectors.json): byte-exact POST and refresh framing,
+//     canonical low-S P-256 signatures, and fail-closed mutation cases.
 //
 // The verify-path artifact is BEHAVIORAL: a consumer feeds each class's input
 // through its real parser/validator and asserts the declared accept/reject

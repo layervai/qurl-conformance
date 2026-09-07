@@ -2504,6 +2504,7 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		{connectorHubLSTCookieName, ConnectorHubLSTCookieVectors},
 		{cridV1Name, CRIDV1Vectors},
 		{targetPathV1Name, TargetPathV1Vectors},
+		{privateUploadV1Name, PrivateUploadV1Vectors},
 	}
 	known := make(map[string]struct{}, len(files))
 	for _, file := range files {

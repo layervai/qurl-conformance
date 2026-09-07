@@ -24,10 +24,10 @@ on:
 # concurrency group evaluates `${{ github.workflow }}-…` against the
 # CALLER'S workflow name at runtime — a caller-side block using the
 # same key would collide with itself and fail the run at startup
-# before any job materializes (hit this in layervai/nhp#1307). The
+# before any job materializes (seen in an earlier repository rollout). The
 # issue-priority.yml reusable uses a literal prefix, which is why
 # a caller-side concurrency block works there. Tracked for fix at
-# the reusable side as layervai/ops-routines#39.
+# the reusable workflow repository.
 # The reusable handles deduplication itself.
 
 permissions:

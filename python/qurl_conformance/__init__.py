@@ -70,3 +70,8 @@ def crid_v1_vectors():
 def target_path_v1_vectors():
     """Return the parsed target_path_v1_vectors.json."""
     return _load("target_path_v1_vectors.json")
+
+
+def private_upload_v1_vectors():
+    """Return the parsed private_upload_v1_vectors.json."""
+    return _load("private_upload_v1_vectors.json")
