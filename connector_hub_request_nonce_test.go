@@ -8,10 +8,6 @@ import (
 )
 
 func TestDecodeConnectorHubRequestNonceAcceptsCommittedFixtures(t *testing.T) {
-	assignment, err := AgentAssignmentGolden()
-	if err != nil {
-		t.Fatal(err)
-	}
 	resource, err := ConnectorResourceLSTV1()
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +24,6 @@ func TestDecodeConnectorHubRequestNonceAcceptsCommittedFixtures(t *testing.T) {
 			t.Fatalf("%s: decoded %d bytes, want %d", name, len(nonce), ConnectorHubRequestNonceBytes)
 		}
 	}
-	_ = assignment
 }
 
 func TestDecodeConnectorHubRequestNonceRejects(t *testing.T) {

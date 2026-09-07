@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base32"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -80,10 +78,6 @@ const (
 	ConnectorResourceLSTV1ErrorQuota            = "52504"
 	ConnectorResourceLSTV1ErrorRateLimited      = "52505"
 	ConnectorResourceLSTV1ErrorInvalidRequest   = "52506"
-
-	ConnectorResourceLSTV1AuthorityOperation  = "ResolveConnectorResource"
-	ConnectorResourceLSTV1CellRequestIDDomain = "layerv:qurl:connector-resource-request-id:v1"
-	ConnectorResourceLSTV1CellRequestIDChars  = 64
 )
 
 const connectorResourceLSTV1Description = "Byte-exact registered-agent NHP_LST/NHP_LRT application contract for resolving or idempotently creating one qURL Connector resource without customer-runtime HTTP."
@@ -357,48 +351,6 @@ func ValidateConnectorResourceLSTV1AgentID(value string) bool {
 
 func ValidateConnectorResourceLSTV1ConnectorID(value string) bool {
 	return connectorResourceLSTV1ConnectorIDPattern.MatchString(value)
-}
-
-// DeriveConnectorResourceLSTV1CellRequestID derives the private Authority
-// replay key from server-owned environment scope and authenticated public inputs.
-// The public nonce itself never becomes an Authority persistence key.
-func DeriveConnectorResourceLSTV1CellRequestID(environment string, authenticatedPeerPublicKey, requestNonce []byte) (string, error) {
-	if !connectorResourceLSTV1EnvironmentPattern.MatchString(environment) {
-		return "", errors.New("conformance: invalid Connector resource environment")
-	}
-	if len(authenticatedPeerPublicKey) != 32 {
-		return "", errors.New("conformance: invalid Connector resource authenticated peer key")
-	}
-	if len(requestNonce) != ConnectorResourceLSTV1NonceBytes {
-		return "", errors.New("conformance: invalid Connector resource request nonce")
-	}
-	preimage := make([]byte, 0, len(ConnectorResourceLSTV1CellRequestIDDomain)+1+3*3+len(environment)+len(authenticatedPeerPublicKey)+len(requestNonce))
-	preimage = append(preimage, ConnectorResourceLSTV1CellRequestIDDomain...)
-	preimage = append(preimage, 0)
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x01, []byte(environment))
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x02, authenticatedPeerPublicKey)
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x03, requestNonce)
-	digest := sha256.Sum256(preimage)
-	return hex.EncodeToString(digest[:]), nil
-}
-
-func appendConnectorResourceLSTV1RequestIDFrame(dst []byte, tag byte, value []byte) []byte {
-	var size [2]byte
-	binary.BigEndian.PutUint16(size[:], uint16(len(value)))
-	dst = append(dst, tag)
-	dst = append(dst, size[:]...)
-	return append(dst, value...)
-}
-
-func ValidateConnectorResourceLSTV1CellRequestID(value string) error {
-	if len(value) != ConnectorResourceLSTV1CellRequestIDChars {
-		return errors.New("conformance: invalid Connector resource cell_request_id")
-	}
-	decoded, err := hex.DecodeString(value)
-	if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != value {
-		return errors.New("conformance: invalid Connector resource cell_request_id")
-	}
-	return nil
 }
 
 // ParseConnectorResourceLSTV1File strictly parses the embedded Connector
