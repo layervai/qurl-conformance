@@ -36,12 +36,12 @@ const (
 	ConnectorResourceLSTV1ResultHeaderName  = "NHP_LRT"
 	ConnectorResourceLSTV1ResultHeaderType  = 6
 
-	ConnectorResourceLSTV1NonceBytes         = RequestNonceBytes
-	ConnectorResourceLSTV1ResourceIDBytes    = 91
-	ConnectorResourceLSTV1ResourceIDChars    = 122
-	ConnectorResourceLSTV1RoutingDigestBytes = 32
-	ConnectorResourceLSTV1RoutingIDPrefix    = "c-"
-	ConnectorResourceLSTV1RoutingIDChars     = 54
+	ConnectorResourceLSTV1NonceBytes             = RequestNonceBytes
+	ConnectorResourceLSTV1ResourcePublicKeyBytes = 91
+	ConnectorResourceLSTV1ResourcePublicKeyChars = 122
+	ConnectorResourceLSTV1RoutingDigestBytes     = 32
+	ConnectorResourceLSTV1RoutingIDPrefix        = "c-"
+	ConnectorResourceLSTV1RoutingIDChars         = 54
 	// ConnectorResourceLSTV1KnockResourceIDMax is deliberately 64 bytes: even
 	// when every byte expands to a six-byte JSON escape, the maximal success
 	// object remains inside ConnectorResourceLSTV1MaxPlaintextBodyBytes.
@@ -154,9 +154,9 @@ type ConnectorResourceLSTV1Contract struct {
 	NonceDecodedBytes             int      `json:"nonce_decoded_bytes"`
 	AgentIDPattern                string   `json:"agent_id_pattern"`
 	ConnectorIDPattern            string   `json:"connector_id_pattern"`
-	ResourceIDEncoding            string   `json:"resource_id_encoding"`
-	ResourceIDDecodedBytes        int      `json:"resource_id_decoded_bytes"`
-	ResourceIDEncodedChars        int      `json:"resource_id_encoded_chars"`
+	ResourcePublicKeyEncoding     string   `json:"resource_public_key_encoding"`
+	ResourcePublicKeyDecodedBytes int      `json:"resource_public_key_decoded_bytes"`
+	ResourcePublicKeyEncodedChars int      `json:"resource_public_key_encoded_chars"`
 	ConnectorRoutingIDPattern     string   `json:"connector_routing_id_pattern"`
 	KnockResourceIDMaxBytes       int      `json:"knock_resource_id_max_bytes"`
 	CRIDProfile                   string   `json:"crid_profile"`
@@ -164,7 +164,7 @@ type ConnectorResourceLSTV1Contract struct {
 	EntitlementSource             string   `json:"entitlement_source"`
 	OneResourcePerExchange        bool     `json:"one_resource_per_exchange"`
 	HTTPFallbackAllowed           bool     `json:"http_fallback_allowed"`
-	ExpectedResourceIDRule        string   `json:"expected_resource_id_rule"`
+	ExpectedCRIDRule              string   `json:"expected_crid_rule"`
 	ExactReplayRule               string   `json:"exact_replay_rule"`
 	ChangedReplayRule             string   `json:"changed_replay_rule"`
 	LaterRequestRule              string   `json:"later_request_rule"`
@@ -204,7 +204,7 @@ type ConnectorResourceLSTV1Fixtures struct {
 	AgentID                       string `json:"agent_id"`
 	AuthenticatedPeerPublicKeyB64 string `json:"authenticated_peer_public_key_b64"`
 	ConnectorID                   string `json:"connector_id"`
-	ResourceID                    string `json:"resource_id"`
+	ResourcePublicKey             string `json:"resource_public_key"`
 	ConnectorRoutingID            string `json:"connector_routing_id"`
 	KnockResourceID               string `json:"knock_resource_id"`
 	CRID                          string `json:"crid"`
@@ -273,11 +273,11 @@ type connectorResourceLSTV1RequestWire struct {
 }
 
 type connectorResourceLSTV1RequestUserDataWire struct {
-	Query              string  `json:"query"`
-	Version            int     `json:"version"`
-	RequestNonce       string  `json:"request_nonce"`
-	ConnectorID        string  `json:"connector_id"`
-	ExpectedResourceID *string `json:"expected_resource_id,omitempty"`
+	Query        string  `json:"query"`
+	Version      int     `json:"version"`
+	RequestNonce string  `json:"request_nonce"`
+	ConnectorID  string  `json:"connector_id"`
+	ExpectedCRID *string `json:"expected_crid,omitempty"`
 }
 
 type connectorResourceLSTV1ResultWire struct {
@@ -292,7 +292,7 @@ type connectorResourceLSTV1SuccessListWire struct {
 	Version            int     `json:"version"`
 	AgentID            string  `json:"agent_id"`
 	ConnectorID        string  `json:"connector_id"`
-	ResourceID         string  `json:"resource_id"`
+	ResourcePublicKey  string  `json:"resource_public_key"`
 	ConnectorRoutingID string  `json:"connector_routing_id"`
 	KnockResourceID    string  `json:"knock_resource_id"`
 	CRID               *string `json:"crid,omitempty"`
@@ -408,21 +408,21 @@ func validateConnectorResourceLSTV1Contract(contract ConnectorResourceLSTV1Contr
 		AspID:                         ConnectorResourceLSTV1AspID,
 		RequestOuterFields:            []string{"usrId", "devId", "aspId", "usrData"},
 		RequestUserDataRequiredFields: []string{"query", "version", "request_nonce", "connector_id"},
-		RequestUserDataOptionalFields: []string{"expected_resource_id"},
+		RequestUserDataOptionalFields: []string{"expected_crid"},
 		SuccessOuterFields:            []string{"errCode", "list"},
-		SuccessListRequiredFields:     []string{"query", "version", "agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id", "found_existing"},
-		SuccessListOptionalFields:     []string{"crid"},
+		SuccessListRequiredFields:     []string{"query", "version", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id", "crid", "found_existing"},
+		SuccessListOptionalFields:     []string{},
 		ErrorRequiredFields:           []string{"errCode", "errMsg"},
 		ErrorOptionalFields:           []string{"retryAfterSeconds"},
 		NonceEncoding:                 "canonical_base64url_unpadded", NonceDecodedBytes: ConnectorResourceLSTV1NonceBytes,
 		AgentIDPattern: connectorResourceLSTV1AgentIDPattern.String(), ConnectorIDPattern: connectorResourceLSTV1ConnectorIDPattern.String(),
-		ResourceIDEncoding: "canonical_base64url_unpadded_p256_der_spki", ResourceIDDecodedBytes: ConnectorResourceLSTV1ResourceIDBytes, ResourceIDEncodedChars: ConnectorResourceLSTV1ResourceIDChars,
+		ResourcePublicKeyEncoding: "canonical_base64url_unpadded_p256_der_spki", ResourcePublicKeyDecodedBytes: ConnectorResourceLSTV1ResourcePublicKeyBytes, ResourcePublicKeyEncodedChars: ConnectorResourceLSTV1ResourcePublicKeyChars,
 		ConnectorRoutingIDPattern: `^c-[a-z2-7]{52}$`, KnockResourceIDMaxBytes: ConnectorResourceLSTV1KnockResourceIDMax,
-		CRIDProfile:            "qurl-crid-v1-vectors_optional_but_if_present_must_match_resource_id",
+		CRIDProfile:            "qurl-crid-v1-vectors_required_and_must_match_resource_public_key",
 		IdentitySource:         "noise_authenticated_registered_agent_key_mapped_to_exact_usrId_and_devId",
 		EntitlementSource:      "server_side_owner_and_enrollment_connector_claim_never_client_supplied",
 		OneResourcePerExchange: true, HTTPFallbackAllowed: false,
-		ExpectedResourceIDRule:     "optional_read_only_continuity_assertion_exact_active_match_only_else_terminal_52503_for_absent_revoked_tombstoned_or_different_resource_never_create_or_reclaim",
+		ExpectedCRIDRule:           "optional_read_only_continuity_assertion_exact_active_match_only_else_terminal_52503_for_absent_revoked_tombstoned_or_different_resource_never_create_or_reclaim",
 		ExactReplayRule:            "same_authenticated_peer_query_request_nonce_and_exact_semantic_body_returns_byte_identical_result",
 		ChangedReplayRule:          "same_replay_key_changed_semantics_returns_52506_before_authority_or_mutation",
 		LaterRequestRule:           "fresh_nonce_reexecutes_authoritative_resolve_and_reports_current_found_existing",
@@ -460,8 +460,8 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if err != nil || len(peer) != 32 || base64.StdEncoding.EncodeToString(peer) != fixtures.AuthenticatedPeerPublicKeyB64 {
 		return errors.New("conformance: Connector resource LST fixture peer key is not canonical padded base64 X25519")
 	}
-	if err := ValidateConnectorResourceLSTV1ResourceID(fixtures.ResourceID); err != nil {
-		return fmt.Errorf("conformance: Connector resource LST fixture resource_id: %w", err)
+	if err := ValidateConnectorResourceLSTV1ResourcePublicKey(fixtures.ResourcePublicKey); err != nil {
+		return fmt.Errorf("conformance: Connector resource LST fixture resource_public_key: %w", err)
 	}
 	if err := ValidateConnectorResourceLSTV1RoutingID(fixtures.ConnectorRoutingID); err != nil {
 		return fmt.Errorf("conformance: Connector resource LST fixture connector_routing_id: %w", err)
@@ -469,11 +469,11 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if err := ValidateConnectorResourceLSTV1KnockResourceID(fixtures.KnockResourceID); err != nil {
 		return fmt.Errorf("conformance: Connector resource LST fixture knock_resource_id: %w", err)
 	}
-	if fixtures.ResourceID == fixtures.KnockResourceID || fixtures.ConnectorRoutingID == fixtures.KnockResourceID {
+	if fixtures.ResourcePublicKey == fixtures.KnockResourceID || fixtures.ConnectorRoutingID == fixtures.KnockResourceID {
 		return errors.New("conformance: Connector resource LST fixture identity/routing/admission values are cross-wired")
 	}
-	if outcome, err := CRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
-		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_id")
+	if outcome, err := CRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourcePublicKey); err != nil || outcome != CRIDV1OutcomeMatch {
+		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_public_key")
 	}
 	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.NoCRIDRequestNonce} {
 		if err := ValidateConnectorResourceLSTV1Nonce(nonce); err != nil {
@@ -487,7 +487,7 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 }
 
 func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourceLSTV1Exchange, fixtures ConnectorResourceLSTV1Fixtures) error {
-	required := []string{"fresh_create", "existing_with_continuity", "existing_without_crid"}
+	required := []string{"fresh_create", "existing_with_continuity", "existing_with_crid"}
 	if len(exchanges) != len(required) {
 		return fmt.Errorf("conformance: Connector resource LST success exchange count = %d, want %d", len(exchanges), len(required))
 	}
@@ -517,21 +517,17 @@ func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourc
 		if err != nil || class != "" || parsed.List == nil {
 			return fmt.Errorf("conformance: Connector resource LST exchange %q result rejected as %q: %v", exchange.Name, class, err)
 		}
-		if parsed.List.ResourceID != fixtures.ResourceID || parsed.List.ConnectorRoutingID != fixtures.ConnectorRoutingID || parsed.List.KnockResourceID != fixtures.KnockResourceID || parsed.List.FoundExisting != exchange.ExpectedFoundExisting {
+		if parsed.List.ResourcePublicKey != fixtures.ResourcePublicKey || parsed.List.ConnectorRoutingID != fixtures.ConnectorRoutingID || parsed.List.KnockResourceID != fixtures.KnockResourceID || parsed.List.FoundExisting != exchange.ExpectedFoundExisting {
 			return fmt.Errorf("conformance: Connector resource LST exchange %q success binding drift", exchange.Name)
 		}
-		if exchange.Name == "existing_without_crid" {
-			if parsed.List.CRID != nil {
-				return errors.New("conformance: existing_without_crid unexpectedly carries crid")
-			}
-		} else if parsed.List.CRID == nil || *parsed.List.CRID != fixtures.CRID {
+		if parsed.List.CRID == nil || *parsed.List.CRID != fixtures.CRID {
 			return fmt.Errorf("conformance: Connector resource LST exchange %q CRID drift", exchange.Name)
 		}
-		if exchange.Name == "fresh_create" && request.UsrData.ExpectedResourceID != nil {
-			return errors.New("conformance: fresh_create must not carry expected_resource_id")
+		if exchange.Name == "fresh_create" && request.UsrData.ExpectedCRID != nil {
+			return errors.New("conformance: fresh_create must not carry expected_crid")
 		}
-		if exchange.Name == "existing_with_continuity" && (request.UsrData.ExpectedResourceID == nil || *request.UsrData.ExpectedResourceID != fixtures.ResourceID) {
-			return errors.New("conformance: existing_with_continuity must carry the exact fixture expected_resource_id")
+		if exchange.Name == "existing_with_continuity" && (request.UsrData.ExpectedCRID == nil || *request.UsrData.ExpectedCRID != fixtures.CRID) {
+			return errors.New("conformance: existing_with_continuity must carry the exact fixture expected_crid")
 		}
 	}
 	for _, name := range required {
@@ -599,25 +595,25 @@ func validateConnectorResourceLSTV1ReplayCases(cases []ConnectorResourceLSTV1Rep
 
 func validateConnectorResourceLSTV1RequestCases(cases []ConnectorResourceLSTV1BodyCase, fixtures ConnectorResourceLSTV1Fixtures) error {
 	required := map[string]string{
-		"reject_duplicate_outer_dev_id":       ConnectorResourceLSTV1RejectBodyParse,
-		"reject_unknown_outer_field":          ConnectorResourceLSTV1RejectUnknownField,
-		"reject_missing_usr_id":               ConnectorResourceLSTV1RejectMissingField,
-		"reject_null_usr_data":                ConnectorResourceLSTV1RejectWrongType,
-		"reject_usr_id_agent_mismatch":        ConnectorResourceLSTV1RejectAgentBinding,
-		"reject_dev_id_agent_mismatch":        ConnectorResourceLSTV1RejectAgentBinding,
-		"reject_wrong_asp_id":                 ConnectorResourceLSTV1RejectSemantic,
-		"reject_wrong_query":                  ConnectorResourceLSTV1RejectSemantic,
-		"reject_wrong_version":                ConnectorResourceLSTV1RejectSemantic,
-		"reject_missing_request_nonce":        ConnectorResourceLSTV1RejectMissingField,
-		"reject_null_request_nonce":           ConnectorResourceLSTV1RejectWrongType,
-		"reject_padded_request_nonce":         ConnectorResourceLSTV1RejectSemantic,
-		"reject_short_request_nonce":          ConnectorResourceLSTV1RejectSemantic,
-		"reject_missing_connector_id":         ConnectorResourceLSTV1RejectMissingField,
-		"reject_invalid_connector_id":         ConnectorResourceLSTV1RejectSemantic,
-		"reject_null_expected_resource_id":    ConnectorResourceLSTV1RejectWrongType,
-		"reject_invalid_expected_resource_id": ConnectorResourceLSTV1RejectSemantic,
-		"reject_unknown_user_data_field":      ConnectorResourceLSTV1RejectUnknownField,
-		"reject_trailing_value":               ConnectorResourceLSTV1RejectBodyParse,
+		"reject_duplicate_outer_dev_id":  ConnectorResourceLSTV1RejectBodyParse,
+		"reject_unknown_outer_field":     ConnectorResourceLSTV1RejectUnknownField,
+		"reject_missing_usr_id":          ConnectorResourceLSTV1RejectMissingField,
+		"reject_null_usr_data":           ConnectorResourceLSTV1RejectWrongType,
+		"reject_usr_id_agent_mismatch":   ConnectorResourceLSTV1RejectAgentBinding,
+		"reject_dev_id_agent_mismatch":   ConnectorResourceLSTV1RejectAgentBinding,
+		"reject_wrong_asp_id":            ConnectorResourceLSTV1RejectSemantic,
+		"reject_wrong_query":             ConnectorResourceLSTV1RejectSemantic,
+		"reject_wrong_version":           ConnectorResourceLSTV1RejectSemantic,
+		"reject_missing_request_nonce":   ConnectorResourceLSTV1RejectMissingField,
+		"reject_null_request_nonce":      ConnectorResourceLSTV1RejectWrongType,
+		"reject_padded_request_nonce":    ConnectorResourceLSTV1RejectSemantic,
+		"reject_short_request_nonce":     ConnectorResourceLSTV1RejectSemantic,
+		"reject_missing_connector_id":    ConnectorResourceLSTV1RejectMissingField,
+		"reject_invalid_connector_id":    ConnectorResourceLSTV1RejectSemantic,
+		"reject_null_expected_crid":      ConnectorResourceLSTV1RejectWrongType,
+		"reject_invalid_expected_crid":   ConnectorResourceLSTV1RejectSemantic,
+		"reject_unknown_user_data_field": ConnectorResourceLSTV1RejectUnknownField,
+		"reject_trailing_value":          ConnectorResourceLSTV1RejectBodyParse,
 	}
 	return validateConnectorResourceLSTV1BodyCases("request", cases, required, func(body []byte) string {
 		_, class, _ := parseConnectorResourceLSTV1Request(body, fixtures.AgentID)
@@ -627,28 +623,28 @@ func validateConnectorResourceLSTV1RequestCases(cases []ConnectorResourceLSTV1Bo
 
 func validateConnectorResourceLSTV1ResultRejectCases(cases []ConnectorResourceLSTV1BodyCase, fixtures ConnectorResourceLSTV1Fixtures) error {
 	baseline := &connectorResourceLSTV1RequestWire{UsrID: fixtures.AgentID, DevID: fixtures.AgentID, AspID: ConnectorResourceLSTV1AspID,
-		UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: fixtures.ConnectorID, ExpectedResourceID: &fixtures.ResourceID}}
+		UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: fixtures.ConnectorID, ExpectedCRID: &fixtures.CRID}}
 	required := map[string]string{
-		"reject_success_missing_list":               ConnectorResourceLSTV1RejectMissingField,
-		"reject_success_null_list":                  ConnectorResourceLSTV1RejectWrongType,
-		"reject_success_err_msg":                    ConnectorResourceLSTV1RejectUnknownField,
-		"reject_success_retry_after":                ConnectorResourceLSTV1RejectUnknownField,
-		"reject_success_unknown_field":              ConnectorResourceLSTV1RejectUnknownField,
-		"reject_success_wrong_query":                ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_wrong_version":              ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_agent_mismatch":             ConnectorResourceLSTV1RejectRequestBinding,
-		"reject_success_connector_mismatch":         ConnectorResourceLSTV1RejectRequestBinding,
-		"reject_success_expected_resource_mismatch": ConnectorResourceLSTV1RejectResourceBinding,
-		"reject_success_invalid_resource_id":        ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_invalid_routing_id":         ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_blank_knock_id":             ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_oversize_knock_id":          ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_crosswired_knock_id":        ConnectorResourceLSTV1RejectResourceBinding,
-		"reject_success_invalid_crid":               ConnectorResourceLSTV1RejectSemantic,
-		"reject_success_crid_mismatch":              ConnectorResourceLSTV1RejectCRIDBinding,
-		"reject_success_missing_found_existing":     ConnectorResourceLSTV1RejectMissingField,
-		"reject_success_string_found_existing":      ConnectorResourceLSTV1RejectWrongType,
-		"reject_success_unknown_list_field":         ConnectorResourceLSTV1RejectUnknownField,
+		"reject_success_missing_list":                ConnectorResourceLSTV1RejectMissingField,
+		"reject_success_null_list":                   ConnectorResourceLSTV1RejectWrongType,
+		"reject_success_err_msg":                     ConnectorResourceLSTV1RejectUnknownField,
+		"reject_success_retry_after":                 ConnectorResourceLSTV1RejectUnknownField,
+		"reject_success_unknown_field":               ConnectorResourceLSTV1RejectUnknownField,
+		"reject_success_wrong_query":                 ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_wrong_version":               ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_agent_mismatch":              ConnectorResourceLSTV1RejectRequestBinding,
+		"reject_success_connector_mismatch":          ConnectorResourceLSTV1RejectRequestBinding,
+		"reject_success_expected_resource_mismatch":  ConnectorResourceLSTV1RejectResourceBinding,
+		"reject_success_invalid_resource_public_key": ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_invalid_routing_id":          ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_blank_knock_id":              ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_oversize_knock_id":           ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_crosswired_knock_id":         ConnectorResourceLSTV1RejectResourceBinding,
+		"reject_success_invalid_crid":                ConnectorResourceLSTV1RejectSemantic,
+		"reject_success_crid_mismatch":               ConnectorResourceLSTV1RejectCRIDBinding,
+		"reject_success_missing_found_existing":      ConnectorResourceLSTV1RejectMissingField,
+		"reject_success_string_found_existing":       ConnectorResourceLSTV1RejectWrongType,
+		"reject_success_unknown_list_field":          ConnectorResourceLSTV1RejectUnknownField,
 	}
 	return validateConnectorResourceLSTV1BodyCases("result", cases, required, func(body []byte) string {
 		_, class, _ := parseConnectorResourceLSTV1Result(body, baseline)
@@ -797,9 +793,9 @@ func validateConnectorResourceLSTV1SizeCases(cases []ConnectorResourceLSTV1SizeC
 			if err := strictDecodeArtifact(body, &result); err != nil || result.List == nil {
 				return fmt.Errorf("conformance: Connector resource LST max result decode: %v", err)
 			}
-			expected := result.List.ResourceID
+			expected := *result.List.CRID
 			request := &connectorResourceLSTV1RequestWire{UsrID: result.List.AgentID, DevID: result.List.AgentID, AspID: ConnectorResourceLSTV1AspID,
-				UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: result.List.ConnectorID, ExpectedResourceID: &expected}}
+				UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: result.List.ConnectorID, ExpectedCRID: &expected}}
 			if _, class, err := parseConnectorResourceLSTV1Result(body, request); err != nil || class != "" {
 				return fmt.Errorf("conformance: Connector resource LST max result rejected as %q: %v", class, err)
 			}
@@ -838,7 +834,7 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 	}
 	userData, class, err := connectorResourceLSTV1ExactObject(outer["usrData"],
 		[]string{"query", "version", "request_nonce", "connector_id"},
-		[]string{"query", "version", "request_nonce", "connector_id", "expected_resource_id"})
+		[]string{"query", "version", "request_nonce", "connector_id", "expected_crid"})
 	if err != nil {
 		return nil, class, err
 	}
@@ -847,8 +843,8 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 			return nil, ConnectorResourceLSTV1RejectWrongType, fmt.Errorf("%s must be a string", key)
 		}
 	}
-	if expected, ok := userData["expected_resource_id"]; ok && (string(expected) == "null" || len(expected) == 0 || expected[0] != '"') {
-		return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("expected_resource_id must be a string when present")
+	if expected, ok := userData["expected_crid"]; ok && (string(expected) == "null" || len(expected) == 0 || expected[0] != '"') {
+		return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("expected_crid must be a string when present")
 	}
 	if string(userData["version"]) != "1" {
 		if len(userData["version"]) == 0 || (userData["version"][0] != '-' && (userData["version"][0] < '0' || userData["version"][0] > '9')) {
@@ -872,8 +868,8 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 	if !connectorResourceLSTV1ConnectorIDPattern.MatchString(request.UsrData.ConnectorID) {
 		return nil, ConnectorResourceLSTV1RejectSemantic, errors.New("connector_id is invalid")
 	}
-	if request.UsrData.ExpectedResourceID != nil {
-		if err := ValidateConnectorResourceLSTV1ResourceID(*request.UsrData.ExpectedResourceID); err != nil {
+	if request.UsrData.ExpectedCRID != nil {
+		if err := ValidateConnectorResourceLSTV1CRID(*request.UsrData.ExpectedCRID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
 	}
@@ -905,12 +901,12 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 			return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("list must be an object")
 		}
 		list, class, err := connectorResourceLSTV1ExactObject(outer["list"],
-			[]string{"query", "version", "agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id", "found_existing"},
-			[]string{"query", "version", "agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id", "crid", "found_existing"})
+			[]string{"query", "version", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id", "crid", "found_existing"},
+			[]string{"query", "version", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id", "crid", "found_existing"})
 		if err != nil {
 			return nil, class, err
 		}
-		for _, key := range []string{"query", "agent_id", "connector_id", "resource_id", "connector_routing_id", "knock_resource_id"} {
+		for _, key := range []string{"query", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id"} {
 			if string(list[key]) == "null" || len(list[key]) == 0 || list[key][0] != '"' {
 				return nil, ConnectorResourceLSTV1RejectWrongType, fmt.Errorf("%s must be a string", key)
 			}
@@ -945,7 +941,7 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 		if !connectorResourceLSTV1AgentIDPattern.MatchString(result.List.AgentID) || !connectorResourceLSTV1ConnectorIDPattern.MatchString(result.List.ConnectorID) {
 			return nil, ConnectorResourceLSTV1RejectSemantic, errors.New("success identity is invalid")
 		}
-		if err := ValidateConnectorResourceLSTV1ResourceID(result.List.ResourceID); err != nil {
+		if err := ValidateConnectorResourceLSTV1ResourcePublicKey(result.List.ResourcePublicKey); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
 		if err := ValidateConnectorResourceLSTV1RoutingID(result.List.ConnectorRoutingID); err != nil {
@@ -954,20 +950,21 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 		if err := ValidateConnectorResourceLSTV1KnockResourceID(result.List.KnockResourceID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
-		if result.List.ResourceID == result.List.KnockResourceID || result.List.ConnectorRoutingID == result.List.KnockResourceID {
+		if result.List.ResourcePublicKey == result.List.KnockResourceID || result.List.ConnectorRoutingID == result.List.KnockResourceID {
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success identity/routing/admission values are cross-wired")
 		}
-		if request != nil && request.UsrData.ExpectedResourceID != nil && result.List.ResourceID != *request.UsrData.ExpectedResourceID {
-			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success violates expected_resource_id continuity")
-		}
+
 		if result.List.CRID != nil {
-			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourceID)
+			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourcePublicKey)
 			if matchErr != nil {
 				return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
 			}
 			if outcome != CRIDV1OutcomeMatch {
-				return nil, ConnectorResourceLSTV1RejectCRIDBinding, errors.New("crid does not match resource_id")
+				return nil, ConnectorResourceLSTV1RejectCRIDBinding, errors.New("crid does not match resource_public_key")
 			}
+		}
+		if request != nil && request.UsrData.ExpectedCRID != nil && (result.List.CRID == nil || *result.List.CRID != *request.UsrData.ExpectedCRID) {
+			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success violates expected_crid continuity")
 		}
 		return &result, "", nil
 	}
@@ -1082,25 +1079,25 @@ func ValidateConnectorResourceLSTV1Nonce(value string) error {
 	return nil
 }
 
-func ValidateConnectorResourceLSTV1ResourceID(value string) error {
-	if len(value) != ConnectorResourceLSTV1ResourceIDChars {
-		return errors.New("resource_id has invalid encoded length")
+func ValidateConnectorResourceLSTV1ResourcePublicKey(value string) error {
+	if len(value) != ConnectorResourceLSTV1ResourcePublicKeyChars {
+		return errors.New("resource_public_key has invalid encoded length")
 	}
 	der, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil || len(der) != ConnectorResourceLSTV1ResourceIDBytes || base64.RawURLEncoding.EncodeToString(der) != value {
-		return errors.New("resource_id is not canonical unpadded base64url")
+	if err != nil || len(der) != ConnectorResourceLSTV1ResourcePublicKeyBytes || base64.RawURLEncoding.EncodeToString(der) != value {
+		return errors.New("resource_public_key is not canonical unpadded base64url")
 	}
 	parsed, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
-		return errors.New("resource_id is not DER SubjectPublicKeyInfo")
+		return errors.New("resource_public_key is not DER SubjectPublicKeyInfo")
 	}
 	ecdsaKey, ok := parsed.(*ecdsa.PublicKey)
 	if !ok || ecdsaKey.Curve != elliptic.P256() || ecdsaKey.X == nil || ecdsaKey.Y == nil || !ecdsaKey.Curve.IsOnCurve(ecdsaKey.X, ecdsaKey.Y) {
-		return errors.New("resource_id must contain a P-256 public key")
+		return errors.New("resource_public_key must contain a P-256 public key")
 	}
 	canonical, err := x509.MarshalPKIXPublicKey(ecdsaKey)
 	if err != nil || !bytes.Equal(canonical, der) {
-		return errors.New("resource_id DER is not canonical")
+		return errors.New("resource_public_key DER is not canonical")
 	}
 	return nil
 }
@@ -1132,6 +1129,13 @@ func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
 func ValidateConnectorResourceLSTV1Environment(value string) error {
 	if !connectorResourceLSTV1EnvironmentPattern.MatchString(value) {
 		return errors.New("conformance: environment is not a canonical Connector environment label")
+	}
+	return nil
+}
+
+func ValidateConnectorResourceLSTV1CRID(value string) error {
+	if outcome, _ := deriveCRIDV1ValueExpectation(value); outcome != "accept" {
+		return errors.New("expected_crid must be a canonical CRID")
 	}
 	return nil
 }

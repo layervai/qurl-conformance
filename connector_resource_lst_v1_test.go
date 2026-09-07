@@ -70,9 +70,29 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 		t.Fatalf("duplicate request = %v", err)
 	}
 
+	for _, oldRequest := range []string{
+		strings.Replace(requestJSON, `"connector_id":`, `"expected_resource_id":"legacy-key","connector_id":`, 1),
+		strings.Replace(requestJSON, `"connector_id":`, `"expected_crid":"`+file.Fixtures.ResourcePublicKey+`","connector_id":`, 1),
+	} {
+		if _, err := ParseConnectorResourceLSTV1RequestBody([]byte(oldRequest), file.Fixtures.AgentID); err == nil {
+			t.Fatal("accepted a public-key continuity request")
+		}
+	}
+	goodResult := file.SuccessExchanges[0].Result.BodyJSON
+	for _, oldResult := range []string{
+		strings.Replace(goodResult, `"resource_public_key":`, `"resource_id":`, 1),
+		strings.Replace(goodResult, `,"crid":"`+file.Fixtures.CRID+`"`, "", 1),
+	} {
+		if oldResult == goodResult {
+			t.Fatal("old-field fixture did not change")
+		}
+		if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(oldResult), request); err == nil {
+			t.Fatal("accepted a resource-ID or CRID-less result")
+		}
+	}
 	resultJSON := file.SuccessExchanges[0].Result.BodyJSON
-	wrongExpected := file.Fixtures.ResourceID[:len(file.Fixtures.ResourceID)-1] + "A"
-	request.UsrData.ExpectedResourceID = &wrongExpected
+	wrongExpected := file.Fixtures.ResourcePublicKey[:len(file.Fixtures.ResourcePublicKey)-1] + "A"
+	request.UsrData.ExpectedCRID = &wrongExpected
 	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
 		t.Fatalf("expected-resource mismatch = %v", err)
 	}
@@ -108,7 +128,7 @@ func TestParseConnectorResourceLSTV1FileFailsClosed(t *testing.T) {
 	}{
 		{"schema", mutate(func(f *ConnectorResourceLSTV1File) { f.SchemaVersion++ }), "identity"},
 		{"transport", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.HTTPFallbackAllowed = true }), "contract drift"},
-		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedResourceIDRule = "create_if_absent" }), "contract drift"},
+		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedCRIDRule = "create_if_absent" }), "contract drift"},
 		{"replay", mutate(func(f *ConnectorResourceLSTV1File) { f.ReplayCases[0].MutationAllowed = true }), "expectation drift"},
 		{"size", mutate(func(f *ConnectorResourceLSTV1File) { f.SizeCases[0].SizeBudgetBytes++ }), "size/outcome drift"},
 	} {
