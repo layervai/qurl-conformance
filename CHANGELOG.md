@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/layervai/qurl-conformance/compare/v0.15.0...v0.16.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** removed vectors connector_authority_lambda_v1_vectors.json, connector_hub_request_id_v1_vectors.json, agent_credential_recovery_v1_vectors.json, delegated_mint_issue_v1_vectors.json; Go ConnectorAuthorityLambda, ConnectorHubRequestID, AgentCredentialRecovery, DelegatedMintIssueV1 and their *Vectors accessors, DeriveConnectorHubRequestID, DecodeConnectorHubRequestNonce, DeriveConnectorResourceLSTV1CellRequestID, ValidateConnectorResourceLSTV1CellRequestID, ConnectorResourceLSTV1CellRequestIDDomain, ConnectorResourceLSTV1CellRequestIDChars, ConnectorResourceLSTV1AuthorityOperation; npm connectorAuthorityLambdaVectors, connectorHubRequestIdVectors, agentCredentialRecoveryVectors, delegatedMintIssueV1Vectors; Python connector_authority_lambda_vectors, connector_hub_request_id_vectors, agent_credential_recovery_vectors, delegated_mint_issue_v1_vectors. Open() and path-based npm/Python loads of those names now fail at call time.
+
+### Features
+
+* **vectors:** add private upload signing contract ([#133](https://github.com/layervai/qurl-conformance/issues/133)) ([d2961b7](https://github.com/layervai/qurl-conformance/commit/d2961b7519ec60cf311d45246a655f76965146b9))
+* **vectors:** move platform-internal contracts to a private module ([#134](https://github.com/layervai/qurl-conformance/issues/134)) ([6879ba6](https://github.com/layervai/qurl-conformance/commit/6879ba679c1ab03fc4a8ac5fbdf1257146ba345c))
+
 ## [0.15.0](https://github.com/layervai/qurl-conformance/compare/v0.14.0...v0.15.0) (2026-09-06)
 
 
