@@ -92,7 +92,7 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 		}
 	}
 	resultJSON := file.SuccessExchanges[0].Result.BodyJSON
-	wrongExpected := "ahpviqz46qwcvx56glfatm3p3ooccwfcf2it4sdgjervwdkapykw3o3qdq2a"
+	wrongExpected := cridV1IssuerProdCRID
 	request.UsrData.ExpectedCRID = &wrongExpected
 	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
 		t.Fatalf("expected-resource mismatch = %v", err)
@@ -127,6 +127,8 @@ func TestParseConnectorResourceLSTV1FileFailsClosed(t *testing.T) {
 		body   []byte
 		needle string
 	}{
+		{"unpinned request", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Request = f.SuccessExchanges[1].Request }), "unpinned exchange"},
+		{"trailing crid", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Result = f.SuccessExchanges[1].Result }), "trailing crid"},
 		{"schema", mutate(func(f *ConnectorResourceLSTV1File) { f.SchemaVersion++ }), "identity"},
 		{"transport", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.HTTPFallbackAllowed = true }), "contract drift"},
 		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedCRIDRule = "create_if_absent" }), "contract drift"},

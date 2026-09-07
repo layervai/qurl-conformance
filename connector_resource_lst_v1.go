@@ -44,7 +44,8 @@ const (
 	ConnectorResourceLSTV1RoutingIDChars         = 54
 	// ConnectorResourceLSTV1KnockResourceIDMax is deliberately 64 bytes: even
 	// when every byte expands to a six-byte JSON escape, the maximal success
-	// object remains inside ConnectorResourceLSTV1MaxPlaintextBodyBytes.
+	// object is 951 bytes with its required 60-character CRID, leaving 25 bytes
+	// inside ConnectorResourceLSTV1MaxPlaintextBodyBytes.
 	ConnectorResourceLSTV1KnockResourceIDMax          = 64
 	ConnectorResourceLSTV1ConservativeSealBudgetBytes = 256
 	ConnectorResourceLSTV1MaxPacketBytes              = 1232
@@ -523,6 +524,14 @@ func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourc
 		if parsed.List.CRID == nil || *parsed.List.CRID != fixtures.CRID {
 			return fmt.Errorf("conformance: Connector resource LST exchange %q CRID drift", exchange.Name)
 		}
+		if exchange.Name == "existing_unpinned_trailing_crid" {
+			if request.UsrData.ExpectedCRID != nil || request.UsrData.RequestNonce != fixtures.UnpinnedRequestNonce {
+				return errors.New("conformance: unpinned exchange requires its fixture nonce and no expected_crid")
+			}
+			if !strings.HasSuffix(exchange.Result.BodyJSON, `"crid":"`+fixtures.CRID+`"}}`) {
+				return errors.New("conformance: unpinned exchange requires trailing crid")
+			}
+		}
 		if exchange.Name == "fresh_create" && request.UsrData.ExpectedCRID != nil {
 			return errors.New("conformance: fresh_create must not carry expected_crid")
 		}
@@ -961,6 +970,7 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success identity/routing/admission values are cross-wired")
 		}
 
+		// Defensive assertion after the required-string checks above.
 		if result.List.CRID == nil {
 			return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("crid must be a string")
 		}
