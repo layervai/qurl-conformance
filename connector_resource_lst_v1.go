@@ -1170,3 +1170,12 @@ func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
 	}
 	return nil
 }
+
+// ValidateConnectorResourceLSTV1Environment reports whether value is a
+// canonical Connector environment label: lowercase, starting with a letter,
+// at most 32 bytes, with no leading or trailing hyphen. Private contracts that
+// compose this artifact validate their environment field through this exact
+// gate rather than a copied pattern.
+func ValidateConnectorResourceLSTV1Environment(value string) bool {
+	return connectorResourceLSTV1EnvironmentPattern.MatchString(value)
+}

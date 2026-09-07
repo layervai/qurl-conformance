@@ -142,8 +142,9 @@ authenticates the exact body. Reusing a valid current cookie from the same IP
 and peer on a fresh transaction proves the same source again, but grants no
 additional authority. This artifact's closed base flows select only
 IssueAssignment or RefreshAssignment. Its primitive may also be composed by
-the explicitly allowlisted recovery application profile in
-`agent_credential_recovery_v1_vectors.json`; that additive artifact owns the
+the explicitly allowlisted recovery application profile
+(`qurl-agent-credential-recovery-v1-vectors/hub_cookie_composition`), frozen in
+the private conformance module; that additive artifact owns the
 recovery body, size, proof, and Authority-call cases without extending this
 artifact's two-flow set. In every profile, the private `hub_request_id` remains
 derived from the authenticated peer plus `request_nonce`. Same-nonce and

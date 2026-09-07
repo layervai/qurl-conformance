@@ -2500,14 +2500,10 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		{agentSessionControlName, AgentSessionControlVectors},
 		{agentAPIKeyIDName, AgentAPIKeyIDVectors},
 		{assignmentTicketName, AssignmentTicketVectors},
-		{connectorAuthorityName, ConnectorAuthorityLambdaVectors},
 		{connectorResourceLSTV1Name, ConnectorResourceLSTV1Vectors},
-		{connectorHubRequestIDName, ConnectorHubRequestIDVectors},
 		{connectorHubLSTCookieName, ConnectorHubLSTCookieVectors},
-		{agentCredentialRecoveryName, AgentCredentialRecoveryVectors},
 		{cridV1Name, CRIDV1Vectors},
 		{targetPathV1Name, TargetPathV1Vectors},
-		{delegatedMintIssueV1Name, DelegatedMintIssueV1Vectors},
 	}
 	known := make(map[string]struct{}, len(files))
 	for _, file := range files {

@@ -593,3 +593,13 @@ func cridV1CheckShape(crid string, version byte) error {
 	}
 	return nil
 }
+
+// CRIDV1KeyMatchExpectation returns CRIDV1OutcomeMatch when derSPKIB64URL
+// (a base64url DER SubjectPublicKeyInfo) re-derives exactly the held CRID and
+// CRIDV1OutcomeMismatch otherwise. It fails when the held CRID does not pass
+// the local validation gate or either input is malformed. Consumers that
+// compose CRID delivery into another contract use this exact expectation
+// rather than re-implementing the derivation.
+func CRIDV1KeyMatchExpectation(crid, derSPKIB64URL string) (string, error) {
+	return deriveCRIDV1KeyMatchExpectation(crid, derSPKIB64URL)
+}

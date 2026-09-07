@@ -111,8 +111,8 @@ violates the table reject.
 ## Private Authority boundary
 
 The authenticated cell converts a valid public request into the private
-`ResolveConnectorResource` operation frozen in
-`connector_authority_lambda_v1_vectors.json`. Its exact request is:
+`ResolveConnectorResource` Authority operation, whose contract is frozen in the
+private conformance module. Its exact request is:
 
 ```json
 {"version":1,"cell_request_id":"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a","agent_id":"agent-conform","authenticated_peer_public_key_b64":"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=","connector_id":"prod-dashboard"}

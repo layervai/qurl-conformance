@@ -5,11 +5,13 @@ vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
-control-plane API-key IDs, private Connector Authority invocations, private
-Connector Hub replay identifiers, Hub LST return-routability cookies,
-same-agent device-credential recovery, CRID v1 resource identifiers, qURL
-Connector target paths, and the private delegated-mint capability issue
-signature decoupled by layer.
+control-plane API-key IDs, Hub LST return-routability cookies, Connector
+resource discovery, CRID v1 resource identifiers, and qURL Connector target
+paths decoupled by layer.
+
+Everything here is a contract a third-party SDK implements. Platform-internal
+contracts between the NHP runtime, the Connector Hub, and the Connector
+Authority live in a private conformance module and are not published here.
 
 The verify-path vectors are **behavioral**. Each class names the verifier
 operation it targets and the input shape it consumes; a consumer feeds that input
@@ -35,22 +37,14 @@ trust.
 | `vectors/README_agent_api_key_id_vectors.md` | API-key ID grammar, fixture roles, reject classes, and lockstep rule |
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
-| `vectors/connector_authority_lambda_v1_vectors.json` | strict private request/result/error bodies for six NHP runtime Authority operations plus the sandbox-only attended-proof mutation control and the runtime operations' NHP public mappings |
-| `vectors/README_connector_authority_lambda_v1_vectors.md` | private schema, closed errors, reject vocabulary, mapping provenance, and consumer algorithm |
 | `vectors/connector_resource_lst_v1_vectors.json` | registered-agent `connector_resource` v1 NHP_LST/NHP_LRT application bodies, continuity/replay rules, strict errors, and conservative unfragmented size fixtures |
 | `vectors/README_connector_resource_lst_v1_vectors.md` | public request/result schema, identity binding, request-ID derivation, retry grammar, size boundary, and consumer algorithm |
-| `vectors/connector_hub_request_id_v1_vectors.json` | private Hub replay-key framing over environment, operation, authenticated peer, and client logical-request nonce |
-| `vectors/README_connector_hub_request_id_v1_vectors.md` | request-nonce lifetime, exact derivation, excluded packet inputs, and consumer boundaries |
 | `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, closed initial/refresh flows, allowlisted additive profiles, amplification bounds, and rejects |
 | `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
-| `vectors/agent_credential_recovery_v1_vectors.json` | UDP-only same-agent device-credential recovery public/private bodies, grant bindings, exact replay, recovery horizon, and closed errors |
-| `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
 | `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
-| `vectors/delegated_mint_issue_v1_vectors.json` | private Connector-to-service delegated-mint capability issue signature contract and byte-exact golden request |
-| `vectors/README_delegated_mint_issue_v1_vectors.md` | signature framing, canonical encodings, replay inputs, and trust boundaries |
 | `vectors/README_qv2_conformance_vectors.md` | the schema, `reject_class` vocabulary, class-to-entry-point map, and the derived tamper case |
 | `schema.go`, `embed.go` | a stdlib-only Go module that embeds the artifacts and exposes strict, typed loaders |
 
@@ -68,14 +62,10 @@ ka, err := conformance.AgentKnockApplication()      // strict-parsed agent KNK/A
 sc, err := conformance.AgentSessionControl()        // strict-parsed RKN/EXT full-packet vectors
 ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-key ID vectors
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
-ca, err := conformance.ConnectorAuthorityLambda()   // strict-parsed private authority invocation artifact
 rr, err := conformance.ConnectorResourceLSTV1()      // strict-parsed Connector resource LST/LRT artifact
-hi, err := conformance.ConnectorHubRequestID()       // strict-parsed private Hub request-ID KATs
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
-cr, err := conformance.AgentCredentialRecovery()      // strict-parsed UDP credential-recovery contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
 tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
-dm, err := conformance.DelegatedMintIssueV1()         // strict-parsed private capability-issue signature vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
@@ -98,7 +88,7 @@ typed consumers must update their loader for `transport_contract` and the
 
 ## Scope
 
-This module hosts sixteen artifacts across fifteen protocol families. Each
+This module hosts twelve artifacts across eleven protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -145,7 +135,7 @@ artifact has its own `artifact` id:
   An SDK mints it once per logical assignment operation and reuses the exact
   body through every nested retry, while a later operation mints a fresh nonce.
   It is never echoed in LRT and never exposes the Hub's private replay key. The
-  separate Hub request-ID artifact freezes that private derivation.
+  private Hub request-ID artifact freezes that derivation outside this module.
   The opaque ticket returned by initial assignment appears byte-for-byte in REG `usrData`
   and is consumed there. Ordinary refresh returns only the current assignment
   binding and never issues a registration ticket, while completion deliberately
@@ -287,71 +277,6 @@ artifact has its own `artifact` id:
   pre-seal size budgets; the NHP reference integration owns the real sealed
   1,232-byte proof. No HTTP fallback or hostname-derived placement is allowed.
   See `vectors/README_connector_resource_lst_v1_vectors.md`.
-- **Private Connector Authority Lambda v1**
-  (`qurl-connector-authority-lambda-v1-vectors`,
-  `connector_authority_lambda_v1_vectors.json`) — seven distinct strict request
-  schemas for `IssueAssignment`, `RefreshAssignment`,
-  `IssueRegistrationOTP`, `ActivateRegistration`, and
-  `CompleteRegistration`, the post-registration `ResolveConnectorResource`,
-  plus the sandbox-only attended-controller
-  `MutateProofAgent` control. There is no generic operation selector. NHP
-  runtime callers cannot supply environment, cell, owner, or assignment
-  generation; only the separately permissioned proof operation accepts its
-  exact pinned/target-cell mutation fields. Each
-  global `IssueAssignment` and `RefreshAssignment` request carries a required
-  lowercase SHA-256 hex `hub_request_id`. The authenticated Hub worker uses
-  domain-separated framing over its environment, the Hub-selected exact
-  operation, authenticated initiator public key, and the raw 32-byte
-  `request_nonce` from the strict authenticated LST. NHP timestamp, transaction
-  id, source address, and body digest are deliberately excluded so fresh-packet
-  retries retain one logical ID. This gives the private authority a
-  cross-worker replay key without making it caller authority: a successful
-  Issue/Refresh domain result is cached for 15 minutes and the same id plus
-  request fingerprint reuses it, while the same id plus a different semantic
-  request fingerprint fails closed. Malformed, rejected-credential or identity,
-  pre-invoke/rate-limited, and transient-unavailable outcomes are not cached. A
-  later top-level assignment operation has a newly generated request nonce and
-  therefore a new id. Cell operations reject the field, and it never appears
-  in a public NHP body or authority response. Each response is exactly
-  `{version,result}` or `{version,error}` under a 4,096-byte
-  cap. OTP and Connector-resource `rate_limited` require positive
-  `retry_after_seconds`; Connector-resource `unavailable` permits an optional
-  positive delay bounded at 3,600 seconds.
-  Private-to-NHP cases freeze whether the worker emits LRT, emits RAK, follows
-  OTP's normal no-application-reply protocol, or deliberately drops an
-  activation reply. In particular, activation `unavailable` is deliberately
-  silent so the SDK's bounded exact-pending-activation transport recovery owns
-  ambiguity; it is never translated to 52107. Initial-enrollment 52107 and
-  Issue/Refresh assignment-admission 52204 are explicitly NHP pre-invoke
-  outcomes, not authority errors. Public 52203 remains reserved by the public
-  assignment artifact but is intentionally not produced here: the Issue and
-  Refresh domain operations do not mutate assignments, although their private
-  adapter writes the 15-minute replay envelope; activation atomically enforces
-  owner quota as RAK 52112.
-  `MutateProofAgent` has exact `arm`, `move`, and `expire_lease` request/result
-  unions, closed proof-only errors, no public NHP mapping or numeric code, and
-  a durable 900-second command/replay contract: an exact live
-  `hub_request_id` replay returns byte-identical success, changed semantics
-  cannot commit a mutation, and each mutation is atomically fenced by its
-  exact-fingerprint command write. Pending move recovery admits only the
-  frozen moving-on-pinned transition. A move accepted into durable pending
-  before logical expiry remains authorized for a bounded five-minute recovery
-  window: it either finishes with the exact success or atomically compensates
-  back to active on the pinned cell at the same generation and leaves a
-  terminal unavailable tombstone. A first observation of an already-expired
-  durable ID, and every expired terminal replay, remains unavailable without
-  mutation. The existing 24-hour tombstone prevents expired request IDs from
-  being reused as fresh commands.
-  See
-  `vectors/README_connector_authority_lambda_v1_vectors.md`.
-- **Private Connector Hub request-ID v1**
-  (`qurl-connector-hub-request-id-v1-vectors`,
-  `connector_hub_request_id_v1_vectors.json`) — exact tagged framing and KATs
-  for the Hub-derived replay key. It also freezes the canonical public
-  `request_nonce` encoding and the rule that same-nonce changed semantics must
-  reach the Authority under the same operation-scoped ID and fail its semantic
-  fingerprint check. See
-  `vectors/README_connector_hub_request_id_v1_vectors.md`.
 - **Connector Hub LST return-routability cookie v1**
   (`qurl-connector-hub-lst-cookie-v1-vectors`,
   `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing,
@@ -361,14 +286,6 @@ artifact has its own `artifact` id:
   pre-Authority rejects. It neither changes nor reuses the existing overload
   KNK/RKN cookie domain. See
   `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
-- **Agent credential recovery v1**
-  (`qurl-agent-credential-recovery-v1-vectors`,
-  `agent_credential_recovery_v1_vectors.json`) — strict UDP-only public Hub and
-  assigned-cell bodies, operation-specific private Authority bodies, recovery
-  error mappings, additive Hub-cookie proof/size cases, replay fingerprints,
-  grant bindings, no-takeover/no-placement-hint policy, exact-candidate replay,
-  per-episode immutable 90-day horizon, and closed `524xx` outcomes. See
-  `vectors/README_agent_credential_recovery_v1_vectors.md`.
 - **CRID v1** (`qurl-crid-v1-vectors`, `crid_v1_vectors.json`) — exact
   derivation of the Cryptographic Resource ID from a DER
   `SubjectPublicKeyInfo` (domain-separated SHA-256, big-endian CRC32C,
@@ -390,23 +307,12 @@ artifact has its own `artifact` id:
   alphabet and adds the path-only `forbidden_path_ascii` set. Every accepted
   value is safe to open. See
   `vectors/README_target_path_v1_vectors.md`.
-- **Delegated-mint capability issue v1**
-  (`qurl-delegated-mint-issue-v1-vectors`,
-  `delegated_mint_issue_v1_vectors.json`) — exact private Connector-to-service
-  request signing over method, lowercase authority, fixed route, configured
-  issuer and key IDs, idempotency key, 16-byte replay nonce, timestamp, and the
-  SHA-256 of the exact body bytes. The strict loader rebuilds the framed digest
-  and verifies the canonical low-S DER P-256 signature. It does not publish or
-  parse the opaque capability. See
-  `vectors/README_delegated_mint_issue_v1_vectors.md`.
 
-This module is intentionally dependency-free (stdlib only). The generators for
-key-dependent vectors live at `tools/gen` and `tools/gen-delegated-mint`. Run the
-explicit rotation Make target once per test-key and KID rotation. The default
-delegated-mint target preserves existing keys and signatures while it rebuilds
-derived metadata. Rotation targets never run in CI because ECDSA signatures use
-random nonces and are not reproducible. The committed JSON is the artifact.
-Vectors are edited under `vectors/`.
+This module is intentionally dependency-free (stdlib only). The generator for
+key-dependent vectors lives at `tools/gen`. Run the explicit rotation Make
+target once per test-key rotation. Rotation targets never run in CI because
+ECDSA signatures use random nonces and are not reproducible. The committed JSON
+is the artifact. Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 
@@ -437,8 +343,7 @@ no in-repo check can recompute an NHP packet, a header digest, or the Hub proof
 digest. Those in-repo gates are **structural**: framing, lengths, canonical
 hex/base64, key roles, counter and version bytes, and cross-field correlation. A
 transcription error inside an otherwise well-formed regenerated `packet_hex`
-would pass CI here. The delegated-mint issue artifact uses stdlib P-256, so its
-strict loader does rebuild the digest and verify the golden signature.
+would pass CI here.
 
 Cryptographic verification belongs to the consumers, which rebuild and open
 these exact bytes against their real codecs in their own CI. Regenerating any
