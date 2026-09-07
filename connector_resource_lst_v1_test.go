@@ -91,13 +91,12 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 			t.Fatal("accepted a resource-ID or CRID-less result")
 		}
 	}
-	resultJSON := file.SuccessExchanges[0].Result.BodyJSON
 	wrongExpected := cridV1IssuerProdCRID
 	request.UsrData.ExpectedCRID = &wrongExpected
-	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
+	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(goodResult), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
 		t.Fatalf("expected-resource mismatch = %v", err)
 	}
-	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), nil); rejectClass(t, err) != ConnectorResourceLSTV1RejectRequestBinding {
+	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(goodResult), nil); rejectClass(t, err) != ConnectorResourceLSTV1RejectRequestBinding {
 		t.Fatalf("uncorrelated success = %v", err)
 	}
 	tooLarge := bytes.Repeat([]byte{' '}, ConnectorResourceLSTV1MaxPlaintextBodyBytes+1)
@@ -127,6 +126,10 @@ func TestParseConnectorResourceLSTV1FileFailsClosed(t *testing.T) {
 		body   []byte
 		needle string
 	}{
+		{"create nonce", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[0].Request = f.SuccessExchanges[2].Request }), "fresh_create requires"},
+		{"existing nonce", mutate(func(f *ConnectorResourceLSTV1File) {
+			f.SuccessExchanges[1].Request.BodyJSON = strings.Replace(f.SuccessExchanges[1].Request.BodyJSON, f.Fixtures.ExistingRequestNonce, f.Fixtures.CreateRequestNonce, 1)
+		}), "existing_with_continuity requires"},
 		{"unpinned request", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Request = f.SuccessExchanges[1].Request }), "unpinned exchange"},
 		{"trailing crid", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Result = f.SuccessExchanges[1].Result }), "trailing crid"},
 		{"schema", mutate(func(f *ConnectorResourceLSTV1File) { f.SchemaVersion++ }), "identity"},

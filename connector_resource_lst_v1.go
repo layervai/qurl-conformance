@@ -44,7 +44,7 @@ const (
 	ConnectorResourceLSTV1RoutingIDChars         = 54
 	// ConnectorResourceLSTV1KnockResourceIDMax is deliberately 64 bytes: even
 	// when every byte expands to a six-byte JSON escape, the maximal success
-	// object is 951 bytes with its required 60-character CRID, leaving 25 bytes
+	// object is 952 bytes with its required 60-character CRID, leaving 24 bytes
 	// inside ConnectorResourceLSTV1MaxPlaintextBodyBytes.
 	ConnectorResourceLSTV1KnockResourceIDMax          = 64
 	ConnectorResourceLSTV1ConservativeSealBudgetBytes = 256
@@ -532,11 +532,11 @@ func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourc
 				return errors.New("conformance: unpinned exchange requires trailing crid")
 			}
 		}
-		if exchange.Name == "fresh_create" && request.UsrData.ExpectedCRID != nil {
-			return errors.New("conformance: fresh_create must not carry expected_crid")
+		if exchange.Name == "fresh_create" && (request.UsrData.ExpectedCRID != nil || request.UsrData.RequestNonce != fixtures.CreateRequestNonce) {
+			return errors.New("conformance: fresh_create requires its fixture nonce and no expected_crid")
 		}
-		if exchange.Name == "existing_with_continuity" && (request.UsrData.ExpectedCRID == nil || *request.UsrData.ExpectedCRID != fixtures.CRID) {
-			return errors.New("conformance: existing_with_continuity must carry the exact fixture expected_crid")
+		if exchange.Name == "existing_with_continuity" && (request.UsrData.RequestNonce != fixtures.ExistingRequestNonce || request.UsrData.ExpectedCRID == nil || *request.UsrData.ExpectedCRID != fixtures.CRID) {
+			return errors.New("conformance: existing_with_continuity requires its fixture nonce and exact expected_crid")
 		}
 	}
 	for _, name := range required {

@@ -15,7 +15,9 @@ reply remains suitable for an unfragmented 1,232-byte UDP path.
 The request body is an exact object:
 
 ```json
-{"usrId":"agent-conform","devId":"agent-conform","aspId":"agent","usrData":{"query":"connector_resource","version":1,"request_nonce":"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8","connector_id":"prod-dashboard"}}
+{"usrId":"agent-conform","devId":"agent-conform","aspId":"agent","usrData":{"q
+uery":"connector_resource","version":1,"request_nonce":"oKGio6SlpqeoqaqrrK2ur7
+CxsrO0tba3uLm6u7y9vr8","connector_id":"prod-dashboard"}}
 ```
 
 `expected_crid` is the only optional member of `usrData` and follows
@@ -46,7 +48,14 @@ and hyphens; it starts with a letter and ends alphanumeric.
 A success is an exact `NHP_LRT` body:
 
 ```json
-{"errCode":"0","list":{"query":"connector_resource","version":1,"agent_id":"agent-conform","connector_id":"prod-dashboard","resource_public_key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ","connector_routing_id":"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda","knock_resource_id":"connector-conformance-01","crid":"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha","found_existing":false}}
+{"errCode":"0","list":{"query":"connector_resource","version":1,"agent_id":"ag
+ent-conform","connector_id":"prod-dashboard","resource_public_key":"MFkwEwYHKo
+ZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5
+Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ","connector_routing_id":"c-
+pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda","knock_resource_id":"con
+nector-conformance-
+01","crid":"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha","fou
+nd_existing":false}}
 ```
 
 The result echoes the authenticated `agent_id` and requested `connector_id`.
@@ -150,8 +159,15 @@ are mandatory executable suites. A consumer supports this artifact only when
 it accepts every success/error case and rejects every negative case with the
 declared `reject_class`.
 
-`expected_crid` is a byte-exact echo of the CRID returned by this operation. The issued spelling is stable for the resource lifetime; clients do not derive a different form for continuity.
+`expected_crid` is a byte-exact echo of the CRID returned by this operation.
+The issued spelling is stable for the resource lifetime; clients do not derive
+a different form for continuity.
 
-`existing_unpinned_trailing_crid` checks existing-resource lookup without continuity and success-member order independence. The worst-case success body is 951 bytes, leaving 25 bytes under the 976-byte plaintext cap. Recheck that budget before adding any success field.
+`existing_unpinned_trailing_crid` checks existing-resource lookup without
+continuity and success-member order independence. The worst-case success body
+is 952 bytes, leaving 24 bytes under the 976-byte plaintext cap. Recheck that
+budget before adding any success field.
 
-`crid_binding` rejects a CRID that does not match its delivered key. `resource_binding` rejects a self-consistent CRID that differs from the pinned CRID, or other cross-wired resource values.
+`crid_binding` rejects a CRID that does not match its delivered key.
+`resource_binding` rejects a self-consistent CRID that differs from the pinned
+CRID, or other cross-wired resource values.
