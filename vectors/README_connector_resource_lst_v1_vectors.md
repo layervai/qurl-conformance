@@ -18,7 +18,7 @@ The request body is an exact object:
 {"usrId":"agent-conform","devId":"agent-conform","aspId":"agent","usrData":{"query":"connector_resource","version":1,"request_nonce":"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8","connector_id":"prod-dashboard"}}
 ```
 
-`expected_resource_id` is the only optional member of `usrData` and follows
+`expected_crid` is the only optional member of `usrData` and follows
 `connector_id` when present. Duplicate keys, case aliases, unknown members,
 null optionals, invalid UTF-8, alternate numeric spellings, and trailing JSON
 reject.
@@ -46,13 +46,13 @@ and hyphens; it starts with a letter and ends alphanumeric.
 A success is an exact `NHP_LRT` body:
 
 ```json
-{"errCode":"0","list":{"query":"connector_resource","version":1,"agent_id":"agent-conform","connector_id":"prod-dashboard","resource_id":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ","connector_routing_id":"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda","knock_resource_id":"connector-conformance-01","crid":"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha","found_existing":false}}
+{"errCode":"0","list":{"query":"connector_resource","version":1,"agent_id":"agent-conform","connector_id":"prod-dashboard","resource_public_key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcOtuxu2qhc3gt1E7BiEU0CLqEDlXDwzZq0JnESgMAwERX6y_XXF5Cn5SKITWIZQmUhCZ0pHHlVn7SmFUTAnTGQ","connector_routing_id":"c-pvlulb4otmwg4scb7dajq37eiov6xdwptfxp2uwdsy2j23uo7zda","knock_resource_id":"connector-conformance-01","crid":"ae4jqpd7eaoslq7jinmjv4yikgzmcxgpjfsuobiniqnko32lpw743ivbeyha","found_existing":false}}
 ```
 
 The result echoes the authenticated `agent_id` and requested `connector_id`.
 The remaining identities have distinct roles:
 
-- `resource_id` is the canonical unpadded base64url P-256 DER SPKI resource
+- `resource_public_key` is the canonical unpadded base64url P-256 DER SPKI resource
   identity: exactly 91 decoded bytes and 122 encoded characters.
 - `connector_routing_id` is an opaque placement-neutral routing identity with
   the exact `c-` plus 52 lowercase base32 pattern. Consumers must not derive or
@@ -62,18 +62,21 @@ The remaining identities have distinct roles:
   Authority producers limit it to 64 UTF-8 bytes; together with the whole-body
   cap, this keeps even maximally JSON-escaped valid values inside the UDP
   envelope.
-- `crid` is optional. When present it must be valid under
-  `qurl-crid-v1-vectors` and match `resource_id` exactly.
+- `crid` is required and must be a non-null string valid under
+  `qurl-crid-v1-vectors` and match `resource_public_key` exactly.
 - `found_existing` reports the Authority outcome for the first logical
   execution. It is required even when `false`.
 
 No binding revision or epoch is present: the current resource model has no
 trustworthy monotonic value. Continuity is instead fail-closed through
-`expected_resource_id`.
+`expected_crid`.
 
 ## Continuity and replay
 
-`expected_resource_id` is a read-only assertion. When supplied, the Authority
+Check the CRID-to-public-key binding before comparing `expected_crid`. A result
+that fails both checks is a `crid_binding` rejection.
+
+`expected_crid` is a read-only assertion. When supplied, the Authority
 may return success only for the same currently active resource. An absent,
 revoked, tombstoned, or different resource returns terminal `52503`. The
 Authority must never create, reclaim, or substitute a resource while processing
@@ -139,10 +142,23 @@ bytes without fragmentation.
 5. Seal exactly one result under `NHP_LRT`. Never fall back to HTTP and never
    infer placement from a hostname.
 6. On the consumer side, correlate success with the originating request and
-   validate every echoed identity, continuity assertion, and optional CRID
+   validate every echoed identity, continuity assertion, and required CRID
    before persisting or dialing.
 
 `request_cases`, `result_reject_cases`, `error_reject_cases`, and `size_cases`
 are mandatory executable suites. A consumer supports this artifact only when
 it accepts every success/error case and rejects every negative case with the
 declared `reject_class`.
+
+`expected_crid` is a byte-exact echo of the CRID returned by this operation.
+The issued spelling is stable for the resource lifetime; clients do not derive
+a different form for continuity.
+
+`existing_unpinned_trailing_crid` checks existing-resource lookup without
+continuity and success-member order independence. The worst-case success body
+is 952 bytes, leaving 24 bytes under the 976-byte plaintext cap. Recheck that
+budget before adding any success field.
+
+`crid_binding` rejects a CRID that does not match its delivered key.
+`resource_binding` rejects a self-consistent CRID that differs from the pinned
+CRID, or other cross-wired resource values.

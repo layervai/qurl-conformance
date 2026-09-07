@@ -70,13 +70,33 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 		t.Fatalf("duplicate request = %v", err)
 	}
 
-	resultJSON := file.SuccessExchanges[0].Result.BodyJSON
-	wrongExpected := file.Fixtures.ResourceID[:len(file.Fixtures.ResourceID)-1] + "A"
-	request.UsrData.ExpectedResourceID = &wrongExpected
-	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
+	for _, oldRequest := range []string{
+		strings.Replace(requestJSON, `"connector_id":`, `"expected_resource_id":"legacy-key","connector_id":`, 1),
+		strings.Replace(requestJSON, `"connector_id":`, `"expected_crid":"`+file.Fixtures.ResourcePublicKey+`","connector_id":`, 1),
+	} {
+		if _, err := ParseConnectorResourceLSTV1RequestBody([]byte(oldRequest), file.Fixtures.AgentID); err == nil {
+			t.Fatal("accepted a public-key continuity request")
+		}
+	}
+	goodResult := file.SuccessExchanges[0].Result.BodyJSON
+	for _, oldResult := range []string{
+		strings.Replace(goodResult, `"resource_public_key":`, `"resource_id":`, 1),
+		strings.Replace(goodResult, `,"crid":"`+file.Fixtures.CRID+`"`, "", 1),
+		strings.Replace(goodResult, `"crid":"`+file.Fixtures.CRID+`"`, `"crid":null`, 1),
+	} {
+		if oldResult == goodResult {
+			t.Fatal("old-field fixture did not change")
+		}
+		if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(oldResult), request); err == nil {
+			t.Fatal("accepted a resource-ID or CRID-less result")
+		}
+	}
+	wrongExpected := cridV1IssuerProdCRID
+	request.UsrData.ExpectedCRID = &wrongExpected
+	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(goodResult), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
 		t.Fatalf("expected-resource mismatch = %v", err)
 	}
-	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), nil); rejectClass(t, err) != ConnectorResourceLSTV1RejectRequestBinding {
+	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(goodResult), nil); rejectClass(t, err) != ConnectorResourceLSTV1RejectRequestBinding {
 		t.Fatalf("uncorrelated success = %v", err)
 	}
 	tooLarge := bytes.Repeat([]byte{' '}, ConnectorResourceLSTV1MaxPlaintextBodyBytes+1)
@@ -106,9 +126,15 @@ func TestParseConnectorResourceLSTV1FileFailsClosed(t *testing.T) {
 		body   []byte
 		needle string
 	}{
+		{"create nonce", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[0].Request = f.SuccessExchanges[2].Request }), "fresh_create requires"},
+		{"existing nonce", mutate(func(f *ConnectorResourceLSTV1File) {
+			f.SuccessExchanges[1].Request.BodyJSON = strings.Replace(f.SuccessExchanges[1].Request.BodyJSON, f.Fixtures.ExistingRequestNonce, f.Fixtures.CreateRequestNonce, 1)
+		}), "existing_with_continuity requires"},
+		{"unpinned request", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Request = f.SuccessExchanges[1].Request }), "unpinned exchange"},
+		{"trailing crid", mutate(func(f *ConnectorResourceLSTV1File) { f.SuccessExchanges[2].Result = f.SuccessExchanges[1].Result }), "trailing crid"},
 		{"schema", mutate(func(f *ConnectorResourceLSTV1File) { f.SchemaVersion++ }), "identity"},
 		{"transport", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.HTTPFallbackAllowed = true }), "contract drift"},
-		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedResourceIDRule = "create_if_absent" }), "contract drift"},
+		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedCRIDRule = "create_if_absent" }), "contract drift"},
 		{"replay", mutate(func(f *ConnectorResourceLSTV1File) { f.ReplayCases[0].MutationAllowed = true }), "expectation drift"},
 		{"size", mutate(func(f *ConnectorResourceLSTV1File) { f.SizeCases[0].SizeBudgetBytes++ }), "size/outcome drift"},
 	} {

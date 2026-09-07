@@ -16,7 +16,7 @@ func TestDecodeRequestNonceAcceptsCommittedFixtures(t *testing.T) {
 		"assignment refresh fixture": AgentAssignmentRefreshRequestNonceFixture,
 		"resource create nonce":      resource.Fixtures.CreateRequestNonce,
 		"resource existing nonce":    resource.Fixtures.ExistingRequestNonce,
-		"resource no-CRID nonce":     resource.Fixtures.NoCRIDRequestNonce,
+		"resource unpinned nonce":    resource.Fixtures.UnpinnedRequestNonce,
 	} {
 		nonce, err := DecodeRequestNonce(value)
 		if err != nil {
