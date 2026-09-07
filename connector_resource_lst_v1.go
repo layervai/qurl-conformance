@@ -790,7 +790,7 @@ func validateConnectorResourceLSTV1SizeCases(cases []ConnectorResourceLSTV1SizeC
 			}
 		case "result":
 			var result connectorResourceLSTV1ResultWire
-			if err := strictDecodeArtifact(body, &result); err != nil || result.List == nil {
+			if err := strictDecodeArtifact(body, &result); err != nil || result.List == nil || result.List.CRID == nil {
 				return fmt.Errorf("conformance: Connector resource LST max result decode: %v", err)
 			}
 			expected := *result.List.CRID
@@ -906,7 +906,7 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 		if err != nil {
 			return nil, class, err
 		}
-		for _, key := range []string{"query", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id"} {
+		for _, key := range []string{"query", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id", "crid"} {
 			if string(list[key]) == "null" || len(list[key]) == 0 || list[key][0] != '"' {
 				return nil, ConnectorResourceLSTV1RejectWrongType, fmt.Errorf("%s must be a string", key)
 			}
@@ -954,7 +954,10 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success identity/routing/admission values are cross-wired")
 		}
 
-		if result.List.CRID != nil {
+		if result.List.CRID == nil {
+			return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("crid must be a string")
+		}
+		{
 			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourcePublicKey)
 			if matchErr != nil {
 				return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
@@ -1134,8 +1137,8 @@ func ValidateConnectorResourceLSTV1Environment(value string) error {
 }
 
 func ValidateConnectorResourceLSTV1CRID(value string) error {
-	if outcome, _ := deriveCRIDV1ValueExpectation(value); outcome != "accept" {
-		return errors.New("expected_crid must be a canonical CRID")
+	if outcome, class := deriveCRIDV1ValueExpectation(value); outcome != ExpectAccept {
+		return fmt.Errorf("invalid CRID: %s", class)
 	}
 	return nil
 }

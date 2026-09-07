@@ -62,7 +62,7 @@ The remaining identities have distinct roles:
   Authority producers limit it to 64 UTF-8 bytes; together with the whole-body
   cap, this keeps even maximally JSON-escaped valid values inside the UDP
   envelope.
-- `crid` is optional. When present it must be valid under
+- `crid` is required and must be a non-null string valid under
   `qurl-crid-v1-vectors` and match `resource_public_key` exactly.
 - `found_existing` reports the Authority outcome for the first logical
   execution. It is required even when `false`.
@@ -72,6 +72,9 @@ trustworthy monotonic value. Continuity is instead fail-closed through
 `expected_crid`.
 
 ## Continuity and replay
+
+Check the CRID-to-public-key binding before comparing `expected_crid`. A result
+that fails both checks is a `crid_binding` rejection.
 
 `expected_crid` is a read-only assertion. When supplied, the Authority
 may return success only for the same currently active resource. An absent,
@@ -139,7 +142,7 @@ bytes without fragmentation.
 5. Seal exactly one result under `NHP_LRT`. Never fall back to HTTP and never
    infer placement from a hostname.
 6. On the consumer side, correlate success with the originating request and
-   validate every echoed identity, continuity assertion, and optional CRID
+   validate every echoed identity, continuity assertion, and required CRID
    before persisting or dialing.
 
 `request_cases`, `result_reject_cases`, `error_reject_cases`, and `size_cases`

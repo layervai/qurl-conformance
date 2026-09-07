@@ -82,6 +82,7 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 	for _, oldResult := range []string{
 		strings.Replace(goodResult, `"resource_public_key":`, `"resource_id":`, 1),
 		strings.Replace(goodResult, `,"crid":"`+file.Fixtures.CRID+`"`, "", 1),
+		strings.Replace(goodResult, `"crid":"`+file.Fixtures.CRID+`"`, `"crid":null`, 1),
 	} {
 		if oldResult == goodResult {
 			t.Fatal("old-field fixture did not change")
@@ -91,7 +92,7 @@ func TestConnectorResourceLSTV1PublicParsersFailClosed(t *testing.T) {
 		}
 	}
 	resultJSON := file.SuccessExchanges[0].Result.BodyJSON
-	wrongExpected := file.Fixtures.ResourcePublicKey[:len(file.Fixtures.ResourcePublicKey)-1] + "A"
+	wrongExpected := "ahpviqz46qwcvx56glfatm3p3ooccwfcf2it4sdgjervwdkapykw3o3qdq2a"
 	request.UsrData.ExpectedCRID = &wrongExpected
 	if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(resultJSON), request); rejectClass(t, err) != ConnectorResourceLSTV1RejectResourceBinding {
 		t.Fatalf("expected-resource mismatch = %v", err)
