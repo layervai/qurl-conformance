@@ -487,7 +487,7 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 }
 
 func validateConnectorResourceLSTV1SuccessExchanges(exchanges []ConnectorResourceLSTV1Exchange, fixtures ConnectorResourceLSTV1Fixtures) error {
-	required := []string{"fresh_create", "existing_with_continuity", "existing_with_crid"}
+	required := []string{"fresh_create", "existing_with_continuity", "existing_unpinned_trailing_crid"}
 	if len(exchanges) != len(required) {
 		return fmt.Errorf("conformance: Connector resource LST success exchange count = %d, want %d", len(exchanges), len(required))
 	}
@@ -595,25 +595,26 @@ func validateConnectorResourceLSTV1ReplayCases(cases []ConnectorResourceLSTV1Rep
 
 func validateConnectorResourceLSTV1RequestCases(cases []ConnectorResourceLSTV1BodyCase, fixtures ConnectorResourceLSTV1Fixtures) error {
 	required := map[string]string{
-		"reject_duplicate_outer_dev_id":  ConnectorResourceLSTV1RejectBodyParse,
-		"reject_unknown_outer_field":     ConnectorResourceLSTV1RejectUnknownField,
-		"reject_missing_usr_id":          ConnectorResourceLSTV1RejectMissingField,
-		"reject_null_usr_data":           ConnectorResourceLSTV1RejectWrongType,
-		"reject_usr_id_agent_mismatch":   ConnectorResourceLSTV1RejectAgentBinding,
-		"reject_dev_id_agent_mismatch":   ConnectorResourceLSTV1RejectAgentBinding,
-		"reject_wrong_asp_id":            ConnectorResourceLSTV1RejectSemantic,
-		"reject_wrong_query":             ConnectorResourceLSTV1RejectSemantic,
-		"reject_wrong_version":           ConnectorResourceLSTV1RejectSemantic,
-		"reject_missing_request_nonce":   ConnectorResourceLSTV1RejectMissingField,
-		"reject_null_request_nonce":      ConnectorResourceLSTV1RejectWrongType,
-		"reject_padded_request_nonce":    ConnectorResourceLSTV1RejectSemantic,
-		"reject_short_request_nonce":     ConnectorResourceLSTV1RejectSemantic,
-		"reject_missing_connector_id":    ConnectorResourceLSTV1RejectMissingField,
-		"reject_invalid_connector_id":    ConnectorResourceLSTV1RejectSemantic,
-		"reject_null_expected_crid":      ConnectorResourceLSTV1RejectWrongType,
-		"reject_invalid_expected_crid":   ConnectorResourceLSTV1RejectSemantic,
-		"reject_unknown_user_data_field": ConnectorResourceLSTV1RejectUnknownField,
-		"reject_trailing_value":          ConnectorResourceLSTV1RejectBodyParse,
+		"reject_legacy_expected_resource_id": ConnectorResourceLSTV1RejectUnknownField,
+		"reject_duplicate_outer_dev_id":      ConnectorResourceLSTV1RejectBodyParse,
+		"reject_unknown_outer_field":         ConnectorResourceLSTV1RejectUnknownField,
+		"reject_missing_usr_id":              ConnectorResourceLSTV1RejectMissingField,
+		"reject_null_usr_data":               ConnectorResourceLSTV1RejectWrongType,
+		"reject_usr_id_agent_mismatch":       ConnectorResourceLSTV1RejectAgentBinding,
+		"reject_dev_id_agent_mismatch":       ConnectorResourceLSTV1RejectAgentBinding,
+		"reject_wrong_asp_id":                ConnectorResourceLSTV1RejectSemantic,
+		"reject_wrong_query":                 ConnectorResourceLSTV1RejectSemantic,
+		"reject_wrong_version":               ConnectorResourceLSTV1RejectSemantic,
+		"reject_missing_request_nonce":       ConnectorResourceLSTV1RejectMissingField,
+		"reject_null_request_nonce":          ConnectorResourceLSTV1RejectWrongType,
+		"reject_padded_request_nonce":        ConnectorResourceLSTV1RejectSemantic,
+		"reject_short_request_nonce":         ConnectorResourceLSTV1RejectSemantic,
+		"reject_missing_connector_id":        ConnectorResourceLSTV1RejectMissingField,
+		"reject_invalid_connector_id":        ConnectorResourceLSTV1RejectSemantic,
+		"reject_null_expected_crid":          ConnectorResourceLSTV1RejectWrongType,
+		"reject_invalid_expected_crid":       ConnectorResourceLSTV1RejectSemantic,
+		"reject_unknown_user_data_field":     ConnectorResourceLSTV1RejectUnknownField,
+		"reject_trailing_value":              ConnectorResourceLSTV1RejectBodyParse,
 	}
 	return validateConnectorResourceLSTV1BodyCases("request", cases, required, func(body []byte) string {
 		_, class, _ := parseConnectorResourceLSTV1Request(body, fixtures.AgentID)
@@ -625,6 +626,7 @@ func validateConnectorResourceLSTV1ResultRejectCases(cases []ConnectorResourceLS
 	baseline := &connectorResourceLSTV1RequestWire{UsrID: fixtures.AgentID, DevID: fixtures.AgentID, AspID: ConnectorResourceLSTV1AspID,
 		UsrData: connectorResourceLSTV1RequestUserDataWire{Query: ConnectorResourceLSTV1Query, Version: 1, RequestNonce: fixtures.ExistingRequestNonce, ConnectorID: fixtures.ConnectorID, ExpectedCRID: &fixtures.CRID}}
 	required := map[string]string{
+		"reject_legacy_resource_id":                  ConnectorResourceLSTV1RejectUnknownField,
 		"reject_success_missing_crid":                ConnectorResourceLSTV1RejectMissingField,
 		"reject_success_null_crid":                   ConnectorResourceLSTV1RejectWrongType,
 		"reject_success_missing_list":                ConnectorResourceLSTV1RejectMissingField,

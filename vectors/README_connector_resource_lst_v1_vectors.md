@@ -149,3 +149,7 @@ bytes without fragmentation.
 are mandatory executable suites. A consumer supports this artifact only when
 it accepts every success/error case and rejects every negative case with the
 declared `reject_class`.
+
+`expected_crid` is a byte-exact echo of the CRID returned by this operation. The issued spelling is stable for the resource lifetime; clients do not derive a different form for continuity.
+
+`existing_unpinned_trailing_crid` checks existing-resource lookup without continuity and success-member order independence. The worst-case success body is 951 bytes, leaving 25 bytes under the 976-byte plaintext cap. Recheck that budget before adding any success field.
