@@ -15,6 +15,8 @@ func TestDecodeConnectorHubRequestNonceAcceptsCommittedFixtures(t *testing.T) {
 	for name, value := range map[string]string{
 		"assignment refresh fixture": AgentAssignmentRefreshRequestNonceFixture,
 		"resource create nonce":      resource.Fixtures.CreateRequestNonce,
+		"resource existing nonce":    resource.Fixtures.ExistingRequestNonce,
+		"resource no-CRID nonce":     resource.Fixtures.NoCRIDRequestNonce,
 	} {
 		nonce, err := DecodeConnectorHubRequestNonce(value)
 		if err != nil {

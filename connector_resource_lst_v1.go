@@ -1077,7 +1077,7 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 // grammar (DecodeConnectorHubRequestNonce) to a Connector resource request.
 func ValidateConnectorResourceLSTV1Nonce(value string) error {
 	if _, err := DecodeConnectorHubRequestNonce(value); err != nil {
-		return fmt.Errorf("request_nonce must be canonical unpadded base64url for exactly %d bytes: %w", ConnectorResourceLSTV1NonceBytes, err)
+		return fmt.Errorf("request_nonce must be canonical unpadded base64url for exactly %d bytes", ConnectorResourceLSTV1NonceBytes)
 	}
 	return nil
 }
