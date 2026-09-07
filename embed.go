@@ -23,6 +23,7 @@ const (
 	connectorHubLSTCookieName  = "vectors/connector_hub_lst_cookie_v1_vectors.json"
 	cridV1Name                 = "vectors/crid_v1_vectors.json"
 	targetPathV1Name           = "vectors/target_path_v1_vectors.json"
+	privateUploadV1Name        = "vectors/private_upload_v1_vectors.json"
 )
 
 func mustReadVector(name string) []byte {
@@ -120,6 +121,12 @@ func TargetPathV1Vectors() []byte {
 	return mustReadVector(targetPathV1Name)
 }
 
+// PrivateUploadV1Vectors returns the private upload and refresh application-
+// signing contract and its byte-exact golden requests.
+func PrivateUploadV1Vectors() []byte {
+	return mustReadVector(privateUploadV1Name)
+}
+
 // Open returns the raw bytes of an embedded vectors file by its base name (for
 // example "qv2_conformance_vectors.json" or "issuer_signature_vectors.json"), or
 // by its full "vectors/..." path. It returns an error for any other name.
@@ -211,4 +218,10 @@ func CRIDV1() (*CRIDV1File, error) {
 // TargetPathV1 strictly parses the embedded target_path contract artifact.
 func TargetPathV1() (*TargetPathV1File, error) {
 	return ParseTargetPathV1File(TargetPathV1Vectors())
+}
+
+// PrivateUploadV1 strictly parses and verifies the private upload and refresh
+// application-signing artifact.
+func PrivateUploadV1() (*PrivateUploadV1File, error) {
+	return ParsePrivateUploadV1File(PrivateUploadV1Vectors())
 }

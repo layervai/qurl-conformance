@@ -49,7 +49,7 @@ jobs:
 
       - name: Sanitizer gate (no private-repo leakage in vectors/docs/packages)
         run: |
-          if grep -rInE 'nhp-OWNED|nhp-owned|endpoints/server/internal|endpoints/js-agent|layervai/nhp|nhp/core|\bvendored\b|vendoring' vectors/ npm/vectors/ python/qurl_conformance/_data/ README.md 2>/dev/null; then
+          if grep -rInE 'nhp-OWNED|nhp-owned|endpoints/server/internal|endpoints/js-agent|nhp/core|\bvendored\b|vendoring' vectors/ npm/vectors/ python/qurl_conformance/_data/ README.md 2>/dev/null; then
             echo "::error::private-repo leak term found"; exit 1
           fi
 
@@ -84,6 +84,7 @@ jobs:
             connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
             cridV1Vectors: 'crid_v1_vectors.json',
             targetPathV1Vectors: 'target_path_v1_vectors.json',
+            privateUploadV1Vectors: 'private_upload_v1_vectors.json',
           };
           assert.deepEqual(Object.keys(c).sort(), Object.keys(files).sort());
           assert.deepEqual(
@@ -96,6 +97,233 @@ jobs:
 
           const hc = c.connectorHubLstCookieVectors();
           const cd = c.cridV1Vectors();
+          const pu = c.privateUploadV1Vectors();
+
+          assert.equal(pu.contract.audience_key_id_rule, 'regex:^key_[A-Za-z0-9]{12}$');
+          assert.equal(pu.contract.client_id_rule, 'regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$');
+          assert.equal(pu.contract.key_id_rule, 'regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$');
+          assert.equal(pu.contract.upload_request_id_rule, 'regex:^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
+          assert.equal(pu.contract.upload_handle_rule, 'regex:^upl_[A-Za-z0-9_-]{43}$');
+          assert.equal(pu.contract.authority_expires_at_rule, 'rfc3339_utc_whole_seconds_uppercase_z');
+          assert.equal(pu.contract.body_length_rule, 'positive_canonical_decimal_equal_to_exact_body_byte_length');
+          assert.equal(pu.contract.upload.media_type_rule, "regex:^[!#$%&'*+.^_`|~0-9a-z-]+/[!#$%&'*+.^_`|~0-9a-z-]+$");
+          assert.equal(pu.contract.upload.media_type_subtype_rule, 'not_exactly_star');
+          assert.equal(pu.contract.upload.filename_encoding, 'utf8_then_base64url_unpadded');
+          assert.equal(pu.contract.upload.display_filename_rule, 'nfc_utf8_1_to_180_bytes_no_leading_or_trailing_unicode_whitespace_not_dot_or_dotdot_no_slash_or_backslash_no_unicode_control_cf_co_zl_or_zp');
+          assert.equal(pu.contract.upload.content_type_rule, 'exactly_equal_to_signed_media_type');
+          assert.deepEqual(pu.contract.refresh.body_key_order, [
+            'upload_handle',
+            'upload_request_id',
+            'max_batch_size',
+            'max_link_ttl_seconds',
+            'authority_expires_at',
+          ]);
+          assert.equal(pu.contract.refresh.body_whitespace_rule, 'none_between_tokens');
+          assert.equal(
+            pu.contract.refresh.body_string_escaping_rule,
+            'rfc8259_utf8_short_escapes_for_quote_backslash_backspace_tab_newline_formfeed_carriage_return_u00xx_for_other_u0000_to_u001f_controls_plus_lowercase_u003c_u003e_u0026_u2028_u2029',
+          );
+          assert.equal(pu.contract.refresh.content_type_rule, 'exactly_application/json');
+
+          const frame = value => {
+            if (typeof value !== 'string') throw new Error('private-upload frame value must be a string');
+            const bytes = Buffer.from(value, 'utf8');
+            const length = Buffer.alloc(4);
+            length.writeUInt32BE(bytes.length);
+            return Buffer.concat([length, bytes]);
+          };
+          const p256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+          const inspectP256Signature = encoded => {
+            if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return { rejectClass: 'signature_encoding' };
+            const der = Buffer.from(encoded, 'base64url');
+            if (der.toString('base64url') !== encoded || der.length < 8 || der.length > 72) {
+              return { rejectClass: 'signature_encoding' };
+            }
+            let offset = 0;
+            if (der[offset++] !== 0x30 || der[offset++] !== der.length - offset) {
+              return { rejectClass: 'signature_encoding' };
+            }
+            const integer = () => {
+              if (der[offset++] !== 0x02) return undefined;
+              const length = der[offset++];
+              if (length < 1 || length > 33 || offset + length > der.length) return undefined;
+              const bytes = der.subarray(offset, offset += length);
+              const negative = Boolean(bytes[0] & 0x80);
+              if (bytes.length > 1 && ((!negative && bytes[0] === 0 && !(bytes[1] & 0x80)) ||
+                  (negative && bytes[0] === 0xff && (bytes[1] & 0x80)))) {
+                return undefined;
+              }
+              const unsigned = BigInt('0x' + bytes.toString('hex'));
+              return negative ? unsigned - (1n << BigInt(bytes.length * 8)) : unsigned;
+            };
+            const r = integer();
+            const s = integer();
+            if (r === undefined || s === undefined || offset !== der.length) {
+              return { rejectClass: 'signature_encoding' };
+            }
+            if (r <= 0n || s <= 0n || r >= p256Order || s >= p256Order) {
+              return { rejectClass: 'signature_scalar' };
+            }
+            if (s > p256Order / 2n) return { rejectClass: 'signature_malleability' };
+            return { der };
+          };
+          const canonicalJSONString = value => JSON.stringify(value).replace(
+            /[<>&\u2028\u2029]/g,
+            character => '\\u' + character.codePointAt(0).toString(16).padStart(4, '0'),
+          );
+          const canonicalPositiveDecimal = value => /^[1-9][0-9]*$/.test(value) ? value : null;
+          const canonicalRefreshBody = golden => {
+            const maxBatchSize = canonicalPositiveDecimal(golden.max_batch_size_decimal);
+            const maxLinkTTLSeconds = canonicalPositiveDecimal(golden.max_link_ttl_seconds_decimal);
+            if (!maxBatchSize || !maxLinkTTLSeconds) return null;
+            return Buffer.from(
+              '{"upload_handle":' + canonicalJSONString(golden.upload_handle) +
+              ',"upload_request_id":' + canonicalJSONString(golden.upload_request_id) +
+              ',"max_batch_size":' + maxBatchSize +
+              ',"max_link_ttl_seconds":' + maxLinkTTLSeconds +
+              ',"authority_expires_at":' + canonicalJSONString(golden.authority_expires_at) + '}',
+              'utf8',
+            );
+          };
+          const verifyPrivateUpload = (operation, golden) => {
+            const contract = pu.contract[operation];
+            const body = Buffer.from(golden.body_hex, 'hex');
+            const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+            const values = { ...golden, body_sha256_hex: bodyHash };
+            const canonical = Buffer.concat([
+              Buffer.from(contract.signing_domain_ascii, 'ascii'),
+              Buffer.from([0]),
+              ...contract.field_order.map(name => frame(values[name])),
+            ]);
+            const inspected = inspectP256Signature(golden.signature_der_b64url);
+            const stable = Buffer.concat([
+              Buffer.from(contract.stable_request_domain_ascii, 'ascii'),
+              Buffer.from([0]),
+              ...contract.stable_request_field_order.map(name => frame(golden[name])),
+            ]);
+            const expectedRefreshBody = operation === 'refresh' ? canonicalRefreshBody(golden) : null;
+            return !inspected.rejectClass &&
+              body.length.toString() === golden.body_length_decimal &&
+              bodyHash === golden.body_sha256_hex &&
+              'sha-256=:' + crypto.createHash('sha256').update(body).digest('base64') + ':' === golden.content_digest_header &&
+              canonical.toString('hex') === golden.canonical_hex &&
+              crypto.createHash('sha256').update(canonical).digest('hex') === golden.signing_digest_hex &&
+              stable.toString('hex') === golden.stable_request_canonical_hex &&
+              crypto.createHash('sha256').update(stable).digest('hex') === golden.stable_request_digest_hex &&
+              (operation !== 'upload' || golden.content_type === golden.media_type) &&
+              (operation !== 'refresh' || (golden.content_type === 'application/json' && expectedRefreshBody?.equals(body))) &&
+              (operation !== 'upload' || Buffer.from(golden.display_filename_utf8).toString('base64url') === golden.filename_b64url) &&
+              crypto.verify(
+                'sha256',
+                canonical,
+                crypto.createPublicKey({
+                  key: Buffer.from(pu.fixture_key.public_key_der_b64url, 'base64url'),
+                  format: 'der',
+                  type: 'spki',
+                }),
+                inspected.der,
+              );
+          };
+          const canonicalPrivateAuthority = value => {
+            if (!value || value !== value.toLowerCase() || /[ /\\\t\r\n]/.test(value)) return false;
+            if (value.includes('[') || value.includes(']') || (value.match(/:/g) || []).length > 1) return false;
+            const separator = value.lastIndexOf(':');
+            const host = separator < 0 ? value : value.slice(0, separator);
+            const port = separator < 0 ? '' : value.slice(separator + 1);
+            if (!host || host.length > 253 || host.endsWith('.')) return false;
+            if (port && (!/^[1-9][0-9]*$/.test(port) || Number(port) > 65535)) return false;
+            if (separator >= 0 && !port) return false;
+            return host.split('.').every(label =>
+              label.length >= 1 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
+          };
+          const canonicalPrivateNonce = value => {
+            if (!/^[A-Za-z0-9_-]+$/.test(value)) return false;
+            const decoded = Buffer.from(value, 'base64url');
+            return decoded.length === 32 && decoded.toString('base64url') === value;
+          };
+          const privateUploadRejectClass = reject => {
+            if (reject.base !== 'upload_golden' && reject.base !== 'refresh_golden') {
+              throw new Error('unknown private-upload reject base: ' + reject.base);
+            }
+            const operation = reject.base === 'upload_golden' ? 'upload' : 'refresh';
+            const golden = { ...pu[reject.base] };
+            const contract = pu.contract[operation];
+            let forbiddenHeader = false;
+            const requestFields = new Set([
+              'method', 'authority', 'path', 'nonce', 'body_sha256_hex', 'signature_der_b64url',
+            ]);
+            if (operation === 'upload') requestFields.add('audience_key_id');
+            for (const mutation of reject.mutations) {
+              if (mutation.target === 'request_field' && requestFields.has(mutation.field)) {
+                golden[mutation.field] = mutation.value;
+                continue;
+              }
+              if (mutation.target === 'body' && mutation.field === 'body_hex') {
+                golden.body_hex = mutation.value;
+                continue;
+              }
+              if (mutation.target === 'request_header' && contract.forbidden_headers.includes(mutation.field)) {
+                forbiddenHeader = true;
+                continue;
+              }
+              throw new Error('unknown private-upload reject mutation: ' + mutation.target + '.' + mutation.field);
+            }
+            if (golden.method !== contract.method || golden.path !== pu.contract.path) return 'method_path';
+            if (forbiddenHeader) return 'forbidden_header';
+            if (!canonicalPrivateAuthority(golden.authority)) return 'authority';
+            if (!canonicalPrivateNonce(golden.nonce)) return 'nonce';
+            if (operation === 'upload' && !/^key_[A-Za-z0-9]{12}$/.test(golden.audience_key_id)) return 'audience_key_id';
+            const canonical = Buffer.concat([
+              Buffer.from(contract.signing_domain_ascii, 'ascii'),
+              Buffer.from([0]),
+              ...contract.field_order.map(name => frame(golden[name])),
+            ]);
+            const inspected = inspectP256Signature(golden.signature_der_b64url);
+            if (inspected.rejectClass) return inspected.rejectClass;
+            if (!crypto.verify(
+              'sha256',
+              canonical,
+              crypto.createPublicKey({
+                key: Buffer.from(pu.fixture_key.public_key_der_b64url, 'base64url'),
+                format: 'der',
+                type: 'spki',
+              }),
+              inspected.der,
+            )) return 'signature_mismatch';
+            const body = Buffer.from(golden.body_hex, 'hex');
+            if (crypto.createHash('sha256').update(body).digest('hex') !== golden.body_sha256_hex) {
+              return 'body_digest';
+            }
+            return '';
+          };
+          const privateUploadMediaTypeValid = value => {
+            const pattern = new RegExp(pu.contract.upload.media_type_rule.slice('regex:'.length));
+            const subtype = value.includes('/') ? value.slice(value.indexOf('/') + 1) : '';
+            return pattern.test(value) && subtype !== '*';
+          };
+          const privateUploadFilenameInvalid = value => {
+            const byteLength = Buffer.byteLength(value, 'utf8');
+            return value.normalize('NFC') !== value || byteLength === 0 || byteLength > 180 ||
+              value.trim() !== value || value === '.' || value === '..' || /[\\/]/u.test(value) ||
+              /[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]/u.test(value);
+          };
+          const privateUploadConstructionRejects = reject => {
+            if (reject.outcome !== 'reject' || reject.base !== 'upload_golden') {
+              throw new Error('unknown private-upload construction case');
+            }
+            if (reject.field === 'content_type' && reject.reject_rule === 'upload.content_type_rule') {
+              return reject.value !== pu.upload_golden.media_type;
+            }
+            if (reject.field === 'display_filename_utf8' && reject.reject_rule === 'upload.display_filename_rule') {
+              return privateUploadFilenameInvalid(reject.value);
+            }
+            if (reject.field === 'media_type' &&
+                (reject.reject_rule === 'upload.media_type_rule' ||
+                 reject.reject_rule === 'upload.media_type_subtype_rule')) {
+              return !privateUploadMediaTypeValid(reject.value);
+            }
+            throw new Error('unknown private-upload construction field or rule');
+          };
 
           const rawIP = source => {
             const address = source.startsWith('::ffff:') ? source.slice(7) : source;
@@ -171,6 +399,41 @@ jobs:
               base32(encoded) === vector.expected_crid;
           };
 
+          assert.equal(
+            crypto.createPublicKey(crypto.createPrivateKey({
+              key: Buffer.from(pu.fixture_key.private_key_pkcs8_der_b64url, 'base64url'),
+              format: 'der',
+              type: 'pkcs8',
+            })).export({ format: 'der', type: 'spki' }).toString('base64url'),
+            pu.fixture_key.public_key_der_b64url,
+          );
+          assert.ok(verifyPrivateUpload('upload', pu.upload_golden));
+          assert.ok(verifyPrivateUpload('refresh', pu.refresh_golden));
+          assert.equal(privateUploadFilenameInvalid(pu.upload_golden.display_filename_utf8), false);
+          assert.equal(privateUploadMediaTypeValid(pu.upload_golden.media_type), true);
+          assert.match(pu.upload_golden.audience_key_id, /^key_[A-Za-z0-9]{12}$/);
+          assert.match(pu.refresh_golden.upload_handle, /^upl_[A-Za-z0-9_-]{43}$/);
+          for (const reject of pu.reject_cases) {
+            assert.equal(privateUploadRejectClass(reject), reject.reject_class, reject.name);
+          }
+          for (const reject of pu.construction_reject_cases) {
+            assert.equal(privateUploadConstructionRejects(reject), true, reject.name);
+          }
+          assert.throws(
+            () => privateUploadRejectClass({
+              ...pu.reject_cases[0],
+              mutations: [{ target: 'request_header', field: 'X-Future-Header', value: 'future' }],
+            }),
+            /unknown private-upload reject mutation/,
+          );
+          assert.throws(
+            () => privateUploadRejectClass({
+              ...pu.reject_cases[0],
+              base: 'refresh_golden',
+              mutations: [{ target: 'request_field', field: 'audience_key_id', value: 'key_A1b2C3d4E5f6' }],
+            }),
+            /unknown private-upload reject mutation/,
+          );
           assert.ok(hc.cookie_kats.every(verifyHubCookie));
           assert.ok(cd.producer_cases.every(verifyCRID));
           console.log('npm ok');
@@ -204,7 +467,9 @@ jobs:
           import ipaddress
           import json
           from pathlib import Path
+          import re
           import struct
+          import unicodedata
 
           import qurl_conformance as q
 
@@ -222,6 +487,7 @@ jobs:
               'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
               'crid_v1_vectors': 'crid_v1_vectors.json',
               'target_path_v1_vectors': 'target_path_v1_vectors.json',
+              'private_upload_v1_vectors': 'private_upload_v1_vectors.json',
           }
           assert {
               name for name, value in vars(q).items()
@@ -234,6 +500,132 @@ jobs:
 
           hc = q.connector_hub_lst_cookie_vectors()
           cd = q.crid_v1_vectors()
+          pu = q.private_upload_v1_vectors()
+
+          assert pu['contract']['audience_key_id_rule'] == 'regex:^key_[A-Za-z0-9]{12}$'
+          assert pu['contract']['client_id_rule'] == 'regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+          assert pu['contract']['key_id_rule'] == 'regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+          assert pu['contract']['upload_request_id_rule'] == 'regex:^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          assert pu['contract']['upload_handle_rule'] == 'regex:^upl_[A-Za-z0-9_-]{43}$'
+          assert pu['contract']['authority_expires_at_rule'] == 'rfc3339_utc_whole_seconds_uppercase_z'
+          assert pu['contract']['body_length_rule'] == 'positive_canonical_decimal_equal_to_exact_body_byte_length'
+          assert pu['contract']['upload']['media_type_rule'].startswith('regex:^')
+          assert pu['contract']['upload']['media_type_subtype_rule'] == 'not_exactly_star'
+          assert pu['contract']['upload']['filename_encoding'] == 'utf8_then_base64url_unpadded'
+          assert pu['contract']['upload']['display_filename_rule'] == (
+              'nfc_utf8_1_to_180_bytes_no_leading_or_trailing_unicode_whitespace_not_dot_or_dotdot_'
+              'no_slash_or_backslash_no_unicode_control_cf_co_zl_or_zp'
+          )
+          assert pu['contract']['upload']['content_type_rule'] == 'exactly_equal_to_signed_media_type'
+          assert pu['contract']['refresh']['body_key_order'] == [
+              'upload_handle',
+              'upload_request_id',
+              'max_batch_size',
+              'max_link_ttl_seconds',
+              'authority_expires_at',
+          ]
+          assert pu['contract']['refresh']['body_whitespace_rule'] == 'none_between_tokens'
+          assert pu['contract']['refresh']['body_string_escaping_rule'] == (
+              'rfc8259_utf8_short_escapes_for_quote_backslash_backspace_tab_newline_formfeed_carriage_return_'
+              'u00xx_for_other_u0000_to_u001f_controls_plus_lowercase_u003c_u003e_u0026_u2028_u2029'
+          )
+          assert pu['contract']['refresh']['content_type_rule'] == 'exactly_application/json'
+
+          def frame(value):
+              encoded = str(value).encode()
+              return struct.pack('>I', len(encoded)) + encoded
+
+          def verify_private_upload(operation, golden):
+              contract = pu['contract'][operation]
+              body = bytes.fromhex(golden['body_hex'])
+              body_hash = hashlib.sha256(body).hexdigest()
+              values = dict(golden)
+              values['body_sha256_hex'] = body_hash
+              canonical = b''.join((
+                  contract['signing_domain_ascii'].encode('ascii'),
+                  b'\0',
+                  *(frame(values[name]) for name in contract['field_order']),
+              ))
+              expected_refresh_body = None
+              if operation == 'refresh':
+                  if not re.fullmatch(r'[1-9][0-9]*', golden['max_batch_size_decimal']):
+                      return False
+                  if not re.fullmatch(r'[1-9][0-9]*', golden['max_link_ttl_seconds_decimal']):
+                      return False
+
+                  def canonical_string(value):
+                      return (
+                          json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+                          .replace('<', r'\u003c')
+                          .replace('>', r'\u003e')
+                          .replace('&', r'\u0026')
+                          .replace('\u2028', r'\u2028')
+                          .replace('\u2029', r'\u2029')
+                      )
+
+                  expected_refresh_body = (
+                      '{"upload_handle":' + canonical_string(golden['upload_handle'])
+                      + ',"upload_request_id":' + canonical_string(golden['upload_request_id'])
+                      + ',"max_batch_size":' + golden['max_batch_size_decimal']
+                      + ',"max_link_ttl_seconds":' + golden['max_link_ttl_seconds_decimal']
+                      + ',"authority_expires_at":' + canonical_string(golden['authority_expires_at'])
+                      + '}'
+                  ).encode()
+              stable = b''.join((
+                  contract['stable_request_domain_ascii'].encode('ascii'),
+                  b'\0',
+                  *(frame(golden[name]) for name in contract['stable_request_field_order']),
+              ))
+              return (
+                  str(len(body)) == golden['body_length_decimal']
+                  and body_hash == golden['body_sha256_hex']
+                  and 'sha-256=:' + base64.b64encode(hashlib.sha256(body).digest()).decode() + ':' == golden['content_digest_header']
+                  and canonical.hex() == golden['canonical_hex']
+                  and hashlib.sha256(canonical).hexdigest() == golden['signing_digest_hex']
+                  and stable.hex() == golden['stable_request_canonical_hex']
+                  and hashlib.sha256(stable).hexdigest() == golden['stable_request_digest_hex']
+                  and (operation != 'upload' or golden['content_type'] == golden['media_type'])
+                  and (
+                      operation != 'refresh'
+                      or (golden['content_type'] == 'application/json' and expected_refresh_body == body)
+                  )
+                  and (
+                      operation != 'upload'
+                      or base64.urlsafe_b64encode(golden['display_filename_utf8'].encode()).decode().rstrip('=')
+                      == golden['filename_b64url']
+                  )
+              )
+
+          def private_upload_media_type_valid(value):
+              pattern = pu['contract']['upload']['media_type_rule'].removeprefix('regex:')
+              _, separator, subtype = value.partition('/')
+              return re.fullmatch(pattern, value) is not None and bool(separator) and subtype != '*'
+
+          def private_upload_filename_invalid(value):
+              return (
+                  unicodedata.normalize('NFC', value) != value
+                  or not value
+                  or len(value.encode()) > 180
+                  or value.strip() != value
+                  or value in ('.', '..')
+                  or '/' in value
+                  or '\\' in value
+                  or any(unicodedata.category(char) in ('Cc', 'Cf', 'Co', 'Zl', 'Zp') for char in value)
+              )
+
+          def private_upload_construction_rejects(reject):
+              if reject['outcome'] != 'reject' or reject['base'] != 'upload_golden':
+                  raise ValueError('unknown private-upload construction case')
+              if reject['field'] == 'content_type' and reject['reject_rule'] == 'upload.content_type_rule':
+                  return reject['value'] != pu['upload_golden']['media_type']
+              if reject['field'] == 'display_filename_utf8' and reject['reject_rule'] == 'upload.display_filename_rule':
+                  return private_upload_filename_invalid(reject['value'])
+              if reject['field'] == 'media_type' and reject['reject_rule'] in (
+                  'upload.media_type_rule',
+                  'upload.media_type_subtype_rule',
+              ):
+                  return not private_upload_media_type_valid(reject['value'])
+              raise ValueError('unknown private-upload construction field or rule')
 
           def verify_hub_cookie(vector):
               address = ipaddress.ip_address(vector['source_ip'])
@@ -284,6 +676,13 @@ jobs:
                   and base64.b32encode(encoded).decode().rstrip('=').lower() == vector['expected_crid']
               )
 
+          assert verify_private_upload('upload', pu['upload_golden'])
+          assert verify_private_upload('refresh', pu['refresh_golden'])
+          assert not private_upload_filename_invalid(pu['upload_golden']['display_filename_utf8'])
+          assert private_upload_media_type_valid(pu['upload_golden']['media_type'])
+          assert all(private_upload_construction_rejects(reject) for reject in pu['construction_reject_cases'])
+          assert re.fullmatch(r'key_[A-Za-z0-9]{12}', pu['upload_golden']['audience_key_id'])
+          assert re.fullmatch(r'upl_[A-Za-z0-9_-]{43}', pu['refresh_golden']['upload_handle'])
           assert all(verify_hub_cookie(vector) for vector in hc['cookie_kats'])
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
           print('py ok')
@@ -303,11 +702,10 @@ jobs:
               accessor()
           print('python wheel ok')
           PY
-  # Slack build-completion card. Thin shim over the fleet-shared reusable in
-  # layervai/ops-routines-workflows (public mirror of private
-  # layervai/ops-routines); the Block Kit payload builder and gate-result
-  # aggregation live there. Adding/removing a gate is a one-line edit to
-  # `needs:` + `gates:` here.
+  # Slack build-completion card. Thin shim over the public fleet-shared
+  # reusable workflow. The Block Kit payload builder and gate-result aggregation
+  # live there. Adding/removing a gate is a one-line edit to `needs:` + `gates:`
+  # here.
   notify:
     name: Notify
     needs: [conformance]

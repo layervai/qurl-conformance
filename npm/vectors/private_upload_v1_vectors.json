@@ -1,0 +1,662 @@
+{
+  "artifact": "qurl-private-upload-v1-vectors",
+  "schema_version": 1,
+  "description": "Byte-exact application signing contract for private upload and capability refresh through an authenticated NHP 1.1 session. It binds the exact protected authority, method, path, body, caller identity, audience, and request identity without an HTTP bearer credential.",
+  "contract": {
+    "nhp_protocol_version": "1.1",
+    "transport_scope": "application_request_after_authenticated_nhp_1_1_ack",
+    "freshness_replay_scope": "timestamp_freshness_and_nonce_replay_are_receiver_state_checks_not_stateless_signer_mutations",
+    "path": "/internal/v1/uploads",
+    "authority_rule": "sign_exact_protected_ack_url_authority_lowercase_dns_or_ipv4_labels_a-z0-9-hyphen_no_empty_or_edge_hyphen_max_63_per_label_and_253_host_bytes_optional_canonical_nonzero_decimal_port_colon_requires_port_ipv6_forbidden",
+    "audience_key_id_rule": "regex:^key_[A-Za-z0-9]{12}$",
+    "client_id_rule": "regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+    "key_id_rule": "regex:^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+    "upload_request_id_rule": "regex:^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    "upload_handle_rule": "regex:^upl_[A-Za-z0-9_-]{43}$",
+    "authority_expires_at_rule": "rfc3339_utc_whole_seconds_uppercase_z",
+    "body_length_rule": "positive_canonical_decimal_equal_to_exact_body_byte_length",
+    "frame_encoding": "u32be_byte_length_then_exact_utf8_bytes",
+    "signature_algorithm": "ECDSA_P-256_SHA-256",
+    "signature_encoding": "canonical_der_base64url_unpadded_low_s",
+    "private_key_encoding": "pkcs8_der_base64url_unpadded",
+    "public_key_encoding": "der_spki_base64url_unpadded",
+    "content_digest_encoding": "sha-256=:canonical_standard_base64_sha256:",
+    "nonce_encoding": "base64url_unpadded",
+    "nonce_decoded_bytes": 32,
+    "timestamp_max_skew_seconds": 30,
+    "upload": {
+      "method": "POST",
+      "signing_domain_ascii": "LV-QURL-UPLOAD-AUTH-V1",
+      "signing_domain_separator_hex": "00",
+      "field_order": [
+        "method",
+        "authority",
+        "path",
+        "timestamp_unix_decimal",
+        "nonce",
+        "client_id",
+        "key_id",
+        "audience_key_id",
+        "body_sha256_hex",
+        "body_length_decimal",
+        "media_type",
+        "display_filename_utf8",
+        "authority_expires_at",
+        "upload_request_id"
+      ],
+      "stable_request_domain_ascii": "LV-QURL-UPLOAD-REQUEST-V1",
+      "stable_request_field_order": [
+        "client_id",
+        "audience_key_id",
+        "body_sha256_hex",
+        "body_length_decimal",
+        "media_type",
+        "display_filename_utf8",
+        "authority_expires_at",
+        "upload_request_id"
+      ],
+      "body_encoding": "exact_bytes_no_multipart",
+      "media_type_rule": "regex:^[!#$%&'*+.^_`|~0-9a-z-]+/[!#$%&'*+.^_`|~0-9a-z-]+$",
+      "media_type_subtype_rule": "not_exactly_star",
+      "filename_encoding": "utf8_then_base64url_unpadded",
+      "display_filename_rule": "nfc_utf8_1_to_180_bytes_no_leading_or_trailing_unicode_whitespace_not_dot_or_dotdot_no_slash_or_backslash_no_unicode_control_cf_co_zl_or_zp",
+      "required_headers": [
+        "Content-Type",
+        "Content-Length",
+        "Content-Digest",
+        "X-LayerV-Client-ID",
+        "X-LayerV-Key-ID",
+        "X-LayerV-Timestamp",
+        "X-LayerV-Nonce",
+        "X-LayerV-Audience-Key-ID",
+        "X-LayerV-Authority-Expires-At",
+        "X-LayerV-Upload-Request-ID",
+        "X-LayerV-Filename-B64",
+        "X-LayerV-Upload-Signature"
+      ],
+      "forbidden_headers": [
+        "Authorization"
+      ],
+      "content_type_rule": "exactly_equal_to_signed_media_type"
+    },
+    "refresh": {
+      "method": "PATCH",
+      "signing_domain_ascii": "LV-QURL-UPLOAD-REFRESH-AUTH-V1",
+      "signing_domain_separator_hex": "00",
+      "field_order": [
+        "method",
+        "authority",
+        "path",
+        "timestamp_unix_decimal",
+        "nonce",
+        "client_id",
+        "key_id",
+        "body_sha256_hex",
+        "body_length_decimal",
+        "upload_request_id"
+      ],
+      "stable_request_domain_ascii": "LV-QURL-UPLOAD-REFRESH-REQUEST-V1",
+      "stable_request_field_order": [
+        "client_id",
+        "upload_handle",
+        "max_batch_size_decimal",
+        "max_link_ttl_seconds_decimal",
+        "authority_expires_at",
+        "upload_request_id"
+      ],
+      "body_encoding": "canonical_json_exact_bytes",
+      "body_key_order": [
+        "upload_handle",
+        "upload_request_id",
+        "max_batch_size",
+        "max_link_ttl_seconds",
+        "authority_expires_at"
+      ],
+      "body_whitespace_rule": "none_between_tokens",
+      "body_string_escaping_rule": "rfc8259_utf8_short_escapes_for_quote_backslash_backspace_tab_newline_formfeed_carriage_return_u00xx_for_other_u0000_to_u001f_controls_plus_lowercase_u003c_u003e_u0026_u2028_u2029",
+      "content_type_rule": "exactly_application/json",
+      "required_headers": [
+        "Content-Type",
+        "Content-Length",
+        "Content-Digest",
+        "X-LayerV-Client-ID",
+        "X-LayerV-Key-ID",
+        "X-LayerV-Timestamp",
+        "X-LayerV-Nonce",
+        "X-LayerV-Upload-Request-ID",
+        "X-LayerV-Upload-Signature"
+      ],
+      "forbidden_headers": [
+        "Authorization",
+        "X-LayerV-Audience-Key-ID",
+        "X-LayerV-Filename-B64"
+      ]
+    },
+    "reject_classes": [
+      "authority",
+      "audience_key_id",
+      "body_digest",
+      "forbidden_header",
+      "method_path",
+      "nonce",
+      "signature_encoding",
+      "signature_malleability",
+      "signature_mismatch",
+      "signature_scalar"
+    ],
+    "reject_class_precedence": [
+      "method_path",
+      "forbidden_header",
+      "authority",
+      "nonce",
+      "audience_key_id",
+      "signature_encoding",
+      "signature_scalar",
+      "signature_malleability",
+      "signature_mismatch",
+      "body_digest"
+    ]
+  },
+  "fixture_key": {
+    "warning": "Synthetic conformance private key with scalar d=1. Never admit it to a production trust store.",
+    "private_key_pkcs8_der_b64url": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhRANCAARrF9Hy4SxCR_i85uVjpEDydwN9gS3rM6D0oTlF2JjClk_jQuL-Gn-bjufrSnwPnhYrzjNXazFezsu2QGg3v1H1",
+    "public_key_der_b64url": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q"
+  },
+  "upload_golden": {
+    "method": "POST",
+    "authority": "127.0.0.1:48123",
+    "path": "/internal/v1/uploads",
+    "timestamp_unix_decimal": "1788645600",
+    "nonce": "WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo",
+    "client_id": "example-client",
+    "key_id": "example-signing-v1",
+    "audience_key_id": "key_A1b2C3d4E5f6",
+    "body_hex": "68656c6c6f",
+    "body_sha256_hex": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+    "body_length_decimal": "5",
+    "content_digest_header": "sha-256=:LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=:",
+    "media_type": "text/plain",
+    "content_type": "text/plain",
+    "display_filename_utf8": "report.txt",
+    "filename_b64url": "cmVwb3J0LnR4dA",
+    "authority_expires_at": "2026-09-06T22:00:00Z",
+    "upload_request_id": "123e4567-e89b-42d3-a456-426614174000",
+    "canonical_hex": "4c562d5155524c2d55504c4f41442d415554482d56310000000004504f53540000000f3132372e302e302e313a3438313233000000142f696e7465726e616c2f76312f75706c6f6164730000000a313738383634353630300000002b576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c6f0000000e6578616d706c652d636c69656e74000000126578616d706c652d7369676e696e672d7631000000106b65795f413162324333643445356636000000403263663234646261356662306133306532366538336232616335623965323965316231363165356331666137343235653733303433333632393338623938323400000001350000000a746578742f706c61696e0000000a7265706f72742e74787400000014323032362d30392d30365432323a30303a30305a0000002431323365343536372d653839622d343264332d613435362d343236363134313734303030",
+    "signing_digest_hex": "4b16db1f5f466d55dcca2da95b7b6ff0d113b7b7e1e2f3f8cfefe64b7398086f",
+    "signature_der_b64url": "MEUCIQDZoJLqxBIiAffH7siVHMmjEB6b_LxWwMdIeHEgTxqMEwIgKZc4uc2a7Vr-z5qffYLmhqoN_D-Js2j9cvR833QB_f8",
+    "stable_request_canonical_hex": "4c562d5155524c2d55504c4f41442d524551554553542d5631000000000e6578616d706c652d636c69656e74000000106b65795f413162324333643445356636000000403263663234646261356662306133306532366538336232616335623965323965316231363165356331666137343235653733303433333632393338623938323400000001350000000a746578742f706c61696e0000000a7265706f72742e74787400000014323032362d30392d30365432323a30303a30305a0000002431323365343536372d653839622d343264332d613435362d343236363134313734303030",
+    "stable_request_digest_hex": "43df0711a0dfce4c1dd82875ce674881d0256d97a66f799ea0e0b7c6b4b9efb8"
+  },
+  "refresh_golden": {
+    "method": "PATCH",
+    "authority": "127.0.0.1:48123",
+    "path": "/internal/v1/uploads",
+    "timestamp_unix_decimal": "1788645600",
+    "nonce": "WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo",
+    "client_id": "example-client",
+    "key_id": "example-signing-v1",
+    "body_hex": "7b2275706c6f61645f68616e646c65223a2275706c5f41414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c2275706c6f61645f726571756573745f6964223a2231323365343536372d653839622d343264332d613435362d343236363134313734303030222c226d61785f62617463685f73697a65223a35302c226d61785f6c696e6b5f74746c5f7365636f6e6473223a3330302c22617574686f726974795f657870697265735f6174223a22323032362d30392d30365432323a30303a30305a227d",
+    "body_sha256_hex": "4947b4d24a420f3c7a6c5fc500b20b375ae84df901f53b51fb8d2785efb474fc",
+    "body_length_decimal": "219",
+    "content_digest_header": "sha-256=:SUe00kpCDzx6bF/FALILN1roTfkB9TtR+40nhe+0dPw=:",
+    "content_type": "application/json",
+    "upload_handle": "upl_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "max_batch_size_decimal": "50",
+    "max_link_ttl_seconds_decimal": "300",
+    "authority_expires_at": "2026-09-06T22:00:00Z",
+    "upload_request_id": "123e4567-e89b-42d3-a456-426614174000",
+    "canonical_hex": "4c562d5155524c2d55504c4f41442d524546524553482d415554482d5631000000000550415443480000000f3132372e302e302e313a3438313233000000142f696e7465726e616c2f76312f75706c6f6164730000000a313738383634353630300000002b576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c7061576c6f0000000e6578616d706c652d636c69656e74000000126578616d706c652d7369676e696e672d76310000004034393437623464323461343230663363376136633566633530306232306233373561653834646639303166353362353166623864323738356566623437346663000000033231390000002431323365343536372d653839622d343264332d613435362d343236363134313734303030",
+    "signing_digest_hex": "57b1bad2cc15ceadbf33903a4524359021fee5fd3fa099d14ad2399362da887c",
+    "signature_der_b64url": "MEQCIEFNYVK3QskWvMDwqQEdgTW18h0n_joo0xE06Xg83W2TAiBddDXileDiawKMQSvTyLhcP-jGrYnUxH_gDiGh-83aeQ",
+    "stable_request_canonical_hex": "4c562d5155524c2d55504c4f41442d524546524553482d524551554553542d5631000000000e6578616d706c652d636c69656e740000002f75706c5f414141414141414141414141414141414141414141414141414141414141414141414141414141414141410000000235300000000333303000000014323032362d30392d30365432323a30303a30305a0000002431323365343536372d653839622d343264332d613435362d343236363134313734303030",
+    "stable_request_digest_hex": "3b35f458ac3b6f409878745e16cd07667d3d1e48943dffb5828b6c53fa77d301"
+  },
+  "reject_cases": [
+    {
+      "name": "reject_upload_high_s_signature",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MEYCIQDZoJLqxBIiAffH7siVHMmjEB6b_LxWwMdIeHEgTxqMEwIhANZox0UyZRKmATBlYIJ9GXkS2P5uHWQ1h4DFTeOIYSdS"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_malleability",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_high_s_signature",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MEUCIEFNYVK3QskWvMDwqQEdgTW18h0n_joo0xE06Xg83W2TAiEAoovKHGofHZX9c77ULDdHo3z-NAAdQtoFE6upIQCVStg"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_malleability",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_padded_signature_base64url",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MEUCIQDZoJLqxBIiAffH7siVHMmjEB6b_LxWwMdIeHEgTxqMEwIgKZc4uc2a7Vr-z5qffYLmhqoN_D-Js2j9cvR833QB_f8="
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_encoding",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_nonminimal_signature_der",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MEYCIgAA2aCS6sQSIgH3x-7IlRzJoxAem_y8VsDHSHhxIE8ajBMCICmXOLnNmu1a_s-an32C5oaqDfw_ibNo_XL0fN90Af3_"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_encoding",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_trailing_signature_der_bytes",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MEUCIQDZoJLqxBIiAffH7siVHMmjEB6b_LxWwMdIeHEgTxqMEwIgKZc4uc2a7Vr-z5qffYLmhqoN_D-Js2j9cvR833QB_f8A"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_encoding",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_zero_signature_scalar",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MAYCAQACAQE"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_scalar",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_negative_signature_scalar",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "signature_der_b64url",
+          "value": "MAYCAf8CAQE"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_scalar",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_uppercase_authority",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "authority",
+          "value": "UPLOAD.EXAMPLE:48123"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "authority",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_trailing_colon_authority",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "authority",
+          "value": "127.0.0.1:"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "authority",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_changed_canonical_authority_stale_signature",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "authority",
+          "value": "127.0.0.1:48124"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_mismatch",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_short_nonce",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "nonce",
+          "value": "WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWg"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "nonce",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_invalid_audience_key_id",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "audience_key_id",
+          "value": "invalid-key-1"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "audience_key_id",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_changed_audience_key_stale_signature",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "audience_key_id",
+          "value": "key_Z9y8X7w6V5u4"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_mismatch",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_audience_header",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_header",
+          "field": "X-LayerV-Audience-Key-ID",
+          "value": "key_A1b2C3d4E5f6"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "forbidden_header",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_upload_authorization_header",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_header",
+          "field": "Authorization",
+          "value": "Bearer forbidden"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "forbidden_header",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_authorization_header",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_header",
+          "field": "Authorization",
+          "value": "Bearer forbidden"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "forbidden_header",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_filename_header",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_header",
+          "field": "X-LayerV-Filename-B64",
+          "value": "cmVwb3J0LnR4dA"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "forbidden_header",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_changed_upload_body",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "body",
+          "field": "body_hex",
+          "value": "68656c6c6e"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "body_digest",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_changed_refresh_body",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "body",
+          "field": "body_hex",
+          "value": "7b2275706c6f61645f68616e646c65223a2275706c5f41414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c2275706c6f61645f726571756573745f6964223a2231323365343536372d653839622d343264332d613435362d343236363134313734303030222c226d61785f62617463685f73697a65223a35302c226d61785f6c696e6b5f74746c5f7365636f6e6473223a3330302c22617574686f726974795f657870697265735f6174223a22323032362d30392d30365432323a30303a30305a227e"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "body_digest",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_changed_body_digest_stale_signature",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "body_sha256_hex",
+          "value": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "signature_mismatch",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_upload_method",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "method",
+          "value": "PUT"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "method_path",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_upload_path",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "path",
+          "value": "/internal/v1/uploads/"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "method_path",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_method",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "method",
+          "value": "POST"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "method_path",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_refresh_path",
+      "base": "refresh_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "path",
+          "value": "/internal/v1/uploads/"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "method_path",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    },
+    {
+      "name": "reject_method_before_authority",
+      "base": "upload_golden",
+      "mutations": [
+        {
+          "target": "request_field",
+          "field": "method",
+          "value": "PUT"
+        },
+        {
+          "target": "request_field",
+          "field": "authority",
+          "value": "UPLOAD.EXAMPLE:48123"
+        }
+      ],
+      "outcome": "reject",
+      "reject_class": "method_path",
+      "status": 401,
+      "error_code": "invalid_upload_auth"
+    }
+  ],
+  "construction_reject_cases": [
+    {
+      "name": "reject_upload_content_type_mismatch",
+      "base": "upload_golden",
+      "field": "content_type",
+      "value": "application/octet-stream",
+      "reject_rule": "upload.content_type_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_display_filename_dotdot",
+      "base": "upload_golden",
+      "field": "display_filename_utf8",
+      "value": "..",
+      "reject_rule": "upload.display_filename_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_display_filename_forward_slash",
+      "base": "upload_golden",
+      "field": "display_filename_utf8",
+      "value": "folder/report.txt",
+      "reject_rule": "upload.display_filename_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_display_filename_backslash",
+      "base": "upload_golden",
+      "field": "display_filename_utf8",
+      "value": "folder\\report.txt",
+      "reject_rule": "upload.display_filename_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_display_filename_control",
+      "base": "upload_golden",
+      "field": "display_filename_utf8",
+      "value": "report\n.txt",
+      "reject_rule": "upload.display_filename_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_display_filename_not_nfc",
+      "base": "upload_golden",
+      "field": "display_filename_utf8",
+      "value": "café.txt",
+      "reject_rule": "upload.display_filename_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_media_type_uppercase",
+      "base": "upload_golden",
+      "field": "media_type",
+      "value": "TEXT/plain",
+      "reject_rule": "upload.media_type_rule",
+      "outcome": "reject"
+    },
+    {
+      "name": "reject_media_type_wildcard_subtype",
+      "base": "upload_golden",
+      "field": "media_type",
+      "value": "text/*",
+      "reject_rule": "upload.media_type_subtype_rule",
+      "outcome": "reject"
+    }
+  ]
+}

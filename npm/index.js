@@ -18,4 +18,5 @@ module.exports = {
   connectorHubLstCookieVectors: () => load("connector_hub_lst_cookie_v1_vectors.json"),
   cridV1Vectors: () => load("crid_v1_vectors.json"),
   targetPathV1Vectors: () => load("target_path_v1_vectors.json"),
+  privateUploadV1Vectors: () => load("private_upload_v1_vectors.json"),
 };

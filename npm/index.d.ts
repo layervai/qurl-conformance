@@ -11,3 +11,4 @@ export declare function connectorResourceLstV1Vectors(): unknown;
 export declare function connectorHubLstCookieVectors(): unknown;
 export declare function cridV1Vectors(): unknown;
 export declare function targetPathV1Vectors(): unknown;
+export declare function privateUploadV1Vectors(): unknown;
