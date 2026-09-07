@@ -21,13 +21,11 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 
 ## Hard rules
 
-- The generator that produces key-dependent vectors lives at `tools/gen`. Run
-  `make gen-vectors` ONCE per intentional test-key rotation. It is NEVER run in
-  CI (ECDSA signatures use random nonces, so they are not reproducible). The
-  committed JSON is the artifact.
-- `tools/gen` uses fixed public, vector-only issuer and resource keys so a claims
-  edit does not also rotate trust. Run `make gen-vectors` once when its
-  key-dependent artifact must change; its ECDSA signature is not reproducible.
+- The generator that produces key-dependent vectors lives at `tools/gen`. It
+  uses fixed public, vector-only issuer and resource keys so a claims edit does
+  not also rotate trust. Run `make gen-vectors` ONCE per intentional test-key
+  rotation or claims change; it is NEVER run in CI (ECDSA signatures use random
+  nonces, so they are not reproducible). The committed JSON is the artifact.
 - `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts. It
   never rewrites the frozen NHP packet families.
 - This repo publishes only contracts a third-party SDK implements. Contracts
@@ -43,9 +41,9 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   digest. The in-repo gates for those NHP packet families are structural only,
   and a transcription error inside a well-formed `packet_hex` would pass CI.
   Stdlib-verifiable families such as CRID must rebuild and verify their
-  derivations here. Regenerating NHP packet bytes
-  hands verification to `RELEASE_CHECKLIST.md`; work through it and keep it
-  current rather than adding a consumer codec here.
+  derivations here. Regenerating NHP packet bytes hands verification to
+  `RELEASE_CHECKLIST.md`; work through it and keep it current rather than
+  adding a consumer codec here.
 - Producer-revision pins name the commit that emitted the committed bytes. Never
   leave one pointing at a pre-change commit — the self-consistency tests pass
   when the pins agree with each other, not when they are true.

@@ -26,6 +26,9 @@ that handoff real rather than assumed.
 
 ## Every release
 
+- [ ] Every artifact in `vectors/` is a contract a third-party SDK implements.
+      Platform-internal contracts (NHP runtime, Connector Hub, Connector
+      Authority) belong in the private conformance module, never here.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`

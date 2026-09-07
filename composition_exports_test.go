@@ -28,30 +28,25 @@ func TestCRIDV1KeyMatchExpectationPinsTheDeliveredKeyOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(file.ProducerCases) == 0 {
-		t.Fatal("need a producer case")
+	if len(file.KeyMatchCases) == 0 {
+		t.Fatal("need key_match_cases")
 	}
-	first := file.ProducerCases[0]
-	// Flip one payload character of the delivered key so it still decodes but
-	// no longer re-derives the held CRID.
-	other := []byte(first.DERSPKIB64URL)
-	i := len(other) / 2
-	if other[i] == 'A' {
-		other[i] = 'B'
-	} else {
-		other[i] = 'A'
+	seen := map[string]bool{}
+	for _, c := range file.KeyMatchCases {
+		got, err := CRIDV1KeyMatchExpectation(c.CRID, c.DERSPKIB64URL)
+		if err != nil || got != c.Outcome {
+			t.Errorf("%s: outcome %q, %v; want %q", c.Name, got, err, c.Outcome)
+		}
+		seen[c.Outcome] = true
 	}
-	second := struct{ DERSPKIB64URL string }{string(other)}
-	if got, err := CRIDV1KeyMatchExpectation(first.ExpectedCRID, first.DERSPKIB64URL); err != nil || got != CRIDV1OutcomeMatch {
-		t.Fatalf("same key: outcome %q, %v; want %q", got, err, CRIDV1OutcomeMatch)
+	if !seen[CRIDV1OutcomeMatch] || !seen[CRIDV1OutcomeMismatch] {
+		t.Fatalf("key_match_cases must cover both outcomes, saw %v", seen)
 	}
-	if got, err := CRIDV1KeyMatchExpectation(first.ExpectedCRID, second.DERSPKIB64URL); err != nil || got != CRIDV1OutcomeMismatch {
-		t.Fatalf("other key: outcome %q, %v; want %q", got, err, CRIDV1OutcomeMismatch)
-	}
+	first := file.KeyMatchCases[0]
 	if _, err := CRIDV1KeyMatchExpectation("not-a-crid", first.DERSPKIB64URL); err == nil {
 		t.Fatal("held CRID that fails the local gate was accepted")
 	}
-	if _, err := CRIDV1KeyMatchExpectation(first.ExpectedCRID, "!!"); err == nil {
+	if _, err := CRIDV1KeyMatchExpectation(first.CRID, "!!"); err == nil {
 		t.Fatal("malformed der_spki_b64url was accepted")
 	}
 }

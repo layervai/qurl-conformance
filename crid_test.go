@@ -69,7 +69,7 @@ func TestEmbeddedCRIDV1Loads(t *testing.T) {
 		}
 	}
 	for _, c := range cf.KeyMatchCases {
-		outcome, err := deriveCRIDV1KeyMatchExpectation(c.CRID, c.DERSPKIB64URL)
+		outcome, err := CRIDV1KeyMatchExpectation(c.CRID, c.DERSPKIB64URL)
 		if err != nil {
 			t.Errorf("key-match %q: %v", c.Name, err)
 			continue

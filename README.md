@@ -38,7 +38,7 @@ trust.
 | `vectors/assignment_ticket_v1_vectors.json` | standalone qat1 claims/signature golden bytes, three exact fences, and strict reject suites |
 | `vectors/README_assignment_ticket_v1_vectors.md` | qat1 wire, signing, fence, size-budget, and reject-consumer contract |
 | `vectors/connector_resource_lst_v1_vectors.json` | registered-agent `connector_resource` v1 NHP_LST/NHP_LRT application bodies, continuity/replay rules, strict errors, and conservative unfragmented size fixtures |
-| `vectors/README_connector_resource_lst_v1_vectors.md` | public request/result schema, identity binding, request-ID derivation, retry grammar, size boundary, and consumer algorithm |
+| `vectors/README_connector_resource_lst_v1_vectors.md` | public request/result schema, identity binding, the shared `request_nonce` gate, retry grammar, size boundary, and consumer algorithm |
 | `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, closed initial/refresh flows, allowlisted additive profiles, amplification bounds, and rejects |
 | `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |

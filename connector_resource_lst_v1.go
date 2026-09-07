@@ -472,7 +472,7 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if fixtures.ResourceID == fixtures.KnockResourceID || fixtures.ConnectorRoutingID == fixtures.KnockResourceID {
 		return errors.New("conformance: Connector resource LST fixture identity/routing/admission values are cross-wired")
 	}
-	if outcome, err := deriveCRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
+	if outcome, err := CRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
 		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_id")
 	}
 	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.NoCRIDRequestNonce} {
@@ -961,7 +961,7 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success violates expected_resource_id continuity")
 		}
 		if result.List.CRID != nil {
-			outcome, matchErr := deriveCRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourceID)
+			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourceID)
 			if matchErr != nil {
 				return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
 			}
@@ -1077,7 +1077,7 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 // grammar (DecodeConnectorHubRequestNonce) to a Connector resource request.
 func ValidateConnectorResourceLSTV1Nonce(value string) error {
 	if _, err := DecodeConnectorHubRequestNonce(value); err != nil {
-		return errors.New("request_nonce must be canonical unpadded base64url for exactly 32 bytes")
+		return fmt.Errorf("request_nonce must be canonical unpadded base64url for exactly %d bytes: %w", ConnectorResourceLSTV1NonceBytes, err)
 	}
 	return nil
 }
