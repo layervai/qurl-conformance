@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base32"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -38,7 +36,7 @@ const (
 	ConnectorResourceLSTV1ResultHeaderName  = "NHP_LRT"
 	ConnectorResourceLSTV1ResultHeaderType  = 6
 
-	ConnectorResourceLSTV1NonceBytes         = 32
+	ConnectorResourceLSTV1NonceBytes         = RequestNonceBytes
 	ConnectorResourceLSTV1ResourceIDBytes    = 91
 	ConnectorResourceLSTV1ResourceIDChars    = 122
 	ConnectorResourceLSTV1RoutingDigestBytes = 32
@@ -80,10 +78,6 @@ const (
 	ConnectorResourceLSTV1ErrorQuota            = "52504"
 	ConnectorResourceLSTV1ErrorRateLimited      = "52505"
 	ConnectorResourceLSTV1ErrorInvalidRequest   = "52506"
-
-	ConnectorResourceLSTV1AuthorityOperation  = "ResolveConnectorResource"
-	ConnectorResourceLSTV1CellRequestIDDomain = "layerv:qurl:connector-resource-request-id:v1"
-	ConnectorResourceLSTV1CellRequestIDChars  = 64
 )
 
 const connectorResourceLSTV1Description = "Byte-exact registered-agent NHP_LST/NHP_LRT application contract for resolving or idempotently creating one qURL Connector resource without customer-runtime HTTP."
@@ -359,48 +353,6 @@ func ValidateConnectorResourceLSTV1ConnectorID(value string) bool {
 	return connectorResourceLSTV1ConnectorIDPattern.MatchString(value)
 }
 
-// DeriveConnectorResourceLSTV1CellRequestID derives the private Authority
-// replay key from server-owned environment scope and authenticated public inputs.
-// The public nonce itself never becomes an Authority persistence key.
-func DeriveConnectorResourceLSTV1CellRequestID(environment string, authenticatedPeerPublicKey, requestNonce []byte) (string, error) {
-	if !connectorResourceLSTV1EnvironmentPattern.MatchString(environment) {
-		return "", errors.New("conformance: invalid Connector resource environment")
-	}
-	if len(authenticatedPeerPublicKey) != 32 {
-		return "", errors.New("conformance: invalid Connector resource authenticated peer key")
-	}
-	if len(requestNonce) != ConnectorResourceLSTV1NonceBytes {
-		return "", errors.New("conformance: invalid Connector resource request nonce")
-	}
-	preimage := make([]byte, 0, len(ConnectorResourceLSTV1CellRequestIDDomain)+1+3*3+len(environment)+len(authenticatedPeerPublicKey)+len(requestNonce))
-	preimage = append(preimage, ConnectorResourceLSTV1CellRequestIDDomain...)
-	preimage = append(preimage, 0)
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x01, []byte(environment))
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x02, authenticatedPeerPublicKey)
-	preimage = appendConnectorResourceLSTV1RequestIDFrame(preimage, 0x03, requestNonce)
-	digest := sha256.Sum256(preimage)
-	return hex.EncodeToString(digest[:]), nil
-}
-
-func appendConnectorResourceLSTV1RequestIDFrame(dst []byte, tag byte, value []byte) []byte {
-	var size [2]byte
-	binary.BigEndian.PutUint16(size[:], uint16(len(value)))
-	dst = append(dst, tag)
-	dst = append(dst, size[:]...)
-	return append(dst, value...)
-}
-
-func ValidateConnectorResourceLSTV1CellRequestID(value string) error {
-	if len(value) != ConnectorResourceLSTV1CellRequestIDChars {
-		return errors.New("conformance: invalid Connector resource cell_request_id")
-	}
-	decoded, err := hex.DecodeString(value)
-	if err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != value {
-		return errors.New("conformance: invalid Connector resource cell_request_id")
-	}
-	return nil
-}
-
 // ParseConnectorResourceLSTV1File strictly parses the embedded Connector
 // resource discovery artifact and reclassifies every body through the reference
 // application parser.
@@ -520,7 +472,7 @@ func validateConnectorResourceLSTV1Fixtures(fixtures ConnectorResourceLSTV1Fixtu
 	if fixtures.ResourceID == fixtures.KnockResourceID || fixtures.ConnectorRoutingID == fixtures.KnockResourceID {
 		return errors.New("conformance: Connector resource LST fixture identity/routing/admission values are cross-wired")
 	}
-	if outcome, err := deriveCRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
+	if outcome, err := CRIDV1KeyMatchExpectation(fixtures.CRID, fixtures.ResourceID); err != nil || outcome != CRIDV1OutcomeMatch {
 		return errors.New("conformance: Connector resource LST fixture CRID does not match resource_id")
 	}
 	for _, nonce := range []string{fixtures.CreateRequestNonce, fixtures.ExistingRequestNonce, fixtures.NoCRIDRequestNonce} {
@@ -1009,7 +961,7 @@ func parseConnectorResourceLSTV1Result(body []byte, request *connectorResourceLS
 			return nil, ConnectorResourceLSTV1RejectResourceBinding, errors.New("success violates expected_resource_id continuity")
 		}
 		if result.List.CRID != nil {
-			outcome, matchErr := deriveCRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourceID)
+			outcome, matchErr := CRIDV1KeyMatchExpectation(*result.List.CRID, result.List.ResourceID)
 			if matchErr != nil {
 				return nil, ConnectorResourceLSTV1RejectSemantic, matchErr
 			}
@@ -1121,10 +1073,11 @@ func connectorResourceLSTV1ExactObject(body []byte, required, allowed []string) 
 	return object, "", nil
 }
 
+// ValidateConnectorResourceLSTV1Nonce applies the one shared request_nonce
+// grammar (DecodeRequestNonce) to a Connector resource request.
 func ValidateConnectorResourceLSTV1Nonce(value string) error {
-	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil || len(decoded) != ConnectorResourceLSTV1NonceBytes || base64.RawURLEncoding.EncodeToString(decoded) != value {
-		return errors.New("request_nonce must be canonical unpadded base64url for exactly 32 bytes")
+	if _, err := DecodeRequestNonce(value); err != nil {
+		return fmt.Errorf("request_nonce must be canonical unpadded base64url for exactly %d bytes", ConnectorResourceLSTV1NonceBytes)
 	}
 	return nil
 }
@@ -1167,6 +1120,18 @@ func ValidateConnectorResourceLSTV1RoutingID(value string) error {
 func ValidateConnectorResourceLSTV1KnockResourceID(value string) error {
 	if value == "" || len([]byte(value)) > ConnectorResourceLSTV1KnockResourceIDMax || !utf8.ValidString(value) || strings.TrimSpace(value) != value || strings.IndexFunc(value, unicode.IsControl) >= 0 {
 		return errors.New("knock_resource_id is not a transport-safe opaque identifier")
+	}
+	return nil
+}
+
+// ValidateConnectorResourceLSTV1Environment rejects a value that is not a
+// canonical Connector environment label: lowercase, starting with a letter, at
+// most 32 bytes, with no leading or trailing hyphen. Private contracts that
+// compose this artifact validate their environment field through this exact
+// gate rather than a copied pattern.
+func ValidateConnectorResourceLSTV1Environment(value string) error {
+	if !connectorResourceLSTV1EnvironmentPattern.MatchString(value) {
+		return errors.New("conformance: environment is not a canonical Connector environment label")
 	}
 	return nil
 }

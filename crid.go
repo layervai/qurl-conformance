@@ -433,7 +433,7 @@ func validateCRIDV1KeyMatchCases(cases []CRIDV1KeyMatchCase) error {
 		if c.CRID != fixture.crid || c.DERSPKIB64URL != fixture.derSPKIB64URL {
 			return fmt.Errorf("conformance: CRID v1 key-match case %q inputs do not match their fixtures", c.Name)
 		}
-		outcome, err := deriveCRIDV1KeyMatchExpectation(c.CRID, c.DERSPKIB64URL)
+		outcome, err := CRIDV1KeyMatchExpectation(c.CRID, c.DERSPKIB64URL)
 		if err != nil {
 			return fmt.Errorf("conformance: CRID v1 key-match case %q: %w", c.Name, err)
 		}
@@ -532,10 +532,10 @@ func deriveCRIDV1VersionExpectation(value string) (versionHex string, known bool
 	return versionHex, false, CRIDV1EnvironmentUnknown, digestLength, nil
 }
 
-// deriveCRIDV1KeyMatchExpectation re-derives a CRID from the delivered key
+// CRIDV1KeyMatchExpectation re-derives a CRID from the delivered key
 // under the held CRID's version byte and digest length and reports whether a
 // consumer may use the key.
-func deriveCRIDV1KeyMatchExpectation(crid, derSPKIB64URL string) (string, error) {
+func CRIDV1KeyMatchExpectation(crid, derSPKIB64URL string) (string, error) {
 	if outcome, rejectClass := deriveCRIDV1ValueExpectation(crid); outcome != ExpectAccept {
 		return "", fmt.Errorf("held CRID fails the local gate with class %q", rejectClass)
 	}

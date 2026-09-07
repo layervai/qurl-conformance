@@ -14,12 +14,8 @@ module.exports = {
   agentSessionControlVectors: () => load("agent_session_control_vectors.json"),
   agentApiKeyIdVectors: () => load("agent_api_key_id_vectors.json"),
   assignmentTicketVectors: () => load("assignment_ticket_v1_vectors.json"),
-  connectorAuthorityLambdaVectors: () => load("connector_authority_lambda_v1_vectors.json"),
   connectorResourceLstV1Vectors: () => load("connector_resource_lst_v1_vectors.json"),
-  connectorHubRequestIdVectors: () => load("connector_hub_request_id_v1_vectors.json"),
   connectorHubLstCookieVectors: () => load("connector_hub_lst_cookie_v1_vectors.json"),
-  agentCredentialRecoveryVectors: () => load("agent_credential_recovery_v1_vectors.json"),
   cridV1Vectors: () => load("crid_v1_vectors.json"),
   targetPathV1Vectors: () => load("target_path_v1_vectors.json"),
-  delegatedMintIssueV1Vectors: () => load("delegated_mint_issue_v1_vectors.json"),
 };

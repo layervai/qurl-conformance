@@ -22,12 +22,13 @@ byte-identity across `vectors/`, `npm/vectors/` and
 CI cannot prove the **NHP packet** bytes are authentic. A transcription error
 inside an otherwise well-formed regenerated `packet_hex` passes every check in
 this repo. Authentication happens in the NHP consumers, and the steps below make
-that handoff real rather than assumed. The delegated-mint issue artifact is
-different: its P-256 primitive is in the standard library, so the strict Go
-loader rebuilds and verifies that golden signature here.
+that handoff real rather than assumed.
 
 ## Every release
 
+- [ ] Every artifact in `vectors/` is a contract a third-party SDK implements.
+      Platform-internal contracts (NHP runtime, Connector Hub, Connector
+      Authority) belong in the private conformance module, never here.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`
@@ -87,22 +88,6 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       design, so senders must never lead receivers. Vectors release first,
       servers next, clients last, and the 7-day dependency-age quarantine makes
       each step a separate pass roughly a week apart.
-
-## When a release rotates delegated-mint test keys
-
-- [ ] Run `make gen-delegated-mint-vectors-rotate` once. Confirm that it self-verifies
-      every low-S signature and derives the published reject cases.
-- [ ] Run `scripts/sync-vectors.sh`, then all gates in **Every release**. Confirm
-      that the Node smoke verifies every P-256 signature, the Python smoke
-      rebuilds every canonical frame and digest, and all three published JSON
-      files are byte-identical. The Python standard library does not verify the
-      P-256 signatures.
-- [ ] Run the real Connector producer tests against this exact artifact. They
-      must rebuild the same canonical digest with a new private key and verify
-      the result. Record the producing repository and exact commit in the PR.
-- [ ] Confirm that the issuing service accepts both goldens, rejects every
-      published reject case, retains accepted key verifiers through operation
-      authority expiry, and permits a fresh-envelope key rotation.
 
 ## When a release regenerates qURL v2 issuer or fragment bytes
 

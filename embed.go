@@ -10,23 +10,19 @@ import (
 var vectorsFS embed.FS
 
 const (
-	conformanceVectorsName      = "vectors/qv2_conformance_vectors.json"
-	issuerSignatureName         = "vectors/issuer_signature_vectors.json"
-	relayKnockName              = "vectors/relay_knock_golden.json"
-	agentRegistrationName       = "vectors/agent_registration_golden.json"
-	agentAssignmentName         = "vectors/agent_assignment_golden.json"
-	agentKnockApplicationName   = "vectors/agent_knock_application_vectors.json"
-	agentSessionControlName     = "vectors/agent_session_control_vectors.json"
-	agentAPIKeyIDName           = "vectors/agent_api_key_id_vectors.json"
-	assignmentTicketName        = "vectors/assignment_ticket_v1_vectors.json"
-	connectorAuthorityName      = "vectors/connector_authority_lambda_v1_vectors.json"
-	connectorResourceLSTV1Name  = "vectors/connector_resource_lst_v1_vectors.json"
-	connectorHubRequestIDName   = "vectors/connector_hub_request_id_v1_vectors.json"
-	connectorHubLSTCookieName   = "vectors/connector_hub_lst_cookie_v1_vectors.json"
-	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
-	cridV1Name                  = "vectors/crid_v1_vectors.json"
-	targetPathV1Name            = "vectors/target_path_v1_vectors.json"
-	delegatedMintIssueV1Name    = "vectors/delegated_mint_issue_v1_vectors.json"
+	conformanceVectorsName     = "vectors/qv2_conformance_vectors.json"
+	issuerSignatureName        = "vectors/issuer_signature_vectors.json"
+	relayKnockName             = "vectors/relay_knock_golden.json"
+	agentRegistrationName      = "vectors/agent_registration_golden.json"
+	agentAssignmentName        = "vectors/agent_assignment_golden.json"
+	agentKnockApplicationName  = "vectors/agent_knock_application_vectors.json"
+	agentSessionControlName    = "vectors/agent_session_control_vectors.json"
+	agentAPIKeyIDName          = "vectors/agent_api_key_id_vectors.json"
+	assignmentTicketName       = "vectors/assignment_ticket_v1_vectors.json"
+	connectorResourceLSTV1Name = "vectors/connector_resource_lst_v1_vectors.json"
+	connectorHubLSTCookieName  = "vectors/connector_hub_lst_cookie_v1_vectors.json"
+	cridV1Name                 = "vectors/crid_v1_vectors.json"
+	targetPathV1Name           = "vectors/target_path_v1_vectors.json"
 )
 
 func mustReadVector(name string) []byte {
@@ -99,35 +95,16 @@ func AssignmentTicketVectors() []byte {
 	return mustReadVector(assignmentTicketName)
 }
 
-// ConnectorAuthorityLambdaVectors returns the raw bytes of the private,
-// operation-specific NHP-to-authority invocation artifact.
-func ConnectorAuthorityLambdaVectors() []byte {
-	return mustReadVector(connectorAuthorityName)
-}
-
 // ConnectorResourceLSTV1Vectors returns the exact registered-agent NHP_LST and
 // NHP_LRT application bodies for resolving one Connector resource.
 func ConnectorResourceLSTV1Vectors() []byte {
 	return mustReadVector(connectorResourceLSTV1Name)
 }
 
-// ConnectorHubRequestIDVectors returns the private Hub replay-key derivation
-// KAT shared by Hub worker implementations.
-func ConnectorHubRequestIDVectors() []byte {
-	return mustReadVector(connectorHubRequestIDName)
-}
-
 // ConnectorHubLSTCookieVectors returns the Hub assignment return-routability
 // challenge and proof contract.
 func ConnectorHubLSTCookieVectors() []byte {
 	return mustReadVector(connectorHubLSTCookieName)
-}
-
-// AgentCredentialRecoveryVectors returns the UDP-only same-agent device-
-// credential recovery contract shared by the Hub, assigned cell, Authority,
-// and native SDK.
-func AgentCredentialRecoveryVectors() []byte {
-	return mustReadVector(agentCredentialRecoveryName)
 }
 
 // CRIDV1Vectors returns the raw bytes of the CRID v1 derivation and
@@ -141,12 +118,6 @@ func CRIDV1Vectors() []byte {
 // request contract shared by the service and SDKs.
 func TargetPathV1Vectors() []byte {
 	return mustReadVector(targetPathV1Name)
-}
-
-// DelegatedMintIssueV1Vectors returns the private Connector-to-service issue
-// signature contract and its byte-exact golden request.
-func DelegatedMintIssueV1Vectors() []byte {
-	return mustReadVector(delegatedMintIssueV1Name)
 }
 
 // Open returns the raw bytes of an embedded vectors file by its base name (for
@@ -219,34 +190,16 @@ func AssignmentTicket() (*AssignmentTicketFile, error) {
 	return ParseAssignmentTicketFile(AssignmentTicketVectors())
 }
 
-// ConnectorAuthorityLambda strictly parses the embedded private invocation
-// artifact shared by NHP workers and Connector Authority handlers.
-func ConnectorAuthorityLambda() (*ConnectorAuthorityLambdaFile, error) {
-	return ParseConnectorAuthorityLambdaFile(ConnectorAuthorityLambdaVectors())
-}
-
 // ConnectorResourceLSTV1 strictly parses the registered-agent Connector
 // resource-discovery application contract.
 func ConnectorResourceLSTV1() (*ConnectorResourceLSTV1File, error) {
 	return ParseConnectorResourceLSTV1File(ConnectorResourceLSTV1Vectors())
 }
 
-// ConnectorHubRequestID strictly parses the embedded private Hub replay-key
-// derivation artifact.
-func ConnectorHubRequestID() (*ConnectorHubRequestIDFile, error) {
-	return ParseConnectorHubRequestIDFile(ConnectorHubRequestIDVectors())
-}
-
 // ConnectorHubLSTCookie strictly parses the Hub assignment
 // return-routability challenge artifact.
 func ConnectorHubLSTCookie() (*ConnectorHubLSTCookieFile, error) {
 	return ParseConnectorHubLSTCookieFile(ConnectorHubLSTCookieVectors())
-}
-
-// AgentCredentialRecovery strictly parses the UDP-only same-agent device-
-// credential recovery artifact.
-func AgentCredentialRecovery() (*AgentCredentialRecoveryFile, error) {
-	return ParseAgentCredentialRecoveryFile(AgentCredentialRecoveryVectors())
 }
 
 // CRIDV1 strictly parses the embedded CRID v1 derivation and validation
@@ -258,10 +211,4 @@ func CRIDV1() (*CRIDV1File, error) {
 // TargetPathV1 strictly parses the embedded target_path contract artifact.
 func TargetPathV1() (*TargetPathV1File, error) {
 	return ParseTargetPathV1File(TargetPathV1Vectors())
-}
-
-// DelegatedMintIssueV1 strictly parses and verifies the private Connector
-// capability-issue signature artifact.
-func DelegatedMintIssueV1() (*DelegatedMintIssueV1File, error) {
-	return ParseDelegatedMintIssueV1File(DelegatedMintIssueV1Vectors())
 }

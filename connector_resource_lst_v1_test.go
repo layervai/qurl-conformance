@@ -2,7 +2,6 @@ package conformance
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -43,45 +42,6 @@ func TestEmbeddedConnectorResourceLSTV1Loads(t *testing.T) {
 		}
 		if result.ErrCode != errorCase.ErrorCode || result.List != nil {
 			t.Fatalf("%s error result drift", errorCase.Name)
-		}
-	}
-}
-
-func TestConnectorResourceLSTV1CellRequestIDKAT(t *testing.T) {
-	file, err := ConnectorResourceLSTV1()
-	if err != nil {
-		t.Fatal(err)
-	}
-	peer, err := base64.StdEncoding.Strict().DecodeString(file.Fixtures.AuthenticatedPeerPublicKeyB64)
-	if err != nil {
-		t.Fatal(err)
-	}
-	nonce, err := base64.RawURLEncoding.Strict().DecodeString(file.Fixtures.CreateRequestNonce)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := DeriveConnectorResourceLSTV1CellRequestID("sandbox", peer, nonce)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const want = "57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a"
-	if got != want {
-		t.Fatalf("cell_request_id = %s, want %s", got, want)
-	}
-	if err := ValidateConnectorResourceLSTV1CellRequestID(got); err != nil {
-		t.Fatalf("ValidateConnectorResourceLSTV1CellRequestID: %v", err)
-	}
-	for _, test := range []struct {
-		environment string
-		peer        []byte
-		nonce       []byte
-	}{
-		{"Sandbox", peer, nonce},
-		{"sandbox", peer[:31], nonce},
-		{"sandbox", peer, nonce[:31]},
-	} {
-		if _, err := DeriveConnectorResourceLSTV1CellRequestID(test.environment, test.peer, test.nonce); err == nil {
-			t.Fatalf("invalid request-id input accepted: %+v", test)
 		}
 	}
 }

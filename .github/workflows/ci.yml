@@ -80,14 +80,10 @@ jobs:
             agentSessionControlVectors: 'agent_session_control_vectors.json',
             agentApiKeyIdVectors: 'agent_api_key_id_vectors.json',
             assignmentTicketVectors: 'assignment_ticket_v1_vectors.json',
-            connectorAuthorityLambdaVectors: 'connector_authority_lambda_v1_vectors.json',
             connectorResourceLstV1Vectors: 'connector_resource_lst_v1_vectors.json',
-            connectorHubRequestIdVectors: 'connector_hub_request_id_v1_vectors.json',
             connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
-            agentCredentialRecoveryVectors: 'agent_credential_recovery_v1_vectors.json',
             cridV1Vectors: 'crid_v1_vectors.json',
             targetPathV1Vectors: 'target_path_v1_vectors.json',
-            delegatedMintIssueV1Vectors: 'delegated_mint_issue_v1_vectors.json',
           };
           assert.deepEqual(Object.keys(c).sort(), Object.keys(files).sort());
           assert.deepEqual(
@@ -98,113 +94,9 @@ jobs:
             assert.deepEqual(c[accessor](), require('./npm/vectors/' + file));
           }
 
-          const dm = c.delegatedMintIssueV1Vectors();
-          const h = c.connectorHubRequestIdVectors();
           const hc = c.connectorHubLstCookieVectors();
-          const rr = c.connectorResourceLstV1Vectors();
-          const u = c.connectorAuthorityLambdaVectors();
           const cd = c.cridV1Vectors();
 
-          const frame = value => {
-            const bytes = Buffer.from(String(value), 'utf8');
-            const length = Buffer.alloc(4);
-            length.writeUInt32BE(bytes.length);
-            return Buffer.concat([length, bytes]);
-          };
-          const tagged = (tag, value) => {
-            const prefix = Buffer.alloc(3);
-            prefix[0] = tag;
-            prefix.writeUInt16BE(value.length, 1);
-            return Buffer.concat([prefix, value]);
-          };
-          const dmIdempotency = golden => {
-            const body = JSON.parse(golden.body_utf8);
-            const preimage = Buffer.concat([
-              Buffer.from(dm.contract.idempotency_derivation_domain_ascii, 'ascii'),
-              Buffer.from([0]),
-              frame(golden.issuer_id),
-              frame(body.upload_handle),
-              frame(body.issue_generation),
-            ]);
-            return [
-              preimage,
-              dm.contract.idempotency_key_prefix +
-                crypto.createHash('sha256').update(preimage).digest('base64url'),
-            ];
-          };
-          const p256Order = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
-          const strictLowSSignature = encoded => {
-            if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
-            const der = Buffer.from(encoded, 'base64url');
-            if (der.toString('base64url') !== encoded || der.length < 8 || der.length > 72) return null;
-            let offset = 0;
-            if (der[offset++] !== 0x30 || der[offset++] !== der.length - offset) return null;
-            const integer = () => {
-              if (der[offset++] !== 0x02) return null;
-              const length = der[offset++];
-              if (length < 1 || length > 33 || offset + length > der.length) return null;
-              const bytes = der.subarray(offset, offset += length);
-              if ((bytes[0] & 0x80) || (bytes.length > 1 && bytes[0] === 0 && !(bytes[1] & 0x80))) return null;
-              return BigInt('0x' + bytes.toString('hex'));
-            };
-            const r = integer();
-            const s = integer();
-            return r && s && offset === der.length && r < p256Order && s <= p256Order / 2n ? der : null;
-          };
-          const verifyDelegatedMint = golden => {
-            const bodyHash = crypto.createHash('sha256').update(golden.body_utf8).digest('hex');
-            const values = {
-              method: golden.method,
-              authority: golden.authority,
-              route: golden.route,
-              issuer_id: golden.issuer_id,
-              kid: golden.kid,
-              idempotency_key: golden.idempotency_key,
-              timestamp_unix_decimal: golden.timestamp_unix,
-              nonce: golden.nonce,
-              body_sha256: bodyHash,
-            };
-            const canonical = Buffer.concat([
-              Buffer.from(dm.contract.signing_domain_ascii, 'ascii'),
-              Buffer.from([0]),
-              ...dm.contract.field_order.map(name => frame(values[name])),
-            ]);
-            const signature = strictLowSSignature(golden.signature_der_b64url);
-            return signature &&
-              bodyHash === golden.body_sha256 &&
-              canonical.toString('hex') === golden.canonical_hex &&
-              crypto.createHash('sha256').update(canonical).digest('hex') === golden.signing_digest_hex &&
-              crypto.verify(
-                'sha256',
-                canonical,
-                crypto.createPublicKey({
-                  key: Buffer.from(golden.public_key_der_b64url, 'base64url'),
-                  format: 'der',
-                  type: 'spki',
-                }),
-                signature,
-              );
-          };
-          const verifyHubRequestID = vector => {
-            const preimage = Buffer.concat([
-              Buffer.from(h.contract.domain_ascii + '\0', 'ascii'),
-              tagged(1, Buffer.from(vector.environment, 'ascii')),
-              tagged(2, Buffer.from(vector.operation, 'ascii')),
-              tagged(3, Buffer.from(vector.authenticated_peer_public_key_b64, 'base64')),
-              tagged(4, Buffer.from(vector.request_nonce, 'base64url')),
-            ]);
-            return preimage.toString('hex') === vector.preimage_hex &&
-              crypto.createHash('sha256').update(preimage).digest('hex') === vector.hub_request_id;
-          };
-          const connectorResourceRequestID = () => {
-            const preimage = Buffer.concat([
-              Buffer.from(u.protocol.cell_request_id_domain + '\0', 'ascii'),
-              tagged(1, Buffer.from(u.fixtures.environment, 'ascii')),
-              tagged(2, Buffer.from(rr.fixtures.authenticated_peer_public_key_b64, 'base64')),
-              tagged(3, Buffer.from(rr.fixtures.create_request_nonce, 'base64url')),
-            ]);
-            return crypto.createHash('sha256').update(preimage).digest('hex');
-          };
           const rawIP = source => {
             const address = source.startsWith('::ffff:') ? source.slice(7) : source;
             if (net.isIPv4(address)) return [4, Buffer.from(address.split('.').map(Number))];
@@ -279,22 +171,6 @@ jobs:
               base32(encoded) === vector.expected_crid;
           };
 
-          const signed = [
-            dm.golden,
-            dm.retry_golden,
-            dm.refresh_golden,
-            dm.wrong_endpoint_signed,
-            dm.nonce_reuse_signed,
-            dm.authority_conflict_signed,
-          ];
-          assert.ok(signed.every(golden => {
-            const [preimage, key] = dmIdempotency(golden);
-            return verifyDelegatedMint(golden) &&
-              preimage.toString('hex') === golden.idempotency_preimage_hex &&
-              key === golden.idempotency_key;
-          }));
-          assert.ok(h.cases.every(verifyHubRequestID));
-          assert.equal(connectorResourceRequestID(), u.fixtures.cell_request_id);
           assert.ok(hc.cookie_kats.every(verifyHubCookie));
           assert.ok(cd.producer_cases.every(verifyCRID));
           console.log('npm ok');
@@ -342,14 +218,10 @@ jobs:
               'agent_session_control_vectors': 'agent_session_control_vectors.json',
               'agent_api_key_id_vectors': 'agent_api_key_id_vectors.json',
               'assignment_ticket_vectors': 'assignment_ticket_v1_vectors.json',
-              'connector_authority_lambda_vectors': 'connector_authority_lambda_v1_vectors.json',
               'connector_resource_lst_v1_vectors': 'connector_resource_lst_v1_vectors.json',
-              'connector_hub_request_id_vectors': 'connector_hub_request_id_v1_vectors.json',
               'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
-              'agent_credential_recovery_vectors': 'agent_credential_recovery_v1_vectors.json',
               'crid_v1_vectors': 'crid_v1_vectors.json',
               'target_path_v1_vectors': 'target_path_v1_vectors.json',
-              'delegated_mint_issue_v1_vectors': 'delegated_mint_issue_v1_vectors.json',
           }
           assert {
               name for name, value in vars(q).items()
@@ -360,81 +232,8 @@ jobs:
               expected = json.loads((Path('qurl_conformance/_data') / file).read_text())
               assert getattr(q, accessor)() == expected
 
-          dm = q.delegated_mint_issue_v1_vectors()
-          h = q.connector_hub_request_id_vectors()
           hc = q.connector_hub_lst_cookie_vectors()
-          rr = q.connector_resource_lst_v1_vectors()
-          u = q.connector_authority_lambda_vectors()
           cd = q.crid_v1_vectors()
-
-          def frame(value):
-              encoded = str(value).encode()
-              return struct.pack('>I', len(encoded)) + encoded
-
-          def tagged(tag, value):
-              return bytes([tag]) + struct.pack('>H', len(value)) + value
-
-          def dm_idempotency(golden):
-              body = json.loads(golden['body_utf8'])
-              preimage = b''.join((
-                  dm['contract']['idempotency_derivation_domain_ascii'].encode('ascii'),
-                  b'\0',
-                  frame(golden['issuer_id']),
-                  frame(body['upload_handle']),
-                  frame(body['issue_generation']),
-              ))
-              key = dm['contract']['idempotency_key_prefix'] + base64.urlsafe_b64encode(
-                  hashlib.sha256(preimage).digest()
-              ).decode().rstrip('=')
-              return preimage, key
-
-          def verify_delegated_mint(golden):
-              body_hash = hashlib.sha256(golden['body_utf8'].encode()).hexdigest()
-              values = {
-                  'method': golden['method'],
-                  'authority': golden['authority'],
-                  'route': golden['route'],
-                  'issuer_id': golden['issuer_id'],
-                  'kid': golden['kid'],
-                  'idempotency_key': golden['idempotency_key'],
-                  'timestamp_unix_decimal': golden['timestamp_unix'],
-                  'nonce': golden['nonce'],
-                  'body_sha256': body_hash,
-              }
-              canonical = b''.join((
-                  dm['contract']['signing_domain_ascii'].encode('ascii'),
-                  b'\0',
-                  *(frame(values[name]) for name in dm['contract']['field_order']),
-              ))
-              return (
-                  body_hash == golden['body_sha256']
-                  and canonical.hex() == golden['canonical_hex']
-                  and hashlib.sha256(canonical).hexdigest() == golden['signing_digest_hex']
-              )
-
-          def verify_hub_request_id(vector):
-              preimage = b''.join((
-                  h['contract']['domain_ascii'].encode('ascii'),
-                  b'\0',
-                  tagged(1, vector['environment'].encode('ascii')),
-                  tagged(2, vector['operation'].encode('ascii')),
-                  tagged(3, base64.b64decode(vector['authenticated_peer_public_key_b64'], validate=True)),
-                  tagged(4, base64.urlsafe_b64decode(vector['request_nonce'] + '==')),
-              ))
-              return (
-                  preimage.hex() == vector['preimage_hex']
-                  and hashlib.sha256(preimage).hexdigest() == vector['hub_request_id']
-              )
-
-          def connector_resource_request_id():
-              preimage = b''.join((
-                  u['protocol']['cell_request_id_domain'].encode('ascii'),
-                  b'\0',
-                  tagged(1, u['fixtures']['environment'].encode('ascii')),
-                  tagged(2, base64.b64decode(rr['fixtures']['authenticated_peer_public_key_b64'], validate=True)),
-                  tagged(3, base64.urlsafe_b64decode(rr['fixtures']['create_request_nonce'] + '==')),
-              ))
-              return hashlib.sha256(preimage).hexdigest()
 
           def verify_hub_cookie(vector):
               address = ipaddress.ip_address(vector['source_ip'])
@@ -485,21 +284,6 @@ jobs:
                   and base64.b32encode(encoded).decode().rstrip('=').lower() == vector['expected_crid']
               )
 
-          signed = (
-              dm['golden'],
-              dm['retry_golden'],
-              dm['refresh_golden'],
-              dm['wrong_endpoint_signed'],
-              dm['nonce_reuse_signed'],
-              dm['authority_conflict_signed'],
-          )
-          for golden in signed:
-              preimage, key = dm_idempotency(golden)
-              assert preimage.hex() == golden['idempotency_preimage_hex']
-              assert key == golden['idempotency_key']
-              assert verify_delegated_mint(golden)
-          assert all(verify_hub_request_id(vector) for vector in h['cases'])
-          assert connector_resource_request_id() == u['fixtures']['cell_request_id']
           assert all(verify_hub_cookie(vector) for vector in hc['cookie_kats'])
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
           print('py ok')

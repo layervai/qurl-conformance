@@ -21,19 +21,16 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 
 ## Hard rules
 
-- The generators that produce key-dependent vectors live at `tools/gen` and
-  `tools/gen-delegated-mint`. The delegated-mint generator preserves existing
-  keys by default; only `make gen-delegated-mint-vectors-rotate` rotates its
-  keys, KIDs, and signatures. Run a rotation target ONCE per intentional test-key
-  rotation. Rotation targets are NEVER run in CI (ECDSA signatures use random
+- The generator that produces key-dependent vectors lives at `tools/gen`. It
+  uses fixed public, vector-only issuer and resource keys so a claims edit does
+  not also rotate trust. Run `make gen-vectors` ONCE per intentional test-key
+  rotation or claims change; it is NEVER run in CI (ECDSA signatures use random
   nonces, so they are not reproducible). The committed JSON is the artifact.
-- `tools/gen` uses fixed public, vector-only issuer and resource keys so a claims
-  edit does not also rotate trust. Run `make gen-vectors` once when its
-  key-dependent artifact must change; its ECDSA signature is not reproducible.
-- `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts.
-  `tools/gen-delegated-mint` owns only the delegated-mint signed inputs, state
-  and response cases, and reject cases derived from the initial golden. Neither
-  generator rewrites the frozen NHP packet families.
+- `tools/gen` owns only the issuer-signature and qv2 verify-path artifacts. It
+  never rewrites the frozen NHP packet families.
+- This repo publishes only contracts a third-party SDK implements. Contracts
+  between the NHP runtime, the Connector Hub, and the Connector Authority live
+  in a private conformance module; never add a platform-internal artifact here.
 - This repo does NOT verify its vectors by rebuilding them with a consumer SDK.
   Doing so made the vector artifact depend on its own consumers, and every wire
   change deadlocked: the cross-check could not pass until a consumer spoke the
@@ -43,10 +40,10 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   nothing in this repo can recompute an NHP packet, header digest, or Hub proof
   digest. The in-repo gates for those NHP packet families are structural only,
   and a transcription error inside a well-formed `packet_hex` would pass CI.
-  Stdlib-verifiable families such as CRID and delegated-mint P-256 signatures
-  must rebuild and verify their derivations here. Regenerating NHP packet bytes
-  hands verification to `RELEASE_CHECKLIST.md`; work through it and keep it
-  current rather than adding a consumer codec here.
+  Stdlib-verifiable families such as CRID must rebuild and verify their
+  derivations here. Regenerating NHP packet bytes hands verification to
+  `RELEASE_CHECKLIST.md`; work through it and keep it current rather than
+  adding a consumer codec here.
 - Producer-revision pins name the commit that emitted the committed bytes. Never
   leave one pointing at a pre-change commit — the self-consistency tests pass
   when the pins agree with each other, not when they are true.

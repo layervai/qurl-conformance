@@ -110,41 +110,11 @@ violates the table reject.
 
 ## Private Authority boundary
 
-The authenticated cell converts a valid public request into the private
-`ResolveConnectorResource` operation frozen in
-`connector_authority_lambda_v1_vectors.json`. Its exact request is:
-
-```json
-{"version":1,"cell_request_id":"57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a","agent_id":"agent-conform","authenticated_peer_public_key_b64":"AjPwBu9L7RROoKW7RscGfHwqzsX4zIEfPfWf3NWsdhQ=","connector_id":"prod-dashboard"}
-```
-
-The private request optionally carries the same `expected_resource_id`. The
-cell derives `cell_request_id`; it is not client-supplied. Let `frame(tag,
-value)` be one tag byte, a two-byte big-endian length, then the value. The exact
-preimage is:
-
-```text
-"layerv:qurl:connector-resource-request-id:v1" || 0x00 ||
-frame(0x01, UTF-8 environment) ||
-frame(0x02, authenticated peer raw 32 bytes) ||
-frame(0x03, decoded public nonce raw 32 bytes)
-```
-
-`cell_request_id` is the lowercase hexadecimal SHA-256 digest. For environment
-`sandbox`, the fixture peer, and nonce bytes `a0` through `bf`, the preimage is:
-
-```text
-6c61796572763a7175726c3a636f6e6e6563746f722d7265736f757263652d726571756573742d69643a76310001000773616e64626f780200200233f006ef4bed144ea0a5bb46c7067c7c2acec5f8cc811f3df59fdcd5ac7614030020a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf
-```
-
-and the result is
-`57b3dac2005f8c49f56e9b23bda0f5f17f0be91bf5f8e853155f53d0ed9f1e4a`.
-
-Private errors are `invalid_request`, `identity_rejected`,
-`entitlement_denied`, `resource_identity_conflict`, `quota`, `rate_limited`,
-and `unavailable`. `rate_limited` requires `retry_after_seconds`; `unavailable`
-allows it; all other errors forbid it. The Authority artifact freezes their
-exact public mappings.
+The authenticated cell converts a valid public request into one private
+Authority operation. That operation's name, request body, replay identity, and
+error vocabulary are frozen with the private conformance artifact, not here;
+nothing an SDK sends or receives carries them. Only the public `52500`-series
+codes above and the `request_nonce` grammar cross the boundary.
 
 ## Size accounting
 
@@ -162,10 +132,10 @@ bytes without fragmentation.
    key before parsing the body.
 2. Require the exact `NHP_LST` header and strict request shape, then bind
    `usrId=devId` to the authenticated agent.
-3. Decode the nonce and derive `cell_request_id` from server-owned environment,
-   authenticated peer bytes, and the decoded nonce.
-4. Invoke only `ResolveConnectorResource`; validate its closed response before
-   mapping it to the public result.
+3. Decode the nonce with the shared `request_nonce` gate; the cell binds it
+   into its private request identity as frozen by the private artifact.
+4. Invoke only the private resource-resolution Authority operation; validate
+   its closed response before mapping it to the public result.
 5. Seal exactly one result under `NHP_LRT`. Never fall back to HTTP and never
    infer placement from a hostname.
 6. On the consumer side, correlate success with the originating request and
