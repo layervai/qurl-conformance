@@ -6,7 +6,7 @@ knock. It is a full-packet artifact, not a replacement for
 `agent_knock_application_vectors.json`: the latter defines application-body
 policy, while this artifact validates the Noise packet bytes and transition
 correlation. Its `schema_version` is `4`; earlier resource-scoped and bodyless,
-one-way global EXT contracts are not accepted on the current NHP 1.1 envelope.
+one-way global EXT contracts are not accepted on the current NHP 2.0 envelope.
 
 ## Positive flows
 
@@ -33,24 +33,24 @@ ephemeral private key, timestamp, counter, preamble, compact JSON body, body
 bytes, header digest, and complete packet bytes. The two static X25519 keypairs
 are synthetic. The committed packets are reproduced byte-for-byte by
 `layervai/qurl-go` producer revision
-`b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed
-commit on qurl-go main whose opt-in deterministic regeneration gate reproduces
+`6be850d69f22aad438735b0bb2a0cfdacc401a75`. This is the signed
+qurl-go producer commit whose opt-in deterministic regeneration gate reproduces
 every committed body and packet byte.
 
 ## Protocol version
 
-`HeaderCommon[8:10]` carries `01 01` — NHP protocol **1.1**. Every packet in
-this artifact was regenerated for it; the 1.0 bytes this file used to carry are
-not forward-compatible and a 1.1 receiver rejects a 1.0 sender by design.
+`HeaderCommon[8:10]` carries `02 00` — NHP protocol **2.0**. Every packet in
+this artifact was regenerated for it. A 2.0 receiver rejects every 1.x sender
+before message dispatch.
 
-1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
-as the body-seal AAD, so **editing any header field breaks the body open**.
+2.0 keeps the 1.1 rule that folds the 24-byte serialized `HeaderCommon` into the
+chain hash and uses it as the body-seal AAD, so **editing any header field breaks
+the body open**.
 Under 1.0 the flag word, header type and declared payload size rode outside
 every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
-holding the peer's static *public* key can recompute. Reject a packet below
-minor 1 on the version byte, not on an AEAD tag, so the failure is explicit;
-admit a higher minor so a later compatible release cannot strand deployed
-clients.
+holding the peer's static *public* key can recompute. Minor 0 is the 2.x
+baseline; admit a higher minor so a later compatible release cannot strand
+deployed clients.
 
 The header digest input is unchanged, and so are chain-key derivation, the body
 key, and the nonce. Only the AAD moved.

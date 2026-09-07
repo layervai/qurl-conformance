@@ -428,14 +428,11 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 // version is a repo-wide fact, not a per-family one, so a family must never
 // restate the literals.
 //
-// Minor 1 is the transcript that folds the 24-byte serialized HeaderCommon into
-// the body-seal AAD. Under 1.0 the flag word, header type and declared size rode
-// outside every AEAD and were forgeable by anyone holding the peer's static
-// public key. Consumers must reject a packet below this minor on the version
-// rather than on an AEAD tag.
+// Protocol 2.0 is the incompatible standard message-registry cutover. It keeps
+// the HeaderCommon body-AAD binding introduced by 1.1.
 const (
-	NHPProtocolVersionMajor = 1
-	NHPProtocolVersionMinor = 1
+	NHPProtocolVersionMajor = 2
+	NHPProtocolVersionMinor = 0
 )
 
 // validateNHPPacketProtocolVersion asserts the version bytes a decoded NHP
@@ -744,12 +741,11 @@ const (
 	// the revision's higher-level assignment request builder knows the current
 	// artifact schema; consumers add that support conformance-first.
 	//
-	// It names the protocol-1.1 codec commit on branch
-	// justin/feat/authenticate-nhp-header-aad, which is pushed and immutable but
-	// NOT yet merged. A pre-merge pin is the only value that is true today; a
+	// It names the protocol-2.0 codec commit on a pushed qurl-go branch. A
+	// pre-merge pin is the only value that is true today; a
 	// squash-merge will mint a different SHA, so re-pinning to the merged commit
 	// is a release-checklist item (see RELEASE_CHECKLIST.md).
-	AgentAssignmentQURLGoProducerRevision = "c4729832bf29b0f356964035864707f6904b1982"
+	AgentAssignmentQURLGoProducerRevision = "6be850d69f22aad438735b0bb2a0cfdacc401a75"
 	// AgentAssignmentNHPProducerRevision is the merged NHP revision that owns
 	// the closed assignment and registration error-code taxonomy.
 	AgentAssignmentNHPProducerRevision = "9653fcb185c77629b787ad046c13c760baba88f4"
@@ -772,8 +768,8 @@ const (
 // literals agree, so regenerating vectors at a new version cannot leave the pins
 // silently behind.
 const (
-	nhpPacketProducerProtocolMajor = 1
-	nhpPacketProducerProtocolMinor = 1
+	nhpPacketProducerProtocolMajor = 2
+	nhpPacketProducerProtocolMinor = 0
 )
 
 // Exact synthetic production-shaped fixture values.

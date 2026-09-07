@@ -83,10 +83,9 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       denial-carried receipt authority are not conformant `server_deny` bodies.
       Record the producer tests in the PR or release handoff; consumer-only
       fixtures do not satisfy this gate.
-- [ ] **State the rollout order.** A 1.1 receiver rejects a 1.0 sender by
-      design, so senders must never lead receivers. Vectors release first,
-      servers next, clients last, and the 7-day dependency-age quarantine makes
-      each step a separate pass roughly a week apart.
+- [ ] **State the rollout order.** A 2.0 receiver rejects every 1.x sender by
+      design. Release vectors first, build every role, stage a complete
+      blue/green cell, then switch traffic once. Do not mix protocol majors.
 
 ## When a release rotates delegated-mint test keys
 

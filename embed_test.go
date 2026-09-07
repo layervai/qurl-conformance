@@ -1875,14 +1875,13 @@ func TestAgentKnockSessionEnvelopeContract(t *testing.T) {
 	}
 }
 
-// downgradeNHPPacketVersion rewrites HeaderCommon[9] of a hex-encoded NHP packet
-// to 0, i.e. back to the protocol-1.0 transcript that left the header word
-// unauthenticated. Byte 9 is hex characters 18:20.
-func downgradeNHPPacketVersion(packetHex string) string {
+// rewriteNHPPacketToOldMajor rewrites HeaderCommon[8] to protocol major 1.
+// Byte 8 is hex characters 16:18.
+func rewriteNHPPacketToOldMajor(packetHex string) string {
 	if len(packetHex) < 20 {
 		return packetHex
 	}
-	return packetHex[:18] + "00" + packetHex[20:]
+	return packetHex[:16] + "01" + packetHex[18:]
 }
 
 // nhpGoldenPacketHexes returns every NHP golden packet in the repository keyed by
@@ -1991,7 +1990,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(RelayKnockVectors(), &rf); err != nil {
 					t.Fatal(err)
 				}
-				rf.Knock.PacketHex = downgradeNHPPacketVersion(rf.Knock.PacketHex)
+				rf.Knock.PacketHex = rewriteNHPPacketToOldMajor(rf.Knock.PacketHex)
 				return mustMarshalJSON(t, rf)
 			},
 			parse: func(b []byte) error { _, err := ParseRelayKnockFile(b); return err },
@@ -2004,7 +2003,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(RelayKnockVectors(), &rf); err != nil {
 					t.Fatal(err)
 				}
-				rf.Ack.PacketHex = downgradeNHPPacketVersion(rf.Ack.PacketHex)
+				rf.Ack.PacketHex = rewriteNHPPacketToOldMajor(rf.Ack.PacketHex)
 				return mustMarshalJSON(t, rf)
 			},
 			parse: func(b []byte) error { _, err := ParseRelayKnockFile(b); return err },
@@ -2017,7 +2016,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(AgentRegistrationVectors(), &af); err != nil {
 					t.Fatal(err)
 				}
-				af.RegEmailed.PacketHex = downgradeNHPPacketVersion(af.RegEmailed.PacketHex)
+				af.RegEmailed.PacketHex = rewriteNHPPacketToOldMajor(af.RegEmailed.PacketHex)
 				return mustMarshalJSON(t, af)
 			},
 			parse: func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err },
@@ -2030,7 +2029,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(AgentRegistrationVectors(), &af); err != nil {
 					t.Fatal(err)
 				}
-				af.RakSuccess.PacketHex = downgradeNHPPacketVersion(af.RakSuccess.PacketHex)
+				af.RakSuccess.PacketHex = rewriteNHPPacketToOldMajor(af.RakSuccess.PacketHex)
 				return mustMarshalJSON(t, af)
 			},
 			parse: func(b []byte) error { _, err := ParseAgentRegistrationFile(b); return err },
@@ -2043,7 +2042,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(AgentAssignmentVectors(), &doc); err != nil {
 					t.Fatal(err)
 				}
-				doc.InitialAssignment.Request.PacketHex = downgradeNHPPacketVersion(doc.InitialAssignment.Request.PacketHex)
+				doc.InitialAssignment.Request.PacketHex = rewriteNHPPacketToOldMajor(doc.InitialAssignment.Request.PacketHex)
 				return mustMarshalJSON(t, doc)
 			},
 			parse: func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err },
@@ -2056,7 +2055,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(AgentAssignmentVectors(), &doc); err != nil {
 					t.Fatal(err)
 				}
-				doc.AccountCredentialOTP.Request.PacketHex = downgradeNHPPacketVersion(doc.AccountCredentialOTP.Request.PacketHex)
+				doc.AccountCredentialOTP.Request.PacketHex = rewriteNHPPacketToOldMajor(doc.AccountCredentialOTP.Request.PacketHex)
 				return mustMarshalJSON(t, doc)
 			},
 			parse: func(b []byte) error { _, err := ParseAgentAssignmentFile(b); return err },
@@ -2069,7 +2068,7 @@ func TestNHPParsersRejectProtocolVersionDrift(t *testing.T) {
 				if err := json.Unmarshal(AgentSessionControlVectors(), &af); err != nil {
 					t.Fatal(err)
 				}
-				af.OverloadReknock.ReknockRequest.PacketHex = downgradeNHPPacketVersion(af.OverloadReknock.ReknockRequest.PacketHex)
+				af.OverloadReknock.ReknockRequest.PacketHex = rewriteNHPPacketToOldMajor(af.OverloadReknock.ReknockRequest.PacketHex)
 				return mustMarshalJSON(t, af)
 			},
 			parse: func(b []byte) error { _, err := ParseAgentSessionControlFile(b); return err },

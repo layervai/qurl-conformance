@@ -121,7 +121,7 @@ proof flight's authenticated body and embedded `request_nonce` to remain
 byte-identical to its own unproven flight.
 
 Because the prefix is copied from the refresh golden, it carries that packet's
-`HeaderCommon[8:10]` — NHP protocol **1.1** (`01 01`), which every packet family
+`HeaderCommon[8:10]` — NHP protocol **2.0** (`02 00`), which every packet family
 in this repository moved to together. `header_prefix_hex` and
 `expected_digest_hex` therefore changed with the version bump even though the
 digest construction did not: the digest is taken over the prefix bytes, and the

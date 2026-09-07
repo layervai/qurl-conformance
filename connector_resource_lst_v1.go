@@ -121,7 +121,7 @@ type connectorResourceLSTV1ErrorSpec struct {
 // ConnectorResourceLSTV1File freezes the public application bodies, replay
 // behavior, closed error grammar, and operational unfragmented size bound. It
 // deliberately contains no encrypted packets: consumers compose these exact
-// bodies with their own NHP 1.1 codec and pinned assigned-cell key.
+// bodies with their own NHP 2.0 codec and pinned assigned-cell key.
 type ConnectorResourceLSTV1File struct {
 	Artifact          string                             `json:"artifact"`
 	SchemaVersion     int                                `json:"schema_version"`

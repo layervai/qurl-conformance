@@ -20,14 +20,14 @@ const (
 	// AgentSessionControlSchemaVersion identifies the exact immutable session
 	// receipt carried by successful KNK/RKN ACKs and the strict EXT/ACK retirement
 	// exchange. Earlier resource-scoped and bodyless/global EXT contracts are not
-	// accepted on the current NHP 1.1 envelope.
+	// accepted on the current NHP 2.0 envelope.
 	AgentSessionControlSchemaVersion = 4
 	// AgentSessionControlProducerRevision is the exact producer revision that
 	// deterministically reproduces the golden packets and contains the strict
 	// exact-session receipt and EXT/ACK retirement contract in layervai/qurl-go.
-	// This signed qurl-go main commit contains the deterministic regeneration
+	// This signed qurl-go producer commit contains the deterministic regeneration
 	// gate that reproduces every committed body and packet byte.
-	AgentSessionControlProducerRevision = "b962ee4aa82f643d507ddf75adc3c110df8dff9d"
+	AgentSessionControlProducerRevision = "6be850d69f22aad438735b0bb2a0cfdacc401a75"
 
 	AgentSessionHeaderKNK = 1
 	AgentSessionHeaderACK = 2

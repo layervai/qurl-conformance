@@ -237,8 +237,8 @@ artifact has its own `artifact` id:
   `agent_session_control_vectors.json`, schema version 4) — deterministic full packets for the
   overload path KNK -> COK -> RKN -> ACK and exact-session EXT -> ACK, pinned to
   `layervai/qurl-go` producer revision
-  `b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed
-  commit on qurl-go main whose deterministic regeneration gate reproduces the
+  `6be850d69f22aad438735b0bb2a0cfdacc401a75`. This is the signed
+  qurl-go producer commit whose deterministic regeneration gate reproduces the
   committed artifact. The COK wire
   counter is deliberately unconstrained; its authenticated body `trxId` must
   equal the originating KNK counter. RKN authenticates a canonical padded
@@ -411,12 +411,12 @@ Vectors are edited under `vectors/`.
 ## NHP protocol version
 
 Every NHP packet in this repository — relay-knock, agent-registration,
-agent-assignment, and agent-session — carries **protocol 1.1** in
-`HeaderCommon[8:10]` (`01 01`), exposed as `NHPProtocolVersionMajor` /
-`NHPProtocolVersionMinor`. All four families moved from 1.0 together and the
-loaders assert the bytes.
+agent-assignment, and agent-session — carries **protocol 2.0** in
+`HeaderCommon[8:10]` (`02 00`), exposed as `NHPProtocolVersionMajor` /
+`NHPProtocolVersionMinor`. All four families move together and the loaders
+assert the bytes.
 
-1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
+2.0 keeps the 1.1 rule that folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
 as the body-seal AAD, so **editing any header field breaks the body open**.
 Under 1.0 the flag word, header type and declared payload size rode outside
 every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
@@ -424,10 +424,9 @@ holding the peer's static *public* key can recompute — so those fields were
 forgeable. Chain-key derivation, the body key, the nonce, and the header-digest
 input are unchanged.
 
-A 1.1 receiver rejects a 1.0 sender by design, so senders must never lead
-receivers on a rollout. Reject a lower minor on the version byte rather than on
-an AEAD tag, so the failure is explicit; admit a higher minor so a later
-compatible release cannot strand deployed clients.
+A 2.0 receiver rejects every 1.x sender before message dispatch. This is a
+complete blue/green cutover, not a rolling update. Minor 0 is the 2.x baseline;
+later compatible 2.x minors remain admissible.
 
 ## Who authenticates these bytes
 
