@@ -11,7 +11,7 @@ const RequestNonceBytes = 32
 
 // ErrRequestNonce identifies a logical-request nonce that is not
 // exactly RequestNonceBytes of canonical unpadded base64url.
-var ErrRequestNonce = errors.New("conformance: invalid Connector Hub request nonce")
+var ErrRequestNonce = errors.New("conformance: invalid request nonce")
 
 // DecodeRequestNonce strictly decodes the public LST request_nonce grammar:
 // an SDK mints it once per logical request and the platform consumes it as exactly RequestNonceBytes of

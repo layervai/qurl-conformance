@@ -5,9 +5,9 @@ vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
 against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
-control-plane API-key IDs, Hub LST return-routability cookies, Connector
-resource discovery, CRID v1 resource identifiers, and qURL Connector target
-paths decoupled by layer.
+control-plane API-key IDs, assignment tickets, Hub LST return-routability
+cookies, Connector resource discovery, CRID v1 resource identifiers, and qURL
+Connector target paths decoupled by layer.
 
 Everything here is a contract a third-party SDK implements. Platform-internal
 contracts between the NHP runtime, the Connector Hub, and the Connector
@@ -309,9 +309,9 @@ artifact has its own `artifact` id:
   `vectors/README_target_path_v1_vectors.md`.
 
 This module is intentionally dependency-free (stdlib only). The generator for
-key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once per
-intentional test-key rotation. It never runs in CI because ECDSA signatures use
-random nonces and are not reproducible. The committed JSON is the artifact.
+key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once when
+its key-dependent artifact must change. It never runs in CI because ECDSA
+signatures use random nonces and are not reproducible. The committed JSON is the artifact.
 Vectors are edited under `vectors/`.
 
 ## NHP protocol version
