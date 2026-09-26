@@ -93,12 +93,13 @@ func TestAgentCredentialRecoveryFixturesAreCarriedByPublicBodies(t *testing.T) {
 		"nhp_host":                 "host",
 		"nhp_port":                 "port",
 	}
+	carried := bodies.String()
 	for name, value := range fixtures {
 		key := name
 		if alias, ok := wireKey[name]; ok {
 			key = alias
 		}
-		if !strings.Contains(bodies.String(), `"`+key+`":`+string(value)) {
+		if !strings.Contains(carried, `"`+key+`":`+string(value)) {
 			t.Errorf("fixture %s=%s is not carried by any public body as %q", name, value, key)
 		}
 	}
@@ -192,6 +193,21 @@ func TestParseAgentCredentialRecoveryFileFailsClosed(t *testing.T) {
 			}
 		})
 	}
+	// Positive controls: both re-encoding paths below must round-trip the
+	// unmodified artifact, or every mutation subtest would pass vacuously.
+	t.Run("identity map round-trip", func(t *testing.T) {
+		var document map[string]any
+		if err := json.Unmarshal(raw, &document); err != nil {
+			t.Fatal(err)
+		}
+		body, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseAgentCredentialRecoveryFile(body); err != nil {
+			t.Fatalf("unmodified map round-trip rejected: %v", err)
+		}
+	})
 	for _, missing := range []string{
 		"later_grant_or_local_clock_extension_allowed",
 		"http_fallback_allowed",
@@ -227,6 +243,11 @@ func TestParseAgentCredentialRecoveryFileFailsClosed(t *testing.T) {
 		}
 		return body
 	}
+	t.Run("identity struct round-trip", func(t *testing.T) {
+		if _, err := ParseAgentCredentialRecoveryFile(mutate(t, func(*AgentCredentialRecoveryFile) {})); err != nil {
+			t.Fatalf("unmodified struct round-trip rejected: %v", err)
+		}
+	})
 	for _, test := range []struct {
 		name   string
 		change func(*AgentCredentialRecoveryFile)

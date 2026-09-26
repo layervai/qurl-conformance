@@ -437,8 +437,8 @@ jobs:
           );
           assert.ok(hc.cookie_kats.every(verifyHubCookie));
           const acr = c.agentCredentialRecoveryVectors();
-          assert.equal(acr.private_operations, undefined);
-          assert.equal(acr.fixtures.hub_request_id, undefined);
+          assert.ok(!('private_operations' in acr));
+          assert.ok(!('hub_request_id' in acr.fixtures));
           assert.ok(hc.contract.additive_application_profiles.includes(acr.protocol.hub_cookie_contract));
           assert.ok(cd.producer_cases.every(verifyCRID));
           console.log('npm ok');

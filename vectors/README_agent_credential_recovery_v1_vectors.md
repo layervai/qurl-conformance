@@ -84,9 +84,13 @@ request and success bodies.
 
 One explicit recovery operation mints one `request_nonce` and reuses the exact
 serialized Hub body through every nested transport retry. The platform keys its
-replay record on that nonce and the authenticated peer, and fingerprints the
-operation over the fields named in `protocol.issue_semantic_fingerprint_fields`
-(the agent ID, the authenticated peer, and the key ID, hash, and fence derived
+replay record on that nonce, the authenticated peer, and the operation, so the
+record is scoped to recovery. Reusing a nonce value across different
+operations, such as an assignment refresh and a recovery, is not a replay and
+not a conflict; this fixture nonce equals the refresh-assignment nonce used
+by the assignment and base cookie artifacts. The platform fingerprints the recovery operation
+over the fields named in `protocol.issue_semantic_fingerprint_fields` (the
+agent ID, the authenticated peer, and the key ID, hash, and fence derived
 from the recovery credential). The same nonce with the same fingerprint returns
 the byte-identical assignment, grant, issued time, and expiry. The same nonce
 with a changed credential, agent, or authenticated peer is a terminal
@@ -180,7 +184,13 @@ hash, and fence are derived server-side from the recovery credential. The
 `reject_wrong_environment` and peer grant-binding cases, and the matching
 entries in `issue_semantic_fingerprint_fields`, are therefore declarative in
 this public half. An SDK exercises them against its own durable pending state,
-for example the stored agent, public key, and credential fingerprint.
+for example the stored agent, public key, and credential fingerprint. Likewise,
+`hub_cookie_composition.authority_invocations_before_proof` /
+`authority_invocations_after_proof`, the cookie case
+`reject_authority_before_proof`, and the flow case
+`reject_authority_before_cookie_proof` describe Hub behavior. An SDK can only
+check that it sends the byte-identical body in the proof and never treats an
+unproven exchange as a result.
 
 Consumers also validate the Hub cookie composition, result counter/type,
 LayerV host, pinned server key, cell/generation binding, grant times, and
