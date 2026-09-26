@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/layervai/qurl-conformance/compare/v0.17.0...v0.17.1) (2026-09-26)
+
+
+### Features
+
+* **vectors:** re-publish SDK-facing agent credential recovery contract ([#148](https://github.com/layervai/qurl-conformance/issues/148)) ([124e610](https://github.com/layervai/qurl-conformance/commit/124e6107c09998df833c44e6bd1ce0baa5eab555))
+
 ## [0.17.0](https://github.com/layervai/qurl-conformance/compare/v0.16.0...v0.17.0) (2026-09-07)
 
 
