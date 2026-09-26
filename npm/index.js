@@ -16,6 +16,7 @@ module.exports = {
   assignmentTicketVectors: () => load("assignment_ticket_v1_vectors.json"),
   connectorResourceLstV1Vectors: () => load("connector_resource_lst_v1_vectors.json"),
   connectorHubLstCookieVectors: () => load("connector_hub_lst_cookie_v1_vectors.json"),
+  agentCredentialRecoveryVectors: () => load("agent_credential_recovery_v1_vectors.json"),
   cridV1Vectors: () => load("crid_v1_vectors.json"),
   targetPathV1Vectors: () => load("target_path_v1_vectors.json"),
   privateUploadV1Vectors: () => load("private_upload_v1_vectors.json"),

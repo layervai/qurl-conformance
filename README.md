@@ -6,9 +6,9 @@ against its own implementation. Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, assignment tickets, Hub LST return-routability
-cookies, Connector resource discovery, CRID v1 resource identifiers, qURL
-Connector target paths, and private upload application signatures decoupled by
-layer.
+cookies, same-agent device-credential recovery, Connector resource discovery,
+CRID v1 resource identifiers, qURL Connector target paths, and private upload
+application signatures decoupled by layer.
 
 Everything here is a contract a third-party SDK implements. Platform-internal
 contracts between the NHP runtime, the Connector Hub, and the Connector
@@ -42,6 +42,8 @@ trust.
 | `vectors/README_connector_resource_lst_v1_vectors.md` | public request/result schema, identity binding, the shared `request_nonce` gate, retry grammar, size boundary, and consumer algorithm |
 | `vectors/connector_hub_lst_cookie_v1_vectors.json` | Hub LST/COK/LST return-routability derivation, closed initial/refresh flows, allowlisted additive profiles, amplification bounds, and rejects |
 | `vectors/README_connector_hub_lst_cookie_v1_vectors.md` | cookie framing, proof flag/digest placement, replay boundaries, and consumer algorithm |
+| `vectors/agent_credential_recovery_v1_vectors.json` | UDP-only same-agent device-credential recovery Hub/cell bodies, strict rejects, grant bindings, exact replay, recovery horizon, and closed errors |
+| `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
@@ -67,6 +69,7 @@ ki, err := conformance.AgentAPIKeyIDs()             // strict-parsed agent API-k
 at, err := conformance.AssignmentTicket()           // strict-parsed qat1 cryptographic/fence artifact
 rr, err := conformance.ConnectorResourceLSTV1()      // strict-parsed Connector resource LST/LRT artifact
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
+cr, err := conformance.AgentCredentialRecovery()     // strict-parsed UDP credential-recovery contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
 tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
 pu, err := conformance.PrivateUploadV1()              // strict-parsed private upload/refresh signature vectors
@@ -94,7 +97,7 @@ mutation against the same preflight used in production.
 
 ## Scope
 
-This module hosts thirteen artifacts across twelve protocol families. Each
+This module hosts fourteen artifacts across thirteen protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -292,6 +295,16 @@ artifact has its own `artifact` id:
   pre-Authority rejects. It neither changes nor reuses the existing overload
   KNK/RKN cookie domain. See
   `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
+- **Agent credential recovery v1**
+  (`qurl-agent-credential-recovery-v1-vectors`,
+  `agent_credential_recovery_v1_vectors.json`) — the SDK-facing half of
+  explicit same-agent device-credential recovery: strict UDP-only Hub and
+  assigned-cell bodies, the additive Hub-cookie proof/size composition,
+  request and result rejects, logical-request replay outcomes, grant bindings,
+  the no-takeover/no-placement-hint policy, exact-candidate replay, the
+  per-episode immutable 90-day horizon, and closed `524xx` outcomes. The
+  platform's internal invocation bodies and replay-key derivation are not part
+  of it. See `vectors/README_agent_credential_recovery_v1_vectors.md`.
 - **CRID v1** (`qurl-crid-v1-vectors`, `crid_v1_vectors.json`) — exact
   derivation of the Cryptographic Resource ID from a DER
   `SubjectPublicKeyInfo` (domain-separated SHA-256, big-endian CRC32C,

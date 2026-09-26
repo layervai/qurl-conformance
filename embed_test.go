@@ -2502,6 +2502,7 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		{assignmentTicketName, AssignmentTicketVectors},
 		{connectorResourceLSTV1Name, ConnectorResourceLSTV1Vectors},
 		{connectorHubLSTCookieName, ConnectorHubLSTCookieVectors},
+		{agentCredentialRecoveryName, AgentCredentialRecoveryVectors},
 		{cridV1Name, CRIDV1Vectors},
 		{targetPathV1Name, TargetPathV1Vectors},
 		{privateUploadV1Name, PrivateUploadV1Vectors},

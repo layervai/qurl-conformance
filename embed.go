@@ -10,20 +10,21 @@ import (
 var vectorsFS embed.FS
 
 const (
-	conformanceVectorsName     = "vectors/qv2_conformance_vectors.json"
-	issuerSignatureName        = "vectors/issuer_signature_vectors.json"
-	relayKnockName             = "vectors/relay_knock_golden.json"
-	agentRegistrationName      = "vectors/agent_registration_golden.json"
-	agentAssignmentName        = "vectors/agent_assignment_golden.json"
-	agentKnockApplicationName  = "vectors/agent_knock_application_vectors.json"
-	agentSessionControlName    = "vectors/agent_session_control_vectors.json"
-	agentAPIKeyIDName          = "vectors/agent_api_key_id_vectors.json"
-	assignmentTicketName       = "vectors/assignment_ticket_v1_vectors.json"
-	connectorResourceLSTV1Name = "vectors/connector_resource_lst_v1_vectors.json"
-	connectorHubLSTCookieName  = "vectors/connector_hub_lst_cookie_v1_vectors.json"
-	cridV1Name                 = "vectors/crid_v1_vectors.json"
-	targetPathV1Name           = "vectors/target_path_v1_vectors.json"
-	privateUploadV1Name        = "vectors/private_upload_v1_vectors.json"
+	conformanceVectorsName      = "vectors/qv2_conformance_vectors.json"
+	issuerSignatureName         = "vectors/issuer_signature_vectors.json"
+	relayKnockName              = "vectors/relay_knock_golden.json"
+	agentRegistrationName       = "vectors/agent_registration_golden.json"
+	agentAssignmentName         = "vectors/agent_assignment_golden.json"
+	agentKnockApplicationName   = "vectors/agent_knock_application_vectors.json"
+	agentSessionControlName     = "vectors/agent_session_control_vectors.json"
+	agentAPIKeyIDName           = "vectors/agent_api_key_id_vectors.json"
+	assignmentTicketName        = "vectors/assignment_ticket_v1_vectors.json"
+	connectorResourceLSTV1Name  = "vectors/connector_resource_lst_v1_vectors.json"
+	connectorHubLSTCookieName   = "vectors/connector_hub_lst_cookie_v1_vectors.json"
+	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
+	cridV1Name                  = "vectors/crid_v1_vectors.json"
+	targetPathV1Name            = "vectors/target_path_v1_vectors.json"
+	privateUploadV1Name         = "vectors/private_upload_v1_vectors.json"
 )
 
 func mustReadVector(name string) []byte {
@@ -106,6 +107,13 @@ func ConnectorResourceLSTV1Vectors() []byte {
 // challenge and proof contract.
 func ConnectorHubLSTCookieVectors() []byte {
 	return mustReadVector(connectorHubLSTCookieName)
+}
+
+// AgentCredentialRecoveryVectors returns the SDK-facing UDP-only same-agent
+// device-credential recovery contract: the public Hub and assigned-cell
+// bodies, rejects, closed errors, and grant/flow mutations.
+func AgentCredentialRecoveryVectors() []byte {
+	return mustReadVector(agentCredentialRecoveryName)
 }
 
 // CRIDV1Vectors returns the raw bytes of the CRID v1 derivation and
@@ -207,6 +215,12 @@ func ConnectorResourceLSTV1() (*ConnectorResourceLSTV1File, error) {
 // return-routability challenge artifact.
 func ConnectorHubLSTCookie() (*ConnectorHubLSTCookieFile, error) {
 	return ParseConnectorHubLSTCookieFile(ConnectorHubLSTCookieVectors())
+}
+
+// AgentCredentialRecovery strictly parses the SDK-facing UDP-only same-agent
+// device-credential recovery artifact.
+func AgentCredentialRecovery() (*AgentCredentialRecoveryFile, error) {
+	return ParseAgentCredentialRecoveryFile(AgentCredentialRecoveryVectors())
 }
 
 // CRIDV1 strictly parses the embedded CRID v1 derivation and validation
