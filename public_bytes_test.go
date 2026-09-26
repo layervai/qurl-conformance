@@ -9,7 +9,8 @@ import (
 // hub_request_id and cell_request_id are derived server-side from the public
 // request_nonce and stay inside the private conformance module; a public body
 // may only reference the nonce. Assignment prose may name the private field
-// to say it is never echoed, so that artifact is checked body by body.
+// to say it is never echoed, and recovery case and rule names name the replay
+// key as a concept, so those artifacts are checked body by body.
 func TestPublicBodiesNeverCarryPrivateReplayIdentities(t *testing.T) {
 	private := []string{"hub_request_id", "cell_request_id"}
 	assignment, err := AgentAssignmentGolden()
@@ -25,6 +26,34 @@ func TestPublicBodiesNeverCarryPrivateReplayIdentities(t *testing.T) {
 		for _, p := range private {
 			if strings.Contains(body, p) {
 				t.Errorf("agent_assignment_golden.json %s exposes private %s", name, p)
+			}
+		}
+	}
+	recovery, err := AgentCredentialRecovery()
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveryBodies := map[string]string{}
+	for name, exchange := range recovery.PublicExchanges {
+		recoveryBodies[name+".request"] = exchange.RequestBodyJSON
+		recoveryBodies[name+".success"] = exchange.SuccessBodyJSON
+	}
+	for _, c := range recovery.RequestRejects {
+		recoveryBodies["request_rejects."+c.Name] = c.BodyJSON
+	}
+	for _, c := range recovery.ResultRejects {
+		recoveryBodies["result_rejects."+c.Name] = c.BodyJSON
+	}
+	for _, c := range recovery.ErrorCases {
+		recoveryBodies["error_cases."+c.Name] = c.BodyJSON
+	}
+	recoveryBodies["hub_cookie_composition.unproven"] = recovery.HubCookie.UnprovenBodyJSON
+	recoveryBodies["hub_cookie_composition.proof"] = recovery.HubCookie.ProofBodyJSON
+	recoveryBodies["hub_cookie_composition.challenge"] = recovery.HubCookie.ChallengeBodyJSON
+	for name, body := range recoveryBodies {
+		for _, p := range private {
+			if strings.Contains(body, p) {
+				t.Errorf("agent_credential_recovery_v1_vectors.json %s exposes private %s", name, p)
 			}
 		}
 	}

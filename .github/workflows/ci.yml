@@ -82,6 +82,7 @@ jobs:
             assignmentTicketVectors: 'assignment_ticket_v1_vectors.json',
             connectorResourceLstV1Vectors: 'connector_resource_lst_v1_vectors.json',
             connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
+            agentCredentialRecoveryVectors: 'agent_credential_recovery_v1_vectors.json',
             cridV1Vectors: 'crid_v1_vectors.json',
             targetPathV1Vectors: 'target_path_v1_vectors.json',
             privateUploadV1Vectors: 'private_upload_v1_vectors.json',
@@ -435,6 +436,10 @@ jobs:
             /unknown private-upload reject mutation/,
           );
           assert.ok(hc.cookie_kats.every(verifyHubCookie));
+          const acr = c.agentCredentialRecoveryVectors();
+          assert.ok(!('private_operations' in acr));
+          assert.ok(!('hub_request_id' in acr.fixtures));
+          assert.ok(hc.contract.additive_application_profiles.includes(acr.protocol.hub_cookie_contract));
           assert.ok(cd.producer_cases.every(verifyCRID));
           console.log('npm ok');
           NODE
@@ -485,6 +490,7 @@ jobs:
               'assignment_ticket_vectors': 'assignment_ticket_v1_vectors.json',
               'connector_resource_lst_v1_vectors': 'connector_resource_lst_v1_vectors.json',
               'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
+              'agent_credential_recovery_vectors': 'agent_credential_recovery_v1_vectors.json',
               'crid_v1_vectors': 'crid_v1_vectors.json',
               'target_path_v1_vectors': 'target_path_v1_vectors.json',
               'private_upload_v1_vectors': 'private_upload_v1_vectors.json',
@@ -684,6 +690,10 @@ jobs:
           assert re.fullmatch(r'key_[A-Za-z0-9]{12}', pu['upload_golden']['audience_key_id'])
           assert re.fullmatch(r'upl_[A-Za-z0-9_-]{43}', pu['refresh_golden']['upload_handle'])
           assert all(verify_hub_cookie(vector) for vector in hc['cookie_kats'])
+          acr = q.agent_credential_recovery_vectors()
+          assert 'private_operations' not in acr
+          assert 'hub_request_id' not in acr['fixtures']
+          assert acr['protocol']['hub_cookie_contract'] in hc['contract']['additive_application_profiles']
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
           print('py ok')
           PY

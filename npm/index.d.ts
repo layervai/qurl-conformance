@@ -9,6 +9,7 @@ export declare function agentApiKeyIdVectors(): unknown;
 export declare function assignmentTicketVectors(): unknown;
 export declare function connectorResourceLstV1Vectors(): unknown;
 export declare function connectorHubLstCookieVectors(): unknown;
+export declare function agentCredentialRecoveryVectors(): unknown;
 export declare function cridV1Vectors(): unknown;
 export declare function targetPathV1Vectors(): unknown;
 export declare function privateUploadV1Vectors(): unknown;

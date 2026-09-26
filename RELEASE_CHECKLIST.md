@@ -29,6 +29,11 @@ that handoff real rather than assumed.
 - [ ] Every artifact in `vectors/` is a contract a third-party SDK implements.
       Platform-internal contracts (NHP runtime, Connector Hub, Connector
       Authority) belong in the private conformance module, never here.
+- [ ] `agent_credential_recovery_v1_vectors.json` still equals the private
+      conformance module's copy of `qurl-agent-credential-recovery-v1-vectors`
+      minus `private_operations`, `protocol.hub_request_id_operation`, and the
+      `environment`, `authenticated_peer_public_key_b64`, and `hub_request_id`
+      fixtures. CI here cannot see the private copy.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`

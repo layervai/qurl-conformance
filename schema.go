@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Twelve families live here, each under its own artifact id so they stay decoupled
+// Fourteen families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing
@@ -37,6 +37,10 @@
 //   - The Connector Hub LST return-routability cookie contract
 //     (connector_hub_lst_cookie_v1_vectors.json): stateless challenge/proof
 //     framing and amplification gates before Authority invocation.
+//   - The agent credential recovery contract
+//     (agent_credential_recovery_v1_vectors.json): the SDK-facing UDP-only
+//     same-agent device-credential replacement bodies, grant fences, horizon,
+//     and outcomes.
 //   - The Connector resource discovery contract
 //     (connector_resource_lst_v1_vectors.json): strict native LST/LRT resource
 //     lookup, continuity, replay, and error cases.
