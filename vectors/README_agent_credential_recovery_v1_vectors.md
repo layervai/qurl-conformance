@@ -173,6 +173,15 @@ must run each raw request and result reject through the real parser and execute
 every issue-replay, grant-binding, and flow mutation against the real SDK state
 machine rather than trusting the stored outcome.
 
+Some binding dimensions have no published fixture value. The environment is
+deployment state that no public body carries. The authenticated peer is the
+Noise-authenticated initiator key, not a body field. The credential key ID,
+hash, and fence are derived server-side from the recovery credential. The
+`reject_wrong_environment` and peer grant-binding cases, and the matching
+entries in `issue_semantic_fingerprint_fields`, are therefore declarative in
+this public half. An SDK exercises them against its own durable pending state,
+for example the stored agent, public key, and credential fingerprint.
+
 Consumers also validate the Hub cookie composition, result counter/type,
 LayerV host, pinned server key, cell/generation binding, grant times, and
 device-key ID grammar. The recovery credential, grant, and replacement

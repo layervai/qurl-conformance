@@ -53,10 +53,14 @@ func TestAgentCredentialRecoveryPublishesNoPlatformInternalSection(t *testing.T)
 			t.Errorf("public recovery fixtures carry private replay-key input %q", private)
 		}
 	}
+	// Wire bodies are stored as JSON strings, so a token is checked both as a
+	// literal and in its string-escaped form.
 	raw := string(AgentCredentialRecoveryVectors())
 	for _, private := range []string{"IssueCredentialRecovery", "CompleteCredentialRecovery", `"hub_request_id"`, `"version":1,"result"`, `"version":1,"error"`} {
-		if strings.Contains(raw, private) {
-			t.Errorf("public recovery artifact contains private token %q", private)
+		for _, form := range []string{private, strings.ReplaceAll(private, `"`, `\"`)} {
+			if strings.Contains(raw, form) {
+				t.Errorf("public recovery artifact contains private token %q", form)
+			}
 		}
 	}
 }
@@ -81,9 +85,21 @@ func TestAgentCredentialRecoveryFixturesAreCarriedByPublicBodies(t *testing.T) {
 	if err := json.Unmarshal(encoded, &fixtures); err != nil {
 		t.Fatal(err)
 	}
+	// A fixture is carried when a public body has the exact "key":value pair.
+	// These fixtures name the wire field they populate differently.
+	wireKey := map[string]string{
+		"recovery_credential":      "credential",
+		"device_api_key_candidate": "device_api_key",
+		"nhp_host":                 "host",
+		"nhp_port":                 "port",
+	}
 	for name, value := range fixtures {
-		if !strings.Contains(bodies.String(), `"`+name+`":`+string(value)) && !strings.Contains(bodies.String(), ":"+string(value)) {
-			t.Errorf("fixture %s=%s is not carried by any public body", name, value)
+		key := name
+		if alias, ok := wireKey[name]; ok {
+			key = alias
+		}
+		if !strings.Contains(bodies.String(), `"`+key+`":`+string(value)) {
+			t.Errorf("fixture %s=%s is not carried by any public body as %q", name, value, key)
 		}
 	}
 }
