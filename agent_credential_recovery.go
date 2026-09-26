@@ -37,11 +37,11 @@ const (
 )
 
 var (
-	agentCredentialRecoveryGrantPattern     = regexp.MustCompile("^" + regexp.QuoteMeta(AgentCredentialRecoveryGrantPrefix) + "[A-Za-z0-9_-]+$")
-	agentCredentialRecoveryCellIDPattern    = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
-	agentCredentialRecoveryDNSLabelPattern  = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
-	agentCredentialRecoveryAPIKeyPrefixes   = []string{"lv_live_", "lv_test_"}
-	agentCredentialRecoveryLayerVHostSuffix = []string{".layerv.ai", ".layerv.xyz"}
+	agentCredentialRecoveryGrantPattern       = regexp.MustCompile("^" + regexp.QuoteMeta(AgentCredentialRecoveryGrantPrefix) + "[A-Za-z0-9_-]+$")
+	agentCredentialRecoveryCellIDPattern      = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
+	agentCredentialRecoveryDNSLabelPattern    = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	agentCredentialRecoveryAPIKeyPrefixes     = []string{"lv_live_", "lv_test_"}
+	agentCredentialRecoveryLayerVHostSuffixes = []string{".layerv.ai", ".layerv.xyz"}
 )
 
 // AgentCredentialRecoveryFile freezes the public UDP Hub and assigned-cell
@@ -837,7 +837,7 @@ func validAgentCredentialRecoveryHost(value string) bool {
 	case "internal", "localhost", "metadata", "private":
 		return false
 	}
-	for _, suffix := range agentCredentialRecoveryLayerVHostSuffix {
+	for _, suffix := range agentCredentialRecoveryLayerVHostSuffixes {
 		if strings.HasSuffix(value, suffix) {
 			return true
 		}

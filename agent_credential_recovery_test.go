@@ -56,7 +56,7 @@ func TestAgentCredentialRecoveryPublishesNoPlatformInternalSection(t *testing.T)
 	// Wire bodies are stored as JSON strings, so a token is checked both as a
 	// literal and in its string-escaped form.
 	raw := string(AgentCredentialRecoveryVectors())
-	for _, private := range []string{"IssueCredentialRecovery", "CompleteCredentialRecovery", `"hub_request_id"`, `"version":1,"result"`, `"version":1,"error"`} {
+	for _, private := range []string{"IssueCredentialRecovery", "CompleteCredentialRecovery", `"hub_request_id"`, `"cell_request_id"`, `"version":1,"result"`, `"version":1,"error"`} {
 		for _, form := range []string{private, strings.ReplaceAll(private, `"`, `\"`)} {
 			if strings.Contains(raw, form) {
 				t.Errorf("public recovery artifact contains private token %q", form)
