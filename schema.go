@@ -4,7 +4,7 @@
 // that can call this Go module, or that copies the JSON directly — can re-run
 // the same wire-truth against its own implementation.
 //
-// Thirteen families live here, each under its own artifact id so they stay decoupled
+// Fourteen families live here, each under its own artifact id so they stay decoupled
 // by layer:
 //
 //   - The qURL v2 verify-path vectors (qv2_conformance_vectors.json composing

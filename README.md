@@ -97,7 +97,7 @@ mutation against the same preflight used in production.
 
 ## Scope
 
-This module hosts fourteen artifacts across thirteen protocol families. Each
+This module hosts fifteen artifacts across fourteen protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the

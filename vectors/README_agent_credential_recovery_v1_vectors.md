@@ -147,7 +147,8 @@ candidate.
 Reject classes are consumer-neutral test categories, not public error strings:
 
 - `body_parse` is invalid JSON shape; `semantic` is structurally valid but
-  invalid recovery wire data.
+  invalid recovery wire data. A duplicated, unknown, or mistyped field is
+  `body_parse`; an absent required field is `semantic`.
 - `proof_body`, `proof_flag`, and `proof_freshness` reject cookie-proof drift;
   `return_routability` rejects credential work before proof; `amplification`
   rejects a challenge that is not strictly smaller than its triggering packet.
