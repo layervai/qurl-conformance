@@ -249,36 +249,40 @@ func TestParseAgentCredentialRecoveryFileFailsClosed(t *testing.T) {
 		}
 	})
 	for _, test := range []struct {
-		name   string
-		change func(*AgentCredentialRecoveryFile)
+		name     string
+		change   func(*AgentCredentialRecoveryFile)
+		contains string
 	}{
-		{name: "protocol takeover", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.TakeoverPolicy = "allowed" }},
-		{name: "protocol HTTP", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.HTTPFallbackAllowed = true }},
-		{name: "horizon", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.RecoveryHorizonSeconds++ }},
-		{name: "grant lifetime", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.RecoveryGrantLifetimeSeconds++ }},
-		{name: "request nonce", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.RequestNonce += "=" }},
-		{name: "agent id", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.AgentID = "Agent-CONFORM" }},
-		{name: "timestamp", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.LeaseExpiresAt = "2026-07-20T12:00:00.000Z" }},
+		{name: "protocol takeover", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.TakeoverPolicy = "allowed" }, contains: "protocol drift"},
+		{name: "protocol HTTP", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.HTTPFallbackAllowed = true }, contains: "protocol drift"},
+		{name: "horizon", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.RecoveryHorizonSeconds++ }, contains: "protocol drift"},
+		{name: "grant lifetime", change: func(file *AgentCredentialRecoveryFile) { file.Protocol.RecoveryGrantLifetimeSeconds++ }, contains: "protocol drift"},
+		{name: "request nonce", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.RequestNonce += "=" }, contains: "fixture request nonce"},
+		{name: "agent id", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.AgentID = "Agent-CONFORM" }, contains: "fixture agent_id"},
+		{name: "timestamp", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.LeaseExpiresAt = "2026-07-20T12:00:00.000Z" }, contains: "fixture lease must be canonical"},
 		{name: "low-order server key", change: func(file *AgentCredentialRecoveryFile) {
 			file.Fixtures.ServerPublicKeyB64 = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-		}},
-		{name: "raw AWS host", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.NHPHost = "internal.amazonaws.com" }},
-		{name: "missing exchange", change: func(file *AgentCredentialRecoveryFile) { delete(file.PublicExchanges, "hub_issue_recovery") }},
-		{name: "cookie proof body", change: func(file *AgentCredentialRecoveryFile) { file.HubCookie.ProofBodyJSON = "{}" }},
-		{name: "golden fixture binding", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.DeviceAPIKeyID = "key_AbCdEf123456" }},
-		{name: "request reject", change: func(file *AgentCredentialRecoveryFile) { file.RequestRejects[0].RejectClass = "semantic" }},
-		{name: "result reject", change: func(file *AgentCredentialRecoveryFile) { file.ResultRejects = file.ResultRejects[1:] }},
+		}, contains: "low-order X25519"},
+		{name: "raw AWS host", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.NHPHost = "internal.amazonaws.com" }, contains: "fixture assignment is invalid"},
+		{name: "missing exchange", change: func(file *AgentCredentialRecoveryFile) { delete(file.PublicExchanges, "hub_issue_recovery") }, contains: "public exchange count"},
+		{name: "cookie proof body", change: func(file *AgentCredentialRecoveryFile) { file.HubCookie.ProofBodyJSON = "{}" }, contains: "Hub cookie composition drift"},
+		{name: "golden fixture binding", change: func(file *AgentCredentialRecoveryFile) { file.Fixtures.DeviceAPIKeyID = "key_AbCdEf123456" }, contains: "cell result fixture bindings drifted"},
+		{name: "request reject", change: func(file *AgentCredentialRecoveryFile) { file.RequestRejects[0].RejectClass = "semantic" }, contains: "request reject \"reject_duplicate_hub_credential\" metadata drifted"},
+		{name: "result reject", change: func(file *AgentCredentialRecoveryFile) { file.ResultRejects = file.ResultRejects[1:] }, contains: "result reject count"},
 		{name: "public diagnostic", change: func(file *AgentCredentialRecoveryFile) {
 			file.ErrorCases[0].BodyJSON = `{"errCode":"52400","errMsg":"changed","retryAfterSeconds":5}`
-		}},
-		{name: "retry terminal", change: func(file *AgentCredentialRecoveryFile) { file.ErrorCases[1].RetryAfterSeconds = 1 }},
-		{name: "issue replay", change: func(file *AgentCredentialRecoveryFile) { file.IssueReplayCases[1].Outcome = ExpectReject }},
-		{name: "grant mutation", change: func(file *AgentCredentialRecoveryFile) { file.GrantBindingCases[0].Mutation = "agent_id" }},
-		{name: "flow outcome", change: func(file *AgentCredentialRecoveryFile) { file.FlowCases[0].Outcome = ExpectReject }},
+		}, contains: "error case \"hub_unavailable\" metadata drifted"},
+		{name: "retry terminal", change: func(file *AgentCredentialRecoveryFile) { file.ErrorCases[1].RetryAfterSeconds = 1 }, contains: "error case \"recovery_credential_rejected\" metadata drifted"},
+		{name: "issue replay", change: func(file *AgentCredentialRecoveryFile) { file.IssueReplayCases[1].Outcome = ExpectReject }, contains: "issue replay case \"accept_exact_issue_replay\" drifted"},
+		{name: "grant mutation", change: func(file *AgentCredentialRecoveryFile) { file.GrantBindingCases[0].Mutation = "agent_id" }, contains: "grant binding case \"accept_exact_binding\" drifted"},
+		{name: "flow outcome", change: func(file *AgentCredentialRecoveryFile) { file.FlowCases[0].Outcome = ExpectReject }, contains: "flow case \"accept_explicit_recovery\" drifted"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := ParseAgentCredentialRecoveryFile(mutate(t, test.change)); err == nil {
-				t.Fatal("mutated artifact unexpectedly accepted")
+			// Pin the gate that fires, so a mutation rejected for an unrelated
+			// reason cannot stand in for a missing check.
+			_, err := ParseAgentCredentialRecoveryFile(mutate(t, test.change))
+			if err == nil || !strings.Contains(err.Error(), test.contains) {
+				t.Fatalf("error = %v, want %q", err, test.contains)
 			}
 		})
 	}
