@@ -316,8 +316,11 @@ func cridLinkKnockV1CompareMembers(path string, typed, raw any) error {
 }
 
 var (
+	// The user-data members a link request never carries, in the order the
+	// artifact lists them: four that belong to the knocks that open a link,
+	// then the one name reserved for a later revision.
 	cridLinkKnockV1ForbiddenUserDataKeys = []string{
-		"qurl_access_token", "qurl_claims_b64", "qurl_issuer_sig_b64", "qurl_passkey",
+		"qurl_access_token", "qurl_claims_b64", "qurl_issuer_sig_b64", "qurl_session_secret", "qurl_passkey",
 	}
 
 	cridLinkKnockV1ErrorCodes = map[string]CRIDLinkKnockV1ErrorCode{

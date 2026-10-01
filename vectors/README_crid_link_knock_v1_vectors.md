@@ -47,9 +47,11 @@ a fresh random key for every request.
 
 `aspId`, `resId` and a string `usrData.qurl_crid` together make the knock a
 link request. A v1 client sends no other member. In particular the body never
-carries a key from `constants.forbidden_user_data_keys`: the first three
-belong to the ordinary link-opening knock, and `qurl_passkey` is reserved for
-a later revision. The server answers `52606` to a request that carries one.
+carries a key from `constants.forbidden_user_data_keys`. The first four,
+`qurl_access_token`, `qurl_claims_b64`, `qurl_issuer_sig_b64` and
+`qurl_session_secret`, belong to the knocks that open a link, and
+`qurl_passkey` is reserved for a later revision. The server answers `52606` to
+a request that carries any of the five.
 
 Each `request_cases` entry gives the caller's input, the body object, and the
 body's canonical bytes:

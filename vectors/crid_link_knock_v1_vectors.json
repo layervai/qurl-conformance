@@ -22,6 +22,7 @@
       "qurl_access_token",
       "qurl_claims_b64",
       "qurl_issuer_sig_b64",
+      "qurl_session_secret",
       "qurl_passkey"
     ],
     "knock_header_type": 1,

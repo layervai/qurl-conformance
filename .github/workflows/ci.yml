@@ -471,7 +471,13 @@ jobs:
             };
             assert.equal(JSON.stringify(body), request.serialized, request.name);
             assert.equal(JSON.stringify(request.body), request.serialized, request.name);
+            // A request carries the CRID, an optional user agent and nothing
+            // else: in particular none of the members it must never carry.
+            for (const forbidden of lk.constants.forbidden_user_data_keys) {
+              assert.ok(!(forbidden in request.body.usrData), `${request.name} carries ${forbidden}`);
+            }
           }
+          assert.ok(!lk.constants.forbidden_user_data_keys.some(key => Object.values(lk.constants.user_data_keys).includes(key)));
           // The request gate is the CRID v1 local gate plus one rule: the version
           // byte must be an active registry row at that row's digest length,
           // the only kind of CRID a client can verify an issued link against.

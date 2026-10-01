@@ -506,6 +506,42 @@ func TestCRIDLinkKnockV1VerificationCasesIsolateOneFault(t *testing.T) {
 	}
 }
 
+// TestCRIDLinkKnockV1ForbiddenUserDataKeys pins the members a link request
+// never carries: four that belong to the knocks that open a link, and the one
+// name reserved for a later revision. No request case carries any of them, and
+// the two members a request does carry are not among them.
+func TestCRIDLinkKnockV1ForbiddenUserDataKeys(t *testing.T) {
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"qurl_access_token", "qurl_claims_b64", "qurl_issuer_sig_b64", "qurl_session_secret", "qurl_passkey"}
+	if !slices.Equal(lf.Constants.ForbiddenUserDataKeys, want) {
+		t.Fatalf("forbidden_user_data_keys = %v, want %v", lf.Constants.ForbiddenUserDataKeys, want)
+	}
+	for _, sent := range []string{lf.Constants.UserDataKeys.CRID, lf.Constants.UserDataKeys.UserAgent} {
+		if slices.Contains(lf.Constants.ForbiddenUserDataKeys, sent) {
+			t.Errorf("%q is both sent and forbidden", sent)
+		}
+	}
+	for _, c := range lf.RequestCases {
+		// Both forms of the request are read: the body object and its bytes.
+		for form, encoded := range map[string][]byte{"body": c.Body, "serialized": []byte(c.Serialized)} {
+			var members struct {
+				UserData map[string]json.RawMessage `json:"usrData"`
+			}
+			if err := json.Unmarshal(encoded, &members); err != nil {
+				t.Fatalf("request %q %s: %v", c.Name, form, err)
+			}
+			for key := range members.UserData {
+				if key != lf.Constants.UserDataKeys.CRID && key != lf.Constants.UserDataKeys.UserAgent {
+					t.Errorf("request %q %s sends the user-data member %q, which a v1 client never sends", c.Name, form, key)
+				}
+			}
+		}
+	}
+}
+
 // TestCRIDLinkKnockV1IssuedLinkExamplesPassClientVerification ties the two
 // suites together. Every ACK case whose expected result is a link must pass
 // the same checks the verification accept cases pass, under both the
@@ -915,6 +951,13 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { change(&lf.Constants) }), "constants")
 		})
 	}
+	t.Run("constants forbidden session secret removed", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			lf.Constants.ForbiddenUserDataKeys = slices.DeleteFunc(lf.Constants.ForbiddenUserDataKeys, func(key string) bool {
+				return key == "qurl_session_secret"
+			})
+		}), "constants")
+	})
 	t.Run("constants retired name limit", func(t *testing.T) {
 		assertRejects(t, mutateDocument(t, func(doc map[string]any) {
 			constants := doc["constants"].(map[string]any)
@@ -1100,14 +1143,16 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			c.Body = json.RawMessage(strings.Replace(string(c.Body), `"resId": "qurl-crid",`, `"resId": "qurl-crid", "aspId": "qurl",`, 1))
 		}), "body does not serialize")
 	})
-	t.Run("request body forbidden key", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
-			c := requestCase(t, lf, "minimal")
-			c.Body = setMember(t, c.Body, "usrData", map[string]string{
-				"qurl_crid": lf.Fixtures.CRID, "qurl_access_token": "at_example",
-			})
-		}), "body does not serialize")
-	})
+	for _, forbidden := range cridLinkKnockV1ForbiddenUserDataKeys {
+		t.Run("request body forbidden key "+forbidden, func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := requestCase(t, lf, "minimal")
+				c.Body = setMember(t, c.Body, "usrData", map[string]string{
+					"qurl_crid": lf.Fixtures.CRID, forbidden: "example",
+				})
+			}), "body does not serialize")
+		})
+	}
 	t.Run("request body header type", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			c := requestCase(t, lf, "minimal")
