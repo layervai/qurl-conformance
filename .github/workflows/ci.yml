@@ -575,18 +575,20 @@ jobs:
             }
             return '';
           };
+          // One cap for every display string: kept only when it is a non-empty
+          // string of at most info_text_max_code_points code points, never shortened.
+          const isInfoText = value => typeof value === 'string' && value !== '' &&
+            [...value].length <= lk.constants.info_text_max_code_points;
+          assert.equal(lk.constants.info_text_max_code_points, 128);
           const sanitizeRedirectInfo = raw => {
             const source = isObject(raw) ? raw : {};
             const info = {};
             for (const member of ['qurl_id', 'expires_at', 'resource_created_at']) {
-              if (typeof source[member] === 'string' && source[member] !== '') info[member] = source[member];
+              if (isInfoText(source[member])) info[member] = source[member];
             }
             const publisher = isObject(source.publisher) ? source.publisher : {};
             info.publisher = {};
-            if (typeof publisher.name === 'string' && publisher.name !== '' &&
-                [...publisher.name].length <= lk.constants.publisher_name_max_code_points) {
-              info.publisher.name = publisher.name;
-            }
+            if (isInfoText(publisher.name)) info.publisher.name = publisher.name;
             info.publisher.verified = publisher.verified === true;
             return info;
           };
@@ -1017,18 +1019,24 @@ jobs:
               encoded = payload + struct.pack('>I', crc32c(payload))
               assert base64.b32encode(encoded).decode().rstrip('=').lower() == crid
 
+          # One cap for every display string: kept only when it is a non-empty
+          # string of at most info_text_max_code_points code points, never shortened.
+          assert lk['constants']['info_text_max_code_points'] == 128
+
+          def is_info_text(value):
+              return isinstance(value, str) and 0 < len(value) <= lk['constants']['info_text_max_code_points']
+
           def sanitize_redirect_info(raw):
               source = raw if isinstance(raw, dict) else {}
               info = {
                   member: source[member]
                   for member in ('qurl_id', 'expires_at', 'resource_created_at')
-                  if isinstance(source.get(member), str) and source[member]
+                  if is_info_text(source.get(member))
               }
               publisher = source.get('publisher') if isinstance(source.get('publisher'), dict) else {}
               info['publisher'] = {'verified': publisher.get('verified') is True}
-              name = publisher.get('name')
-              if isinstance(name, str) and 0 < len(name) <= lk['constants']['publisher_name_max_code_points']:
-                  info['publisher']['name'] = name
+              if is_info_text(publisher.get('name')):
+                  info['publisher']['name'] = publisher['name']
               return info
 
           for case in lk['redirect_info_sanitization_cases']:

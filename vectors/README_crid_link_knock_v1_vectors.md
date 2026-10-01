@@ -231,9 +231,13 @@ pass. They run on a `52600` ACK, for the CRID the client asked for.
 | 2 | parsed as a URL, its scheme, host and port are exactly those of the deployment's link origin, and it carries no userinfo | `origin` |
 | 3 | its path is empty or `/`, and it has no query | `path_or_query` |
 | 4 | its fragment is a `qv2t1` transport, as defined by `qv2_conformance_vectors.json` | `transport` |
-| 5 | the issuer signature of the link that transport reconstructs verifies under the client's trust store | `issuer_signature` |
+| 5 | the link's inner artifact, the canonical `qv2` body that transport reconstructs, parses and verifies under the client's trust store | `issuer_signature` |
 | 6 | the resource public key in the signed claims derives the requested CRID | `crid_mismatch` |
 | 7 | if `redirectInfo` is an object with a `crid` member, that member is exactly the requested CRID string | `info_crid_mismatch` |
+
+`issuer_signature` means that the link's inner artifact did not parse or did
+not verify under the trust store. A client reports any inner-artifact failure
+under this class, whichever of its own parsing or signature steps caught it.
 
 Check 6 is the delivered-key rule of `crid_v1_vectors.json`: re-derive the
 CRID from the key under the requested CRID's own version byte and digest
@@ -305,15 +309,35 @@ escaped where it is displayed.
 
 Malformed metadata never fails the request. A client keeps a sanitized view,
 which is what `expected.info` in `ack_cases` and `expected` in
-`redirect_info_sanitization_cases` hold:
+`redirect_info_sanitization_cases` hold.
+
+Every display string in `redirectInfo` follows one rule. It is kept only when
+it is a non-empty string of at most 128 Unicode code points
+(`constants.info_text_max_code_points`). A longer string is dropped, never
+shortened.
 
 | Member | Kept when | Otherwise |
 | --- | --- | --- |
-| `qurl_id` | it is a non-empty string | absent |
-| `expires_at` | it is a non-empty string | absent |
-| `resource_created_at` | it is a non-empty string | absent |
-| `publisher.name` | it is a string of 1 to 128 Unicode code points (`constants.publisher_name_max_code_points`) | absent |
+| `qurl_id`, `expires_at`, `resource_created_at`, `publisher.name` | it is a non-empty string of at most 128 Unicode code points | absent |
 | `publisher.verified` | it is the JSON boolean `true` | `false` |
+
+These cases pin the cap:
+
+| Case | Member | Code points | Kept |
+| --- | --- | --- | --- |
+| `publisher_name_at_limit` | `publisher.name` | 128 | yes |
+| `publisher_name_over_limit` | `publisher.name` | 129 | no |
+| `qurl_id_at_limit` | `qurl_id` | 128 | yes |
+| `qurl_id_over_limit` | `qurl_id` | 129 | no |
+| `expires_at_over_limit` | `expires_at` | 129 | no |
+| `resource_created_at_over_limit` | `resource_created_at` | 129 | no |
+
+The cap counts code points, not bytes and not UTF-16 code units: both
+at-limit values are 131 bytes and 129 UTF-16 code units. A string over the cap
+removes only its own member; the rest of the view is unchanged. Every
+over-limit value except the name begins with the genuine value, so a client
+that shortened it, or read only its start, would surface something plausible
+where the vectors expect the member to be absent.
 
 - `publisher` is always present in the view, even when all it says is
   `{"verified": false}`.
@@ -322,12 +346,10 @@ which is what `expected.info` in `ack_cases` and `expected` in
   usable.
 - When `publisher` is not a JSON object, the publisher is
   `{"verified": false}`; a client never reads a name out of a non-object.
-- A name that is too long is dropped, never shortened. The limit counts code
-  points, not bytes and not UTF-16 code units (`publisher_name_at_limit`).
 - Unknown members are ignored and never surfaced.
 - The two timestamps are RFC 3339 text as the server wrote them. This
-  artifact pins only that they are strings; a client that cannot parse one
-  treats it as absent where it is used.
+  artifact pins only that each is a string within the cap; a client that
+  cannot parse one treats it as absent where it is used.
 - The view has no `crid`: the echoed CRID is checked, not displayed.
 
 A JSON `null` is not a string, so by the table a `null` display member is
@@ -427,8 +449,10 @@ names the stale value. In the same change:
 3. in `reject_tampered_signature`, use the new fragment with the first
    character of its final (signature) component replaced by `A`, or by `B`
    when it already is `A`;
-4. if the claims' `exp` moved, update `expires_at` in every `redirectInfo` to
-   that instant and the number in `timestamps_not_strings` to match;
+4. if the claims' `exp` moved, replace every copy of the old `expires_at`
+   instant with the new one, which also updates the start of the
+   `expires_at_over_limit` value, and update the number in
+   `timestamps_not_strings` to match;
 5. run `scripts/sync-vectors.sh`.
 
 The CRIDs do not change while the vector resource key stays fixed.

@@ -336,10 +336,10 @@ artifact has its own `artifact` id:
   reply means `busy`, and the checks a client runs before it uses an issued
   link: link origin, bare fragment shape, `qv2t1` transport, issuer
   signature, and a resource key that derives the requested CRID. Publisher
-  metadata in the reply is display-only and unverified, and malformed
-  metadata degrades instead of failing. The fixture link is the published
-  qURL v2 accept link, so the strict Go loader verifies its issuer signature
-  and re-derives its CRID instead of trusting stored labels. See
+  metadata in the reply is display-only and unverified, and malformed or
+  over-long metadata degrades instead of failing. The fixture link is the
+  published qURL v2 accept link, so the strict Go loader verifies its issuer
+  signature and re-derives its CRID instead of trusting stored labels. See
   `vectors/README_crid_link_knock_v1_vectors.md`.
 - **qURL Connector target path** (`qurl-target-path-v1-vectors`,
   `target_path_v1_vectors.json`) — the shared local preflight and service input

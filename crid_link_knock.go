@@ -47,9 +47,10 @@ const (
 	// CRIDLinkKnockV1UserAgentMaxBytes bounds the UTF-8 length of the user
 	// agent a client sends. A longer value is truncated, never rejected.
 	CRIDLinkKnockV1UserAgentMaxBytes = 256
-	// CRIDLinkKnockV1PublisherNameMaxCodePoints bounds the publisher name a
-	// client keeps. A longer name is dropped, never shortened.
-	CRIDLinkKnockV1PublisherNameMaxCodePoints = 128
+	// CRIDLinkKnockV1InfoTextMaxCodePoints bounds every display string a
+	// client keeps from redirectInfo: the qURL id, the two timestamps and the
+	// publisher name. A longer string is dropped whole, never shortened.
+	CRIDLinkKnockV1InfoTextMaxCodePoints = 128
 	// CRIDLinkKnockV1LinkOrigin is the link origin of the deployment these
 	// vectors model. A client checks an issued link against the link origin of
 	// the deployment it is configured for.
@@ -114,16 +115,16 @@ type CRIDLinkKnockV1File struct {
 
 // CRIDLinkKnockV1Constants is the language-neutral request and reply grammar.
 type CRIDLinkKnockV1Constants struct {
-	AuthServiceID              string                      `json:"auth_service_id"`
-	ResourceID                 string                      `json:"resource_id"`
-	UserDataKeys               CRIDLinkKnockV1UserDataKeys `json:"user_data_keys"`
-	ForbiddenUserDataKeys      []string                    `json:"forbidden_user_data_keys"`
-	KnockHeaderType            int                         `json:"knock_header_type"`
-	ACKHeaderType              int                         `json:"ack_header_type"`
-	CookieHeaderType           int                         `json:"cookie_header_type"`
-	UserAgentMaxBytes          int                         `json:"user_agent_max_bytes"`
-	PublisherNameMaxCodePoints int                         `json:"publisher_name_max_code_points"`
-	LinkOrigin                 string                      `json:"link_origin"`
+	AuthServiceID         string                      `json:"auth_service_id"`
+	ResourceID            string                      `json:"resource_id"`
+	UserDataKeys          CRIDLinkKnockV1UserDataKeys `json:"user_data_keys"`
+	ForbiddenUserDataKeys []string                    `json:"forbidden_user_data_keys"`
+	KnockHeaderType       int                         `json:"knock_header_type"`
+	ACKHeaderType         int                         `json:"ack_header_type"`
+	CookieHeaderType      int                         `json:"cookie_header_type"`
+	UserAgentMaxBytes     int                         `json:"user_agent_max_bytes"`
+	InfoTextMaxCodePoints int                         `json:"info_text_max_code_points"`
+	LinkOrigin            string                      `json:"link_origin"`
 }
 
 // CRIDLinkKnockV1UserDataKeys names the only two user-data members a v1
@@ -392,9 +393,8 @@ var (
 	// then one more byte: 258 bytes but only 256 UTF-16 code units.
 	cridLinkKnockV1UserAgentBoundary = "qurl-conformance/1.0 (boundary) " + strings.Repeat("c", 221) + "\U0001F600c"
 
-	// 128 code points that are 131 bytes and 129 UTF-16 code units.
-	cridLinkKnockV1PublisherNameAtLimit   = strings.Repeat("a", CRIDLinkKnockV1PublisherNameMaxCodePoints-1) + "\U00020000"
-	cridLinkKnockV1PublisherNameOverLimit = strings.Repeat("a", CRIDLinkKnockV1PublisherNameMaxCodePoints+1)
+	cridLinkKnockV1PublisherNameAtLimit   = cridLinkKnockV1AtLimit("")
+	cridLinkKnockV1PublisherNameOverLimit = cridLinkKnockV1OverLimit("")
 
 	cridLinkKnockV1RequestFixtures = map[string]*string{
 		"minimal":                  nil,
@@ -436,6 +436,19 @@ var (
 
 func cridLinkKnockV1StringPointer(value string) *string { return &value }
 
+// cridLinkKnockV1AtLimit pads a display string to exactly the cap. Its last
+// code point lies outside the BMP, so the result meets the cap in code points
+// while exceeding it in bytes (131) and in UTF-16 code units (129).
+func cridLinkKnockV1AtLimit(text string) string {
+	return text + strings.Repeat("a", CRIDLinkKnockV1InfoTextMaxCodePoints-utf8.RuneCountInString(text)-1) + "\U00020000"
+}
+
+// cridLinkKnockV1OverLimit pads a display string to one code point past the
+// cap. The padding is ASCII, so the result is over the cap in every unit.
+func cridLinkKnockV1OverLimit(text string) string {
+	return text + strings.Repeat("a", CRIDLinkKnockV1InfoTextMaxCodePoints+1-utf8.RuneCountInString(text))
+}
+
 // cridLinkKnockV1Environment is everything the reference checks borrow from
 // the sibling artifacts: the published qv2t1 link with its transport contract
 // and the issuer key that signs it. Reading them here, rather than restating
@@ -458,6 +471,7 @@ type cridLinkKnockV1Environment struct {
 type cridLinkKnockV1LinkClaims struct {
 	Expiry               int64  `json:"exp"`
 	ResourcePublicKeyB64 string `json:"resource_public_key_b64"`
+	resourceDER          []byte
 }
 
 func loadCRIDLinkKnockV1Environment() (*cridLinkKnockV1Environment, error) {
@@ -497,12 +511,11 @@ func loadCRIDLinkKnockV1Environment() (*cridLinkKnockV1Environment, error) {
 	if class != "" || canonical != env.canonical {
 		return nil, fmt.Errorf("conformance: CRID link knock published link does not verify under its trust anchor (%q)", class)
 	}
-	resourceDER, err := strictRawBase64URL(claims.ResourcePublicKeyB64)
-	if err != nil || len(resourceDER) == 0 || claims.Expiry <= 0 {
-		return nil, errors.New("conformance: CRID link knock published link claims carry no usable resource key or expiry")
+	if claims.Expiry <= 0 {
+		return nil, errors.New("conformance: CRID link knock published link claims carry no expiry")
 	}
 	env.resourceKeyB64 = claims.ResourcePublicKeyB64
-	env.resourceDER = resourceDER
+	env.resourceDER = claims.resourceDER
 	env.expiresUnix = claims.Expiry
 	env.crid = env.deriveCRID(0x01, CRIDV1FullDigestLength)
 	env.testCRID = env.deriveCRID(0x81, CRIDV1FullDigestLength)
@@ -604,13 +617,13 @@ func validateCRIDLinkKnockV1Vocabularies(lf *CRIDLinkKnockV1File) error {
 			CRID:      CRIDLinkKnockV1UserDataCRIDKey,
 			UserAgent: CRIDLinkKnockV1UserDataUserAgentKey,
 		},
-		ForbiddenUserDataKeys:      cridLinkKnockV1ForbiddenUserDataKeys,
-		KnockHeaderType:            CRIDLinkKnockV1KnockHeaderType,
-		ACKHeaderType:              CRIDLinkKnockV1ACKHeaderType,
-		CookieHeaderType:           CRIDLinkKnockV1CookieHeaderType,
-		UserAgentMaxBytes:          CRIDLinkKnockV1UserAgentMaxBytes,
-		PublisherNameMaxCodePoints: CRIDLinkKnockV1PublisherNameMaxCodePoints,
-		LinkOrigin:                 CRIDLinkKnockV1LinkOrigin,
+		ForbiddenUserDataKeys: cridLinkKnockV1ForbiddenUserDataKeys,
+		KnockHeaderType:       CRIDLinkKnockV1KnockHeaderType,
+		ACKHeaderType:         CRIDLinkKnockV1ACKHeaderType,
+		CookieHeaderType:      CRIDLinkKnockV1CookieHeaderType,
+		UserAgentMaxBytes:     CRIDLinkKnockV1UserAgentMaxBytes,
+		InfoTextMaxCodePoints: CRIDLinkKnockV1InfoTextMaxCodePoints,
+		LinkOrigin:            CRIDLinkKnockV1LinkOrigin,
 	}
 	if !reflect.DeepEqual(lf.Constants, wantConstants) {
 		return fmt.Errorf("conformance: CRID link knock constants = %+v, want %+v", lf.Constants, wantConstants)
@@ -936,6 +949,14 @@ func (env *cridLinkKnockV1Environment) sanitizationFixtures() map[string]any {
 		"publisher_name_empty":        named(""),
 		"publisher_name_at_limit":     named(cridLinkKnockV1PublisherNameAtLimit),
 		"publisher_name_over_limit":   named(cridLinkKnockV1PublisherNameOverLimit),
+		// The same cap applies to the other display strings. Each over-limit
+		// value starts with the real one, so shortening it would look valid.
+		"qurl_id_at_limit":      cridLinkKnockV1With(info, "qurl_id", cridLinkKnockV1AtLimit(cridLinkKnockV1FixtureQURLID)),
+		"qurl_id_over_limit":    cridLinkKnockV1With(info, "qurl_id", cridLinkKnockV1OverLimit(cridLinkKnockV1FixtureQURLID)),
+		"expires_at_over_limit": cridLinkKnockV1With(info, "expires_at", cridLinkKnockV1OverLimit(env.expiresAt())),
+		"resource_created_at_over_limit": cridLinkKnockV1With(
+			info, "resource_created_at", cridLinkKnockV1OverLimit(cridLinkKnockV1FixtureResourceCreatedAt),
+		),
 		"timestamps_not_strings": cridLinkKnockV1With(
 			cridLinkKnockV1With(info, "expires_at", json.Number(strconv.FormatInt(env.expiresUnix, 10))),
 			"resource_created_at", map[string]any{"seconds": json.Number(cridLinkKnockV1FixtureResourceCreatedUnix)},
@@ -1103,18 +1124,28 @@ func cridLinkKnockV1SanitizeRedirectInfo(raw json.RawMessage) CRIDLinkKnockV1Lin
 	if !ok {
 		return info
 	}
-	info.QURLID, _ = cridLinkKnockV1JSONString(fields["qurl_id"])
-	info.ExpiresAt, _ = cridLinkKnockV1JSONString(fields["expires_at"])
-	info.ResourceCreatedAt, _ = cridLinkKnockV1JSONString(fields["resource_created_at"])
+	info.QURLID = cridLinkKnockV1InfoText(fields["qurl_id"])
+	info.ExpiresAt = cridLinkKnockV1InfoText(fields["expires_at"])
+	info.ResourceCreatedAt = cridLinkKnockV1InfoText(fields["resource_created_at"])
 	publisher, ok := cridLinkKnockV1JSONObject(fields["publisher"])
 	if !ok {
 		return info
 	}
-	if name, ok := cridLinkKnockV1JSONString(publisher["name"]); ok && utf8.RuneCountInString(name) <= CRIDLinkKnockV1PublisherNameMaxCodePoints {
-		info.Publisher.Name = name
-	}
+	info.Publisher.Name = cridLinkKnockV1InfoText(publisher["name"])
 	info.Publisher.Verified = bytes.Equal(bytes.TrimSpace(publisher["verified"]), []byte("true"))
 	return info
+}
+
+// cridLinkKnockV1InfoText is the one rule for every display string taken from
+// redirectInfo: it is kept only when it is a non-empty JSON string of at most
+// CRIDLinkKnockV1InfoTextMaxCodePoints code points. A longer string is
+// dropped whole, never shortened. The empty result means absent.
+func cridLinkKnockV1InfoText(raw json.RawMessage) string {
+	text, ok := cridLinkKnockV1JSONString(raw)
+	if !ok || utf8.RuneCountInString(text) > CRIDLinkKnockV1InfoTextMaxCodePoints {
+		return ""
+	}
+	return text
 }
 
 // cridLinkKnockV1InfoCRIDMatches is the one hard redirectInfo check: a crid
@@ -1134,7 +1165,8 @@ func cridLinkKnockV1InfoCRIDMatches(requestedCRID string, ack map[string]json.Ra
 }
 
 // openLink runs the checks that need no requested CRID: link shape, transport
-// framing and the issuer signature. It returns the reconstructed canonical
+// framing, and the inner artifact that framing reconstructs, which must parse
+// and verify under the trust anchor. It returns the reconstructed canonical
 // fragment and the signed claims, or the first failing reject class.
 func (env *cridLinkKnockV1Environment) openLink(redirect string) (string, cridLinkKnockV1LinkClaims, string) {
 	var claims cridLinkKnockV1LinkClaims
@@ -1156,11 +1188,18 @@ func (env *cridLinkKnockV1Environment) openLink(redirect string) (string, cridLi
 	if len(parts) != 4 || !env.verifyIssuerSignature(parts[1], parts[3]) {
 		return "", claims, CRIDLinkKnockV1RejectIssuerSignature
 	}
-	// The claims are read only now that their signature has verified. If they
-	// cannot be read, no resource key is left to derive a CRID from, and the
-	// next check reports that.
-	if claimsJSON, err := strictRawBase64URL(parts[1]); err == nil {
-		_ = json.Unmarshal(claimsJSON, &claims)
+	// The claims are read only now that their signature has verified. An
+	// inner artifact that does not parse, down to a resource key that is not
+	// usable, is reported under the same class as one that does not verify.
+	claimsJSON, err := strictRawBase64URL(parts[1])
+	if err == nil {
+		err = json.Unmarshal(claimsJSON, &claims)
+	}
+	if err == nil {
+		claims.resourceDER, err = strictRawBase64URL(claims.ResourcePublicKeyB64)
+	}
+	if err != nil || len(claims.resourceDER) == 0 {
+		return "", claims, CRIDLinkKnockV1RejectIssuerSignature
 	}
 	return canonical, claims, ""
 }

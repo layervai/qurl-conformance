@@ -2,13 +2,19 @@ package conformance
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"math/big"
 	"net/url"
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -27,7 +33,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
 	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
-		len(lf.ClientVerificationCases) != 21 || len(lf.RedirectInfoSanitizationCases) != 16 {
+		len(lf.ClientVerificationCases) != 21 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
 			len(lf.ClientVerificationCases), len(lf.RedirectInfoSanitizationCases))
@@ -125,13 +131,48 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	for _, c := range lf.RedirectInfoSanitizationCases {
 		sanitized[c.Name] = c.Expected
 	}
-	atLimit := sanitized["publisher_name_at_limit"].Publisher.Name
-	if utf8.RuneCountInString(atLimit) != 128 || len(atLimit) <= 128 || len(utf16.Encode([]rune(atLimit))) <= 128 {
-		t.Errorf("publisher_name_at_limit must keep 128 code points that exceed 128 bytes and 128 UTF-16 units, got %d/%d/%d",
-			utf8.RuneCountInString(atLimit), len(atLimit), len(utf16.Encode([]rune(atLimit))))
+	// One cap for every display string. A value at the cap is kept even
+	// though it is longer than the cap in bytes and in UTF-16 code units; a
+	// value one code point past it is dropped, and only that member goes.
+	limit := lf.Constants.InfoTextMaxCodePoints
+	for name, kept := range map[string]string{
+		"publisher_name_at_limit": sanitized["publisher_name_at_limit"].Publisher.Name,
+		"qurl_id_at_limit":        sanitized["qurl_id_at_limit"].QURLID,
+	} {
+		if utf8.RuneCountInString(kept) != limit || len(kept) <= limit || len(utf16.Encode([]rune(kept))) <= limit {
+			t.Errorf("%s must keep %d code points that exceed %d bytes and %d UTF-16 units, got %d/%d/%d",
+				name, limit, limit, limit, utf8.RuneCountInString(kept), len(kept), len(utf16.Encode([]rune(kept))))
+		}
 	}
-	if sanitized["publisher_name_over_limit"].Publisher.Name != "" {
-		t.Error("publisher_name_over_limit must drop the name rather than shorten it")
+	type members struct{ qurlID, expiresAt, resourceCreatedAt, name bool }
+	for name, want := range map[string]members{
+		"publisher_name_over_limit":      {qurlID: true, expiresAt: true, resourceCreatedAt: true},
+		"qurl_id_over_limit":             {expiresAt: true, resourceCreatedAt: true, name: true},
+		"expires_at_over_limit":          {qurlID: true, resourceCreatedAt: true, name: true},
+		"resource_created_at_over_limit": {qurlID: true, expiresAt: true, name: true},
+	} {
+		info, ok := sanitized[name]
+		got := members{info.QURLID != "", info.ExpiresAt != "", info.ResourceCreatedAt != "", info.Publisher.Name != ""}
+		if !ok || got != want {
+			t.Errorf("%s keeps %+v (present %t), want %+v: an over-long string is dropped and nothing else is", name, got, ok, want)
+		}
+	}
+	// The over-long inputs really are one code point past the cap, and each
+	// starts with the genuine value, so a client that shortened one would
+	// surface something that looks right.
+	for _, c := range lf.RedirectInfoSanitizationCases {
+		if !strings.HasSuffix(c.Name, "_over_limit") {
+			continue
+		}
+		fields, _ := cridLinkKnockV1JSONObject(c.RedirectInfo)
+		raw := fields[strings.TrimSuffix(c.Name, "_over_limit")]
+		if c.Name == "publisher_name_over_limit" {
+			publisher, _ := cridLinkKnockV1JSONObject(fields["publisher"])
+			raw = publisher["name"]
+		}
+		if text, ok := cridLinkKnockV1JSONString(raw); !ok || utf8.RuneCountInString(text) != limit+1 || len(text) != limit+1 {
+			t.Errorf("%s input is %d code points, want an ASCII string of %d", c.Name, utf8.RuneCountInString(text), limit+1)
+		}
 	}
 }
 
@@ -553,6 +594,126 @@ func TestCRIDLinkKnockV1TamperedSignatureStaysWellFormed(t *testing.T) {
 	}
 }
 
+// signedCRIDLinkKnockV1Link builds a link whose inner artifact carries the
+// given claims component under a fresh low-S signature of the published test
+// issuer key, the fixed 0x07 vector scalar. The proof-of-possession component
+// is the published one. This artifact publishes no signature of its own, so a
+// link that verifies and still does not parse can only be built in a test.
+func signedCRIDLinkKnockV1Link(t *testing.T, env *cridLinkKnockV1Environment, claimsB64 string) string {
+	t.Helper()
+	issuer, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), bytes.Repeat([]byte{0x07}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(append(append([]byte(env.signingPrefix), 0), claimsB64...))
+	r, s, err := ecdsa.Sign(rand.Reader, issuer, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := elliptic.P256().Params().N
+	if s.Cmp(new(big.Int).Rsh(order, 1)) > 0 {
+		s.Sub(order, s)
+	}
+	signature := make([]byte, 64)
+	r.FillBytes(signature[:32])
+	s.FillBytes(signature[32:])
+
+	fields := []string{claimsB64, strings.Split(env.canonical, ".")[2], base64.RawURLEncoding.EncodeToString(signature)}
+	header := []string{env.transportContract.Prefix}
+	var chunks []string
+	for _, field := range fields {
+		count := 0
+		for ; len(field) > env.transportContract.ComponentMax; count++ {
+			chunks = append(chunks, field[:env.transportContract.ComponentMax])
+			field = field[env.transportContract.ComponentMax:]
+		}
+		chunks = append(chunks, field)
+		header = append(header, strconv.Itoa(count+1))
+	}
+	return CRIDLinkKnockV1LinkOrigin + "/#" + strings.Join(append(header, chunks...), ".")
+}
+
+// TestCRIDLinkKnockV1InnerArtifactFailuresAreIssuerSignatureRejects pins the
+// class of a link whose inner artifact verifies but does not parse. A client
+// reports any inner-artifact failure as issuer_signature; without that rule
+// each of these would surface as a CRID mismatch, or as no reject at all.
+func TestCRIDLinkKnockV1InnerArtifactFailuresAreIssuerSignatureRejects(t *testing.T) {
+	env, err := loadCRIDLinkKnockV1Environment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := func(link string) json.RawMessage {
+		encoded, err := json.Marshal(map[string]string{"errCode": CRIDLinkKnockV1CodeLinkIssued, "redirectUrl": link})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return encoded
+	}
+	claims := func(text string) string { return base64.RawURLEncoding.EncodeToString([]byte(text)) }
+	expiry := strconv.FormatInt(env.expiresUnix, 10)
+
+	// The two claims this step reads, padded with JSON whitespace until the
+	// encoding ends in a two-character group. Canonical base64url leaves the
+	// low four bits of that group's last character zero; setting one of them
+	// keeps the decoded bytes and makes the component non-canonical.
+	minimal := `{"exp":` + expiry + `,"resource_public_key_b64":"` + env.resourceKeyB64 + `"}`
+	for len(minimal)%3 != 1 {
+		minimal += " "
+	}
+	nonCanonical := claims(minimal)
+	nonCanonical = nonCanonical[:len(nonCanonical)-1] + string(nonCanonical[len(nonCanonical)-1]+1)
+	if lenient, err := base64.RawURLEncoding.DecodeString(nonCanonical); err != nil || string(lenient) != minimal {
+		t.Fatalf("non-canonical claims must still decode leniently to the same bytes: %v", err)
+	}
+	if _, err := strictRawBase64URL(nonCanonical); err == nil {
+		t.Fatal("non-canonical claims decode under the strict decoder")
+	}
+
+	// Controls: under a fresh signature, the published claims and the minimal
+	// claims are each a usable link, so every reject below is caused by the
+	// one thing its claims change.
+	for name, claimsB64 := range map[string]string{
+		"published claims": strings.Split(env.canonical, ".")[1],
+		"minimal claims":   claims(minimal),
+	} {
+		control := body(signedCRIDLinkKnockV1Link(t, env, claimsB64))
+		result, rejectClass, err := env.interpretACK(env.crid, control)
+		if err != nil || rejectClass != "" || result.ClientResult != CRIDLinkKnockV1ResultLink {
+			t.Fatalf("re-signed %s interpret as %+v/%q/%v, want a link", name, result, rejectClass, err)
+		}
+		if failing := failingLinkChecks(t, env, env.crid, control); len(failing) != 0 {
+			t.Fatalf("re-signed %s fail checks %v", name, failing)
+		}
+	}
+
+	for name, claimsB64 := range map[string]string{
+		"claims are not canonical base64url": nonCanonical,
+		"claims are not JSON":                claims("not json"),
+		"claims are not an object":           claims(`["` + env.resourceKeyB64 + `"]`),
+		"expiry is not a number":             claims(`{"exp":"` + expiry + `","resource_public_key_b64":"` + env.resourceKeyB64 + `"}`),
+		"no resource key":                    claims(`{"exp":` + expiry + `}`),
+		"resource key is not a string":       claims(`{"exp":` + expiry + `,"resource_public_key_b64":7}`),
+		"resource key is empty":              claims(`{"exp":` + expiry + `,"resource_public_key_b64":""}`),
+		"resource key is padded base64url":   claims(`{"exp":` + expiry + `,"resource_public_key_b64":"` + env.resourceKeyB64 + `="}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			link := signedCRIDLinkKnockV1Link(t, env, claimsB64)
+			canonical, err := decodeConformanceTransport(env.transportContract, strings.TrimPrefix(link, CRIDLinkKnockV1LinkOrigin+"/#"))
+			if err != nil {
+				t.Fatalf("link must still be valid framing: %v", err)
+			}
+			parts := strings.Split(canonical, ".")
+			if parts[1] != claimsB64 || !env.verifyIssuerSignature(parts[1], parts[3]) {
+				t.Fatal("link must still verify under the trust anchor")
+			}
+			result, rejectClass, err := env.interpretACK(env.crid, body(link))
+			if err != nil || rejectClass != CRIDLinkKnockV1RejectIssuerSignature || result.ClientResult != "" || result.Link != "" || result.Info != nil {
+				t.Fatalf("interprets as %+v/%q/%v, want a bare %s reject", result, rejectClass, err, CRIDLinkKnockV1RejectIssuerSignature)
+			}
+		})
+	}
+}
+
 func TestCRIDLinkKnockV1TruncateUserAgent(t *testing.T) {
 	limit := CRIDLinkKnockV1UserAgentMaxBytes
 	for _, tc := range []struct {
@@ -747,13 +908,20 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		"ack header type":         func(c *CRIDLinkKnockV1Constants) { c.ACKHeaderType = 1 },
 		"cookie header type":      func(c *CRIDLinkKnockV1Constants) { c.CookieHeaderType = 8 },
 		"user agent limit":        func(c *CRIDLinkKnockV1Constants) { c.UserAgentMaxBytes = 255 },
-		"publisher name limit":    func(c *CRIDLinkKnockV1Constants) { c.PublisherNameMaxCodePoints = 64 },
+		"info text limit":         func(c *CRIDLinkKnockV1Constants) { c.InfoTextMaxCodePoints = 64 },
 		"link origin":             func(c *CRIDLinkKnockV1Constants) { c.LinkOrigin = "https://qurl.link/" },
 	} {
 		t.Run("constants "+name, func(t *testing.T) {
 			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { change(&lf.Constants) }), "constants")
 		})
 	}
+	t.Run("constants retired name limit", func(t *testing.T) {
+		assertRejects(t, mutateDocument(t, func(doc map[string]any) {
+			constants := doc["constants"].(map[string]any)
+			constants["publisher_name_max_code_points"] = constants["info_text_max_code_points"]
+			delete(constants, "info_text_max_code_points")
+		}), "unknown field")
+	})
 	t.Run("composes", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { lf.Composes.IssuerTrustAnchor = "other.json" }), "composes")
 	})
@@ -1249,6 +1417,36 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			sanitizationCase(t, lf, "publisher_name_at_limit").Expected.Publisher.Name = ""
 		}), "expectation")
+	})
+	t.Run("sanitization at-limit qurl id dropped", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "qurl_id_at_limit").Expected.QURLID = ""
+		}), "expectation")
+	})
+	t.Run("sanitization over-long qurl id kept", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "qurl_id_over_limit").Expected.QURLID = cridLinkKnockV1OverLimit(cridLinkKnockV1FixtureQURLID)
+		}), "expectation")
+	})
+	t.Run("sanitization over-long qurl id shortened", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "qurl_id_over_limit").Expected.QURLID = cridLinkKnockV1FixtureQURLID
+		}), "expectation")
+	})
+	t.Run("sanitization over-long expiry shortened", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "expires_at_over_limit").Expected.ExpiresAt = sanitizationCase(t, lf, "full_info").Expected.ExpiresAt
+		}), "expectation")
+	})
+	t.Run("sanitization over-long creation time kept", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "resource_created_at_over_limit").Expected.ResourceCreatedAt = cridLinkKnockV1OverLimit(cridLinkKnockV1FixtureResourceCreatedAt)
+		}), "expectation")
+	})
+	t.Run("sanitization over-long input brought under the cap", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			sanitizationCase(t, lf, "expires_at_over_limit").RedirectInfo = sanitizationCase(t, lf, "full_info").RedirectInfo
+		}), "redirect_info does not match its fixture")
 	})
 	t.Run("sanitization non-object publisher named", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
