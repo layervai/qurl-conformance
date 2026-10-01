@@ -472,6 +472,66 @@ jobs:
             assert.equal(JSON.stringify(body), request.serialized, request.name);
             assert.equal(JSON.stringify(request.body), request.serialized, request.name);
           }
+          // The request gate is the CRID v1 local gate plus one rule: the version
+          // byte must be an active registry row at that row's digest length,
+          // the only kind of CRID a client can verify an issued link against.
+          const cridLocalGate = value => {
+            const alphabet = cd.contract.alphabet;
+            if ([...value].some(character => !alphabet.includes(character))) return { rejectClass: 'charset' };
+            if (value.length !== cd.contract.full_crid_length && value.length !== cd.contract.truncated_crid_length) {
+              return { rejectClass: 'length' };
+            }
+            const bytes = [];
+            let pending = 0, bits = 0;
+            for (const character of value) {
+              pending = (pending << 5) | alphabet.indexOf(character);
+              bits += 5;
+              if (bits >= 8) {
+                bits -= 8;
+                bytes.push(pending >>> bits);
+                pending &= (1 << bits) - 1;
+              }
+            }
+            if (pending !== 0) return { rejectClass: 'non_canonical' };
+            const decoded = Buffer.from(bytes);
+            const payload = decoded.subarray(0, decoded.length - cd.contract.checksum_length);
+            if (decoded.readUInt32BE(payload.length) !== crc32c(payload)) return { rejectClass: 'checksum' };
+            const versionHex = payload.subarray(0, 1).toString('hex');
+            if (versionHex === cd.contract.forbidden_version_hex) return { rejectClass: 'version' };
+            return { rejectClass: '', versionHex, digestLength: payload.length - 1 };
+          };
+          const cridRequestRejectClass = value => {
+            const gate = cridLocalGate(value);
+            if (gate.rejectClass) return gate.rejectClass;
+            const row = cd.versions.find(version => version.version_hex === gate.versionHex);
+            return row && row.status === 'active' && row.digest_length === gate.digestLength ? '' : 'version';
+          };
+          for (const value of cd.consumer_value_cases) {
+            assert.equal(cridLocalGate(value.value).rejectClass, value.reject_class ?? '', value.name);
+          }
+          for (const refused of lk.invalid_request_cases) {
+            assert.equal(refused.outcome, 'reject', refused.name);
+            assert.equal(cridRequestRejectClass(refused.input.crid), refused.crid_reject_class, refused.name);
+          }
+          // Three refused inputs pass the CRID v1 gate and are refused for their
+          // version alone: one unregistered byte and the two reserved bytes.
+          const unverifiable = lk.invalid_request_cases.filter(refused => cridLocalGate(refused.input.crid).rejectClass === '');
+          assert.deepEqual(
+            unverifiable.map(refused => [refused.name, cridLocalGate(refused.input.crid).versionHex, refused.input.crid.length]),
+            [
+              ['reject_unregistered_version', '7f', cd.contract.full_crid_length],
+              ['reject_reserved_version_02', '02', cd.contract.truncated_crid_length],
+              ['reject_reserved_version_82', '82', cd.contract.truncated_crid_length],
+            ],
+          );
+          assert.ok(unverifiable.every(refused => refused.crid_reject_class === 'version'));
+          for (const requested of [
+            ...lk.request_cases.map(request => request.input.crid),
+            ...lk.ack_cases.map(ackCase => ackCase.requested_crid),
+            ...lk.client_verification_cases.map(check => check.requested_crid),
+          ]) {
+            assert.equal(cridRequestRejectClass(requested), '', requested);
+          }
           const cridFromKey = (keyB64, held) => {
             const version = (cd.contract.alphabet.indexOf(held[0]) << 3) | (cd.contract.alphabet.indexOf(held[1]) >> 2);
             const digest = crypto.createHash('sha256')
@@ -882,6 +942,66 @@ jobs:
               }
               for body in (built, request['body']):
                   assert json.dumps(body, separators=(',', ':'), ensure_ascii=False) == request['serialized'], request['name']
+
+          # The request gate is the CRID v1 local gate plus one rule: the version
+          # byte must be an active registry row at that row's digest length,
+          # the only kind of CRID a client can verify an issued link against.
+          def crid_local_gate(value):
+              alphabet = cd['contract']['alphabet']
+              if any(character not in alphabet for character in value):
+                  return 'charset', None, None
+              if len(value) not in (cd['contract']['full_crid_length'], cd['contract']['truncated_crid_length']):
+                  return 'length', None, None
+              number = 0
+              for character in value:
+                  number = (number << 5) | alphabet.index(character)
+              spare_bits = len(value) * 5 % 8
+              if number & ((1 << spare_bits) - 1):
+                  return 'non_canonical', None, None
+              decoded = (number >> spare_bits).to_bytes(len(value) * 5 // 8, 'big')
+              payload = decoded[:-cd['contract']['checksum_length']]
+              if struct.unpack('>I', decoded[len(payload):])[0] != crc32c(payload):
+                  return 'checksum', None, None
+              version_hex = payload[:1].hex()
+              if version_hex == cd['contract']['forbidden_version_hex']:
+                  return 'version', None, None
+              return '', version_hex, len(payload) - 1
+
+          def crid_request_reject_class(value):
+              reject_class, version_hex, digest_length = crid_local_gate(value)
+              if reject_class:
+                  return reject_class
+              verifiable = any(
+                  row['version_hex'] == version_hex and row['status'] == 'active' and row['digest_length'] == digest_length
+                  for row in cd['versions']
+              )
+              return '' if verifiable else 'version'
+
+          for value in cd['consumer_value_cases']:
+              assert crid_local_gate(value['value'])[0] == value.get('reject_class', ''), value['name']
+          for refused in lk['invalid_request_cases']:
+              assert refused['outcome'] == 'reject', refused['name']
+              assert crid_request_reject_class(refused['input']['crid']) == refused['crid_reject_class'], refused['name']
+          # Three refused inputs pass the CRID v1 gate and are refused for their
+          # version alone: one unregistered byte and the two reserved bytes.
+          unverifiable = [
+              refused for refused in lk['invalid_request_cases'] if crid_local_gate(refused['input']['crid'])[0] == ''
+          ]
+          assert [
+              (refused['name'], crid_local_gate(refused['input']['crid'])[1], len(refused['input']['crid']))
+              for refused in unverifiable
+          ] == [
+              ('reject_unregistered_version', '7f', cd['contract']['full_crid_length']),
+              ('reject_reserved_version_02', '02', cd['contract']['truncated_crid_length']),
+              ('reject_reserved_version_82', '82', cd['contract']['truncated_crid_length']),
+          ]
+          assert all(refused['crid_reject_class'] == 'version' for refused in unverifiable)
+          requested_crids = (
+              [request['input']['crid'] for request in lk['request_cases']]
+              + [case['requested_crid'] for case in lk['ack_cases']]
+              + [case['requested_crid'] for case in lk['client_verification_cases']]
+          )
+          assert all(crid_request_reject_class(crid) == '' for crid in requested_crids)
 
           link_parts = lk['fixtures']['link'].removeprefix(lk['constants']['link_origin'] + '/#').split('.')
           assert link_parts[0] == 'qv2t1'

@@ -26,7 +26,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 10 || len(lf.RejectClasses) != 7 {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
-	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 4 || len(lf.ACKCases) != 17 ||
+	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
 		len(lf.ClientVerificationCases) != 21 || len(lf.RedirectInfoSanitizationCases) != 16 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
@@ -200,9 +200,102 @@ func TestCRIDLinkKnockV1VocabulariesAreExercised(t *testing.T) {
 	for _, c := range lf.InvalidRequestCases {
 		cridClasses[c.CRIDRejectClass] = true
 	}
-	for _, class := range []string{CRIDV1RejectChecksum, CRIDV1RejectLength, CRIDV1RejectCharset} {
+	for _, class := range []string{CRIDV1RejectChecksum, CRIDV1RejectLength, CRIDV1RejectCharset, CRIDV1RejectVersion} {
 		if !cridClasses[class] {
 			t.Errorf("no refused request exercises the CRID v1 %q class", class)
+		}
+	}
+}
+
+// TestCRIDLinkKnockV1RefusesVersionsAClientCannotVerify pins the one place
+// where the request gate is stricter than the CRID v1 local gate. A CRID with
+// an unregistered or reserved version byte is well formed and the local gate
+// forwards it, but a client could never check an issued link against it, so
+// it must not ask for one.
+func TestCRIDLinkKnockV1RefusesVersionsAClientCannotVerify(t *testing.T) {
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused := make(map[string]CRIDLinkKnockV1InvalidRequestCase, len(lf.InvalidRequestCases))
+	for _, c := range lf.InvalidRequestCases {
+		refused[c.Name] = c
+	}
+	registry := make(map[string]CRIDV1Version, len(cridV1VersionRegistry))
+	for _, row := range cridV1VersionRegistry {
+		registry[row.VersionHex] = row
+	}
+	for _, tc := range []struct {
+		name         string
+		versionHex   string
+		length       int
+		digestLength int
+		registered   bool
+	}{
+		{"reject_unregistered_version", "7f", CRIDV1FullCRIDLength, CRIDV1FullDigestLength, false},
+		{"reject_reserved_version_02", "02", CRIDV1TruncatedCRIDLength, CRIDV1TruncatedDigestLength, true},
+		{"reject_reserved_version_82", "82", CRIDV1TruncatedCRIDLength, CRIDV1TruncatedDigestLength, true},
+	} {
+		c, ok := refused[tc.name]
+		if !ok {
+			t.Errorf("missing invalid request case %q", tc.name)
+			continue
+		}
+		crid := c.Input.CRID
+		// The generic gate has nothing to object to: shape and checksum hold.
+		if outcome, rejectClass := deriveCRIDV1ValueExpectation(crid); outcome != ExpectAccept {
+			t.Errorf("%s fails the CRID v1 local gate with class %q; it must be refused for its version alone", tc.name, rejectClass)
+			continue
+		}
+		versionHex, known, _, digestLength, err := deriveCRIDV1VersionExpectation(crid)
+		if err != nil || versionHex != tc.versionHex || known != tc.registered || digestLength != tc.digestLength || len(crid) != tc.length {
+			t.Errorf("%s = version %q known %t digest %d length %d (%v), want %q/%t/%d/%d",
+				tc.name, versionHex, known, digestLength, len(crid), err, tc.versionHex, tc.registered, tc.digestLength, tc.length)
+		}
+		// A reserved row is registered but not active. If the registry ever
+		// activates it, this case stops being a refusal and must be revisited
+		// together with the clients that would then verify it.
+		if row, registered := registry[tc.versionHex]; registered != tc.registered || (registered && row.Status != CRIDV1StatusReserved) {
+			t.Errorf("%s: CRID v1 registry row for %q = %+v (registered %t), want reserved %t", tc.name, tc.versionHex, row, registered, tc.registered)
+		}
+		if outcome, rejectClass := cridLinkKnockV1RequestExpectation(crid); outcome != ExpectReject || rejectClass != CRIDV1RejectVersion ||
+			c.Outcome != ExpectReject || c.CRIDRejectClass != CRIDV1RejectVersion {
+			t.Errorf("%s request gate = %q/%q, declared %q/%q; want a refusal under the CRID v1 version class",
+				tc.name, outcome, rejectClass, c.Outcome, c.CRIDRejectClass)
+		}
+		if _, _, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: crid}); err == nil {
+			t.Errorf("%s: the reference request builder built a request for it", tc.name)
+		}
+	}
+
+	// Every refused input is refused by the builder, and every CRID a case
+	// requests a link for is one the request gate lets through: a client
+	// never holds an answer to a request it would not have sent.
+	for _, c := range lf.InvalidRequestCases {
+		if _, _, err := cridLinkKnockV1SerializeRequest(c.Input); err == nil {
+			t.Errorf("invalid request case %q: the reference request builder built a request for it", c.Name)
+		}
+	}
+	requested := map[string]string{}
+	for _, c := range lf.RequestCases {
+		requested["request case "+c.Name] = c.Input.CRID
+	}
+	for _, c := range lf.ACKCases {
+		requested["ACK case "+c.Name] = c.RequestedCRID
+	}
+	for _, c := range lf.ClientVerificationCases {
+		requested["verification case "+c.Name] = c.RequestedCRID
+	}
+	for name, crid := range requested {
+		if outcome, rejectClass := cridLinkKnockV1RequestExpectation(crid); outcome != ExpectAccept {
+			t.Errorf("%s requests a link for a CRID the request gate refuses (%q)", name, rejectClass)
+		}
+	}
+	// Both active versions are requestable; the test-environment CRID is the
+	// proof that the gate reads the registry instead of hard-coding one byte.
+	for _, crid := range []string{lf.Fixtures.CRID, lf.Fixtures.TestEnvironmentCRID, lf.Fixtures.UnrelatedCRID} {
+		if outcome, rejectClass := cridLinkKnockV1RequestExpectation(crid); outcome != ExpectAccept {
+			t.Errorf("fixture CRID %q is refused (%q)", crid, rejectClass)
 		}
 	}
 }
@@ -882,6 +975,35 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			invalidCase(t, lf, "reject_wrong_length").Outcome = ExpectAccept
 		}), "expectation")
+	})
+	for _, name := range []string{"reject_unregistered_version", "reject_reserved_version_02", "reject_reserved_version_82"} {
+		t.Run("invalid request "+name+" sent", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := invalidCase(t, lf, name)
+				c.Outcome, c.CRIDRejectClass = ExpectAccept, ""
+			}), "expectation")
+		})
+		t.Run("invalid request "+name+" given another class", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				invalidCase(t, lf, name).CRIDRejectClass = CRIDV1RejectChecksum
+			}), "expectation")
+		})
+	}
+	t.Run("invalid request unregistered version made active", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			invalidCase(t, lf, "reject_unregistered_version").Input.CRID = lf.Fixtures.TestEnvironmentCRID
+		}), "input does not match its fixture")
+	})
+	t.Run("invalid request unregistered version from another key", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			invalidCase(t, lf, "reject_unregistered_version").Input.CRID = cridV1UnknownVersionFullCRID
+		}), "input does not match its fixture")
+	})
+	t.Run("invalid request reserved version in full form", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := invalidCase(t, lf, "reject_reserved_version_02")
+			c.Input.CRID = lf.Fixtures.CRID
+		}), "input does not match its fixture")
 	})
 	t.Run("invalid request empty crid omitted", func(t *testing.T) {
 		assertRejects(t, mutateDocument(t, func(doc map[string]any) {

@@ -8,7 +8,8 @@
     "request_cases[].serialized is the canonical byte form of request_cases[].body: compact JSON, members in the listed order, strings escaped exactly as JavaScript JSON.stringify escapes them and otherwise emitted as UTF-8.",
     "Member order inside an ACK body is not part of the contract. errMsg is diagnostic text: clients decide on errCode alone, and the errMsg strings here are examples.",
     "An issued link is used only after every client verification check passes. A check that fails is a hard error and nothing from that reply is shown.",
-    "redirectInfo is display-only metadata. The publisher name is self-declared and unverified, and nothing in redirectInfo is covered by the link signature or by the CRID."
+    "redirectInfo is display-only metadata. The publisher name is self-declared and unverified, and nothing in redirectInfo is covered by the link signature or by the CRID.",
+    "invalid_request_cases use the CRID v1 reject vocabulary. The version cases pass the CRID v1 local gate, which forwards an unregistered or reserved version byte. A link request for one is still refused, because the client could not verify the link it would get back."
   ],
   "constants": {
     "auth_service_id": "qurl",
@@ -254,6 +255,30 @@
       },
       "outcome": "reject",
       "crid_reject_class": "length"
+    },
+    {
+      "name": "reject_unregistered_version",
+      "input": {
+        "crid": "p76cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzxvp4s7q"
+      },
+      "outcome": "reject",
+      "crid_reject_class": "version"
+    },
+    {
+      "name": "reject_reserved_version_02",
+      "input": {
+        "crid": "al6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvzctpfezy"
+      },
+      "outcome": "reject",
+      "crid_reject_class": "version"
+    },
+    {
+      "name": "reject_reserved_version_82",
+      "input": {
+        "crid": "ql6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvzjh43gia"
+      },
+      "outcome": "reject",
+      "crid_reject_class": "version"
     }
   ],
   "ack_cases": [

@@ -107,10 +107,34 @@ character.
 
 Before it builds a request, the client runs the CRID v1 local validation gate
 from `crid_v1_vectors.json` and refuses to send a CRID that fails it. Nothing
-is trimmed, lower-cased or otherwise repaired. `invalid_request_cases` lists
-inputs a client must refuse; `crid_reject_class` is the CRID v1 class for that
-input, not a class defined by this artifact. A CRID that passes the local gate
-is sent as it is, including one whose version byte is not registered.
+is trimmed, lower-cased or otherwise repaired.
+
+A link request has one rule beyond that gate: a client must not send a
+request for a CRID whose version it cannot verify a link against. That is a
+CRID whose version byte is not registered, or is registered only as reserved,
+in the CRID v1 version registry. Such a CRID is well formed, its checksum is
+valid, and the CRID v1 local gate forwards it. Here it is refused, because
+the client could never complete check 6 below: it would ask the server to
+create a link that it must then reject. Today the versions a client can
+verify are the active ones, `01` and `81`, in their full 60-character form.
+
+`invalid_request_cases` lists inputs a client must refuse. `crid_reject_class`
+always comes from the CRID v1 vocabulary; this artifact defines no class of
+its own for a refused request.
+
+| Case | Input | `crid_reject_class` |
+| --- | --- | --- |
+| `reject_checksum` | one character of the digest changed | `checksum` |
+| `reject_wrong_length` | 59 characters | `length` |
+| `reject_uppercase` | upper-cased | `charset` |
+| `reject_empty` | the empty string | `length` |
+| `reject_unregistered_version` | version byte `7f`, 60 characters, valid checksum | `version` |
+| `reject_reserved_version_02`, `reject_reserved_version_82` | the reserved short-form version bytes, 47 characters, valid checksum | `version` |
+
+For the first four the class is what the CRID v1 local gate reports. The last
+three pass that gate. The request builder refuses them under `version`, the
+CRID v1 vocabulary's class for a version byte a consumer must not act on; in
+the local gate itself that class marks only the forbidden `00`.
 
 ## Reply types
 
@@ -257,7 +281,11 @@ configured for; configure `https://qurl.link` to run the vectors.
 
 These checks are only the ones this step adds. The validity window, the relay
 allowlist and proof of possession belong to opening the link in step 2 and
-are pinned by the qURL v2 artifacts. A consumer whose link verifier also
+are pinned by the qURL v2 artifacts. A client may also run its link-opening
+checks, for example its relay allowlist and the claims' validity window, on
+the issued link before it returns the link; a link that fails those is not
+returned, and that outcome is outside this artifact's `reject_classes`,
+because the link-opening artifacts pin it. A consumer whose link verifier
 enforces the validity window evaluates the fixture link at an instant inside
 its claims' `nbf` to `exp` window.
 
@@ -316,7 +344,7 @@ for.
 | --- | --- | --- |
 | `issuer_trust_anchor` | `issuer_signature_vectors.json` | the `issuer` public key: the whole trust store for these vectors |
 | `link_transport` | `qv2_conformance_vectors.json` | the `qv2t1` transport contract and the link itself |
-| `crid` | `crid_v1_vectors.json` | the CRID derivation, the local gate and the delivered-key rule |
+| `crid` | `crid_v1_vectors.json` | the CRID derivation, the local gate, the version registry and the delivered-key rule |
 
 `fixtures` holds the values the cases share:
 
@@ -337,7 +365,8 @@ Consumers derive every declared outcome through their production paths:
 1. For each `request_cases` entry, build the request from `input` and compare
    the serialized body with `serialized` byte for byte.
 2. For each `invalid_request_cases` entry, confirm that the request builder
-   refuses the input before any network I/O.
+   refuses the input before any network I/O. That includes the well-formed
+   CRIDs whose version the client cannot verify a link against.
 3. Apply `reply_type_rules` in the real reply path: a reply with the cookie
    header type yields `busy` without its body being read, and a reply with
    any header type other than the ACK's or the cookie's is a transport error.
@@ -371,7 +400,7 @@ It rejects duplicate keys, unknown members, missing required members and
 optional members written as empty; it pins every case input against a fixture
 derived from the composed artifacts; it pins `reply_type_rules`; and it
 re-derives every expectation: the canonical request bytes and the truncation,
-the CRID local-gate class of every refused input, the client result of every
+the request-gate class of every refused input, the client result of every
 ACK, the reject class of every issued link (with a real issuer-signature
 check against the composed trust anchor and a real CRID derivation from the
 signed resource key), and the sanitized view of every `redirectInfo` value.
@@ -381,10 +410,10 @@ The npm and Python packages carry byte-identical copies and expose thin
 accessors; they do not inherit the Go loader's validation. This repository's
 CI runs the same vectors through `JSON.stringify`, the WHATWG URL parser and
 an independent signature verification in Node, and through Python's
-serializer and CRID derivation, and both runtimes dispatch on
-`reply_type_rules`, so the vectors are known to be implementable outside Go.
-Consumers in those languages still run every case through their own
-production code.
+serializer and CRID derivation, and both runtimes run the request gate and
+dispatch on `reply_type_rules`, so the vectors are known to be implementable
+outside Go. Consumers in those languages still run every case through their
+own production code.
 
 ## Lockstep with the qURL v2 link
 

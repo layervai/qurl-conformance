@@ -197,8 +197,9 @@ type CRIDLinkKnockV1RequestCase struct {
 }
 
 // CRIDLinkKnockV1InvalidRequestCase is an input a client must refuse to send.
-// CRIDRejectClass is the CRID v1 local-gate class, not a class of this
-// artifact.
+// CRIDRejectClass comes from the CRID v1 vocabulary, not from this artifact:
+// the class the CRID v1 local gate reports, or version for a well-formed CRID
+// whose version the client cannot verify a link against.
 type CRIDLinkKnockV1InvalidRequestCase struct {
 	Name            string                      `json:"name"`
 	Input           CRIDLinkKnockV1RequestInput `json:"input"`
@@ -404,19 +405,32 @@ var (
 		"user_agent_truncated_at_code_point_boundary": &cridLinkKnockV1UserAgentBoundary,
 	}
 
-	cridLinkKnockV1InvalidRequestFixtures = map[string]func(crid string) string{
-		"reject_checksum": func(crid string) string {
+	cridLinkKnockV1InvalidRequestFixtures = map[string]func(env *cridLinkKnockV1Environment) string{
+		"reject_checksum": func(env *cridLinkKnockV1Environment) string {
 			// One changed character inside the digest keeps the alphabet, the
 			// length and the pad bits intact, so only the checksum can object.
 			replacement := byte('b')
-			if crid[20] == replacement {
+			if env.crid[20] == replacement {
 				replacement = 'c'
 			}
-			return crid[:20] + string(replacement) + crid[21:]
+			return env.crid[:20] + string(replacement) + env.crid[21:]
 		},
-		"reject_wrong_length": func(crid string) string { return crid[:len(crid)-1] },
-		"reject_uppercase":    strings.ToUpper,
-		"reject_empty":        func(string) string { return "" },
+		"reject_wrong_length": func(env *cridLinkKnockV1Environment) string { return env.crid[:len(env.crid)-1] },
+		"reject_uppercase":    func(env *cridLinkKnockV1Environment) string { return strings.ToUpper(env.crid) },
+		"reject_empty":        func(*cridLinkKnockV1Environment) string { return "" },
+		// The fixture resource key under versions a client cannot verify a
+		// link against: one unregistered byte in the full form, and the two
+		// reserved bytes in their short form. All three are well-formed CRIDs
+		// with a valid checksum.
+		"reject_unregistered_version": func(env *cridLinkKnockV1Environment) string {
+			return env.deriveCRID(0x7f, CRIDV1FullDigestLength)
+		},
+		"reject_reserved_version_02": func(env *cridLinkKnockV1Environment) string {
+			return env.deriveCRID(0x02, CRIDV1TruncatedDigestLength)
+		},
+		"reject_reserved_version_82": func(env *cridLinkKnockV1Environment) string {
+			return env.deriveCRID(0x82, CRIDV1TruncatedDigestLength)
+		},
 	}
 )
 
@@ -434,6 +448,7 @@ type cridLinkKnockV1Environment struct {
 	signingPrefix     string
 	issuerPublic      *ecdsa.PublicKey
 	resourceKeyB64    string
+	resourceDER       []byte
 	expiresUnix       int64
 	crid              string
 	testCRID          string
@@ -487,10 +502,18 @@ func loadCRIDLinkKnockV1Environment() (*cridLinkKnockV1Environment, error) {
 		return nil, errors.New("conformance: CRID link knock published link claims carry no usable resource key or expiry")
 	}
 	env.resourceKeyB64 = claims.ResourcePublicKeyB64
+	env.resourceDER = resourceDER
 	env.expiresUnix = claims.Expiry
-	_, _, _, env.crid = deriveCRIDV1(0x01, resourceDER, CRIDV1FullDigestLength)
-	_, _, _, env.testCRID = deriveCRIDV1(0x81, resourceDER, CRIDV1FullDigestLength)
+	env.crid = env.deriveCRID(0x01, CRIDV1FullDigestLength)
+	env.testCRID = env.deriveCRID(0x81, CRIDV1FullDigestLength)
 	return env, nil
+}
+
+// deriveCRID is the CRID of the fixture resource key under a version byte and
+// digest length.
+func (env *cridLinkKnockV1Environment) deriveCRID(version byte, digestLength int) string {
+	_, _, _, crid := deriveCRIDV1(version, env.resourceDER, digestLength)
+	return crid
 }
 
 func (env *cridLinkKnockV1Environment) link() string {
@@ -515,7 +538,7 @@ func (env *cridLinkKnockV1Environment) tamperedTransport() string {
 
 // ParseCRIDLinkKnockV1File strictly parses the CRID link knock artifact and
 // re-derives every declared expectation with reference implementations: the
-// canonical request bytes and user-agent truncation, the CRID local gate for
+// canonical request bytes and user-agent truncation, the request gate for
 // refused inputs, the client result of every ACK, the reject class of every
 // issued link (including a real issuer-signature check against the composed
 // trust anchor and a real CRID derivation from the signed resource key), and
@@ -664,10 +687,10 @@ func (env *cridLinkKnockV1Environment) validateInvalidRequestCases(cases []CRIDL
 	}
 	for _, c := range cases {
 		build := cridLinkKnockV1InvalidRequestFixtures[c.Name]
-		if c.Input.CRID != build(env.crid) || c.Input.UserAgent != nil {
+		if c.Input.CRID != build(env) || c.Input.UserAgent != nil {
 			return fmt.Errorf("conformance: CRID link knock invalid request case %q input does not match its fixture", c.Name)
 		}
-		outcome, rejectClass := deriveCRIDV1ValueExpectation(c.Input.CRID)
+		outcome, rejectClass := cridLinkKnockV1RequestExpectation(c.Input.CRID)
 		if outcome != ExpectReject || c.Outcome != outcome || c.CRIDRejectClass != rejectClass {
 			return fmt.Errorf("conformance: CRID link knock invalid request case %q expectation = %q/%q, want %q/%q", c.Name, c.Outcome, c.CRIDRejectClass, outcome, rejectClass)
 		}
@@ -980,6 +1003,29 @@ func cridLinkKnockV1TruncateUserAgent(userAgent string) string {
 	return userAgent[:cut]
 }
 
+// cridLinkKnockV1RequestExpectation is the reference request gate. It is the
+// CRID v1 local gate plus one rule of this contract: the version byte must be
+// one a client can verify an issued link against, which is an active row of
+// the CRID v1 registry. The CRID v1 gate forwards an unregistered or reserved
+// version. A link request for one would only fetch a link the client must
+// then reject, so the request is refused, under the CRID v1 version class
+// rather than a class of this artifact's own.
+func cridLinkKnockV1RequestExpectation(crid string) (outcome, rejectClass string) {
+	if outcome, rejectClass := deriveCRIDV1ValueExpectation(crid); outcome != ExpectAccept {
+		return outcome, rejectClass
+	}
+	// The version derivation fails for a registered version in a form the
+	// registry does not pin, so a row it names is the row for this shape.
+	if versionHex, _, _, _, err := deriveCRIDV1VersionExpectation(crid); err == nil {
+		for _, row := range cridV1VersionRegistry {
+			if row.VersionHex == versionHex && row.Status == CRIDV1StatusActive {
+				return ExpectAccept, ""
+			}
+		}
+	}
+	return ExpectReject, CRIDV1RejectVersion
+}
+
 type cridLinkKnockV1WireRequest struct {
 	HeaderType    int                         `json:"headerType"`
 	AuthServiceID string                      `json:"aspId"`
@@ -997,8 +1043,8 @@ type cridLinkKnockV1WireUserData struct {
 // form is what JavaScript's JSON.stringify emits for the body object; this
 // stdlib encoder agrees with it for every string the gate below admits.
 func cridLinkKnockV1SerializeRequest(input CRIDLinkKnockV1RequestInput) (serialized, sentUserAgent string, err error) {
-	if outcome, rejectClass := deriveCRIDV1ValueExpectation(input.CRID); outcome != ExpectAccept {
-		return "", "", fmt.Errorf("CRID fails the local gate with class %q", rejectClass)
+	if outcome, rejectClass := cridLinkKnockV1RequestExpectation(input.CRID); outcome != ExpectAccept {
+		return "", "", fmt.Errorf("CRID fails the request gate with class %q", rejectClass)
 	}
 	wire := cridLinkKnockV1WireRequest{
 		HeaderType:    CRIDLinkKnockV1KnockHeaderType,

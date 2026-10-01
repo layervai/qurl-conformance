@@ -328,17 +328,19 @@ artifact has its own `artifact` id:
   ordinary knock whose body names the CRID and receives the link in a
   deliberately non-success ACK; it then opens that link with the unchanged
   qURL v2 knock. The artifact freezes the canonical request body bytes
-  (including user-agent truncation to 256 bytes of valid UTF-8), the closed
-  `52600`-`52606` outcome codes with their retry flags and client results,
-  the rules that a success code or a non-string code is a protocol violation
-  and that the overload cookie reply means `busy`, and the checks a client
-  runs before it uses an issued link: link origin, bare fragment shape,
-  `qv2t1` transport, issuer signature, and a resource key that derives the
-  requested CRID. Publisher metadata in the reply is display-only and
-  unverified, and malformed metadata degrades instead of failing. The fixture
-  link is the published qURL v2 accept link, so the strict Go loader verifies
-  its issuer signature and re-derives its CRID instead of trusting stored
-  labels. See `vectors/README_crid_link_knock_v1_vectors.md`.
+  (including user-agent truncation to 256 bytes of valid UTF-8), the CRIDs a
+  client must refuse to request (including a well-formed one whose version it
+  could not verify a link against), the closed `52600`-`52606` outcome codes
+  with their retry flags and client results, the rules that a success code or
+  a non-string code is a protocol violation and that the overload cookie
+  reply means `busy`, and the checks a client runs before it uses an issued
+  link: link origin, bare fragment shape, `qv2t1` transport, issuer
+  signature, and a resource key that derives the requested CRID. Publisher
+  metadata in the reply is display-only and unverified, and malformed
+  metadata degrades instead of failing. The fixture link is the published
+  qURL v2 accept link, so the strict Go loader verifies its issuer signature
+  and re-derives its CRID instead of trusting stored labels. See
+  `vectors/README_crid_link_knock_v1_vectors.md`.
 - **qURL Connector target path** (`qurl-target-path-v1-vectors`,
   `target_path_v1_vectors.json`) — the shared local preflight and service input
   grammar for the optional per-qURL path and query on a tunnel resource. The
