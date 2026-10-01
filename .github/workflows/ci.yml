@@ -444,8 +444,9 @@ jobs:
           assert.ok(cd.producer_cases.every(verifyCRID));
 
           // CRID link knock: the canonical request bytes are defined as
-          // JSON.stringify output and the link checks as URL-parser results, so
-          // this runtime re-derives every expectation with the real primitives.
+          // JSON.stringify output and the link origin check as a comparison of
+          // text, so this runtime re-derives every expectation with the real
+          // primitives and then records what a URL parser makes of the same links.
           const lk = c.cridLinkKnockV1Vectors();
           const issuer = c.issuerSignatureVectors();
           assert.equal(lk.artifact, 'qurl-crid-link-knock-v1-vectors');
@@ -553,13 +554,26 @@ jobs:
           };
           const issuerKey = crypto.createPublicKey({ key: issuer.issuer.jwk, format: 'jwk' });
           const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+          // Checks 2 and 3 compare text. An issued link is the link origin, an
+          // optional slash, a number sign and the fragment. It is not parsed as
+          // a URL first: a parser lower-cases the scheme and the host and drops
+          // a default port, so it reads other spellings as the same origin.
+          const splitLink = redirect => {
+            const origin = lk.constants.link_origin;
+            if (!redirect.startsWith(origin)) return { rejectClass: 'origin' };
+            const numberSign = redirect.indexOf('#');
+            const location = redirect.slice(origin.length, numberSign === -1 ? redirect.length : numberSign);
+            if (location !== '' && location !== '/') {
+              return { rejectClass: location[0] === '/' || location[0] === '?' ? 'path_or_query' : 'origin' };
+            }
+            return { rejectClass: '', fragment: numberSign === -1 ? '' : redirect.slice(numberSign + 1) };
+          };
           const linkRejectClass = (requested, ack) => {
             const redirect = ack.redirectUrl;
             if (typeof redirect !== 'string' || redirect === '') return 'missing_redirect';
-            const url = new URL(redirect);
-            if (url.origin !== lk.constants.link_origin || url.username !== '' || url.password !== '') return 'origin';
-            if (url.pathname !== '/' || url.search !== '') return 'path_or_query';
-            const parts = url.hash.slice(1).split('.');
+            const split = splitLink(redirect);
+            if (split.rejectClass) return split.rejectClass;
+            const parts = split.fragment.split('.');
             const counts = parts.slice(1, 4).map(Number);
             if (parts[0] !== 'qv2t1' || parts.length !== 4 + counts[0] + counts[1] + counts[2]) return 'transport';
             const claims = parts.slice(4, 4 + counts[0]).join('');
@@ -659,6 +673,42 @@ jobs:
             assert.equal(result.client_result === 'link' ? 'accept' : 'reject', check.outcome, check.name);
             assert.equal(result.reject_class, check.reject_class, check.name);
           }
+          // What the WHATWG URL parser makes of the same links. It agrees with
+          // the text comparison on every link the comparison lets through. It
+          // also reads five of the rejected links as the bare link on the link
+          // origin: three respelled origins, an empty query and a dot segment.
+          // That is why a client compares text and does not parse.
+          const parsesAsBareLinkOnOrigin = redirect => {
+            const url = new URL(redirect);
+            return url.origin === lk.constants.link_origin && url.username === '' && url.password === '' &&
+              url.pathname === '/' && url.search === '';
+          };
+          const parserWouldAccept = [];
+          for (const check of lk.client_verification_cases) {
+            const redirect = check.body.redirectUrl;
+            if (typeof redirect !== 'string' || redirect === '') continue;
+            if (splitLink(redirect).rejectClass === '') {
+              assert.ok(parsesAsBareLinkOnOrigin(redirect), check.name);
+            } else if (parsesAsBareLinkOnOrigin(redirect)) {
+              parserWouldAccept.push([check.name, check.reject_class]);
+            }
+          }
+          assert.deepEqual(parserWouldAccept, [
+            ['reject_origin_uppercase_scheme', 'origin'],
+            ['reject_origin_uppercase_host', 'origin'],
+            ['reject_origin_default_port', 'origin'],
+            ['reject_empty_query', 'path_or_query'],
+            ['reject_dot_segment', 'path_or_query'],
+          ]);
+          // Both accepted forms are pinned: with the slash and without it.
+          assert.deepEqual(
+            lk.client_verification_cases
+              .filter(check => check.outcome === 'accept')
+              .map(check => check.body.redirectUrl.slice(lk.constants.link_origin.length, check.body.redirectUrl.indexOf('#') + 1))
+              .filter((form, index, forms) => forms.indexOf(form) === index)
+              .sort(),
+            ['#', '/#'],
+          );
           for (const sanitization of lk.redirect_info_sanitization_cases) {
             assert.deepEqual(sanitizeRedirectInfo(sanitization.redirect_info), sanitization.expected, sanitization.name);
           }

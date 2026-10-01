@@ -230,12 +230,40 @@ pass. They run on a `52600` ACK, for the CRID the client asked for.
 | # | Check | `reject_class` |
 | --- | --- | --- |
 | 1 | `redirectUrl` is present and is a non-empty string | `missing_redirect` |
-| 2 | parsed as a URL, its scheme, host and port are exactly those of the deployment's link origin, and it carries no userinfo | `origin` |
-| 3 | its path is empty or `/`, and it has no query | `path_or_query` |
-| 4 | its fragment is a `qv2t1` transport, as defined by `qv2_conformance_vectors.json` | `transport` |
+| 2 | it begins with the deployment's link origin, compared as text, and what follows the origin is `/`, `?`, `#` or the end of the link | `origin` |
+| 3 | between the origin and the fragment there is nothing, or a single `/`: no other path and no query | `path_or_query` |
+| 4 | it has a fragment, and the fragment is a `qv2t1` transport, as defined by `qv2_conformance_vectors.json` | `transport` |
 | 5 | the link's inner artifact, the canonical `qv2` body that transport reconstructs, parses and verifies under the client's trust store | `issuer_signature` |
 | 6 | the resource public key in the signed claims derives the requested CRID | `crid_mismatch` |
 | 7 | if `redirectInfo` is an object with a `crid` member, that member is exactly the requested CRID string | `info_crid_mismatch` |
+
+Checks 2 and 3 compare text. An issued link is exactly the link origin, an
+optional `/`, `#` and the fragment, so it has one of two forms:
+
+```text
+https://qurl.link/#qv2t1...
+https://qurl.link#qv2t1...
+```
+
+`accept_link` and `accept_link_without_slash` pin the two. A client does not
+parse the link as a URL to compare origins. A URL parser lower-cases the
+scheme and the host and drops a default port, so it reads
+`HTTPS://qurl.link/#...`, `https://QURL.LINK/#...` and `https://qurl.link:443/#...`
+as the link origin. None of them is the text a server writes, and each is
+rejected as `origin`. The same comparison rejects a link whose authority only
+begins with the link origin: after the origin the next character must end the
+authority. The link origin a client is configured with is itself one
+spelling: lower-case scheme and host, a port only when it is not the default,
+and no trailing slash.
+
+Check 3 is a comparison of text for the same reason. To a URL parser an empty
+query is no query, and a dot segment is not part of the path, so it reads
+`https://qurl.link/?#...` and `https://qurl.link/.#...` as the bare link.
+Neither is one of the two forms, and each is rejected as `path_or_query`
+(`reject_empty_query`, `reject_dot_segment`).
+
+The fragment is everything after the first `#`, exactly as it is written. A
+client does not percent-decode it before the transport check.
 
 `issuer_signature` means that the link's inner artifact did not parse or did
 not verify under the trust store. A client reports any inner-artifact failure
@@ -264,7 +292,8 @@ case contains exactly one fault, so its class does not depend on the order in
 which an implementation runs the checks. The table order is the reference
 order.
 
-The reject cases are chosen to catch specific mistakes:
+`accept_link_without_slash` catches a client that requires the `/` in front
+of the fragment. The reject cases are chosen to catch specific mistakes:
 
 | Case | What it catches |
 | --- | --- |
@@ -273,7 +302,13 @@ The reject cases are chosen to catch specific mistakes:
 | `reject_origin_http_scheme` | checking the host but not the scheme |
 | `reject_origin_other_port` | checking the host name but not the port |
 | `reject_origin_userinfo` | comparing a parsed origin, which hides the userinfo in front of the right host |
+| `reject_origin_as_userinfo` | comparing a string prefix: the link begins with the link origin, which is only the userinfo of another host |
+| `reject_origin_uppercase_scheme`, `reject_origin_uppercase_host` | parsing the link before comparing: a URL parser lower-cases the scheme and the host |
+| `reject_origin_default_port` | parsing the link before comparing: a URL parser drops the default port |
+| `reject_origin_trailing_dot` | treating the host with a trailing dot as the same host |
 | `reject_path`, `reject_query` | accepting the right origin with something other than the bare fragment link |
+| `reject_empty_query` | checking the query with a URL parser, which reports an empty query as no query |
+| `reject_dot_segment` | checking the path with a URL parser, which removes a dot segment |
 | `reject_legacy_fragment` | accepting the canonical `qv2` body as an outer fragment; only `qv2t1` is a transport |
 | `reject_missing_fragment` | assuming a fragment exists |
 | `reject_tampered_signature` | skipping signature verification: the signature is well formed and low-S but does not verify |
@@ -432,12 +467,16 @@ Every ACK case declared a link also has to pass those link checks.
 
 The npm and Python packages carry byte-identical copies and expose thin
 accessors; they do not inherit the Go loader's validation. This repository's
-CI runs the same vectors through `JSON.stringify`, the WHATWG URL parser and
-an independent signature verification in Node, and through Python's
-serializer and CRID derivation, and both runtimes run the request gate and
-dispatch on `reply_type_rules`, so the vectors are known to be implementable
-outside Go. Consumers in those languages still run every case through their
-own production code.
+CI runs the same vectors through `JSON.stringify`, the text comparison with
+the link origin and an independent signature verification in Node, and
+through Python's serializer and CRID derivation, and both runtimes run the
+request gate and dispatch on `reply_type_rules`, so the vectors are known to
+be implementable outside Go. The Node run also records what the WHATWG URL
+parser makes of each link: it agrees on every link the text comparison lets
+through, and it reads exactly five of the rejected links as the bare link on
+the link origin, the three spellings and the two check 3 links above.
+Consumers in those languages still run every case through their own
+production code.
 
 ## Lockstep with the qURL v2 link
 

@@ -334,8 +334,8 @@ artifact has its own `artifact` id:
   with their retry flags and client results, the rules that a success code or
   a non-string code is a protocol violation and that the overload cookie
   reply means `busy`, and the checks a client runs before it uses an issued
-  link: link origin, bare fragment shape, `qv2t1` transport, issuer
-  signature, and a resource key that derives the requested CRID. Publisher
+  link: link origin compared as text, bare fragment shape, `qv2t1` transport,
+  issuer signature, and a resource key that derives the requested CRID. Publisher
   metadata in the reply is display-only and unverified, and malformed or
   over-long metadata degrades instead of failing. The fixture link is the
   published qURL v2 accept link, so the strict Go loader verifies its issuer

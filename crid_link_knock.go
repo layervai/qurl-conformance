@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
-	"net/url"
 	"reflect"
 	"slices"
 	"strconv"
@@ -863,6 +862,8 @@ func (env *cridLinkKnockV1Environment) verificationFixtures() map[string]cridLin
 	}
 	return map[string]cridLinkKnockV1VerificationFixture{
 		"accept_link": redirect(env.link(), ""),
+		// The slash in front of the fragment is optional.
+		"accept_link_without_slash": redirect(origin+"#"+env.transport, ""),
 		"accept_redirect_info_without_crid": {
 			env.crid, env.linkACK(env.link(), cridLinkKnockV1Without(info, "crid")), "",
 		},
@@ -884,6 +885,20 @@ func (env *cridLinkKnockV1Environment) verificationFixtures() map[string]cridLin
 		"reject_legacy_fragment":       redirect(origin+"/#"+env.canonical, CRIDLinkKnockV1RejectTransport),
 		"reject_missing_fragment":      redirect(origin+"/", CRIDLinkKnockV1RejectTransport),
 		"reject_tampered_signature":    redirect(origin+"/#"+env.tamperedTransport(), CRIDLinkKnockV1RejectIssuerSignature),
+		// Checks 2 and 3 compare text, so each of these is rejected as origin.
+		// The first begins with the link origin and its authority runs on. The
+		// rest are other spellings of the origin, three of which a URL parser
+		// would read as the link origin itself.
+		"reject_origin_as_userinfo":      redirect("https://qurl.link@example.com/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		"reject_origin_uppercase_scheme": redirect("HTTPS://qurl.link/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		"reject_origin_uppercase_host":   redirect("https://QURL.LINK/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		"reject_origin_default_port":     redirect("https://qurl.link:443/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		"reject_origin_trailing_dot":     redirect("https://qurl.link./#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		// Check 3 compares text too. A URL parser reads both of these as the
+		// bare link: to it an empty query is no query, and a dot segment is
+		// removed from the path.
+		"reject_empty_query": redirect(origin+"/?#"+env.transport, CRIDLinkKnockV1RejectPathOrQuery),
+		"reject_dot_segment": redirect(origin+"/.#"+env.transport, CRIDLinkKnockV1RejectPathOrQuery),
 		"reject_link_for_another_crid": {
 			env.unrelatedCRID, env.linkACK(env.link(), env.redirectInfo(env.unrelatedCRID)), CRIDLinkKnockV1RejectCRIDMismatch,
 		},
@@ -1173,16 +1188,10 @@ func cridLinkKnockV1InfoCRIDMatches(requestedCRID string, ack map[string]json.Ra
 // fragment and the signed claims, or the first failing reject class.
 func (env *cridLinkKnockV1Environment) openLink(redirect string) (string, cridLinkKnockV1LinkClaims, string) {
 	var claims cridLinkKnockV1LinkClaims
-	parsed, err := url.Parse(redirect)
-	if err != nil || parsed.User != nil || parsed.Opaque != "" || parsed.Scheme+"://"+parsed.Host != CRIDLinkKnockV1LinkOrigin {
-		return "", claims, CRIDLinkKnockV1RejectOrigin
+	fragment, rejectClass := cridLinkKnockV1SplitLink(redirect, CRIDLinkKnockV1LinkOrigin)
+	if rejectClass != "" {
+		return "", claims, rejectClass
 	}
-	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery {
-		return "", claims, CRIDLinkKnockV1RejectPathOrQuery
-	}
-	// The fragment is taken verbatim: a transport decoder must see the exact
-	// presented bytes, not a percent-decoded rendering of them.
-	_, fragment, _ := strings.Cut(redirect, "#")
 	canonical, err := decodeConformanceTransport(env.transportContract, fragment)
 	if err != nil {
 		return "", claims, CRIDLinkKnockV1RejectTransport
@@ -1205,6 +1214,41 @@ func (env *cridLinkKnockV1Environment) openLink(redirect string) (string, cridLi
 		return "", claims, CRIDLinkKnockV1RejectIssuerSignature
 	}
 	return canonical, claims, ""
+}
+
+// cridLinkKnockV1SplitLink is checks 2 and 3. It compares the text of an
+// issued link with the link origin and returns the link's fragment, or the
+// class of the check that failed.
+//
+// An issued link is exactly the link origin, an optional "/", "#" and the
+// fragment. The link is not parsed as a URL to make the comparison. A URL
+// parser lower-cases the scheme and the host and drops a default port, so it
+// reads other spellings as the same origin, and none of them is the text a
+// server writes. Comparing text also leaves no room for an authority that
+// only begins with the link origin: whatever follows the origin has to end
+// the authority.
+//
+// The fragment is everything after the first "#", exactly as presented. It is
+// never percent-decoded, because the transport decoder must see the bytes
+// that were sent. A link with no "#" yields the empty fragment, which is not
+// a transport, so it fails the next check rather than this one.
+func cridLinkKnockV1SplitLink(link, origin string) (fragment, rejectClass string) {
+	rest, ok := strings.CutPrefix(link, origin)
+	if !ok {
+		return "", CRIDLinkKnockV1RejectOrigin
+	}
+	location, fragment, _ := strings.Cut(rest, "#")
+	switch {
+	case location == "" || location == "/":
+		return fragment, ""
+	case location[0] == '/' || location[0] == '?':
+		// The authority ended where the origin ends. A path or a query follows.
+		return "", CRIDLinkKnockV1RejectPathOrQuery
+	default:
+		// The authority runs on past the origin: a longer host, a port, or the
+		// origin standing as the userinfo of another host.
+		return "", CRIDLinkKnockV1RejectOrigin
+	}
 }
 
 // verifyIssuerSignature applies the qURL v2 issuer rule: a 64-byte raw r||s

@@ -33,7 +33,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
 	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
-		len(lf.ClientVerificationCases) != 21 || len(lf.RedirectInfoSanitizationCases) != 20 {
+		len(lf.ClientVerificationCases) != 29 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
 			len(lf.ClientVerificationCases), len(lf.RedirectInfoSanitizationCases))
@@ -452,17 +452,24 @@ func failingLinkChecks(t *testing.T, env *cridLinkKnockV1Environment, requestedC
 	if !ok || redirect == "" {
 		return append(failing, CRIDLinkKnockV1RejectMissingRedirect)
 	}
-	parsed, err := url.Parse(redirect)
-	if err != nil {
-		t.Fatalf("no fixture carries an unparseable URL: %v", err)
+	// The link is taken apart as text, without a URL parser and without the
+	// reference's own method of stripping the origin first: the scheme and the
+	// authority are whatever stands in front of the first "/", "?" or "#", and
+	// the two checks then look at their own part of the link.
+	beforeFragment, fragment, _ := strings.Cut(redirect, "#")
+	authorityEnd := len(beforeFragment)
+	if schemeEnd := strings.Index(beforeFragment, "://"); schemeEnd >= 0 {
+		if pathStart := strings.IndexAny(beforeFragment[schemeEnd+3:], "/?"); pathStart >= 0 {
+			authorityEnd = schemeEnd + 3 + pathStart
+		}
 	}
-	if parsed.User != nil || parsed.Scheme != "https" || parsed.Host != "qurl.link" {
+	if beforeFragment[:authorityEnd] != CRIDLinkKnockV1LinkOrigin {
 		failing = append(failing, CRIDLinkKnockV1RejectOrigin)
 	}
-	if strings.Trim(parsed.Path, "/") != "" || parsed.RawQuery != "" {
+	if pathAndQuery := beforeFragment[authorityEnd:]; pathAndQuery != "" && pathAndQuery != "/" {
 		failing = append(failing, CRIDLinkKnockV1RejectPathOrQuery)
 	}
-	canonical, err := decodeConformanceTransport(env.transportContract, parsed.EscapedFragment())
+	canonical, err := decodeConformanceTransport(env.transportContract, fragment)
 	if err != nil {
 		return append(failing, CRIDLinkKnockV1RejectTransport)
 	}
@@ -502,6 +509,150 @@ func TestCRIDLinkKnockV1VerificationCasesIsolateOneFault(t *testing.T) {
 		}
 		if got := failingLinkChecks(t, env, c.RequestedCRID, c.Body); !slices.Equal(got, want) {
 			t.Errorf("verification case %q fails checks %v, want exactly %v", c.Name, got, want)
+		}
+	}
+}
+
+// TestCRIDLinkKnockV1LinkOriginIsComparedAsText pins checks 2 and 3 on more
+// links than the artifact carries. An issued link is the link origin, an
+// optional slash, a number sign and the fragment. Everything else is rejected
+// by comparing text: as origin when the link does not begin with the link
+// origin or its authority runs on past it, and as path_or_query when a path or
+// a query follows the origin.
+func TestCRIDLinkKnockV1LinkOriginIsComparedAsText(t *testing.T) {
+	const origin = CRIDLinkKnockV1LinkOrigin
+	for _, tc := range []struct {
+		link         string
+		wantFragment string
+		wantClass    string
+	}{
+		// The two accepted forms. The fragment is everything after the first
+		// number sign, as written.
+		{origin + "/#qv2t1.x", "qv2t1.x", ""},
+		{origin + "#qv2t1.x", "qv2t1.x", ""},
+		{origin + "/#a#b", "a#b", ""},
+		{origin + "/#%41", "%41", ""},
+		// No fragment, or an empty one: these pass checks 2 and 3 and fail the
+		// transport check, which is not this function's.
+		{origin + "/", "", ""},
+		{origin, "", ""},
+		{origin + "/#", "", ""},
+
+		// The link does not begin with the link origin.
+		{"http://qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"HTTPS://qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"Https://qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://QURL.LINK/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://Qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://user@qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://example.com/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{" " + origin + "/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"//qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"", "", CRIDLinkKnockV1RejectOrigin},
+
+		// The link begins with the link origin and its authority runs on.
+		{origin + ":443/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + ":8443/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + ":/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + "./#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + ".example/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + ".example.com/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + "x/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + "@example.com/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + `\@example.com/#f`, "", CRIDLinkKnockV1RejectOrigin},
+		{origin + "%2f@example.com/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + " /#f", "", CRIDLinkKnockV1RejectOrigin},
+		{origin + "\t/#f", "", CRIDLinkKnockV1RejectOrigin},
+
+		// On the link origin, with a path or a query.
+		{origin + "/open#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "//#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/./#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/@example.com/#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/?next=open#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "?next=open#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/?#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "?#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/.#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/..#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/%2e#f", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/open", "", CRIDLinkKnockV1RejectPathOrQuery},
+		{origin + "/?q=1", "", CRIDLinkKnockV1RejectPathOrQuery},
+	} {
+		fragment, rejectClass := cridLinkKnockV1SplitLink(tc.link, origin)
+		if fragment != tc.wantFragment || rejectClass != tc.wantClass {
+			t.Errorf("cridLinkKnockV1SplitLink(%q) = %q, %q; want %q, %q", tc.link, fragment, rejectClass, tc.wantFragment, tc.wantClass)
+		}
+	}
+
+	// Why the comparison is on text. Go's URL parser, like any other, reads
+	// each of these as scheme https and host qurl.link with no userinfo, so a
+	// client that parsed first and compared components would accept links no
+	// server wrote. The artifact rejects all of them as origin.
+	for _, link := range []string{"HTTPS://qurl.link/#f", "Https://qurl.link/#f"} {
+		parsed, err := url.Parse(link)
+		if err != nil || parsed.Scheme+"://"+parsed.Host != origin || parsed.User != nil {
+			t.Fatalf("fixture drift: url.Parse(%q) no longer reads as the link origin (%v)", link, err)
+		}
+		if _, rejectClass := cridLinkKnockV1SplitLink(link, origin); rejectClass != CRIDLinkKnockV1RejectOrigin {
+			t.Errorf("%q is rejected as %q, want %q", link, rejectClass, CRIDLinkKnockV1RejectOrigin)
+		}
+	}
+
+	// The committed cases carry one link of every kind above, each built on the
+	// published fragment, and nothing else about them differs from accept_link.
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fragment := strings.TrimPrefix(lf.Fixtures.Link, origin+"/#")
+	links := make(map[string]string, len(lf.ClientVerificationCases))
+	bodies := make(map[string]map[string]json.RawMessage, len(lf.ClientVerificationCases))
+	for _, c := range lf.ClientVerificationCases {
+		ack, ok := cridLinkKnockV1JSONObject(c.Body)
+		if !ok {
+			t.Fatalf("verification case %q body is not an object", c.Name)
+		}
+		links[c.Name], _ = cridLinkKnockV1JSONString(ack["redirectUrl"])
+		bodies[c.Name] = ack
+	}
+	for name, want := range map[string]struct{ link, outcome, rejectClass string }{
+		"accept_link":                    {origin + "/#" + fragment, ExpectAccept, ""},
+		"accept_link_without_slash":      {origin + "#" + fragment, ExpectAccept, ""},
+		"reject_origin_lookalike_host":   {"https://qurl.link.example.com/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_http_scheme":      {"http://qurl.link/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_other_port":       {"https://qurl.link:8443/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_userinfo":         {"https://user@qurl.link/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_as_userinfo":      {"https://qurl.link@example.com/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_uppercase_scheme": {"HTTPS://qurl.link/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_uppercase_host":   {"https://QURL.LINK/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_default_port":     {"https://qurl.link:443/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_trailing_dot":     {"https://qurl.link./#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_path":                    {origin + "/open#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
+		"reject_query":                   {origin + "/?next=open#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
+		"reject_empty_query":             {origin + "/?#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
+		"reject_dot_segment":             {origin + "/.#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
+	} {
+		var declared CRIDLinkKnockV1VerificationCase
+		for _, c := range lf.ClientVerificationCases {
+			if c.Name == name {
+				declared = c
+			}
+		}
+		if links[name] != want.link || declared.Outcome != want.outcome || declared.RejectClass != want.rejectClass {
+			t.Errorf("verification case %q = link %q, %q/%q; want link %q, %q/%q",
+				name, links[name], declared.Outcome, declared.RejectClass, want.link, want.outcome, want.rejectClass)
+			continue
+		}
+		for member, value := range bodies["accept_link"] {
+			if member != "redirectUrl" && !bytes.Equal(bodies[name][member], value) {
+				t.Errorf("verification case %q differs from accept_link in %s, not only in its link", name, member)
+			}
+		}
+		if len(bodies[name]) != len(bodies["accept_link"]) || declared.RequestedCRID != lf.Fixtures.CRID {
+			t.Errorf("verification case %q differs from accept_link in more than its link", name)
 		}
 	}
 }
@@ -1383,6 +1534,59 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			c := verificationCase(t, lf, "accept_link")
 			c.Outcome, c.RejectClass = ExpectReject, CRIDLinkKnockV1RejectOrigin
 		}), "expectation")
+	})
+	for _, name := range []string{
+		"reject_origin_as_userinfo", "reject_origin_uppercase_scheme", "reject_origin_uppercase_host",
+		"reject_origin_default_port", "reject_origin_trailing_dot",
+	} {
+		t.Run("verification "+name+" accepted", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := verificationCase(t, lf, name)
+				c.Outcome, c.RejectClass = ExpectAccept, ""
+			}), "expectation")
+		})
+		t.Run("verification "+name+" given the path class", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				verificationCase(t, lf, name).RejectClass = CRIDLinkKnockV1RejectPathOrQuery
+			}), "expectation")
+		})
+		t.Run("verification "+name+" respelled as the link origin", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := verificationCase(t, lf, name)
+				c.Body = setMember(t, c.Body, "redirectUrl", lf.Fixtures.Link)
+			}), "input does not match its fixture")
+		})
+	}
+	for _, name := range []string{"reject_empty_query", "reject_dot_segment"} {
+		t.Run("verification "+name+" accepted", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := verificationCase(t, lf, name)
+				c.Outcome, c.RejectClass = ExpectAccept, ""
+			}), "expectation")
+		})
+		t.Run("verification "+name+" given the origin class", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				verificationCase(t, lf, name).RejectClass = CRIDLinkKnockV1RejectOrigin
+			}), "expectation")
+		})
+		t.Run("verification "+name+" respelled as the bare link", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := verificationCase(t, lf, name)
+				c.Body = setMember(t, c.Body, "redirectUrl", lf.Fixtures.Link)
+			}), "input does not match its fixture")
+		})
+	}
+	t.Run("verification link without slash rejected", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := verificationCase(t, lf, "accept_link_without_slash")
+			c.Outcome, c.RejectClass = ExpectReject, CRIDLinkKnockV1RejectPathOrQuery
+		}), "expectation")
+	})
+	t.Run("verification link without slash given its slash", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := verificationCase(t, lf, "accept_link_without_slash")
+			c.Body = setMember(t, c.Body, "redirectUrl", lf.Fixtures.Link)
+		}), "input does not match its fixture")
 	})
 	t.Run("verification class", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
