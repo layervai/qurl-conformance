@@ -112,6 +112,28 @@ inputs a client must refuse; `crid_reject_class` is the CRID v1 class for that
 input, not a class defined by this artifact. A CRID that passes the local gate
 is sent as it is, including one whose version byte is not registered.
 
+## Reply types
+
+A client reads the packet header type of a reply before it reads any body.
+`reply_type_rules` gives the three cases:
+
+| Rule | Header type | `is_ack` | `carries_outcome_code` | `handling` | What the client does |
+| --- | --- | --- | --- | --- | --- |
+| `ack` | `2` (`constants.ack_header_type`) | `true` | `true` | `interpret_ack_body` | interprets the body as the next section describes |
+| `cookie` | `7` (`constants.cookie_header_type`) | `false` | `false` | `client_result` | reports the client result `busy`, whatever the body holds |
+| `other` | any other | `false` | `false` | `transport_error` | reports a transport error, which is not a client result |
+
+The cookie reply is what an overloaded server sends instead of an ACK. It is
+not an ACK and it has no `errCode` to read. A v1 client reports `busy`, which
+tells the user to try again; it does not answer the cookie.
+
+Any other header type is not an answer to this request. A client treats it as
+a transport error and reads nothing from it.
+
+`handling` is a closed vocabulary of these three values. `client_result` is
+present only on a rule whose handling is `client_result`, and `header_type`
+is absent from the catch-all `other` rule.
+
 ## ACK body and outcome codes
 
 The answer to a link request is an ACK whose `errCode` is a string and is
@@ -131,12 +153,17 @@ and there is no `sessId`, because the request opens nothing.
 `52604` and `52605` are only ever sent to a client that may open the resource.
 A client that may not open it gets `52602`, whatever state the resource is in.
 
-Three rules cover every other reply:
+Three rules cover every other ACK body:
 
-- **A success code is a protocol violation.** `"0"`, the empty string and a
-  missing `errCode` are the success codes of an ordinary knock. A link request
-  opens nothing, so none of them is a usable answer, even when the body also
-  carries a valid `redirectUrl` (`success_code_is_protocol_violation`).
+- **A success code, or a code that is not a string, is a protocol violation.**
+  `"0"`, the empty string and a missing `errCode` are the success codes of an
+  ordinary knock. A link request opens nothing, so none of them is a usable
+  answer, even when the body also carries a valid `redirectUrl`
+  (`success_code_is_protocol_violation`). An `errCode` that is not a JSON
+  string is never coerced into a code a client knows:
+  `numeric_code_is_protocol_violation` is the link-issued body with the
+  number `52600`, which a loosely typed lookup would hand out as a link, and
+  `null_code_is_protocol_violation` carries `null`.
 - **Any other code is a generic server error.** That includes an unassigned
   code in this range and the denial codes of other knocks. It is never a link.
 - **Only `52600` carries a link.** A client ignores `redirectUrl` and
@@ -165,13 +192,9 @@ Each `ack_cases` entry carries the `requested_crid`, the ACK `body`, and the
 ```
 
 `link` and `info` are present only for the `link` result. `client_results` is
-the closed set of results of interpreting an ACK body: the seven results in
-the table, plus `protocol_violation` and `server_error`.
-
-Under overload the server may send the standard cookie reply (header type `7`)
-instead of an ACK. A v1 client then reports that the service is busy and that
-the user can try again. It does not answer the cookie. This artifact has no
-case for that reply.
+the closed set of client results: the seven results in the table, then
+`protocol_violation` and `server_error`, which also come from an ACK body,
+and `busy`, which comes only from the cookie reply.
 
 ## Checks on an issued link
 
@@ -196,6 +219,12 @@ test-environment CRID of the same key and must pass;
 `redirectInfo` while the client asked for the other one and must fail, because
 check 7 compares with what was requested, not with what the key could derive.
 
+Check 7 lets only an absent member pass. A member that is present but is not
+the requested string fails, whether it is another CRID, a number, `null` or
+an object: `reject_redirect_info_crid_number` (`0`),
+`reject_redirect_info_crid_null` and `reject_redirect_info_crid_object` (an
+object that even holds the requested CRID).
+
 A failed check is a hard error. The client does not open the link and shows
 nothing from that reply: not the link and not the publisher.
 
@@ -219,6 +248,8 @@ The reject cases are chosen to catch specific mistakes:
 | `reject_missing_fragment` | assuming a fragment exists |
 | `reject_tampered_signature` | skipping signature verification: the signature is well formed and low-S but does not verify |
 | `reject_link_for_another_crid` | trusting a correctly signed link without tying it to the requested CRID |
+| `reject_redirect_info_crid_number`, `reject_redirect_info_crid_null` | treating a falsy echo as if the member were absent |
+| `reject_redirect_info_crid_object` | comparing the echo only when it happens to be a string |
 
 `constants.link_origin` is the link origin of the deployment these vectors
 model. A client checks against the link origin of the deployment it is
@@ -271,8 +302,11 @@ which is what `expected.info` in `ack_cases` and `expected` in
   treats it as absent where it is used.
 - The view has no `crid`: the echoed CRID is checked, not displayed.
 
-The vectors do not contain a JSON `null` for an individual member; the server
-omits a member it has no value for.
+A JSON `null` is not a string, so by the table a `null` display member is
+absent. `crid` is the exception described under check 7: a `null` there is
+present and unequal, and it rejects. Apart from that case the vectors contain
+no `null` for an individual member; the server omits a member it has no value
+for.
 
 ## Fixtures and composition
 
@@ -304,13 +338,17 @@ Consumers derive every declared outcome through their production paths:
    the serialized body with `serialized` byte for byte.
 2. For each `invalid_request_cases` entry, confirm that the request builder
    refuses the input before any network I/O.
-3. For each `ack_cases` entry, feed `requested_crid` and `body` through the
-   real reply interpreter and compare the result with `expected`: the
-   `client_result`, and for a link the exact `link` and the sanitized `info`.
-4. For each `client_verification_cases` entry, do the same and assert the
+3. Apply `reply_type_rules` in the real reply path: a reply with the cookie
+   header type yields `busy` without its body being read, and a reply with
+   any header type other than the ACK's or the cookie's is a transport error.
+4. For each `ack_cases` entry, feed `requested_crid` and `body` through the
+   real reply interpreter as an ACK and compare the result with `expected`:
+   the `client_result`, and for a link the exact `link` and the sanitized
+   `info`.
+5. For each `client_verification_cases` entry, do the same and assert the
    `outcome`; on a reject assert the `reject_class` and that nothing from the
    reply was surfaced.
-5. For each `redirect_info_sanitization_cases` entry, sanitize `redirect_info`
+6. For each `redirect_info_sanitization_cases` entry, sanitize `redirect_info`
    and compare with `expected`. To run it through the full interpreter, put
    the value in place of `redirectInfo` in the `link_issued` ACK; the result
    is still a link.
@@ -319,31 +357,34 @@ A missing vector is a hard failure, never a skipped test.
 
 ## Versioning
 
-`error_codes`, `client_results`, `reject_classes`,
-`constants.forbidden_user_data_keys` and the case names are closed. Adding,
-removing or renaming an entry, or changing what an existing case expects,
-requires a new `schema_version` and a coordinated release. Consumers pin one
-released version, so a client cannot quietly drift from the contract.
+`error_codes`, `client_results`, `reject_classes`, `reply_type_rules` with its
+`handling` values, `constants.forbidden_user_data_keys` and the case names
+are closed. Adding, removing or renaming an entry, or changing what an
+existing rule or case expects, requires a new `schema_version` and a
+coordinated release. Consumers pin one released version, so a client cannot
+quietly drift from the contract.
 
 ## Reference validation in this repository
 
 The dependency-free Go loader is the artifact's strict reference validator.
 It rejects duplicate keys, unknown members, missing required members and
 optional members written as empty; it pins every case input against a fixture
-derived from the composed artifacts; and it re-derives every expectation: the
-canonical request bytes and the truncation, the CRID local-gate class of every
-refused input, the client result of every ACK, the reject class of every
-issued link (with a real issuer-signature check against the composed trust
-anchor and a real CRID derivation from the signed resource key), and the
-sanitized view of every `redirectInfo` value.
+derived from the composed artifacts; it pins `reply_type_rules`; and it
+re-derives every expectation: the canonical request bytes and the truncation,
+the CRID local-gate class of every refused input, the client result of every
+ACK, the reject class of every issued link (with a real issuer-signature
+check against the composed trust anchor and a real CRID derivation from the
+signed resource key), and the sanitized view of every `redirectInfo` value.
+Every ACK case declared a link also has to pass those link checks.
 
 The npm and Python packages carry byte-identical copies and expose thin
 accessors; they do not inherit the Go loader's validation. This repository's
 CI runs the same vectors through `JSON.stringify`, the WHATWG URL parser and
 an independent signature verification in Node, and through Python's
-serializer and CRID derivation, so the vectors are known to be implementable
-outside Go. Consumers in those languages still run every case through their
-own production code.
+serializer and CRID derivation, and both runtimes dispatch on
+`reply_type_rules`, so the vectors are known to be implementable outside Go.
+Consumers in those languages still run every case through their own
+production code.
 
 ## Lockstep with the qURL v2 link
 

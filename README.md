@@ -46,8 +46,8 @@ trust.
 | `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
-| `vectors/crid_link_knock_v1_vectors.json` | the client contract for requesting a qURL link by CRID over a knock: canonical request bodies, the closed ACK outcome codes, the checks on an issued link, and unverified publisher metadata handling |
-| `vectors/README_crid_link_knock_v1_vectors.md` | the two-step flow, request and ACK field tables, closed result and reject vocabularies, client obligations, and the display-only publisher rule |
+| `vectors/crid_link_knock_v1_vectors.json` | the client contract for requesting a qURL link by CRID over a knock: canonical request bodies, reply type rules, the closed ACK outcome codes, the checks on an issued link, and unverified publisher metadata handling |
+| `vectors/README_crid_link_knock_v1_vectors.md` | the two-step flow, request and ACK field tables, reply type rules, closed result and reject vocabularies, client obligations, and the display-only publisher rule |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
 | `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
 | `vectors/private_upload_v1_vectors.json` | private upload and refresh application-signing contract with byte-exact goldens and rejects |
@@ -330,10 +330,11 @@ artifact has its own `artifact` id:
   qURL v2 knock. The artifact freezes the canonical request body bytes
   (including user-agent truncation to 256 bytes of valid UTF-8), the closed
   `52600`-`52606` outcome codes with their retry flags and client results,
-  the rule that a success code is a protocol violation, and the checks a
-  client runs before it uses an issued link: link origin, bare fragment
-  shape, `qv2t1` transport, issuer signature, and a resource key that derives
-  the requested CRID. Publisher metadata in the reply is display-only and
+  the rules that a success code or a non-string code is a protocol violation
+  and that the overload cookie reply means `busy`, and the checks a client
+  runs before it uses an issued link: link origin, bare fragment shape,
+  `qv2t1` transport, issuer signature, and a resource key that derives the
+  requested CRID. Publisher metadata in the reply is display-only and
   unverified, and malformed metadata degrades instead of failing. The fixture
   link is the published qURL v2 accept link, so the strict Go loader verifies
   its issuer signature and re-derives its CRID instead of trusting stored

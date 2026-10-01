@@ -38,9 +38,12 @@ const (
 	// CRIDLinkKnockV1KnockHeaderType is the packet header type of the request
 	// and the value its body repeats as headerType.
 	CRIDLinkKnockV1KnockHeaderType = 1
-	// CRIDLinkKnockV1ACKHeaderType is the packet header type of every reply
-	// this artifact describes.
+	// CRIDLinkKnockV1ACKHeaderType is the packet header type of the only reply
+	// that carries an outcome code.
 	CRIDLinkKnockV1ACKHeaderType = 2
+	// CRIDLinkKnockV1CookieHeaderType is the packet header type of the overload
+	// cookie reply. It is not an ACK, carries no outcome code, and means busy.
+	CRIDLinkKnockV1CookieHeaderType = 7
 	// CRIDLinkKnockV1UserAgentMaxBytes bounds the UTF-8 length of the user
 	// agent a client sends. A longer value is truncated, never rejected.
 	CRIDLinkKnockV1UserAgentMaxBytes = 256
@@ -56,8 +59,9 @@ const (
 	// deliberately not a success code: the request opens nothing.
 	CRIDLinkKnockV1CodeLinkIssued = "52600"
 
-	// The closed client_result vocabulary: every outcome of interpreting an
-	// ACK body. Adding a result requires a schema_version bump.
+	// The closed client_result vocabulary: every outcome of interpreting a
+	// reply. Busy is the one result that does not come from an ACK body; it is
+	// the cookie reply. Adding a result requires a schema_version bump.
 	CRIDLinkKnockV1ResultLink              = "link"
 	CRIDLinkKnockV1ResultUnavailable       = "unavailable"
 	CRIDLinkKnockV1ResultNotFound          = "not_found"
@@ -67,6 +71,13 @@ const (
 	CRIDLinkKnockV1ResultInvalid           = "invalid"
 	CRIDLinkKnockV1ResultProtocolViolation = "protocol_violation"
 	CRIDLinkKnockV1ResultServerError       = "server_error"
+	CRIDLinkKnockV1ResultBusy              = "busy"
+
+	// The closed handling vocabulary of reply_type_rules: what a client does
+	// with a reply once it has read the packet header type.
+	CRIDLinkKnockV1HandlingInterpretACKBody = "interpret_ack_body"
+	CRIDLinkKnockV1HandlingClientResult     = "client_result"
+	CRIDLinkKnockV1HandlingTransportError   = "transport_error"
 
 	// The closed reject_class vocabulary for an issued link, in reference check
 	// order. Adding a class requires a schema_version bump.
@@ -89,6 +100,7 @@ type CRIDLinkKnockV1File struct {
 	Notes                         []string                            `json:"notes"`
 	Constants                     CRIDLinkKnockV1Constants            `json:"constants"`
 	Composes                      CRIDLinkKnockV1Composes             `json:"composes"`
+	ReplyTypeRules                CRIDLinkKnockV1ReplyTypeRules       `json:"reply_type_rules"`
 	ErrorCodes                    map[string]CRIDLinkKnockV1ErrorCode `json:"error_codes"`
 	ClientResults                 []string                            `json:"client_results"`
 	RejectClasses                 []string                            `json:"reject_classes"`
@@ -108,6 +120,7 @@ type CRIDLinkKnockV1Constants struct {
 	ForbiddenUserDataKeys      []string                    `json:"forbidden_user_data_keys"`
 	KnockHeaderType            int                         `json:"knock_header_type"`
 	ACKHeaderType              int                         `json:"ack_header_type"`
+	CookieHeaderType           int                         `json:"cookie_header_type"`
 	UserAgentMaxBytes          int                         `json:"user_agent_max_bytes"`
 	PublisherNameMaxCodePoints int                         `json:"publisher_name_max_code_points"`
 	LinkOrigin                 string                      `json:"link_origin"`
@@ -127,6 +140,26 @@ type CRIDLinkKnockV1Composes struct {
 	IssuerTrustAnchor string `json:"issuer_trust_anchor"`
 	LinkTransport     string `json:"link_transport"`
 	CRID              string `json:"crid"`
+}
+
+// CRIDLinkKnockV1ReplyTypeRules says how a client treats a reply by its packet
+// header type, before it reads any body. Other covers every header type that
+// is neither the ACK nor the cookie reply.
+type CRIDLinkKnockV1ReplyTypeRules struct {
+	ACK    CRIDLinkKnockV1ReplyTypeRule `json:"ack"`
+	Cookie CRIDLinkKnockV1ReplyTypeRule `json:"cookie"`
+	Other  CRIDLinkKnockV1ReplyTypeRule `json:"other"`
+}
+
+// CRIDLinkKnockV1ReplyTypeRule is the handling of one kind of reply.
+// HeaderType is absent from the catch-all rule, and ClientResult is present
+// only when the handling is a fixed client result.
+type CRIDLinkKnockV1ReplyTypeRule struct {
+	HeaderType         int    `json:"header_type,omitempty"`
+	IsACK              bool   `json:"is_ack"`
+	CarriesOutcomeCode bool   `json:"carries_outcome_code"`
+	Handling           string `json:"handling"`
+	ClientResult       string `json:"client_result,omitempty"`
 }
 
 // CRIDLinkKnockV1ErrorCode is one row of the closed ACK outcome table.
@@ -299,6 +332,22 @@ var (
 		CRIDLinkKnockV1ResultLink, CRIDLinkKnockV1ResultUnavailable, CRIDLinkKnockV1ResultNotFound,
 		CRIDLinkKnockV1ResultRateLimited, CRIDLinkKnockV1ResultOffline, CRIDLinkKnockV1ResultClosed,
 		CRIDLinkKnockV1ResultInvalid, CRIDLinkKnockV1ResultProtocolViolation, CRIDLinkKnockV1ResultServerError,
+		CRIDLinkKnockV1ResultBusy,
+	}
+
+	cridLinkKnockV1ReplyTypeRules = CRIDLinkKnockV1ReplyTypeRules{
+		ACK: CRIDLinkKnockV1ReplyTypeRule{
+			HeaderType:         CRIDLinkKnockV1ACKHeaderType,
+			IsACK:              true,
+			CarriesOutcomeCode: true,
+			Handling:           CRIDLinkKnockV1HandlingInterpretACKBody,
+		},
+		Cookie: CRIDLinkKnockV1ReplyTypeRule{
+			HeaderType:   CRIDLinkKnockV1CookieHeaderType,
+			Handling:     CRIDLinkKnockV1HandlingClientResult,
+			ClientResult: CRIDLinkKnockV1ResultBusy,
+		},
+		Other: CRIDLinkKnockV1ReplyTypeRule{Handling: CRIDLinkKnockV1HandlingTransportError},
 	}
 
 	cridLinkKnockV1RejectClasses = []string{
@@ -535,6 +584,7 @@ func validateCRIDLinkKnockV1Vocabularies(lf *CRIDLinkKnockV1File) error {
 		ForbiddenUserDataKeys:      cridLinkKnockV1ForbiddenUserDataKeys,
 		KnockHeaderType:            CRIDLinkKnockV1KnockHeaderType,
 		ACKHeaderType:              CRIDLinkKnockV1ACKHeaderType,
+		CookieHeaderType:           CRIDLinkKnockV1CookieHeaderType,
 		UserAgentMaxBytes:          CRIDLinkKnockV1UserAgentMaxBytes,
 		PublisherNameMaxCodePoints: CRIDLinkKnockV1PublisherNameMaxCodePoints,
 		LinkOrigin:                 CRIDLinkKnockV1LinkOrigin,
@@ -544,6 +594,9 @@ func validateCRIDLinkKnockV1Vocabularies(lf *CRIDLinkKnockV1File) error {
 	}
 	if lf.Composes != cridLinkKnockV1Composition {
 		return fmt.Errorf("conformance: CRID link knock composes = %+v, want %+v", lf.Composes, cridLinkKnockV1Composition)
+	}
+	if lf.ReplyTypeRules != cridLinkKnockV1ReplyTypeRules {
+		return fmt.Errorf("conformance: CRID link knock reply_type_rules = %+v, want %+v", lf.ReplyTypeRules, cridLinkKnockV1ReplyTypeRules)
 	}
 	if !maps.Equal(lf.ErrorCodes, cridLinkKnockV1ErrorCodes) {
 		return fmt.Errorf("conformance: CRID link knock error_codes = %+v, want %+v", lf.ErrorCodes, cridLinkKnockV1ErrorCodes)
@@ -715,6 +768,16 @@ func (env *cridLinkKnockV1Environment) ackFixtures() map[string]cridLinkKnockV1A
 			cridLinkKnockV1Without(cridLinkKnockV1ACK("", ""), "errCode"),
 			CRIDLinkKnockV1ResultProtocolViolation,
 		},
+		// The link-issued body with nothing wrong except the type of its code:
+		// a client that coerces the number would hand out the link.
+		"numeric_code_is_protocol_violation": {
+			cridLinkKnockV1With(env.linkACK(link, info), "errCode", json.Number(CRIDLinkKnockV1CodeLinkIssued)),
+			CRIDLinkKnockV1ResultProtocolViolation,
+		},
+		"null_code_is_protocol_violation": {
+			cridLinkKnockV1With(cridLinkKnockV1ACK("", ""), "errCode", nil),
+			CRIDLinkKnockV1ResultProtocolViolation,
+		},
 		"unassigned_code_is_server_error":   {denial("52607", "example unassigned code"), CRIDLinkKnockV1ResultServerError},
 		"other_denial_code_is_server_error": {denial("52004", "failed to find resource"), CRIDLinkKnockV1ResultServerError},
 	}
@@ -787,6 +850,17 @@ func (env *cridLinkKnockV1Environment) verificationFixtures() map[string]cridLin
 		},
 		"reject_redirect_info_crid_mismatch": {
 			env.crid, env.linkACK(env.link(), env.redirectInfo(env.testCRID)), CRIDLinkKnockV1RejectInfoCRIDMismatch,
+		},
+		// Present but not a string is still present: zero and null are falsy,
+		// and the object even holds the right CRID, yet none of them is it.
+		"reject_redirect_info_crid_number": {
+			env.crid, env.linkACK(env.link(), cridLinkKnockV1With(info, "crid", json.Number("0"))), CRIDLinkKnockV1RejectInfoCRIDMismatch,
+		},
+		"reject_redirect_info_crid_null": {
+			env.crid, env.linkACK(env.link(), cridLinkKnockV1With(info, "crid", nil)), CRIDLinkKnockV1RejectInfoCRIDMismatch,
+		},
+		"reject_redirect_info_crid_object": {
+			env.crid, env.linkACK(env.link(), cridLinkKnockV1With(info, "crid", map[string]any{"value": env.crid})), CRIDLinkKnockV1RejectInfoCRIDMismatch,
 		},
 	}
 }
@@ -998,7 +1072,8 @@ func cridLinkKnockV1SanitizeRedirectInfo(raw json.RawMessage) CRIDLinkKnockV1Lin
 }
 
 // cridLinkKnockV1InfoCRIDMatches is the one hard redirectInfo check: a crid
-// member, when present, must be exactly the requested CRID string.
+// member, when present, must be exactly the requested CRID string. Only an
+// absent member passes; a number, a null or an object is present and unequal.
 func cridLinkKnockV1InfoCRIDMatches(requestedCRID string, ack map[string]json.RawMessage) bool {
 	info, ok := cridLinkKnockV1JSONObject(ack["redirectInfo"])
 	if !ok {
@@ -1092,16 +1167,12 @@ func (env *cridLinkKnockV1Environment) interpretACK(requestedCRID string, body j
 	if !ok {
 		return result, "", errors.New("body is not a JSON object")
 	}
-	code := ""
-	if raw, present := ack["errCode"]; present {
-		if code, ok = cridLinkKnockV1JSONString(raw); !ok {
-			return result, "", errors.New("errCode is not a string")
-		}
-	}
 	// The empty string, "0" and a missing errCode are the success codes of an
 	// ordinary knock. A link request opens nothing, so none of them is a
-	// usable answer, whatever else the body carries.
-	if code == "" || code == "0" {
+	// usable answer, whatever else the body carries. Neither is an errCode
+	// that is not a string: a client never coerces one into a code it knows.
+	code, isString := cridLinkKnockV1JSONString(ack["errCode"])
+	if !isString || code == "" || code == "0" {
 		result.ClientResult = CRIDLinkKnockV1ResultProtocolViolation
 		return result, "", nil
 	}

@@ -23,11 +23,11 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	if lf.Artifact != CRIDLinkKnockV1ArtifactID || lf.SchemaVersion != CRIDLinkKnockV1SchemaVersion {
 		t.Fatalf("identity = %q/v%d, want %q/v%d", lf.Artifact, lf.SchemaVersion, CRIDLinkKnockV1ArtifactID, CRIDLinkKnockV1SchemaVersion)
 	}
-	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 9 || len(lf.RejectClasses) != 7 {
+	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 10 || len(lf.RejectClasses) != 7 {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
-	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 4 || len(lf.ACKCases) != 15 ||
-		len(lf.ClientVerificationCases) != 18 || len(lf.RedirectInfoSanitizationCases) != 16 {
+	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 4 || len(lf.ACKCases) != 17 ||
+		len(lf.ClientVerificationCases) != 21 || len(lf.RedirectInfoSanitizationCases) != 16 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
 			len(lf.ClientVerificationCases), len(lf.RedirectInfoSanitizationCases))
@@ -146,13 +146,15 @@ func TestCRIDLinkKnockV1VocabulariesAreExercised(t *testing.T) {
 	codes := make(map[string]bool, len(lf.ACKCases))
 	results := make(map[string]bool, len(lf.ACKCases))
 	for _, c := range lf.ACKCases {
-		var body struct {
-			Code string `json:"errCode"`
+		ack, ok := cridLinkKnockV1JSONObject(c.Body)
+		if !ok {
+			t.Fatalf("ACK case %q body is not an object", c.Name)
 		}
-		if err := json.Unmarshal(c.Body, &body); err != nil {
-			t.Fatalf("ACK case %q body: %v", c.Name, err)
+		// An errCode that is not a string is not a code; those cases exercise
+		// the protocol_violation result instead.
+		if code, isString := cridLinkKnockV1JSONString(ack["errCode"]); isString {
+			codes[code] = true
 		}
-		codes[body.Code] = true
 		results[c.Expected.ClientResult] = true
 	}
 	for code, entry := range lf.ErrorCodes {
@@ -163,10 +165,19 @@ func TestCRIDLinkKnockV1VocabulariesAreExercised(t *testing.T) {
 			t.Errorf("error code %s maps to %q, which is not a client result", code, entry.ClientResult)
 		}
 	}
+	// Busy belongs to the cookie reply alone: no ACK body may produce it, and
+	// every other result must come from an ACK case.
+	cookieResult := lf.ReplyTypeRules.Cookie.ClientResult
+	if results[cookieResult] {
+		t.Errorf("an ACK case produces %q, which only the cookie reply may", cookieResult)
+	}
 	for _, result := range lf.ClientResults {
-		if !results[result] {
+		if result != cookieResult && !results[result] {
 			t.Errorf("client result %q has no ACK case", result)
 		}
+	}
+	if !slices.Contains(lf.ClientResults, cookieResult) {
+		t.Errorf("the cookie reply maps to %q, which is not a client result", cookieResult)
 	}
 	classes := make(map[string]bool, len(lf.ClientVerificationCases))
 	accepts := 0
@@ -193,6 +204,40 @@ func TestCRIDLinkKnockV1VocabulariesAreExercised(t *testing.T) {
 		if !cridClasses[class] {
 			t.Errorf("no refused request exercises the CRID v1 %q class", class)
 		}
+	}
+}
+
+// TestCRIDLinkKnockV1ReplyTypeRules restates the rules as the relationships a
+// client relies on: three disjoint kinds of reply, of which only the ACK has
+// an outcome code to read, the cookie reply is busy, and anything else is a
+// transport error rather than a client result.
+func TestCRIDLinkKnockV1ReplyTypeRules(t *testing.T) {
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := lf.ReplyTypeRules
+	if rules.ACK.HeaderType != lf.Constants.ACKHeaderType || rules.Cookie.HeaderType != lf.Constants.CookieHeaderType {
+		t.Fatalf("rule header types %d/%d disagree with constants %d/%d",
+			rules.ACK.HeaderType, rules.Cookie.HeaderType, lf.Constants.ACKHeaderType, lf.Constants.CookieHeaderType)
+	}
+	if rules.ACK.HeaderType == rules.Cookie.HeaderType ||
+		rules.ACK.HeaderType == lf.Constants.KnockHeaderType || rules.Cookie.HeaderType == lf.Constants.KnockHeaderType {
+		t.Fatal("the knock, ACK and cookie header types must be distinct")
+	}
+	if !rules.ACK.IsACK || !rules.ACK.CarriesOutcomeCode || rules.ACK.Handling != CRIDLinkKnockV1HandlingInterpretACKBody || rules.ACK.ClientResult != "" {
+		t.Errorf("ACK rule = %+v: only its body decides the result", rules.ACK)
+	}
+	if rules.Cookie.IsACK || rules.Cookie.CarriesOutcomeCode || rules.Cookie.Handling != CRIDLinkKnockV1HandlingClientResult ||
+		rules.Cookie.ClientResult != CRIDLinkKnockV1ResultBusy {
+		t.Errorf("cookie rule = %+v: it is not an ACK, has no outcome code, and means busy", rules.Cookie)
+	}
+	if rules.Other.HeaderType != 0 || rules.Other.IsACK || rules.Other.CarriesOutcomeCode ||
+		rules.Other.Handling != CRIDLinkKnockV1HandlingTransportError || rules.Other.ClientResult != "" {
+		t.Errorf("other rule = %+v: any other reply type is a transport error", rules.Other)
+	}
+	if slices.Contains(lf.ClientResults, rules.Other.Handling) {
+		t.Error("a transport error must not be a client result")
 	}
 }
 
@@ -325,14 +370,51 @@ func TestCRIDLinkKnockV1VerificationCasesIsolateOneFault(t *testing.T) {
 			t.Errorf("verification case %q fails checks %v, want exactly %v", c.Name, got, want)
 		}
 	}
-	// A link-issued ACK case is a full interpreter positive: it passes every
-	// check too.
+}
+
+// TestCRIDLinkKnockV1IssuedLinkExamplesPassClientVerification ties the two
+// suites together. Every ACK case whose expected result is a link must pass
+// the same checks the verification accept cases pass, under both the
+// reference verifier and the independent evaluator, so an "issued" example
+// can never be a link a client would reject.
+func TestCRIDLinkKnockV1IssuedLinkExamplesPassClientVerification(t *testing.T) {
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := loadCRIDLinkKnockV1Environment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued := 0
 	for _, c := range lf.ACKCases {
 		if c.Expected.ClientResult != CRIDLinkKnockV1ResultLink {
 			continue
 		}
-		if got := failingLinkChecks(t, env, c.RequestedCRID, c.Body); len(got) != 0 {
-			t.Errorf("ACK case %q fails checks %v", c.Name, got)
+		issued++
+		ack, ok := cridLinkKnockV1JSONObject(c.Body)
+		if !ok {
+			t.Fatalf("ACK case %q body is not an object", c.Name)
+		}
+		if rejectClass := env.linkRejectClass(c.RequestedCRID, ack); rejectClass != "" {
+			t.Errorf("ACK case %q is declared a link but the reference verifier rejects it as %q", c.Name, rejectClass)
+		}
+		if failing := failingLinkChecks(t, env, c.RequestedCRID, c.Body); len(failing) != 0 {
+			t.Errorf("ACK case %q is declared a link but fails checks %v", c.Name, failing)
+		}
+	}
+	if issued == 0 {
+		t.Fatal("no ACK case issues a link")
+	}
+	// The converse holds for the interpreter the loader runs: a body that a
+	// verification case rejects is never reported as a link.
+	for _, c := range lf.ClientVerificationCases {
+		if c.Outcome != ExpectReject {
+			continue
+		}
+		result, rejectClass, err := env.interpretACK(c.RequestedCRID, c.Body)
+		if err != nil || rejectClass == "" || result.ClientResult != "" || result.Link != "" || result.Info != nil {
+			t.Errorf("verification case %q interprets as %+v/%q/%v, want a bare reject", c.Name, result, rejectClass, err)
 		}
 	}
 }
@@ -570,6 +652,7 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		"forbidden key reordered": func(c *CRIDLinkKnockV1Constants) { slices.Reverse(c.ForbiddenUserDataKeys) },
 		"knock header type":       func(c *CRIDLinkKnockV1Constants) { c.KnockHeaderType = 2 },
 		"ack header type":         func(c *CRIDLinkKnockV1Constants) { c.ACKHeaderType = 1 },
+		"cookie header type":      func(c *CRIDLinkKnockV1Constants) { c.CookieHeaderType = 8 },
 		"user agent limit":        func(c *CRIDLinkKnockV1Constants) { c.UserAgentMaxBytes = 255 },
 		"publisher name limit":    func(c *CRIDLinkKnockV1Constants) { c.PublisherNameMaxCodePoints = 64 },
 		"link origin":             func(c *CRIDLinkKnockV1Constants) { c.LinkOrigin = "https://qurl.link/" },
@@ -580,6 +663,37 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 	}
 	t.Run("composes", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { lf.Composes.IssuerTrustAnchor = "other.json" }), "composes")
+	})
+
+	for name, change := range map[string]func(*CRIDLinkKnockV1ReplyTypeRules){
+		"ack header type":             func(r *CRIDLinkKnockV1ReplyTypeRules) { r.ACK.HeaderType = r.Cookie.HeaderType },
+		"ack handling":                func(r *CRIDLinkKnockV1ReplyTypeRules) { r.ACK.Handling = CRIDLinkKnockV1HandlingTransportError },
+		"cookie header type":          func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.HeaderType = 8 },
+		"cookie declared an ACK":      func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.IsACK = true },
+		"cookie given an outcome":     func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.CarriesOutcomeCode = true },
+		"cookie handling":             func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.Handling = CRIDLinkKnockV1HandlingInterpretACKBody },
+		"cookie client result":        func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.ClientResult = CRIDLinkKnockV1ResultUnavailable },
+		"cookie client result gone":   func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Cookie.ClientResult = "" },
+		"other handling":              func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Other.Handling = CRIDLinkKnockV1HandlingInterpretACKBody },
+		"other given a header type":   func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Other.HeaderType = 4 },
+		"other given a client result": func(r *CRIDLinkKnockV1ReplyTypeRules) { r.Other.ClientResult = CRIDLinkKnockV1ResultBusy },
+	} {
+		t.Run("reply type rule "+name, func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { change(&lf.ReplyTypeRules) }), "reply_type_rules")
+		})
+	}
+	t.Run("reply type rules omitted", func(t *testing.T) {
+		assertRejects(t, mutateDocument(t, func(doc map[string]any) { delete(doc, "reply_type_rules") }), "omits required member reply_type_rules")
+	})
+	t.Run("reply type rule false flag omitted", func(t *testing.T) {
+		assertRejects(t, mutateDocument(t, func(doc map[string]any) {
+			delete(doc["reply_type_rules"].(map[string]any)["cookie"].(map[string]any), "carries_outcome_code")
+		}), "omits required member reply_type_rules.cookie.carries_outcome_code")
+	})
+	t.Run("reply type rule unknown member", func(t *testing.T) {
+		assertRejects(t, mutateDocument(t, func(doc map[string]any) {
+			doc["reply_type_rules"].(map[string]any)["cookie"].(map[string]any)["answer"] = true
+		}), "unknown field")
 	})
 
 	t.Run("error code missing", func(t *testing.T) {
@@ -623,7 +737,7 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		}), "omits required member error_codes.52600.retryable")
 	})
 	t.Run("client result added", func(t *testing.T) {
-		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { lf.ClientResults = append(lf.ClientResults, "busy") }), "client_results")
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { lf.ClientResults = append(lf.ClientResults, "pending") }), "client_results")
 	})
 	t.Run("client result removed", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) { lf.ClientResults = lf.ClientResults[:len(lf.ClientResults)-1] }), "client_results")
@@ -815,8 +929,30 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 	})
 	t.Run("ack unknown client result", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
-			ackCase(t, lf, "denied_unavailable").Expected.ClientResult = "busy"
+			ackCase(t, lf, "denied_unavailable").Expected.ClientResult = "pending"
 		}), "unknown client_result")
+	})
+	t.Run("ack denial reported as busy", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			ackCase(t, lf, "denied_unavailable").Expected.ClientResult = CRIDLinkKnockV1ResultBusy
+		}), "expectation")
+	})
+	t.Run("ack numeric code treated as link", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := ackCase(t, lf, "numeric_code_is_protocol_violation")
+			c.Expected = ackCase(t, lf, "link_issued").Expected
+		}), "expectation")
+	})
+	t.Run("ack numeric code made a string", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := ackCase(t, lf, "numeric_code_is_protocol_violation")
+			c.Body = setMember(t, c.Body, "errCode", CRIDLinkKnockV1CodeLinkIssued)
+		}), "input does not match its fixture")
+	})
+	t.Run("ack null code treated as server error", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			ackCase(t, lf, "null_code_is_protocol_violation").Expected.ClientResult = CRIDLinkKnockV1ResultServerError
+		}), "expectation")
 	})
 	t.Run("ack client result", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
@@ -922,6 +1058,31 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			verificationCase(t, lf, "reject_path").RejectClass = "expired"
 		}), "unknown reject_class")
+	})
+	for _, name := range []string{
+		"reject_redirect_info_crid_number", "reject_redirect_info_crid_null", "reject_redirect_info_crid_object",
+	} {
+		t.Run("verification "+name+" accepted", func(t *testing.T) {
+			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+				c := verificationCase(t, lf, name)
+				c.Outcome, c.RejectClass = ExpectAccept, ""
+			}), "expectation")
+		})
+	}
+	t.Run("verification null crid made absent", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := verificationCase(t, lf, "reject_redirect_info_crid_null")
+			var info map[string]any
+			var body map[string]json.RawMessage
+			if err := json.Unmarshal(c.Body, &body); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(body["redirectInfo"], &info); err != nil {
+				t.Fatal(err)
+			}
+			delete(info, "crid")
+			c.Body = setMember(t, c.Body, "redirectInfo", info)
+		}), "input does not match its fixture")
 	})
 	t.Run("verification empty class spelled out", func(t *testing.T) {
 		assertRejects(t, mutateDocument(t, func(doc map[string]any) {

@@ -531,7 +531,7 @@ jobs:
             return info;
           };
           const interpretAck = (requested, ack) => {
-            if (ack.errCode === undefined || ack.errCode === '' || ack.errCode === '0') {
+            if (typeof ack.errCode !== 'string' || ack.errCode === '' || ack.errCode === '0') {
               return { client_result: 'protocol_violation' };
             }
             if (!Object.hasOwn(lk.error_codes, ack.errCode)) return { client_result: 'server_error' };
@@ -541,9 +541,51 @@ jobs:
             if (rejectClass) return { reject_class: rejectClass };
             return { client_result: result, link: ack.redirectUrl, info: sanitizeRedirectInfo(ack.redirectInfo) };
           };
+          // The packet header type is read before any body: only an ACK has an
+          // outcome code, the cookie reply is busy, anything else is a transport
+          // error and not a client result.
+          const replyRules = lk.reply_type_rules;
+          assert.deepEqual(Object.keys(replyRules), ['ack', 'cookie', 'other']);
+          assert.deepEqual(replyRules.ack, {
+            header_type: lk.constants.ack_header_type,
+            is_ack: true,
+            carries_outcome_code: true,
+            handling: 'interpret_ack_body',
+          });
+          assert.deepEqual(replyRules.cookie, {
+            header_type: lk.constants.cookie_header_type,
+            is_ack: false,
+            carries_outcome_code: false,
+            handling: 'client_result',
+            client_result: 'busy',
+          });
+          assert.deepEqual(replyRules.other, { is_ack: false, carries_outcome_code: false, handling: 'transport_error' });
+          assert.equal(lk.constants.cookie_header_type, 7);
+          const interpretReply = (headerType, requested, body) => {
+            const rule = Object.values(replyRules).find(candidate => candidate.header_type === headerType) ?? replyRules.other;
+            if (rule.handling === 'interpret_ack_body') return interpretAck(requested, body);
+            if (rule.handling === 'client_result') return { client_result: rule.client_result };
+            return { transport_error: true };
+          };
           for (const ackCase of lk.ack_cases) {
-            assert.deepEqual(interpretAck(ackCase.requested_crid, ackCase.body), ackCase.expected, ackCase.name);
+            assert.deepEqual(
+              interpretReply(lk.constants.ack_header_type, ackCase.requested_crid, ackCase.body),
+              ackCase.expected,
+              ackCase.name,
+            );
           }
+          const issued = lk.ack_cases.find(ackCase => ackCase.name === 'link_issued');
+          assert.deepEqual(
+            interpretReply(lk.constants.cookie_header_type, issued.requested_crid, issued.body),
+            { client_result: 'busy' },
+          );
+          assert.deepEqual(
+            interpretReply(lk.constants.knock_header_type, issued.requested_crid, issued.body),
+            { transport_error: true },
+          );
+          const ackResults = new Set(lk.ack_cases.map(ackCase => ackCase.expected.client_result));
+          assert.ok(!ackResults.has(replyRules.cookie.client_result));
+          assert.deepEqual([...ackResults, replyRules.cookie.client_result].sort(), [...lk.client_results].sort());
           for (const check of lk.client_verification_cases) {
             const result = interpretAck(check.requested_crid, check.body);
             assert.equal(result.client_result === 'link' ? 'accept' : 'reject', check.outcome, check.name);
@@ -871,19 +913,63 @@ jobs:
 
           for case in lk['redirect_info_sanitization_cases']:
               assert sanitize_redirect_info(case['redirect_info']) == case['expected'], case['name']
+
+          # The packet header type is read before any body: only an ACK has an
+          # outcome code, the cookie reply is busy, anything else is a
+          # transport error and not a client result.
+          reply_rules = lk['reply_type_rules']
+          assert list(reply_rules) == ['ack', 'cookie', 'other']
+          assert reply_rules['ack'] == {
+              'header_type': lk['constants']['ack_header_type'],
+              'is_ack': True,
+              'carries_outcome_code': True,
+              'handling': 'interpret_ack_body',
+          }
+          assert reply_rules['cookie'] == {
+              'header_type': lk['constants']['cookie_header_type'],
+              'is_ack': False,
+              'carries_outcome_code': False,
+              'handling': 'client_result',
+              'client_result': 'busy',
+          }
+          assert reply_rules['other'] == {'is_ack': False, 'carries_outcome_code': False, 'handling': 'transport_error'}
+          # Dictionary equality treats 1 and 0 as True and False; the flags must be real booleans.
+          assert reply_rules['ack']['is_ack'] is True and reply_rules['ack']['carries_outcome_code'] is True
+          assert all(
+              reply_rules[kind][flag] is False
+              for kind in ('cookie', 'other')
+              for flag in ('is_ack', 'carries_outcome_code')
+          )
+          assert lk['constants']['cookie_header_type'] == 7
+
+          def interpret_reply(header_type, body):
+              rule = next(
+                  (candidate for candidate in reply_rules.values() if candidate.get('header_type') == header_type),
+                  reply_rules['other'],
+              )
+              if rule['handling'] == 'client_result':
+                  return rule['client_result']
+              if rule['handling'] != 'interpret_ack_body':
+                  return 'transport error, not a client result'
+              code = body.get('errCode')
+              if not isinstance(code, str) or code in ('', '0'):
+                  return 'protocol_violation'
+              return lk['error_codes'].get(code, {'client_result': 'server_error'})['client_result']
+
           for case in lk['ack_cases']:
-              code = case['body'].get('errCode')
-              if code in (None, '', '0'):
-                  result = 'protocol_violation'
-              else:
-                  result = lk['error_codes'].get(code, {'client_result': 'server_error'})['client_result']
+              result = interpret_reply(lk['constants']['ack_header_type'], case['body'])
               assert result == case['expected']['client_result'], case['name']
               if result == 'link':
                   assert case['expected']['link'] == case['body']['redirectUrl'] == lk['fixtures']['link'], case['name']
                   assert sanitize_redirect_info(case['body'].get('redirectInfo')) == case['expected']['info'], case['name']
               else:
                   assert 'link' not in case['expected'] and 'info' not in case['expected'], case['name']
-          assert {case['expected']['client_result'] for case in lk['ack_cases']} == set(lk['client_results'])
+          issued = next(case for case in lk['ack_cases'] if case['name'] == 'link_issued')
+          assert interpret_reply(lk['constants']['cookie_header_type'], issued['body']) == 'busy'
+          assert interpret_reply(lk['constants']['knock_header_type'], issued['body']) not in lk['client_results']
+          ack_results = {case['expected']['client_result'] for case in lk['ack_cases']}
+          assert reply_rules['cookie']['client_result'] not in ack_results
+          assert ack_results | {reply_rules['cookie']['client_result']} == set(lk['client_results'])
           assert {
               case['reject_class'] for case in lk['client_verification_cases'] if case['outcome'] == 'reject'
           } == set(lk['reject_classes'])
