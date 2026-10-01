@@ -84,6 +84,7 @@ jobs:
             connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
             agentCredentialRecoveryVectors: 'agent_credential_recovery_v1_vectors.json',
             cridV1Vectors: 'crid_v1_vectors.json',
+            cridLinkKnockV1Vectors: 'crid_link_knock_v1_vectors.json',
             targetPathV1Vectors: 'target_path_v1_vectors.json',
             privateUploadV1Vectors: 'private_upload_v1_vectors.json',
           };
@@ -441,6 +442,120 @@ jobs:
           assert.ok(!('hub_request_id' in acr.fixtures));
           assert.ok(hc.contract.additive_application_profiles.includes(acr.protocol.hub_cookie_contract));
           assert.ok(cd.producer_cases.every(verifyCRID));
+
+          // CRID link knock: the canonical request bytes are defined as
+          // JSON.stringify output and the link checks as URL-parser results, so
+          // this runtime re-derives every expectation with the real primitives.
+          const lk = c.cridLinkKnockV1Vectors();
+          const issuer = c.issuerSignatureVectors();
+          assert.equal(lk.artifact, 'qurl-crid-link-knock-v1-vectors');
+          assert.equal(lk.schema_version, 1);
+          const truncateUserAgent = value => {
+            let kept = '';
+            for (const character of value) {
+              if (Buffer.byteLength(kept + character) > lk.constants.user_agent_max_bytes) break;
+              kept += character;
+            }
+            return kept;
+          };
+          for (const request of lk.request_cases) {
+            const usrData = { [lk.constants.user_data_keys.crid]: request.input.crid };
+            if ('user_agent' in request.input) {
+              usrData[lk.constants.user_data_keys.user_agent] = truncateUserAgent(request.input.user_agent);
+            }
+            const body = {
+              headerType: lk.constants.knock_header_type,
+              aspId: lk.constants.auth_service_id,
+              resId: lk.constants.resource_id,
+              usrData,
+            };
+            assert.equal(JSON.stringify(body), request.serialized, request.name);
+            assert.equal(JSON.stringify(request.body), request.serialized, request.name);
+          }
+          const cridFromKey = (keyB64, held) => {
+            const version = (cd.contract.alphabet.indexOf(held[0]) << 3) | (cd.contract.alphabet.indexOf(held[1]) >> 2);
+            const digest = crypto.createHash('sha256')
+              .update(Buffer.concat([
+                Buffer.from(cd.contract.domain_separation_prefix, 'ascii'),
+                Buffer.from([0]),
+                Buffer.from(keyB64, 'base64url'),
+              ])).digest();
+            const payload = Buffer.concat([Buffer.from([version]), digest]);
+            const crc = Buffer.alloc(4);
+            crc.writeUInt32BE(crc32c(payload));
+            return base32(Buffer.concat([payload, crc]));
+          };
+          const issuerKey = crypto.createPublicKey({ key: issuer.issuer.jwk, format: 'jwk' });
+          const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+          const linkRejectClass = (requested, ack) => {
+            const redirect = ack.redirectUrl;
+            if (typeof redirect !== 'string' || redirect === '') return 'missing_redirect';
+            const url = new URL(redirect);
+            if (url.origin !== lk.constants.link_origin || url.username !== '' || url.password !== '') return 'origin';
+            if (url.pathname !== '/' || url.search !== '') return 'path_or_query';
+            const parts = url.hash.slice(1).split('.');
+            const counts = parts.slice(1, 4).map(Number);
+            if (parts[0] !== 'qv2t1' || parts.length !== 4 + counts[0] + counts[1] + counts[2]) return 'transport';
+            const claims = parts.slice(4, 4 + counts[0]).join('');
+            const signed = Buffer.concat([
+              Buffer.from(issuer.domain_separation_prefix, 'ascii'),
+              Buffer.from([0]),
+              Buffer.from(claims, 'ascii'),
+            ]);
+            if (!crypto.verify(
+              'sha256',
+              signed,
+              { key: issuerKey, dsaEncoding: 'ieee-p1363' },
+              Buffer.from(parts.at(-1), 'base64url'),
+            )) return 'issuer_signature';
+            const resourceKey = JSON.parse(Buffer.from(claims, 'base64url')).resource_public_key_b64;
+            if (cridFromKey(resourceKey, requested) !== requested) return 'crid_mismatch';
+            if (isObject(ack.redirectInfo) && 'crid' in ack.redirectInfo && ack.redirectInfo.crid !== requested) {
+              return 'info_crid_mismatch';
+            }
+            return '';
+          };
+          const sanitizeRedirectInfo = raw => {
+            const source = isObject(raw) ? raw : {};
+            const info = {};
+            for (const member of ['qurl_id', 'expires_at', 'resource_created_at']) {
+              if (typeof source[member] === 'string' && source[member] !== '') info[member] = source[member];
+            }
+            const publisher = isObject(source.publisher) ? source.publisher : {};
+            info.publisher = {};
+            if (typeof publisher.name === 'string' && publisher.name !== '' &&
+                [...publisher.name].length <= lk.constants.publisher_name_max_code_points) {
+              info.publisher.name = publisher.name;
+            }
+            info.publisher.verified = publisher.verified === true;
+            return info;
+          };
+          const interpretAck = (requested, ack) => {
+            if (ack.errCode === undefined || ack.errCode === '' || ack.errCode === '0') {
+              return { client_result: 'protocol_violation' };
+            }
+            if (!Object.hasOwn(lk.error_codes, ack.errCode)) return { client_result: 'server_error' };
+            const result = lk.error_codes[ack.errCode].client_result;
+            if (result !== 'link') return { client_result: result };
+            const rejectClass = linkRejectClass(requested, ack);
+            if (rejectClass) return { reject_class: rejectClass };
+            return { client_result: result, link: ack.redirectUrl, info: sanitizeRedirectInfo(ack.redirectInfo) };
+          };
+          for (const ackCase of lk.ack_cases) {
+            assert.deepEqual(interpretAck(ackCase.requested_crid, ackCase.body), ackCase.expected, ackCase.name);
+          }
+          for (const check of lk.client_verification_cases) {
+            const result = interpretAck(check.requested_crid, check.body);
+            assert.equal(result.client_result === 'link' ? 'accept' : 'reject', check.outcome, check.name);
+            assert.equal(result.reject_class, check.reject_class, check.name);
+          }
+          for (const sanitization of lk.redirect_info_sanitization_cases) {
+            assert.deepEqual(sanitizeRedirectInfo(sanitization.redirect_info), sanitization.expected, sanitization.name);
+          }
+          assert.deepEqual(
+            [...new Set(lk.client_verification_cases.map(check => check.reject_class).filter(Boolean))].sort(),
+            [...lk.reject_classes].sort(),
+          );
           console.log('npm ok');
           NODE
 
@@ -492,6 +607,7 @@ jobs:
               'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
               'agent_credential_recovery_vectors': 'agent_credential_recovery_v1_vectors.json',
               'crid_v1_vectors': 'crid_v1_vectors.json',
+              'crid_link_knock_v1_vectors': 'crid_link_knock_v1_vectors.json',
               'target_path_v1_vectors': 'target_path_v1_vectors.json',
               'private_upload_v1_vectors': 'private_upload_v1_vectors.json',
           }
@@ -695,6 +811,82 @@ jobs:
           assert 'hub_request_id' not in acr['fixtures']
           assert acr['protocol']['hub_cookie_contract'] in hc['contract']['additive_application_profiles']
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
+
+          # CRID link knock: re-derive the canonical request bytes with this
+          # runtime's serializer, tie the fixture link to its CRIDs, and
+          # re-run the display-metadata gate.
+          lk = q.crid_link_knock_v1_vectors()
+          assert lk['artifact'] == 'qurl-crid-link-knock-v1-vectors' and lk['schema_version'] == 1
+
+          def truncate_user_agent(value):
+              kept = ''
+              for character in value:
+                  if len((kept + character).encode()) > lk['constants']['user_agent_max_bytes']:
+                      break
+                  kept += character
+              return kept
+
+          for request in lk['request_cases']:
+              user_data = {lk['constants']['user_data_keys']['crid']: request['input']['crid']}
+              if 'user_agent' in request['input']:
+                  user_data[lk['constants']['user_data_keys']['user_agent']] = truncate_user_agent(
+                      request['input']['user_agent']
+                  )
+              built = {
+                  'headerType': lk['constants']['knock_header_type'],
+                  'aspId': lk['constants']['auth_service_id'],
+                  'resId': lk['constants']['resource_id'],
+                  'usrData': user_data,
+              }
+              for body in (built, request['body']):
+                  assert json.dumps(body, separators=(',', ':'), ensure_ascii=False) == request['serialized'], request['name']
+
+          link_parts = lk['fixtures']['link'].removeprefix(lk['constants']['link_origin'] + '/#').split('.')
+          assert link_parts[0] == 'qv2t1'
+          link_claims_b64 = ''.join(link_parts[4:4 + int(link_parts[1])])
+          link_claims = json.loads(base64.urlsafe_b64decode(link_claims_b64 + '=' * (-len(link_claims_b64) % 4)))
+          assert link_claims['resource_public_key_b64'] == lk['fixtures']['resource_public_key_b64']
+          link_resource_der = base64.urlsafe_b64decode(lk['fixtures']['resource_public_key_b64'] + '==')
+          link_resource_digest = hashlib.sha256(
+              cd['contract']['domain_separation_prefix'].encode('ascii') + bytes(1) + link_resource_der
+          ).digest()
+          for version, crid in ((0x01, lk['fixtures']['crid']), (0x81, lk['fixtures']['test_environment_crid'])):
+              payload = bytes([version]) + link_resource_digest
+              encoded = payload + struct.pack('>I', crc32c(payload))
+              assert base64.b32encode(encoded).decode().rstrip('=').lower() == crid
+
+          def sanitize_redirect_info(raw):
+              source = raw if isinstance(raw, dict) else {}
+              info = {
+                  member: source[member]
+                  for member in ('qurl_id', 'expires_at', 'resource_created_at')
+                  if isinstance(source.get(member), str) and source[member]
+              }
+              publisher = source.get('publisher') if isinstance(source.get('publisher'), dict) else {}
+              info['publisher'] = {'verified': publisher.get('verified') is True}
+              name = publisher.get('name')
+              if isinstance(name, str) and 0 < len(name) <= lk['constants']['publisher_name_max_code_points']:
+                  info['publisher']['name'] = name
+              return info
+
+          for case in lk['redirect_info_sanitization_cases']:
+              assert sanitize_redirect_info(case['redirect_info']) == case['expected'], case['name']
+          for case in lk['ack_cases']:
+              code = case['body'].get('errCode')
+              if code in (None, '', '0'):
+                  result = 'protocol_violation'
+              else:
+                  result = lk['error_codes'].get(code, {'client_result': 'server_error'})['client_result']
+              assert result == case['expected']['client_result'], case['name']
+              if result == 'link':
+                  assert case['expected']['link'] == case['body']['redirectUrl'] == lk['fixtures']['link'], case['name']
+                  assert sanitize_redirect_info(case['body'].get('redirectInfo')) == case['expected']['info'], case['name']
+              else:
+                  assert 'link' not in case['expected'] and 'info' not in case['expected'], case['name']
+          assert {case['expected']['client_result'] for case in lk['ack_cases']} == set(lk['client_results'])
+          assert {
+              case['reject_class'] for case in lk['client_verification_cases'] if case['outcome'] == 'reject'
+          } == set(lk['reject_classes'])
           print('py ok')
           PY
 
