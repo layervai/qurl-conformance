@@ -702,10 +702,17 @@ jobs:
             parsesOnLinkOrigin(url) && url.pathname === '/' && url.search === '';
           const parserWouldAccept = [];
           const parserReadsLinkOriginWithPath = [];
+          const parserRefuses = [];
           for (const check of lk.client_verification_cases) {
             const redirect = check.body.redirectUrl;
             if (typeof redirect !== 'string' || redirect === '') continue;
-            const url = new URL(redirect);
+            let url;
+            try {
+              url = new URL(redirect);
+            } catch {
+              parserRefuses.push(check.name);
+              continue;
+            }
             if (splitLink(redirect).rejectClass === '') {
               assert.ok(parsesAsBareLinkOnOrigin(url), check.name);
             } else if (parsesAsBareLinkOnOrigin(url)) {
@@ -714,6 +721,9 @@ jobs:
               parserReadsLinkOriginWithPath.push([check.name, url.pathname]);
             }
           }
+          // The parser reads every link of the suite. One it refuses to read
+          // fails here, by name.
+          assert.deepStrictEqual(parserRefuses, []);
           assert.deepStrictEqual(parserWouldAccept, [
             ['reject_origin_uppercase_scheme', 'origin'],
             ['reject_origin_uppercase_host', 'origin'],
