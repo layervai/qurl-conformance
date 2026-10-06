@@ -523,7 +523,7 @@ jobs:
           // Three refused inputs pass the CRID v1 gate and are refused for their
           // version alone: one unregistered byte and the two reserved bytes.
           const unverifiable = lk.invalid_request_cases.filter(refused => cridLocalGate(refused.input.crid).rejectClass === '');
-          assert.deepEqual(
+          assert.deepStrictEqual(
             unverifiable.map(refused => [refused.name, cridLocalGate(refused.input.crid).versionHex, refused.input.crid.length]),
             [
               ['reject_unregistered_version', '7f', cd.contract.full_crid_length],
@@ -627,21 +627,21 @@ jobs:
           // outcome code, the cookie reply is busy, anything else is a transport
           // error and not a client result.
           const replyRules = lk.reply_type_rules;
-          assert.deepEqual(Object.keys(replyRules), ['ack', 'cookie', 'other']);
-          assert.deepEqual(replyRules.ack, {
+          assert.deepStrictEqual(Object.keys(replyRules), ['ack', 'cookie', 'other']);
+          assert.deepStrictEqual(replyRules.ack, {
             header_type: lk.constants.ack_header_type,
             is_ack: true,
             carries_outcome_code: true,
             handling: 'interpret_ack_body',
           });
-          assert.deepEqual(replyRules.cookie, {
+          assert.deepStrictEqual(replyRules.cookie, {
             header_type: lk.constants.cookie_header_type,
             is_ack: false,
             carries_outcome_code: false,
             handling: 'client_result',
             client_result: 'busy',
           });
-          assert.deepEqual(replyRules.other, { is_ack: false, carries_outcome_code: false, handling: 'transport_error' });
+          assert.deepStrictEqual(replyRules.other, { is_ack: false, carries_outcome_code: false, handling: 'transport_error' });
           assert.equal(lk.constants.cookie_header_type, 7);
           const interpretReply = (headerType, requested, body) => {
             const rule = Object.values(replyRules).find(candidate => candidate.header_type === headerType) ?? replyRules.other;
@@ -650,24 +650,24 @@ jobs:
             return { transport_error: true };
           };
           for (const ackCase of lk.ack_cases) {
-            assert.deepEqual(
+            assert.deepStrictEqual(
               interpretReply(lk.constants.ack_header_type, ackCase.requested_crid, ackCase.body),
               ackCase.expected,
               ackCase.name,
             );
           }
           const issued = lk.ack_cases.find(ackCase => ackCase.name === 'link_issued');
-          assert.deepEqual(
+          assert.deepStrictEqual(
             interpretReply(lk.constants.cookie_header_type, issued.requested_crid, issued.body),
             { client_result: 'busy' },
           );
-          assert.deepEqual(
+          assert.deepStrictEqual(
             interpretReply(lk.constants.knock_header_type, issued.requested_crid, issued.body),
             { transport_error: true },
           );
           const ackResults = new Set(lk.ack_cases.map(ackCase => ackCase.expected.client_result));
           assert.ok(!ackResults.has(replyRules.cookie.client_result));
-          assert.deepEqual([...ackResults, replyRules.cookie.client_result].sort(), [...lk.client_results].sort());
+          assert.deepStrictEqual([...ackResults, replyRules.cookie.client_result].sort(), [...lk.client_results].sort());
           for (const check of lk.client_verification_cases) {
             const result = interpretAck(check.requested_crid, check.body);
             assert.equal(result.client_result === 'link' ? 'accept' : 'reject', check.outcome, check.name);
@@ -698,7 +698,7 @@ jobs:
               parserReadsLinkOriginWithPath.push([check.name, url.pathname]);
             }
           }
-          assert.deepEqual(parserWouldAccept, [
+          assert.deepStrictEqual(parserWouldAccept, [
             ['reject_origin_uppercase_scheme', 'origin'],
             ['reject_origin_uppercase_host', 'origin'],
             ['reject_origin_default_port', 'origin'],
@@ -709,9 +709,9 @@ jobs:
           // The parser reads the backslash as a slash. A client that parses
           // first and compares only the origin accepts this link; one that
           // also looks at the path refuses it, but as path_or_query.
-          assert.deepEqual(parserReadsLinkOriginWithPath, [['reject_origin_backslash', '/@example.com/']]);
+          assert.deepStrictEqual(parserReadsLinkOriginWithPath, [['reject_origin_backslash', '/@example.com/']]);
           // Both accepted forms are pinned: with the slash and without it.
-          assert.deepEqual(
+          assert.deepStrictEqual(
             lk.client_verification_cases
               .filter(check => check.outcome === 'accept')
               .map(check => check.body.redirectUrl.slice(lk.constants.link_origin.length, check.body.redirectUrl.indexOf('#') + 1))
@@ -720,9 +720,9 @@ jobs:
             ['#', '/#'],
           );
           for (const sanitization of lk.redirect_info_sanitization_cases) {
-            assert.deepEqual(sanitizeRedirectInfo(sanitization.redirect_info), sanitization.expected, sanitization.name);
+            assert.deepStrictEqual(sanitizeRedirectInfo(sanitization.redirect_info), sanitization.expected, sanitization.name);
           }
-          assert.deepEqual(
+          assert.deepStrictEqual(
             [...new Set(lk.client_verification_cases.map(check => check.reject_class).filter(Boolean))].sort(),
             [...lk.reject_classes].sort(),
           );
