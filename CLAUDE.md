@@ -19,9 +19,10 @@ conformance vectors. Keep it small, stdlib-only, and stable.
 - `vectors/README_qv2_conformance_vectors.md` is the schema + `reject_class`
   vocabulary + class-to-entry-point map. Keep it in sync with any schema change.
 - `crid_link_knock_v1_vectors.json` takes its refused-request classes from the
-  version registry in `crid_v1_vectors.json`. Registering version byte `7f`, or
-  activating `02` or `82`, breaks its `invalid_request_cases`; re-point them in
-  the same change ("Lockstep with the CRID version registry" in its README).
+  version registry in `crid_v1_vectors.json`. Registering version byte `7f`,
+  activating `02` or `82`, or changing the row of `01` breaks its
+  `invalid_request_cases`; re-point them in the same change ("Lockstep with
+  the CRID version registry" in its README).
 
 ## Hard rules
 

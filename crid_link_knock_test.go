@@ -32,7 +32,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 10 || len(lf.RejectClasses) != 7 {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
-	if len(lf.RequestCases) != 8 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
+	if len(lf.RequestCases) != 9 || len(lf.InvalidRequestCases) != 8 || len(lf.ACKCases) != 17 ||
 		len(lf.ClientVerificationCases) != 31 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
@@ -310,6 +310,36 @@ func TestCRIDLinkKnockV1RefusesVersionsAClientCannotVerify(t *testing.T) {
 		if _, _, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: crid}); err == nil {
 			t.Errorf("%s: the reference request builder built a request for it", tc.name)
 		}
+	}
+
+	// An active version byte is not enough. The registry gives each byte one
+	// length, and a gate that looked at the byte alone would send this one:
+	// the fixture key under 01 in the short form. It passes the local gate,
+	// its digest is the start of the fixture CRID's digest, and only its
+	// length keeps the registry from naming it.
+	short, ok := refused["reject_active_version_01_short_form"]
+	if !ok {
+		t.Fatal("missing invalid request case reject_active_version_01_short_form")
+	}
+	if row := registry["01"]; row.Status != CRIDV1StatusActive || row.DigestLength != CRIDV1FullDigestLength {
+		t.Errorf("CRID v1 registry row for 01 = %+v, want active at digest length %d: the case needs 01 active in the full form only", row, CRIDV1FullDigestLength)
+	}
+	if outcome, rejectClass := deriveCRIDV1ValueExpectation(short.Input.CRID); outcome != ExpectAccept {
+		t.Errorf("reject_active_version_01_short_form fails the CRID v1 local gate with class %q; it must be refused for its version alone", rejectClass)
+	}
+	shortBytes, shortErr := cridV1Base32.DecodeString(short.Input.CRID)
+	fullBytes, fullErr := cridV1Base32.DecodeString(lf.Fixtures.CRID)
+	if shortErr != nil || fullErr != nil || len(short.Input.CRID) != CRIDV1TruncatedCRIDLength || shortBytes[0] != 0x01 ||
+		!bytes.Equal(shortBytes[:1+CRIDV1TruncatedDigestLength], fullBytes[:1+CRIDV1TruncatedDigestLength]) {
+		t.Errorf("reject_active_version_01_short_form must be the fixture key under version 01 with a %d-byte digest, %d characters", CRIDV1TruncatedDigestLength, CRIDV1TruncatedCRIDLength)
+	}
+	if _, _, _, _, err := deriveCRIDV1VersionExpectation(short.Input.CRID); err == nil {
+		t.Error("the CRID v1 registry now names version 01 in the short form; reject_active_version_01_short_form is no longer a refusal")
+	}
+	if outcome, rejectClass := cridLinkKnockV1RequestExpectation(short.Input.CRID); outcome != ExpectReject || rejectClass != CRIDV1RejectVersion ||
+		short.Outcome != ExpectReject || short.CRIDRejectClass != CRIDV1RejectVersion {
+		t.Errorf("reject_active_version_01_short_form request gate = %q/%q, declared %q/%q; want a refusal under the CRID v1 version class",
+			outcome, rejectClass, short.Outcome, short.CRIDRejectClass)
 	}
 
 	// Every refused input is refused by the builder, and every CRID a case
@@ -961,8 +991,16 @@ func TestCRIDLinkKnockV1UserAgentIsLeftOutWhole(t *testing.T) {
 			holders = append(holders, c.Name)
 		}
 	}
-	// Exactly these two inputs hold such a character, and each sends the
-	// bytes of a request with no user agent.
+	// The rule names these characters and no others. One case holds a C1
+	// control character, U+0085, and sends it unchanged, as UTF-8.
+	c1 := string(rune(0x85))
+	sentC1 := requests["user_agent_c1_character_sent"]
+	if sentC1.Input.UserAgent == nil || strings.Count(*sentC1.Input.UserAgent, c1) != 1 ||
+		!strings.Contains(sentC1.Serialized, `"qurl_user_agent":"`+*sentC1.Input.UserAgent+`"`) {
+		t.Errorf("user_agent_c1_character_sent must hold one U+0085 and send its user agent unchanged, with the character as UTF-8")
+	}
+	// Exactly these two inputs hold a character of the rule, and each sends
+	// the bytes of a request with no user agent.
 	if want := []string{"user_agent_omitted_for_line_separator", "user_agent_omitted_before_truncation"}; !slices.Equal(holders, want) {
 		t.Fatalf("request cases whose user agent holds a control character, U+2028 or U+2029 = %v, want %v", holders, want)
 	}
@@ -988,7 +1026,8 @@ func TestCRIDLinkKnockV1UserAgentIsLeftOutWhole(t *testing.T) {
 
 	// The reference builder leaves the member out for every character of the
 	// rule, before the byte limit and past it, and for nothing next to the
-	// rule: every ASCII character, and the two separators with the code point
+	// rule: every ASCII character, both ends of the C1 control characters and
+	// the code point after them, and the two separators with the code point
 	// on each side of them. A user agent it does send past the limit is
 	// truncated as before.
 	sentFor := func(userAgent string) string {
@@ -1002,7 +1041,7 @@ func TestCRIDLinkKnockV1UserAgentIsLeftOutWhole(t *testing.T) {
 		}
 		return sent
 	}
-	runes := []rune{0x2027, 0x2028, 0x2029, 0x202a}
+	runes := []rune{0x80, 0x85, 0x9f, 0xa0, 0x2027, 0x2028, 0x2029, 0x202a}
 	for r := rune(0); r <= 0x7f; r++ {
 		runes = append(runes, r)
 	}
@@ -1410,6 +1449,24 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			*c.Input.UserAgent = late[:10] + string(rune(0x7f)) + late[10:lf.Constants.UserAgentMaxBytes] + late[lf.Constants.UserAgentMaxBytes+1:]
 		}), "input does not match its fixture")
 	})
+	t.Run("request C1 character left out", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_c1_character_sent")
+			c.Serialized = requestCase(t, lf, "minimal").Serialized
+		}), "serialized does not re-derive")
+	})
+	t.Run("request C1 character escaped", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_c1_character_sent")
+			c.Serialized = strings.Replace(c.Serialized, string(rune(0x85)), "\\"+"u0085", 1)
+		}), "serialized does not re-derive")
+	})
+	t.Run("request C1 character replaced", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_c1_character_sent")
+			*c.Input.UserAgent = strings.Replace(*c.Input.UserAgent, string(rune(0x85)), " ", 1)
+		}), "input does not match its fixture")
+	})
 	t.Run("request body member order", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			c := requestCase(t, lf, "minimal")
@@ -1463,7 +1520,10 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			invalidCase(t, lf, "reject_wrong_length").Outcome = ExpectAccept
 		}), "expectation")
 	})
-	for _, name := range []string{"reject_unregistered_version", "reject_reserved_version_02", "reject_reserved_version_82"} {
+	for _, name := range []string{
+		"reject_unregistered_version", "reject_reserved_version_02", "reject_reserved_version_82",
+		"reject_active_version_01_short_form",
+	} {
 		t.Run("invalid request "+name+" sent", func(t *testing.T) {
 			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 				c := invalidCase(t, lf, name)
@@ -1490,6 +1550,16 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
 			c := invalidCase(t, lf, "reject_reserved_version_02")
 			c.Input.CRID = lf.Fixtures.CRID
+		}), "input does not match its fixture")
+	})
+	t.Run("invalid request active version given its full form", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			invalidCase(t, lf, "reject_active_version_01_short_form").Input.CRID = lf.Fixtures.CRID
+		}), "input does not match its fixture")
+	})
+	t.Run("invalid request active version in the short form of another byte", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			invalidCase(t, lf, "reject_active_version_01_short_form").Input.CRID = invalidCase(t, lf, "reject_reserved_version_02").Input.CRID
 		}), "input does not match its fixture")
 	})
 	t.Run("invalid request empty crid omitted", func(t *testing.T) {

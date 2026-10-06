@@ -92,7 +92,9 @@ write them as UTF-8. The member is optional and only for display, so a
 request without it loses nothing. `user_agent_omitted_for_line_separator` and
 `user_agent_omitted_before_truncation` pin this rule. Each reports a user
 agent and sends none, so its bytes are the bytes of `minimal`, and every
-encoder writes those the same way.
+encoder writes those the same way. The rule names these characters and no
+others. A C1 control character, U+0080 to U+009F, is sent as UTF-8 like any
+other non-ASCII character (`user_agent_c1_character_sent`).
 
 A consumer builds the body from `input` with its real request builder and
 compares the result with `serialized` byte for byte. A serializer that
@@ -122,6 +124,7 @@ code point boundary, so what it sends is always valid UTF-8.
 | `user_agent_truncated_at_code_point_boundary` | 258 bytes in 256 UTF-16 code units; a four-byte character occupies bytes 254 to 257 | the first 253 bytes: the whole character is dropped |
 | `user_agent_omitted_for_line_separator` | 39 bytes; one character is U+2028 | nothing: the member is left out |
 | `user_agent_omitted_before_truncation` | 300 bytes; the first 256 are ASCII with nothing wrong in them, and byte 257 is U+007F | nothing: the member is left out |
+| `user_agent_c1_character_sent` | 33 bytes; one character is U+0085 | unchanged |
 
 `user_agent_truncated_at_code_point_boundary` defeats both common mistakes.
 Counting UTF-16 code units finds nothing to truncate, and cutting the encoded
@@ -135,6 +138,13 @@ U+2028 and U+007F; U+0000 to U+001F and U+2029 fall under the same rule. In
 the vector file their inputs write the two characters as the JSON escapes
 `\u2028` and `\u007f`.
 
+`user_agent_c1_character_sent` is the upper edge of the rule. U+0085 is a
+control character too, but the rule does not name it, and Go, JavaScript and
+Python all write it as UTF-8. A client that leaves out every character its
+language calls a control character fails this case. In the vector file the
+input writes the character as the JSON escape `\u0085`. `body` and
+`serialized` hold the character itself, because they are the canonical form.
+
 ### CRID gate
 
 Before it builds a request, the client runs the CRID v1 local validation gate
@@ -143,8 +153,9 @@ is trimmed, lower-cased or otherwise repaired.
 
 A link request has one rule beyond that gate: a client must not send a
 request for a CRID whose version it cannot verify a link against. That is a
-CRID whose version byte is not registered, or is registered only as reserved,
-in the CRID v1 version registry. Such a CRID is well formed, its checksum is
+CRID whose version byte is not registered in the CRID v1 version registry, or
+is registered only as reserved, or is active but stands in a length the
+registry does not give that byte. Such a CRID is well formed, its checksum is
 valid, and the CRID v1 local gate forwards it. Here it is refused, because
 the client could never complete check 6 below: it would ask the server to
 create a link that it must then reject. Today the versions a client can
@@ -162,9 +173,10 @@ its own for a refused request.
 | `reject_empty` | the empty string | `length` |
 | `reject_unregistered_version` | version byte `7f`, 60 characters, valid checksum | `version` |
 | `reject_reserved_version_02`, `reject_reserved_version_82` | the reserved short-form version bytes, 47 characters, valid checksum | `version` |
+| `reject_active_version_01_short_form` | the active version byte `01` with a 24-byte digest, 47 characters, valid checksum | `version` |
 
 For the first four the class is what the CRID v1 local gate reports. The last
-three pass that gate. The request builder refuses them under `version`, the
+four pass that gate. The request builder refuses them under `version`, the
 CRID v1 vocabulary's class for a version byte a consumer must not act on; in
 the local gate itself that class marks only the forbidden `00`.
 
@@ -545,15 +557,17 @@ The CRIDs do not change while the vector resource key stays fixed.
 ## Lockstep with the CRID version registry
 
 The request gate reads the version registry in `crid_v1_vectors.json`, so
-three `invalid_request_cases` depend on what that registry says today.
+four `invalid_request_cases` depend on what that registry says today.
 `reject_unregistered_version` uses the version byte `7f` because the registry
 has no row for it. `reject_reserved_version_02` and
 `reject_reserved_version_82` use `02` and `82` because their rows are
-reserved. The day one of these bytes becomes active, the request gate lets
-that case's CRID through. The loader then fails and says it wants `accept`
-for the case, and both package smokes fail on the case name. That happens in
-a change about the CRID registry, whose author has no reason to look here.
-In the same change:
+reserved. `reject_active_version_01_short_form` uses `01` with a 24-byte
+digest because the row of `01` is active with a digest length of 32. The day
+one of the first three bytes becomes active, or the row of `01` gets a digest
+length of 24, the request gate lets that case's CRID through. The loader then
+fails and says it wants `accept` for the case, and both package smokes fail
+on the case name. That happens in a change about the CRID registry, whose
+author has no reason to look here. In the same change:
 
 1. if `7f` gets a row, re-point `reject_unregistered_version` to a version
    byte that still has none: change the byte in the loader's fixture and its
@@ -564,4 +578,8 @@ In the same change:
    must refuse, so the case has to go. Removing a case needs a new
    `schema_version` (see "Versioning"), so plan the two changes together,
    and update the sentence under "CRID gate" that names `01` and `81`;
-3. run `scripts/sync-vectors.sh`.
+3. if the row of `01` changes its digest length or is no longer active,
+   `reject_active_version_01_short_form` is no longer what its name says, and
+   every 60-character `01` CRID this artifact asks a link for is refused. That
+   needs a new `schema_version` as well;
+4. run `scripts/sync-vectors.sh`.

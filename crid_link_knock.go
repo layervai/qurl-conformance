@@ -406,6 +406,10 @@ var (
 	// client looks at the whole user agent before it truncates. A client
 	// that truncated first would find nothing wrong in what it kept.
 	cridLinkKnockV1UserAgentLateControl = "qurl-conformance/1.0 (late) " + strings.Repeat("d", 228) + string(rune(0x7f)) + strings.Repeat("d", 43)
+	// One C1 control character, U+0085, in a short user agent. The rule that
+	// leaves a user agent out does not name it, so the member is sent, and
+	// the character goes out as UTF-8 like any other non-ASCII character.
+	cridLinkKnockV1UserAgentC1 = "qurl-conformance/1.0 (next" + string(rune(0x85)) + "line)"
 
 	cridLinkKnockV1PublisherNameAtLimit   = cridLinkKnockV1AtLimit("")
 	cridLinkKnockV1PublisherNameOverLimit = cridLinkKnockV1OverLimit("")
@@ -419,6 +423,7 @@ var (
 		"user_agent_truncated_at_code_point_boundary": &cridLinkKnockV1UserAgentBoundary,
 		"user_agent_omitted_for_line_separator":       &cridLinkKnockV1UserAgentLineSeparator,
 		"user_agent_omitted_before_truncation":        &cridLinkKnockV1UserAgentLateControl,
+		"user_agent_c1_character_sent":                &cridLinkKnockV1UserAgentC1,
 	}
 
 	cridLinkKnockV1InvalidRequestFixtures = map[string]func(env *cridLinkKnockV1Environment) string{
@@ -446,6 +451,12 @@ var (
 		},
 		"reject_reserved_version_82": func(env *cridLinkKnockV1Environment) string {
 			return env.deriveCRID(0x82, CRIDV1TruncatedDigestLength)
+		},
+		// The fixture resource key under an active version byte, in the short
+		// form. The registry gives that byte the full form only, so this is
+		// one more well-formed CRID a client cannot verify a link against.
+		"reject_active_version_01_short_form": func(env *cridLinkKnockV1Environment) string {
+			return env.deriveCRID(0x01, CRIDV1TruncatedDigestLength)
 		},
 	}
 )
@@ -1067,10 +1078,11 @@ func cridLinkKnockV1TruncateUserAgent(userAgent string) string {
 // cridLinkKnockV1RequestExpectation is the reference request gate. It is the
 // CRID v1 local gate plus one rule of this contract: the version byte must be
 // one a client can verify an issued link against, which is an active row of
-// the CRID v1 registry. The CRID v1 gate forwards an unregistered or reserved
-// version. A link request for one would only fetch a link the client must
-// then reject, so the request is refused, under the CRID v1 version class
-// rather than a class of this artifact's own.
+// the CRID v1 registry, in the length that row gives it. The CRID v1 gate
+// forwards an unregistered version, a reserved one, and an active one in
+// another length. A link request for any of them would only fetch a link the
+// client must then reject, so the request is refused, under the CRID v1
+// version class rather than a class of this artifact's own.
 func cridLinkKnockV1RequestExpectation(crid string) (outcome, rejectClass string) {
 	if outcome, rejectClass := deriveCRIDV1ValueExpectation(crid); outcome != ExpectAccept {
 		return outcome, rejectClass

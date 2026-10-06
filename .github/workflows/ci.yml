@@ -536,8 +536,9 @@ jobs:
             assert.equal(refused.outcome, 'reject', refused.name);
             assert.equal(cridRequestRejectClass(refused.input.crid), refused.crid_reject_class, refused.name);
           }
-          // Three refused inputs pass the CRID v1 gate and are refused for their
-          // version alone: one unregistered byte and the two reserved bytes.
+          // Four refused inputs pass the CRID v1 gate and are refused for their
+          // version alone: one unregistered byte, the two reserved bytes, and
+          // an active byte in a length the registry does not give it.
           const unverifiable = lk.invalid_request_cases.filter(refused => cridLocalGate(refused.input.crid).rejectClass === '');
           assert.deepStrictEqual(
             unverifiable.map(refused => [refused.name, cridLocalGate(refused.input.crid).versionHex, refused.input.crid.length]),
@@ -545,6 +546,7 @@ jobs:
               ['reject_unregistered_version', '7f', cd.contract.full_crid_length],
               ['reject_reserved_version_02', '02', cd.contract.truncated_crid_length],
               ['reject_reserved_version_82', '82', cd.contract.truncated_crid_length],
+              ['reject_active_version_01_short_form', '01', cd.contract.truncated_crid_length],
             ],
           );
           assert.ok(unverifiable.every(refused => refused.crid_reject_class === 'version'));
@@ -1094,8 +1096,9 @@ jobs:
           for refused in lk['invalid_request_cases']:
               assert refused['outcome'] == 'reject', refused['name']
               assert crid_request_reject_class(refused['input']['crid']) == refused['crid_reject_class'], refused['name']
-          # Three refused inputs pass the CRID v1 gate and are refused for their
-          # version alone: one unregistered byte and the two reserved bytes.
+          # Four refused inputs pass the CRID v1 gate and are refused for their
+          # version alone: one unregistered byte, the two reserved bytes, and
+          # an active byte in a length the registry does not give it.
           unverifiable = [
               refused for refused in lk['invalid_request_cases'] if crid_local_gate(refused['input']['crid'])[0] == ''
           ]
@@ -1106,6 +1109,7 @@ jobs:
               ('reject_unregistered_version', '7f', cd['contract']['full_crid_length']),
               ('reject_reserved_version_02', '02', cd['contract']['truncated_crid_length']),
               ('reject_reserved_version_82', '82', cd['contract']['truncated_crid_length']),
+              ('reject_active_version_01_short_form', '01', cd['contract']['truncated_crid_length']),
           ]
           assert all(refused['crid_reject_class'] == 'version' for refused in unverifiable)
           requested_crids = (

@@ -127,10 +127,12 @@ fragment/transport accept fixture changes.
 
 - [ ] Re-point `crid_link_knock_v1_vectors.json` in the same change. Its
       refused requests use the version byte `7f` because the registry has no
-      row for it, and `02` and `82` because their rows are reserved, so its
-      loader and both package smokes fail the day one of them becomes
-      active. Follow "Lockstep with the CRID version registry" in
-      `vectors/README_crid_link_knock_v1_vectors.md`, then sync again.
+      row for it, `02` and `82` because their rows are reserved, and `01` in
+      the short form because its row has a digest length of 32. Its loader
+      and both package smokes fail the day one of the first three becomes
+      active or the row of `01` changes. Follow "Lockstep with the CRID
+      version registry" in `vectors/README_crid_link_knock_v1_vectors.md`,
+      then sync again.
 
 ## When the target-path alphabet changes
 
