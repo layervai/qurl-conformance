@@ -521,3 +521,27 @@ names the stale value. In the same change:
 5. run `scripts/sync-vectors.sh`.
 
 The CRIDs do not change while the vector resource key stays fixed.
+
+## Lockstep with the CRID version registry
+
+The request gate reads the version registry in `crid_v1_vectors.json`, so
+three `invalid_request_cases` depend on what that registry says today.
+`reject_unregistered_version` uses the version byte `7f` because the registry
+has no row for it. `reject_reserved_version_02` and
+`reject_reserved_version_82` use `02` and `82` because their rows are
+reserved. The day one of these bytes becomes active, the request gate lets
+that case's CRID through. The loader then fails and says it wants `accept`
+for the case, and both package smokes fail on the case name. That happens in
+a change about the CRID registry, whose author has no reason to look here.
+In the same change:
+
+1. if `7f` gets a row, re-point `reject_unregistered_version` to a version
+   byte that still has none: change the byte in the loader's fixture and its
+   test, derive the case's CRID again under the new byte, and change the
+   byte in the table under "CRID gate" and in both CI smokes. The case keeps
+   its name, its class and its 60-character form;
+2. if `02` or `82` becomes active, its case no longer names a CRID a client
+   must refuse, so the case has to go. Removing a case needs a new
+   `schema_version` (see "Versioning"), so plan the two changes together,
+   and update the sentence under "CRID gate" that names `01` and `81`;
+3. run `scripts/sync-vectors.sh`.

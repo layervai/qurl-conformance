@@ -123,6 +123,15 @@ fragment/transport accept fixture changes.
       exact pre-release vector bytes through their real verify/open paths. A
       structural parse or package-accessor smoke does not satisfy this gate.
 
+## When a release changes the CRID version registry
+
+- [ ] Re-point `crid_link_knock_v1_vectors.json` in the same change. Its
+      refused requests use the version byte `7f` because the registry has no
+      row for it, and `02` and `82` because their rows are reserved, so its
+      loader and both package smokes fail the day one of them becomes
+      active. Follow "Lockstep with the CRID version registry" in
+      `vectors/README_crid_link_knock_v1_vectors.md`, then sync again.
+
 ## When the target-path alphabet changes
 
 - [ ] Run the Go path round-trip gate and one real WHATWG consumer against the
