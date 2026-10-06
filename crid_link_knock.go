@@ -894,6 +894,14 @@ func (env *cridLinkKnockV1Environment) verificationFixtures() map[string]cridLin
 		"reject_origin_uppercase_host":   redirect("https://QURL.LINK/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
 		"reject_origin_default_port":     redirect("https://qurl.link:443/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
 		"reject_origin_trailing_dot":     redirect("https://qurl.link./#"+env.transport, CRIDLinkKnockV1RejectOrigin),
+		// Two more links that the URL parser of a browser puts on the link
+		// origin. It reads a backslash after the host as a slash, so the host
+		// ends at the link host and the rest is a path. It removes a tab before
+		// it reads the link, so the host is the link host again. As text, the
+		// first has an authority that runs on past the link origin, and the
+		// second does not begin with the link origin.
+		"reject_origin_backslash":   redirect(origin+`\@example.com/#`+env.transport, CRIDLinkKnockV1RejectOrigin),
+		"reject_origin_tab_in_host": redirect("https://qurl.li\tnk/#"+env.transport, CRIDLinkKnockV1RejectOrigin),
 		// Check 3 compares text too. A URL parser reads both of these as the
 		// bare link: to it an empty query is no query, and a dot segment is
 		// removed from the path.
@@ -1245,8 +1253,9 @@ func cridLinkKnockV1SplitLink(link, origin string) (fragment, rejectClass string
 		// The authority ended where the origin ends. A path or a query follows.
 		return "", CRIDLinkKnockV1RejectPathOrQuery
 	default:
-		// The authority runs on past the origin: a longer host, a port, or the
-		// origin standing as the userinfo of another host.
+		// The authority runs on past the origin: a longer host, a port, the
+		// origin standing as the userinfo of another host, or a backslash, which
+		// the URL parser of a browser reads as the slash that ends the authority.
 		return "", CRIDLinkKnockV1RejectOrigin
 	}
 }

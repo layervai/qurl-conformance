@@ -675,31 +675,41 @@ jobs:
           }
           // What the WHATWG URL parser makes of the same links. It agrees with
           // the text comparison on every link the comparison lets through. It
-          // also reads five of the rejected links as the bare link on the link
-          // origin: three respelled origins, an empty query and a dot segment.
+          // also reads six of the rejected links as the bare link on the link
+          // origin: three respelled origins, a host with a tab in it, an empty
+          // query and a dot segment. It puts one more rejected link on the link
+          // origin, with a path: the link with a backslash after the host.
           // That is why a client compares text and does not parse.
-          const parsesAsBareLinkOnOrigin = redirect => {
-            const url = new URL(redirect);
-            return url.origin === lk.constants.link_origin && url.username === '' && url.password === '' &&
-              url.pathname === '/' && url.search === '';
-          };
+          const parsesOnLinkOrigin = url =>
+            url.origin === lk.constants.link_origin && url.username === '' && url.password === '';
+          const parsesAsBareLinkOnOrigin = url =>
+            parsesOnLinkOrigin(url) && url.pathname === '/' && url.search === '';
           const parserWouldAccept = [];
+          const parserReadsLinkOriginWithPath = [];
           for (const check of lk.client_verification_cases) {
             const redirect = check.body.redirectUrl;
             if (typeof redirect !== 'string' || redirect === '') continue;
+            const url = new URL(redirect);
             if (splitLink(redirect).rejectClass === '') {
-              assert.ok(parsesAsBareLinkOnOrigin(redirect), check.name);
-            } else if (parsesAsBareLinkOnOrigin(redirect)) {
+              assert.ok(parsesAsBareLinkOnOrigin(url), check.name);
+            } else if (parsesAsBareLinkOnOrigin(url)) {
               parserWouldAccept.push([check.name, check.reject_class]);
+            } else if (check.reject_class === 'origin' && parsesOnLinkOrigin(url)) {
+              parserReadsLinkOriginWithPath.push([check.name, url.pathname]);
             }
           }
           assert.deepEqual(parserWouldAccept, [
             ['reject_origin_uppercase_scheme', 'origin'],
             ['reject_origin_uppercase_host', 'origin'],
             ['reject_origin_default_port', 'origin'],
+            ['reject_origin_tab_in_host', 'origin'],
             ['reject_empty_query', 'path_or_query'],
             ['reject_dot_segment', 'path_or_query'],
           ]);
+          // The parser reads the backslash as a slash. A client that parses
+          // first and compares only the origin accepts this link; one that
+          // also looks at the path refuses it, but as path_or_query.
+          assert.deepEqual(parserReadsLinkOriginWithPath, [['reject_origin_backslash', '/@example.com/']]);
           // Both accepted forms are pinned: with the slash and without it.
           assert.deepEqual(
             lk.client_verification_cases

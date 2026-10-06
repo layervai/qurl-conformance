@@ -256,6 +256,16 @@ authority. The link origin a client is configured with is itself one
 spelling: lower-case scheme and host, a port only when it is not the default,
 and no trailing slash.
 
+The URL parser that browsers use also changes a link before it reads it. It
+removes every tab, line feed and carriage return. So it reads
+`https://qurl.li<TAB>nk/#...`, where `<TAB>` stands for one tab character, as
+the bare link (`reject_origin_tab_in_host`). It reads a backslash as `/`. So
+in `https://qurl.link\@example.com/#...` it ends the host at `qurl.link` and
+reads the rest as a path (`reject_origin_backslash`). A parser that does not
+read `\` as `/` finds the host `example.com` in the same link. Both links are
+rejected as `origin`: the first does not begin with the link origin, and in
+the second the character after the origin does not end the authority.
+
 Check 3 is a comparison of text for the same reason. To a URL parser an empty
 query is no query, and a dot segment is not part of the path, so it reads
 `https://qurl.link/?#...` and `https://qurl.link/.#...` as the bare link.
@@ -306,6 +316,8 @@ of the fragment. The reject cases are chosen to catch specific mistakes:
 | `reject_origin_uppercase_scheme`, `reject_origin_uppercase_host` | parsing the link before comparing: a URL parser lower-cases the scheme and the host |
 | `reject_origin_default_port` | parsing the link before comparing: a URL parser drops the default port |
 | `reject_origin_trailing_dot` | treating the host with a trailing dot as the same host |
+| `reject_origin_backslash` | parsing the link before comparing: a browser's URL parser reads a backslash as `/`, so it ends the host at the link host and reads the other host as a path |
+| `reject_origin_tab_in_host` | parsing the link before comparing: a browser's URL parser removes a tab, a line feed and a carriage return before it reads the link |
 | `reject_path`, `reject_query` | accepting the right origin with something other than the bare fragment link |
 | `reject_empty_query` | checking the query with a URL parser, which reports an empty query as no query |
 | `reject_dot_segment` | checking the path with a URL parser, which removes a dot segment |
@@ -473,10 +485,11 @@ through Python's serializer and CRID derivation, and both runtimes run the
 request gate and dispatch on `reply_type_rules`, so the vectors are known to
 be implementable outside Go. The Node run also records what the WHATWG URL
 parser makes of each link: it agrees on every link the text comparison lets
-through, and it reads exactly five of the rejected links as the bare link on
-the link origin, the three spellings and the two check 3 links above.
-Consumers in those languages still run every case through their own
-production code.
+through, and it reads exactly six of the rejected links as the bare link on
+the link origin: the three spellings, the link with a tab in its host and the
+two check 3 links above. It puts the backslash link on the link origin too,
+with the path `/@example.com/`. Consumers in those languages still run every
+case through their own production code.
 
 ## Lockstep with the qURL v2 link
 

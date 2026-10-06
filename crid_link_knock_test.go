@@ -33,7 +33,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
 	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
-		len(lf.ClientVerificationCases) != 29 || len(lf.RedirectInfoSanitizationCases) != 20 {
+		len(lf.ClientVerificationCases) != 31 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
 			len(lf.ClientVerificationCases), len(lf.RedirectInfoSanitizationCases))
@@ -546,6 +546,9 @@ func TestCRIDLinkKnockV1LinkOriginIsComparedAsText(t *testing.T) {
 		{"https://Qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
 		{"https://user@qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
 		{"https://example.com/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://qurl.li\tnk/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://qurl.li\nnk/#f", "", CRIDLinkKnockV1RejectOrigin},
+		{"https://qurl.li\rnk/#f", "", CRIDLinkKnockV1RejectOrigin},
 		{" " + origin + "/#f", "", CRIDLinkKnockV1RejectOrigin},
 		{"//qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
 		{"qurl.link/#f", "", CRIDLinkKnockV1RejectOrigin},
@@ -630,6 +633,8 @@ func TestCRIDLinkKnockV1LinkOriginIsComparedAsText(t *testing.T) {
 		"reject_origin_uppercase_host":   {"https://QURL.LINK/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
 		"reject_origin_default_port":     {"https://qurl.link:443/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
 		"reject_origin_trailing_dot":     {"https://qurl.link./#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_backslash":        {origin + `\@example.com/#` + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
+		"reject_origin_tab_in_host":      {"https://qurl.li\tnk/#" + fragment, ExpectReject, CRIDLinkKnockV1RejectOrigin},
 		"reject_path":                    {origin + "/open#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
 		"reject_query":                   {origin + "/?next=open#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
 		"reject_empty_query":             {origin + "/?#" + fragment, ExpectReject, CRIDLinkKnockV1RejectPathOrQuery},
@@ -1538,6 +1543,7 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 	for _, name := range []string{
 		"reject_origin_as_userinfo", "reject_origin_uppercase_scheme", "reject_origin_uppercase_host",
 		"reject_origin_default_port", "reject_origin_trailing_dot",
+		"reject_origin_backslash", "reject_origin_tab_in_host",
 	} {
 		t.Run("verification "+name+" accepted", func(t *testing.T) {
 			assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {

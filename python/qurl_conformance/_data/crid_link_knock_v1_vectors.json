@@ -1037,6 +1037,56 @@
       "reject_class": "origin"
     },
     {
+      "name": "reject_origin_backslash",
+      "requested_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+      "body": {
+        "errCode": "52600",
+        "errMsg": "crid link issued",
+        "resHost": null,
+        "opnTime": 0,
+        "agentAddr": "203.0.113.9:49152",
+        "acTokens": null,
+        "redirectUrl": "https://qurl.link\\@example.com/#qv2t1.3.1.1.eyJ2IjoyLCJpc3MiOiJxdXJsLXNlcnZpY2UiLCJraWQiOiJxdXJsLWlzc3Vlci12ZWN0b3Ita2V5LWRvLW5vdC10cnVzdCIsImlhdCI6MTc4MTkxMDAwMCwibmJmIjoxNzgxOTEwMDAwLCJleHAiOjE3ODE5MTAzMDAsImp0aSI6InF1cmxfMDFKVkVDVE9SRklYVFVSRTAwMDAiLCJjZWxsX3B1YmxpY19rZXlfYjY0Ijoi.UkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUSIsImNlbGxfaWQiOiJ2ZWN0b3ItY2VsbCIsInJlbGF5X3VybCI6Imh0dHBzOi8vcmVsYXkuZXhhbXBsZS5jb20iLCJyZXNvdXJjZV9wdWJsaWNfa2V5X2I2NCI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRU90cXhYV1ls.YV9GYzF4WURXejhFRkVUbEV2N1IzV1RVdW5WWmZTRGpadkZVYlN5UXFENjZ1Z0ZaVUpubDhfLTcwemhNZEpUZVoxbjkxZVplLXVuTVp3IiwicXVybF91c2VyX3B1YmxpY19rZXlfYjY0IjoiVjl0TE5aOGpybDRVYms0bEVnVm5CSElsQmpTTUZRd1VkVDBNa3owRTFDRSJ9.eyJxdXJsX3VzZXJfcHJpdmF0ZV9rZXlfYjY0IjoiQ0FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNVayJ9.371yUGZZJ-6pFSpKxK29GWGpsT299PtAt8P0Khp7qvgXSsTlM4w6yhOnDp2o4brzBIw0nrthRRTmfmMIhGrDMQ",
+        "redirectInfo": {
+          "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+          "qurl_id": "q_a1b2c3d4e5f",
+          "expires_at": "2026-06-19T23:05:00Z",
+          "resource_created_at": "2026-06-18T09:30:00Z",
+          "publisher": {
+            "name": "Example Publisher",
+            "verified": false
+          }
+        }
+      },
+      "outcome": "reject",
+      "reject_class": "origin"
+    },
+    {
+      "name": "reject_origin_tab_in_host",
+      "requested_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+      "body": {
+        "errCode": "52600",
+        "errMsg": "crid link issued",
+        "resHost": null,
+        "opnTime": 0,
+        "agentAddr": "203.0.113.9:49152",
+        "acTokens": null,
+        "redirectUrl": "https://qurl.li\tnk/#qv2t1.3.1.1.eyJ2IjoyLCJpc3MiOiJxdXJsLXNlcnZpY2UiLCJraWQiOiJxdXJsLWlzc3Vlci12ZWN0b3Ita2V5LWRvLW5vdC10cnVzdCIsImlhdCI6MTc4MTkxMDAwMCwibmJmIjoxNzgxOTEwMDAwLCJleHAiOjE3ODE5MTAzMDAsImp0aSI6InF1cmxfMDFKVkVDVE9SRklYVFVSRTAwMDAiLCJjZWxsX3B1YmxpY19rZXlfYjY0Ijoi.UkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUkVSRVJFUSIsImNlbGxfaWQiOiJ2ZWN0b3ItY2VsbCIsInJlbGF5X3VybCI6Imh0dHBzOi8vcmVsYXkuZXhhbXBsZS5jb20iLCJyZXNvdXJjZV9wdWJsaWNfa2V5X2I2NCI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRU90cXhYV1ls.YV9GYzF4WURXejhFRkVUbEV2N1IzV1RVdW5WWmZTRGpadkZVYlN5UXFENjZ1Z0ZaVUpubDhfLTcwemhNZEpUZVoxbjkxZVplLXVuTVp3IiwicXVybF91c2VyX3B1YmxpY19rZXlfYjY0IjoiVjl0TE5aOGpybDRVYms0bEVnVm5CSElsQmpTTUZRd1VkVDBNa3owRTFDRSJ9.eyJxdXJsX3VzZXJfcHJpdmF0ZV9rZXlfYjY0IjoiQ0FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNVayJ9.371yUGZZJ-6pFSpKxK29GWGpsT299PtAt8P0Khp7qvgXSsTlM4w6yhOnDp2o4brzBIw0nrthRRTmfmMIhGrDMQ",
+        "redirectInfo": {
+          "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+          "qurl_id": "q_a1b2c3d4e5f",
+          "expires_at": "2026-06-19T23:05:00Z",
+          "resource_created_at": "2026-06-18T09:30:00Z",
+          "publisher": {
+            "name": "Example Publisher",
+            "verified": false
+          }
+        }
+      },
+      "outcome": "reject",
+      "reject_class": "origin"
+    },
+    {
       "name": "reject_path",
       "requested_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
       "body": {
