@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/layervai/qurl-conformance/compare/v0.17.1...v0.17.2) (2026-10-06)
+
+
+### Features
+
+* add crid link knock v1 vectors ([#150](https://github.com/layervai/qurl-conformance/issues/150)) ([10f7927](https://github.com/layervai/qurl-conformance/commit/10f7927aee9eabb739c307f1bc36f594e81fdfac))
+
 ## [0.17.1](https://github.com/layervai/qurl-conformance/compare/v0.17.0...v0.17.1) (2026-09-26)
 
 
