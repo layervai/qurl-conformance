@@ -11,7 +11,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"os"
 	"regexp"
@@ -509,82 +508,6 @@ func TestParseConformanceFileRejectsMalformedTransportClass(t *testing.T) {
 			t.Fatalf("ParseConformanceFile() error = %v, want malformed transport vector rejection", err)
 		}
 	})
-}
-
-// decodeConformanceTransport is an artifact-integrity check, not a consumer
-// implementation. Consumers still must run these vectors through their own real
-// decoder. Keeping this structural check here catches transcription mistakes in
-// the committed JSON and proves every accept component stays at or below 240.
-func decodeConformanceTransport(tc ConformanceTransportContract, body string) (string, error) {
-	if len(body) > tc.MaxTransportLength {
-		return "", fmt.Errorf("transport length %d exceeds %d", len(body), tc.MaxTransportLength)
-	}
-	parts := strings.Split(body, ".")
-	if len(parts) < 4 || parts[0] != tc.Prefix {
-		return "", fmt.Errorf("invalid prefix or header")
-	}
-	counts := make([]int, 3)
-	maxCounts := []int{tc.Fields.Claims.MaxChunks, tc.Fields.Secret.MaxChunks, tc.Fields.Signature.MaxChunks}
-	for i := range counts {
-		count, err := parseConformanceTransportCount(parts[i+1], maxCounts[i])
-		if err != nil {
-			return "", err
-		}
-		counts[i] = count
-	}
-	if len(parts) != 4+counts[0]+counts[1]+counts[2] {
-		return "", fmt.Errorf("part count mismatch")
-	}
-
-	fieldBounds := []ConformanceTransportField{tc.Fields.Claims, tc.Fields.Secret, tc.Fields.Signature}
-	fields := make([]string, 3)
-	part := 4
-	for fieldIndex, count := range counts {
-		fieldChunks := parts[part : part+count]
-		part += count
-		fieldLen := 0
-		for chunkIndex, chunk := range fieldChunks {
-			if len(chunk) == 0 || len(chunk) > tc.ComponentMax {
-				return "", fmt.Errorf("invalid chunk length")
-			}
-			if chunkIndex < len(fieldChunks)-1 && len(chunk) != tc.ComponentMax {
-				return "", fmt.Errorf("non-final chunk is not full width")
-			}
-			for i := 0; i < len(chunk); i++ {
-				if !isConformanceBase64URLByte(chunk[i]) {
-					return "", fmt.Errorf("invalid chunk alphabet")
-				}
-			}
-			fieldLen += len(chunk)
-		}
-		if fieldLen > fieldBounds[fieldIndex].MaxEncodedLength {
-			return "", fmt.Errorf("reconstructed field too long")
-		}
-		fields[fieldIndex] = strings.Join(fieldChunks, "")
-	}
-	return tc.CanonicalPrefix + "." + strings.Join(fields, "."), nil
-}
-
-func parseConformanceTransportCount(token string, max int) (int, error) {
-	if token == "" || token == "0" || token[0] == '0' {
-		return 0, fmt.Errorf("non-canonical count")
-	}
-	value := 0
-	for i := 0; i < len(token); i++ {
-		if token[i] < '0' || token[i] > '9' {
-			return 0, fmt.Errorf("non-decimal count")
-		}
-		digit := int(token[i] - '0')
-		if value > max/10 || value == max/10 && digit > max%10 {
-			return 0, fmt.Errorf("count exceeds maximum")
-		}
-		value = value*10 + digit
-	}
-	return value, nil
-}
-
-func isConformanceBase64URLByte(b byte) bool {
-	return b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b == '-' || b == '_'
 }
 
 func TestEmbeddedSignatureClassWellFormed(t *testing.T) {
@@ -2135,6 +2058,7 @@ func TestAllArtifactParsersRejectDuplicateKeysAndTrailingValues(t *testing.T) {
 		{"agent API-key ID", AgentAPIKeyIDVectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseAgentAPIKeyIDFile(b); return err }},
 		{"Connector resource LST v1", ConnectorResourceLSTV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseConnectorResourceLSTV1File(b); return err }},
 		{"CRID v1", CRIDV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseCRIDV1File(b); return err }},
+		{"CRID link knock v1", CRIDLinkKnockV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseCRIDLinkKnockV1File(b); return err }},
 		{"target path v1", TargetPathV1Vectors(), `{"artifact":"duplicate",`, func(b []byte) error { _, err := ParseTargetPathV1File(b); return err }},
 	}
 	for _, tc := range tests {
@@ -2504,6 +2428,7 @@ func TestOpenKnownAndUnknown(t *testing.T) {
 		{connectorHubLSTCookieName, ConnectorHubLSTCookieVectors},
 		{agentCredentialRecoveryName, AgentCredentialRecoveryVectors},
 		{cridV1Name, CRIDV1Vectors},
+		{cridLinkKnockV1Name, CRIDLinkKnockV1Vectors},
 		{targetPathV1Name, TargetPathV1Vectors},
 		{privateUploadV1Name, PrivateUploadV1Vectors},
 	}

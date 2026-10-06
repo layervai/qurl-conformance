@@ -72,6 +72,11 @@ def crid_v1_vectors():
     return _load("crid_v1_vectors.json")
 
 
+def crid_link_knock_v1_vectors():
+    """Return the parsed crid_link_knock_v1_vectors.json."""
+    return _load("crid_link_knock_v1_vectors.json")
+
+
 def target_path_v1_vectors():
     """Return the parsed target_path_v1_vectors.json."""
     return _load("target_path_v1_vectors.json")

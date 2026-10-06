@@ -7,8 +7,8 @@ path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, assignment tickets, Hub LST return-routability
 cookies, same-agent device-credential recovery, Connector resource discovery,
-CRID v1 resource identifiers, qURL Connector target paths, and private upload
-application signatures decoupled by layer.
+CRID v1 resource identifiers, CRID link requests, qURL Connector target paths,
+and private upload application signatures decoupled by layer.
 
 Everything here is a contract a third-party SDK implements. Platform-internal
 contracts between the NHP runtime, the Connector Hub, and the Connector
@@ -46,6 +46,8 @@ trust.
 | `vectors/README_agent_credential_recovery_v1_vectors.md` | recovery trust boundary, no-takeover rule, Hub/cell flow, crash/time semantics, and consumer algorithm |
 | `vectors/crid_v1_vectors.json` | CRID v1 derivation goldens from DER public keys, the local validation gate, the version-byte registry, and delivered-key match binding |
 | `vectors/README_crid_v1_vectors.md` | CRID v1 derivation, version registry, closed reject vocabulary, forwarding rule, and key-match/lockstep rules |
+| `vectors/crid_link_knock_v1_vectors.json` | the client contract for requesting a qURL link by CRID over a knock: canonical request bodies, reply type rules, the closed ACK outcome codes, the checks on an issued link, and unverified publisher metadata handling |
+| `vectors/README_crid_link_knock_v1_vectors.md` | the two-step flow, request and ACK field tables, reply type rules, closed result and reject vocabularies, client obligations, and the display-only publisher rule |
 | `vectors/target_path_v1_vectors.json` | shared canonical qURL Connector target-path request grammar and exact wire values |
 | `vectors/README_target_path_v1_vectors.md` | target-path security boundary, reject classes, consumer algorithm, and SDK lockstep rule |
 | `vectors/private_upload_v1_vectors.json` | private upload and refresh application-signing contract with byte-exact goldens and rejects |
@@ -71,6 +73,7 @@ rr, err := conformance.ConnectorResourceLSTV1()      // strict-parsed Connector 
 hc, err := conformance.ConnectorHubLSTCookie()       // strict-parsed Hub LST return-routability contract
 cr, err := conformance.AgentCredentialRecovery()     // strict-parsed UDP credential-recovery contract
 cd, err := conformance.CRIDV1()                       // strict-parsed CRID v1 derivation/validation vectors
+lk, err := conformance.CRIDLinkKnockV1()              // strict-parsed CRID link request/ACK client vectors
 tp, err := conformance.TargetPathV1()                 // strict-parsed Connector target-path vectors
 pu, err := conformance.PrivateUploadV1()              // strict-parsed private upload/refresh signature vectors
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
@@ -93,11 +96,14 @@ rules into a private fixture. qURL v2 schema version 2 is a deliberate breaking 
 typed consumers must update their loader for `transport_contract` and the
 `transport` class before adopting this release. Private upload clients consume
 `private_upload_v1_vectors.json` through their real request signer and run each
-mutation against the same preflight used in production.
+mutation against the same preflight used in production. CRID link request
+clients consume `crid_link_knock_v1_vectors.json` through their real request
+builder and reply interpreter, together with `issuer_signature_vectors.json`,
+which supplies the trust anchor for its fixture link.
 
 ## Scope
 
-This module hosts fifteen artifacts across fourteen protocol families. Each
+This module hosts sixteen artifacts across fifteen protocol families. Each
 artifact has its own `artifact` id:
 
 - **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
@@ -316,6 +322,25 @@ artifact has its own `artifact` id:
   used only when its re-derived CRID equals the held CRID. This family is
   fully stdlib-derivable, so the strict Go loader re-derives every golden
   from the DER key bytes. See `vectors/README_crid_v1_vectors.md`.
+- **CRID link knock v1** (`qurl-crid-link-knock-v1-vectors`,
+  `crid_link_knock_v1_vectors.json`) — the client contract for turning a CRID
+  into a qURL link without an account or an HTTP API. The client sends an
+  ordinary knock whose body names the CRID and receives the link in a
+  deliberately non-success ACK; it then opens that link with the unchanged
+  qURL v2 knock. The artifact freezes the canonical request body bytes
+  (including user-agent truncation to 256 bytes of valid UTF-8), the CRIDs a
+  client must refuse to request (including a well-formed one whose version it
+  could not verify a link against), the closed `52600`-`52606` outcome codes
+  with their retry flags and client results, the rules that a success code or
+  a non-string code is a protocol violation and that the overload cookie
+  reply means `busy`, and the checks a client runs before it uses an issued
+  link: link origin compared as text, bare fragment shape, `qv2t1` transport,
+  issuer signature, and a resource key that derives the requested CRID. Publisher
+  metadata in the reply is display-only and unverified, and malformed or
+  over-long metadata degrades instead of failing. The fixture link is the
+  published qURL v2 accept link, so the strict Go loader verifies its issuer
+  signature and re-derives its CRID instead of trusting stored labels. See
+  `vectors/README_crid_link_knock_v1_vectors.md`.
 - **qURL Connector target path** (`qurl-target-path-v1-vectors`,
   `target_path_v1_vectors.json`) — the shared local preflight and service input
   grammar for the optional per-qURL path and query on a tunnel resource. The

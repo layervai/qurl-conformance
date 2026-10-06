@@ -23,6 +23,7 @@ const (
 	connectorHubLSTCookieName   = "vectors/connector_hub_lst_cookie_v1_vectors.json"
 	agentCredentialRecoveryName = "vectors/agent_credential_recovery_v1_vectors.json"
 	cridV1Name                  = "vectors/crid_v1_vectors.json"
+	cridLinkKnockV1Name         = "vectors/crid_link_knock_v1_vectors.json"
 	targetPathV1Name            = "vectors/target_path_v1_vectors.json"
 	privateUploadV1Name         = "vectors/private_upload_v1_vectors.json"
 )
@@ -121,6 +122,13 @@ func AgentCredentialRecoveryVectors() []byte {
 // cryptographic resource identifier.
 func CRIDV1Vectors() []byte {
 	return mustReadVector(cridV1Name)
+}
+
+// CRIDLinkKnockV1Vectors returns the raw bytes of the CRID link knock
+// vectors: the client contract for asking the server for a qURL link by CRID
+// and for checking the link that comes back.
+func CRIDLinkKnockV1Vectors() []byte {
+	return mustReadVector(cridLinkKnockV1Name)
 }
 
 // TargetPathV1Vectors returns the raw bytes of the canonical target_path
@@ -227,6 +235,12 @@ func AgentCredentialRecovery() (*AgentCredentialRecoveryFile, error) {
 // artifact.
 func CRIDV1() (*CRIDV1File, error) {
 	return ParseCRIDV1File(CRIDV1Vectors())
+}
+
+// CRIDLinkKnockV1 strictly parses the embedded CRID link knock artifact and
+// re-derives every expectation it declares.
+func CRIDLinkKnockV1() (*CRIDLinkKnockV1File, error) {
+	return ParseCRIDLinkKnockV1File(CRIDLinkKnockV1Vectors())
 }
 
 // TargetPathV1 strictly parses the embedded target_path contract artifact.

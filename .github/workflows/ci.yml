@@ -84,6 +84,7 @@ jobs:
             connectorHubLstCookieVectors: 'connector_hub_lst_cookie_v1_vectors.json',
             agentCredentialRecoveryVectors: 'agent_credential_recovery_v1_vectors.json',
             cridV1Vectors: 'crid_v1_vectors.json',
+            cridLinkKnockV1Vectors: 'crid_link_knock_v1_vectors.json',
             targetPathV1Vectors: 'target_path_v1_vectors.json',
             privateUploadV1Vectors: 'private_upload_v1_vectors.json',
           };
@@ -441,6 +442,318 @@ jobs:
           assert.ok(!('hub_request_id' in acr.fixtures));
           assert.ok(hc.contract.additive_application_profiles.includes(acr.protocol.hub_cookie_contract));
           assert.ok(cd.producer_cases.every(verifyCRID));
+
+          // CRID link knock: the canonical request bytes are defined as
+          // JSON.stringify output and the link origin check as a comparison of
+          // text, so this runtime re-derives every expectation with the real
+          // primitives and then records what a URL parser makes of the same links.
+          const lk = c.cridLinkKnockV1Vectors();
+          const issuer = c.issuerSignatureVectors();
+          assert.equal(lk.artifact, 'qurl-crid-link-knock-v1-vectors');
+          assert.equal(lk.schema_version, 1);
+          const truncateUserAgent = value => {
+            let kept = '';
+            for (const character of value) {
+              if (Buffer.byteLength(kept + character) > lk.constants.user_agent_max_bytes) break;
+              kept += character;
+            }
+            return kept;
+          };
+          // A user agent that holds a control character, U+2028 or U+2029 is
+          // left out whole. The client looks at the whole string first and
+          // truncates after.
+          const leavesUserAgentOut = value => [...value].some(character => {
+            const codePoint = character.codePointAt(0);
+            return codePoint < 0x20 || codePoint === 0x7f || codePoint === 0x2028 || codePoint === 0x2029;
+          });
+          for (const request of lk.request_cases) {
+            const usrData = { [lk.constants.user_data_keys.crid]: request.input.crid };
+            if ('user_agent' in request.input && !leavesUserAgentOut(request.input.user_agent)) {
+              usrData[lk.constants.user_data_keys.user_agent] = truncateUserAgent(request.input.user_agent);
+            }
+            const body = {
+              headerType: lk.constants.knock_header_type,
+              aspId: lk.constants.auth_service_id,
+              resId: lk.constants.resource_id,
+              usrData,
+            };
+            assert.equal(JSON.stringify(body), request.serialized, request.name);
+            assert.equal(JSON.stringify(request.body), request.serialized, request.name);
+            // A request carries the CRID, an optional user agent and nothing
+            // else: in particular none of the members it must never carry.
+            for (const forbidden of lk.constants.forbidden_user_data_keys) {
+              assert.ok(!(forbidden in request.body.usrData), `${request.name} carries ${forbidden}`);
+            }
+          }
+          assert.ok(!lk.constants.forbidden_user_data_keys.some(key => Object.values(lk.constants.user_data_keys).includes(key)));
+          // Two cases report a user agent and send none. The second holds
+          // nothing wrong in the bytes a client would keep, so it pins the order.
+          const leftOut = lk.request_cases.filter(request =>
+            'user_agent' in request.input && !(lk.constants.user_data_keys.user_agent in request.body.usrData));
+          assert.deepStrictEqual(
+            leftOut.map(request => request.name),
+            ['user_agent_omitted_for_line_separator', 'user_agent_omitted_before_truncation'],
+          );
+          assert.ok(!leavesUserAgentOut(truncateUserAgent(leftOut[1].input.user_agent)), leftOut[1].name);
+          // The request gate is the CRID v1 local gate plus one rule: the version
+          // byte must be an active registry row at that row's digest length,
+          // the only kind of CRID a client can verify an issued link against.
+          const cridLocalGate = value => {
+            const alphabet = cd.contract.alphabet;
+            if ([...value].some(character => !alphabet.includes(character))) return { rejectClass: 'charset' };
+            if (value.length !== cd.contract.full_crid_length && value.length !== cd.contract.truncated_crid_length) {
+              return { rejectClass: 'length' };
+            }
+            const bytes = [];
+            let pending = 0, bits = 0;
+            for (const character of value) {
+              pending = (pending << 5) | alphabet.indexOf(character);
+              bits += 5;
+              if (bits >= 8) {
+                bits -= 8;
+                bytes.push(pending >>> bits);
+                pending &= (1 << bits) - 1;
+              }
+            }
+            if (pending !== 0) return { rejectClass: 'non_canonical' };
+            const decoded = Buffer.from(bytes);
+            const payload = decoded.subarray(0, decoded.length - cd.contract.checksum_length);
+            if (decoded.readUInt32BE(payload.length) !== crc32c(payload)) return { rejectClass: 'checksum' };
+            const versionHex = payload.subarray(0, 1).toString('hex');
+            if (versionHex === cd.contract.forbidden_version_hex) return { rejectClass: 'version' };
+            return { rejectClass: '', versionHex, digestLength: payload.length - 1 };
+          };
+          const cridRequestRejectClass = value => {
+            const gate = cridLocalGate(value);
+            if (gate.rejectClass) return gate.rejectClass;
+            const row = cd.versions.find(version => version.version_hex === gate.versionHex);
+            return row && row.status === 'active' && row.digest_length === gate.digestLength ? '' : 'version';
+          };
+          for (const value of cd.consumer_value_cases) {
+            assert.equal(cridLocalGate(value.value).rejectClass, value.reject_class ?? '', value.name);
+          }
+          for (const refused of lk.invalid_request_cases) {
+            assert.equal(refused.outcome, 'reject', refused.name);
+            assert.equal(cridRequestRejectClass(refused.input.crid), refused.crid_reject_class, refused.name);
+          }
+          // Four refused inputs pass the CRID v1 gate and are refused for their
+          // version alone: one unregistered byte, the two reserved bytes, and
+          // an active byte in a length the registry does not give it.
+          const unverifiable = lk.invalid_request_cases.filter(refused => cridLocalGate(refused.input.crid).rejectClass === '');
+          assert.deepStrictEqual(
+            unverifiable.map(refused => [refused.name, cridLocalGate(refused.input.crid).versionHex, refused.input.crid.length]),
+            [
+              ['reject_unregistered_version', '7f', cd.contract.full_crid_length],
+              ['reject_reserved_version_02', '02', cd.contract.truncated_crid_length],
+              ['reject_reserved_version_82', '82', cd.contract.truncated_crid_length],
+              ['reject_active_version_01_short_form', '01', cd.contract.truncated_crid_length],
+            ],
+          );
+          assert.ok(unverifiable.every(refused => refused.crid_reject_class === 'version'));
+          for (const requested of [
+            ...lk.request_cases.map(request => request.input.crid),
+            ...lk.ack_cases.map(ackCase => ackCase.requested_crid),
+            ...lk.client_verification_cases.map(check => check.requested_crid),
+          ]) {
+            assert.equal(cridRequestRejectClass(requested), '', requested);
+          }
+          const cridFromKey = (keyB64, held) => {
+            const version = (cd.contract.alphabet.indexOf(held[0]) << 3) | (cd.contract.alphabet.indexOf(held[1]) >> 2);
+            const digest = crypto.createHash('sha256')
+              .update(Buffer.concat([
+                Buffer.from(cd.contract.domain_separation_prefix, 'ascii'),
+                Buffer.from([0]),
+                Buffer.from(keyB64, 'base64url'),
+              ])).digest();
+            const payload = Buffer.concat([Buffer.from([version]), digest]);
+            const crc = Buffer.alloc(4);
+            crc.writeUInt32BE(crc32c(payload));
+            return base32(Buffer.concat([payload, crc]));
+          };
+          const issuerKey = crypto.createPublicKey({ key: issuer.issuer.jwk, format: 'jwk' });
+          const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+          // Checks 2 and 3 compare text. An issued link is the link origin, an
+          // optional slash, a number sign and the fragment. It is not parsed as
+          // a URL first: a parser lower-cases the scheme and the host and drops
+          // a default port, so it reads other spellings as the same origin.
+          const splitLink = redirect => {
+            const origin = lk.constants.link_origin;
+            if (!redirect.startsWith(origin)) return { rejectClass: 'origin' };
+            const numberSign = redirect.indexOf('#');
+            const location = redirect.slice(origin.length, numberSign === -1 ? redirect.length : numberSign);
+            if (location !== '' && location !== '/') {
+              return { rejectClass: location[0] === '/' || location[0] === '?' ? 'path_or_query' : 'origin' };
+            }
+            return { rejectClass: '', fragment: numberSign === -1 ? '' : redirect.slice(numberSign + 1) };
+          };
+          const linkRejectClass = (requested, ack) => {
+            const redirect = ack.redirectUrl;
+            if (typeof redirect !== 'string' || redirect === '') return 'missing_redirect';
+            const split = splitLink(redirect);
+            if (split.rejectClass) return split.rejectClass;
+            const parts = split.fragment.split('.');
+            const counts = parts.slice(1, 4).map(Number);
+            if (parts[0] !== 'qv2t1' || parts.length !== 4 + counts[0] + counts[1] + counts[2]) return 'transport';
+            const claims = parts.slice(4, 4 + counts[0]).join('');
+            const signed = Buffer.concat([
+              Buffer.from(issuer.domain_separation_prefix, 'ascii'),
+              Buffer.from([0]),
+              Buffer.from(claims, 'ascii'),
+            ]);
+            if (!crypto.verify(
+              'sha256',
+              signed,
+              { key: issuerKey, dsaEncoding: 'ieee-p1363' },
+              Buffer.from(parts.at(-1), 'base64url'),
+            )) return 'issuer_signature';
+            const resourceKey = JSON.parse(Buffer.from(claims, 'base64url')).resource_public_key_b64;
+            if (cridFromKey(resourceKey, requested) !== requested) return 'crid_mismatch';
+            if (isObject(ack.redirectInfo) && 'crid' in ack.redirectInfo && ack.redirectInfo.crid !== requested) {
+              return 'info_crid_mismatch';
+            }
+            return '';
+          };
+          // One cap for every display string: kept only when it is a non-empty
+          // string of at most info_text_max_code_points code points, never shortened.
+          const isInfoText = value => typeof value === 'string' && value !== '' &&
+            [...value].length <= lk.constants.info_text_max_code_points;
+          assert.equal(lk.constants.info_text_max_code_points, 128);
+          const sanitizeRedirectInfo = raw => {
+            const source = isObject(raw) ? raw : {};
+            const info = {};
+            for (const member of ['qurl_id', 'expires_at', 'resource_created_at']) {
+              if (isInfoText(source[member])) info[member] = source[member];
+            }
+            const publisher = isObject(source.publisher) ? source.publisher : {};
+            info.publisher = {};
+            if (isInfoText(publisher.name)) info.publisher.name = publisher.name;
+            info.publisher.verified = publisher.verified === true;
+            return info;
+          };
+          const interpretAck = (requested, ack) => {
+            if (typeof ack.errCode !== 'string' || ack.errCode === '' || ack.errCode === '0') {
+              return { client_result: 'protocol_violation' };
+            }
+            if (!Object.hasOwn(lk.error_codes, ack.errCode)) return { client_result: 'server_error' };
+            const result = lk.error_codes[ack.errCode].client_result;
+            if (result !== 'link') return { client_result: result };
+            const rejectClass = linkRejectClass(requested, ack);
+            if (rejectClass) return { reject_class: rejectClass };
+            return { client_result: result, link: ack.redirectUrl, info: sanitizeRedirectInfo(ack.redirectInfo) };
+          };
+          // The packet header type is read before any body: only an ACK has an
+          // outcome code, the cookie reply is busy, anything else is a transport
+          // error and not a client result.
+          const replyRules = lk.reply_type_rules;
+          assert.deepStrictEqual(Object.keys(replyRules), ['ack', 'cookie', 'other']);
+          assert.deepStrictEqual(replyRules.ack, {
+            header_type: lk.constants.ack_header_type,
+            is_ack: true,
+            carries_outcome_code: true,
+            handling: 'interpret_ack_body',
+          });
+          assert.deepStrictEqual(replyRules.cookie, {
+            header_type: lk.constants.cookie_header_type,
+            is_ack: false,
+            carries_outcome_code: false,
+            handling: 'client_result',
+            client_result: 'busy',
+          });
+          assert.deepStrictEqual(replyRules.other, { is_ack: false, carries_outcome_code: false, handling: 'transport_error' });
+          assert.equal(lk.constants.cookie_header_type, 7);
+          const interpretReply = (headerType, requested, body) => {
+            const rule = Object.values(replyRules).find(candidate => candidate.header_type === headerType) ?? replyRules.other;
+            if (rule.handling === 'interpret_ack_body') return interpretAck(requested, body);
+            if (rule.handling === 'client_result') return { client_result: rule.client_result };
+            return { transport_error: true };
+          };
+          for (const ackCase of lk.ack_cases) {
+            assert.deepStrictEqual(
+              interpretReply(lk.constants.ack_header_type, ackCase.requested_crid, ackCase.body),
+              ackCase.expected,
+              ackCase.name,
+            );
+          }
+          const issued = lk.ack_cases.find(ackCase => ackCase.name === 'link_issued');
+          assert.deepStrictEqual(
+            interpretReply(lk.constants.cookie_header_type, issued.requested_crid, issued.body),
+            { client_result: 'busy' },
+          );
+          assert.deepStrictEqual(
+            interpretReply(lk.constants.knock_header_type, issued.requested_crid, issued.body),
+            { transport_error: true },
+          );
+          const ackResults = new Set(lk.ack_cases.map(ackCase => ackCase.expected.client_result));
+          assert.ok(!ackResults.has(replyRules.cookie.client_result));
+          assert.deepStrictEqual([...ackResults, replyRules.cookie.client_result].sort(), [...lk.client_results].sort());
+          for (const check of lk.client_verification_cases) {
+            const result = interpretAck(check.requested_crid, check.body);
+            assert.equal(result.client_result === 'link' ? 'accept' : 'reject', check.outcome, check.name);
+            assert.equal(result.reject_class, check.reject_class, check.name);
+          }
+          // What the WHATWG URL parser makes of the same links. It agrees with
+          // the text comparison on every link the comparison lets through. It
+          // also reads six of the rejected links as the bare link on the link
+          // origin: three respelled origins, a host with a tab in it, an empty
+          // query and a dot segment. It puts one more rejected link on the link
+          // origin, with a path: the link with a backslash after the host.
+          // That is why a client compares text and does not parse.
+          const parsesOnLinkOrigin = url =>
+            url.origin === lk.constants.link_origin && url.username === '' && url.password === '';
+          const parsesAsBareLinkOnOrigin = url =>
+            parsesOnLinkOrigin(url) && url.pathname === '/' && url.search === '';
+          const parserWouldAccept = [];
+          const parserReadsLinkOriginWithPath = [];
+          const parserRefuses = [];
+          for (const check of lk.client_verification_cases) {
+            const redirect = check.body.redirectUrl;
+            if (typeof redirect !== 'string' || redirect === '') continue;
+            let url;
+            try {
+              url = new URL(redirect);
+            } catch {
+              parserRefuses.push(check.name);
+              continue;
+            }
+            if (splitLink(redirect).rejectClass === '') {
+              assert.ok(parsesAsBareLinkOnOrigin(url), check.name);
+            } else if (parsesAsBareLinkOnOrigin(url)) {
+              parserWouldAccept.push([check.name, check.reject_class]);
+            } else if (check.reject_class === 'origin' && parsesOnLinkOrigin(url)) {
+              parserReadsLinkOriginWithPath.push([check.name, url.pathname]);
+            }
+          }
+          // The parser reads every link of the suite. One it refuses to read
+          // fails here, by name.
+          assert.deepStrictEqual(parserRefuses, []);
+          assert.deepStrictEqual(parserWouldAccept, [
+            ['reject_origin_uppercase_scheme', 'origin'],
+            ['reject_origin_uppercase_host', 'origin'],
+            ['reject_origin_default_port', 'origin'],
+            ['reject_origin_tab_in_host', 'origin'],
+            ['reject_empty_query', 'path_or_query'],
+            ['reject_dot_segment', 'path_or_query'],
+          ]);
+          // The parser reads the backslash as a slash. A client that parses
+          // first and compares only the origin accepts this link; one that
+          // also looks at the path refuses it, but as path_or_query.
+          assert.deepStrictEqual(parserReadsLinkOriginWithPath, [['reject_origin_backslash', '/@example.com/']]);
+          // Both accepted forms are pinned: with the slash and without it.
+          assert.deepStrictEqual(
+            lk.client_verification_cases
+              .filter(check => check.outcome === 'accept')
+              .map(check => check.body.redirectUrl.slice(lk.constants.link_origin.length, check.body.redirectUrl.indexOf('#') + 1))
+              .filter((form, index, forms) => forms.indexOf(form) === index)
+              .sort(),
+            ['#', '/#'],
+          );
+          for (const sanitization of lk.redirect_info_sanitization_cases) {
+            assert.deepStrictEqual(sanitizeRedirectInfo(sanitization.redirect_info), sanitization.expected, sanitization.name);
+          }
+          assert.deepStrictEqual(
+            [...new Set(lk.client_verification_cases.map(check => check.reject_class).filter(Boolean))].sort(),
+            [...lk.reject_classes].sort(),
+          );
           console.log('npm ok');
           NODE
 
@@ -492,6 +805,7 @@ jobs:
               'connector_hub_lst_cookie_vectors': 'connector_hub_lst_cookie_v1_vectors.json',
               'agent_credential_recovery_vectors': 'agent_credential_recovery_v1_vectors.json',
               'crid_v1_vectors': 'crid_v1_vectors.json',
+              'crid_link_knock_v1_vectors': 'crid_link_knock_v1_vectors.json',
               'target_path_v1_vectors': 'target_path_v1_vectors.json',
               'private_upload_v1_vectors': 'private_upload_v1_vectors.json',
           }
@@ -695,6 +1009,212 @@ jobs:
           assert 'hub_request_id' not in acr['fixtures']
           assert acr['protocol']['hub_cookie_contract'] in hc['contract']['additive_application_profiles']
           assert all(verify_crid(vector) for vector in cd['producer_cases'])
+
+          # CRID link knock: re-derive the canonical request bytes with this
+          # runtime's serializer, tie the fixture link to its CRIDs, and
+          # re-run the display-metadata gate.
+          lk = q.crid_link_knock_v1_vectors()
+          assert lk['artifact'] == 'qurl-crid-link-knock-v1-vectors' and lk['schema_version'] == 1
+
+          def truncate_user_agent(value):
+              kept = ''
+              for character in value:
+                  if len((kept + character).encode()) > lk['constants']['user_agent_max_bytes']:
+                      break
+                  kept += character
+              return kept
+
+          # A user agent that holds a control character, U+2028 or U+2029 is
+          # left out whole. The client looks at the whole string first and
+          # truncates after.
+          def leaves_user_agent_out(value):
+              return any(ord(character) < 0x20 or ord(character) in (0x7f, 0x2028, 0x2029) for character in value)
+
+          for request in lk['request_cases']:
+              user_data = {lk['constants']['user_data_keys']['crid']: request['input']['crid']}
+              if 'user_agent' in request['input'] and not leaves_user_agent_out(request['input']['user_agent']):
+                  user_data[lk['constants']['user_data_keys']['user_agent']] = truncate_user_agent(
+                      request['input']['user_agent']
+                  )
+              built = {
+                  'headerType': lk['constants']['knock_header_type'],
+                  'aspId': lk['constants']['auth_service_id'],
+                  'resId': lk['constants']['resource_id'],
+                  'usrData': user_data,
+              }
+              for body in (built, request['body']):
+                  assert json.dumps(body, separators=(',', ':'), ensure_ascii=False) == request['serialized'], request['name']
+          # Two cases report a user agent and send none. The second holds
+          # nothing wrong in the bytes a client would keep, so it pins the order.
+          left_out = [
+              request for request in lk['request_cases']
+              if 'user_agent' in request['input']
+              and lk['constants']['user_data_keys']['user_agent'] not in request['body']['usrData']
+          ]
+          assert [request['name'] for request in left_out] == [
+              'user_agent_omitted_for_line_separator',
+              'user_agent_omitted_before_truncation',
+          ]
+          assert not leaves_user_agent_out(truncate_user_agent(left_out[1]['input']['user_agent'])), left_out[1]['name']
+
+          # The request gate is the CRID v1 local gate plus one rule: the version
+          # byte must be an active registry row at that row's digest length,
+          # the only kind of CRID a client can verify an issued link against.
+          def crid_local_gate(value):
+              alphabet = cd['contract']['alphabet']
+              if any(character not in alphabet for character in value):
+                  return 'charset', None, None
+              if len(value) not in (cd['contract']['full_crid_length'], cd['contract']['truncated_crid_length']):
+                  return 'length', None, None
+              number = 0
+              for character in value:
+                  number = (number << 5) | alphabet.index(character)
+              spare_bits = len(value) * 5 % 8
+              if number & ((1 << spare_bits) - 1):
+                  return 'non_canonical', None, None
+              decoded = (number >> spare_bits).to_bytes(len(value) * 5 // 8, 'big')
+              payload = decoded[:-cd['contract']['checksum_length']]
+              if struct.unpack('>I', decoded[len(payload):])[0] != crc32c(payload):
+                  return 'checksum', None, None
+              version_hex = payload[:1].hex()
+              if version_hex == cd['contract']['forbidden_version_hex']:
+                  return 'version', None, None
+              return '', version_hex, len(payload) - 1
+
+          def crid_request_reject_class(value):
+              reject_class, version_hex, digest_length = crid_local_gate(value)
+              if reject_class:
+                  return reject_class
+              verifiable = any(
+                  row['version_hex'] == version_hex and row['status'] == 'active' and row['digest_length'] == digest_length
+                  for row in cd['versions']
+              )
+              return '' if verifiable else 'version'
+
+          for value in cd['consumer_value_cases']:
+              assert crid_local_gate(value['value'])[0] == value.get('reject_class', ''), value['name']
+          for refused in lk['invalid_request_cases']:
+              assert refused['outcome'] == 'reject', refused['name']
+              assert crid_request_reject_class(refused['input']['crid']) == refused['crid_reject_class'], refused['name']
+          # Four refused inputs pass the CRID v1 gate and are refused for their
+          # version alone: one unregistered byte, the two reserved bytes, and
+          # an active byte in a length the registry does not give it.
+          unverifiable = [
+              refused for refused in lk['invalid_request_cases'] if crid_local_gate(refused['input']['crid'])[0] == ''
+          ]
+          assert [
+              (refused['name'], crid_local_gate(refused['input']['crid'])[1], len(refused['input']['crid']))
+              for refused in unverifiable
+          ] == [
+              ('reject_unregistered_version', '7f', cd['contract']['full_crid_length']),
+              ('reject_reserved_version_02', '02', cd['contract']['truncated_crid_length']),
+              ('reject_reserved_version_82', '82', cd['contract']['truncated_crid_length']),
+              ('reject_active_version_01_short_form', '01', cd['contract']['truncated_crid_length']),
+          ]
+          assert all(refused['crid_reject_class'] == 'version' for refused in unverifiable)
+          requested_crids = (
+              [request['input']['crid'] for request in lk['request_cases']]
+              + [case['requested_crid'] for case in lk['ack_cases']]
+              + [case['requested_crid'] for case in lk['client_verification_cases']]
+          )
+          assert all(crid_request_reject_class(crid) == '' for crid in requested_crids)
+
+          link_parts = lk['fixtures']['link'].removeprefix(lk['constants']['link_origin'] + '/#').split('.')
+          assert link_parts[0] == 'qv2t1'
+          link_claims_b64 = ''.join(link_parts[4:4 + int(link_parts[1])])
+          link_claims = json.loads(base64.urlsafe_b64decode(link_claims_b64 + '=' * (-len(link_claims_b64) % 4)))
+          assert link_claims['resource_public_key_b64'] == lk['fixtures']['resource_public_key_b64']
+          link_resource_der = base64.urlsafe_b64decode(lk['fixtures']['resource_public_key_b64'] + '==')
+          link_resource_digest = hashlib.sha256(
+              cd['contract']['domain_separation_prefix'].encode('ascii') + bytes(1) + link_resource_der
+          ).digest()
+          for version, crid in ((0x01, lk['fixtures']['crid']), (0x81, lk['fixtures']['test_environment_crid'])):
+              payload = bytes([version]) + link_resource_digest
+              encoded = payload + struct.pack('>I', crc32c(payload))
+              assert base64.b32encode(encoded).decode().rstrip('=').lower() == crid
+
+          # One cap for every display string: kept only when it is a non-empty
+          # string of at most info_text_max_code_points code points, never shortened.
+          assert lk['constants']['info_text_max_code_points'] == 128
+
+          def is_info_text(value):
+              return isinstance(value, str) and 0 < len(value) <= lk['constants']['info_text_max_code_points']
+
+          def sanitize_redirect_info(raw):
+              source = raw if isinstance(raw, dict) else {}
+              info = {
+                  member: source[member]
+                  for member in ('qurl_id', 'expires_at', 'resource_created_at')
+                  if is_info_text(source.get(member))
+              }
+              publisher = source.get('publisher') if isinstance(source.get('publisher'), dict) else {}
+              info['publisher'] = {'verified': publisher.get('verified') is True}
+              if is_info_text(publisher.get('name')):
+                  info['publisher']['name'] = publisher['name']
+              return info
+
+          for case in lk['redirect_info_sanitization_cases']:
+              assert sanitize_redirect_info(case['redirect_info']) == case['expected'], case['name']
+
+          # The packet header type is read before any body: only an ACK has an
+          # outcome code, the cookie reply is busy, anything else is a
+          # transport error and not a client result.
+          reply_rules = lk['reply_type_rules']
+          assert list(reply_rules) == ['ack', 'cookie', 'other']
+          assert reply_rules['ack'] == {
+              'header_type': lk['constants']['ack_header_type'],
+              'is_ack': True,
+              'carries_outcome_code': True,
+              'handling': 'interpret_ack_body',
+          }
+          assert reply_rules['cookie'] == {
+              'header_type': lk['constants']['cookie_header_type'],
+              'is_ack': False,
+              'carries_outcome_code': False,
+              'handling': 'client_result',
+              'client_result': 'busy',
+          }
+          assert reply_rules['other'] == {'is_ack': False, 'carries_outcome_code': False, 'handling': 'transport_error'}
+          # Dictionary equality treats 1 and 0 as True and False; the flags must be real booleans.
+          assert reply_rules['ack']['is_ack'] is True and reply_rules['ack']['carries_outcome_code'] is True
+          assert all(
+              reply_rules[kind][flag] is False
+              for kind in ('cookie', 'other')
+              for flag in ('is_ack', 'carries_outcome_code')
+          )
+          assert lk['constants']['cookie_header_type'] == 7
+
+          def interpret_reply(header_type, body):
+              rule = next(
+                  (candidate for candidate in reply_rules.values() if candidate.get('header_type') == header_type),
+                  reply_rules['other'],
+              )
+              if rule['handling'] == 'client_result':
+                  return rule['client_result']
+              if rule['handling'] != 'interpret_ack_body':
+                  return 'transport error, not a client result'
+              code = body.get('errCode')
+              if not isinstance(code, str) or code in ('', '0'):
+                  return 'protocol_violation'
+              return lk['error_codes'].get(code, {'client_result': 'server_error'})['client_result']
+
+          for case in lk['ack_cases']:
+              result = interpret_reply(lk['constants']['ack_header_type'], case['body'])
+              assert result == case['expected']['client_result'], case['name']
+              if result == 'link':
+                  assert case['expected']['link'] == case['body']['redirectUrl'] == lk['fixtures']['link'], case['name']
+                  assert sanitize_redirect_info(case['body'].get('redirectInfo')) == case['expected']['info'], case['name']
+              else:
+                  assert 'link' not in case['expected'] and 'info' not in case['expected'], case['name']
+          issued = next(case for case in lk['ack_cases'] if case['name'] == 'link_issued')
+          assert interpret_reply(lk['constants']['cookie_header_type'], issued['body']) == 'busy'
+          assert interpret_reply(lk['constants']['knock_header_type'], issued['body']) not in lk['client_results']
+          ack_results = {case['expected']['client_result'] for case in lk['ack_cases']}
+          assert reply_rules['cookie']['client_result'] not in ack_results
+          assert ack_results | {reply_rules['cookie']['client_result']} == set(lk['client_results'])
+          assert {
+              case['reject_class'] for case in lk['client_verification_cases'] if case['outcome'] == 'reject'
+          } == set(lk['reject_classes'])
           print('py ok')
           PY
 
