@@ -43,7 +43,7 @@ a fresh random key for every request.
 | `aspId` | `qurl` (`constants.auth_service_id`) |
 | `resId` | `qurl-crid` (`constants.resource_id`): a fixed sentinel, not a resource key |
 | `usrData.qurl_crid` | the CRID, exactly as issued |
-| `usrData.qurl_user_agent` | optional: the client's user agent, at most 256 bytes of UTF-8; left out when the user agent holds a control character, U+2028 or U+2029 |
+| `usrData.qurl_user_agent` | optional: the client's user agent, at most 256 bytes of UTF-8; left out when the user agent holds a control character, U+2028 or U+2029 (`user_agent_omitted_for_line_separator`, `user_agent_omitted_before_truncation`) |
 
 `aspId`, `resId` and a string `usrData.qurl_crid` together make the knock a
 link request. A v1 client sends no other member. In particular the body never
@@ -76,7 +76,7 @@ body's canonical bytes:
   becomes `\\`. `/`, `<`, `>` and `&` are written as they are, and every
   non-ASCII character is emitted as UTF-8 rather than as a `\u` escape.
   `user_agent_json_escaping` and `user_agent_at_limit` pin these rules. No
-  vector contains a control character, U+2028 or U+2029.
+  `serialized` value contains a control character, U+2028 or U+2029.
 
 A control character never reaches these bytes, and neither does U+2028 or
 U+2029. A v1 client sends `usrData.qurl_user_agent` only when the user agent
@@ -89,7 +89,10 @@ bytes. JSON has a short and a long escape for some control characters:
 `encoding/json` always writes U+2028 and U+2029 as `\u2028` and `\u2029`,
 while `JSON.stringify`, and Python's `json.dumps` with `ensure_ascii=False`,
 write them as UTF-8. The member is optional and only for display, so a
-request without it loses nothing. No case pins this rule yet.
+request without it loses nothing. `user_agent_omitted_for_line_separator` and
+`user_agent_omitted_before_truncation` pin this rule. Each reports a user
+agent and sends none, so its bytes are the bytes of `minimal`, and every
+encoder writes those the same way.
 
 A consumer builds the body from `input` with its real request builder and
 compares the result with `serialized` byte for byte. A serializer that
@@ -104,8 +107,10 @@ committed `body` object lists its members in the same order, so
 
 `usrData.qurl_user_agent` is omitted when the client has no user agent to
 report. It is also omitted when the user agent holds a control character,
-U+2028 or U+2029, as "Canonical bytes" says. The client looks at the whole
-user agent for that, before it truncates anything. A value longer than
+U+2028 or U+2029, as "Canonical bytes" says
+(`user_agent_omitted_for_line_separator`). The client looks at the whole
+user agent for that, before it truncates anything
+(`user_agent_omitted_before_truncation`). A value longer than
 `constants.user_agent_max_bytes` is truncated, never rejected: the client
 keeps the longest prefix that is at most 256 bytes of UTF-8 and ends on a
 code point boundary, so what it sends is always valid UTF-8.
@@ -115,10 +120,20 @@ code point boundary, so what it sends is always valid UTF-8.
 | `user_agent_at_limit` | 256 bytes, 255 characters | unchanged |
 | `user_agent_truncated` | 300 ASCII bytes | the first 256 bytes |
 | `user_agent_truncated_at_code_point_boundary` | 258 bytes in 256 UTF-16 code units; a four-byte character occupies bytes 254 to 257 | the first 253 bytes: the whole character is dropped |
+| `user_agent_omitted_for_line_separator` | 39 bytes; one character is U+2028 | nothing: the member is left out |
+| `user_agent_omitted_before_truncation` | 300 bytes; the first 256 are ASCII with nothing wrong in them, and byte 257 is U+007F | nothing: the member is left out |
 
-The last case defeats both common mistakes. Counting UTF-16 code units finds
-nothing to truncate, and cutting the encoded bytes at 256 leaves a broken
-character.
+`user_agent_truncated_at_code_point_boundary` defeats both common mistakes.
+Counting UTF-16 code units finds nothing to truncate, and cutting the encoded
+bytes at 256 leaves a broken character.
+
+`user_agent_omitted_before_truncation` pins the order. A client that truncates
+first finds nothing wrong in the 256 bytes it keeps, and sends them.
+`user_agent_truncated` is the other side: a long user agent that holds no
+such character is still truncated and sent. The two omission cases hold
+U+2028 and U+007F; U+0000 to U+001F and U+2029 fall under the same rule. In
+the vector file their inputs write the two characters as the JSON escapes
+`\u2028` and `\u007f`.
 
 ### CRID gate
 
@@ -485,12 +500,13 @@ The dependency-free Go loader is the artifact's strict reference validator.
 It rejects duplicate keys, unknown members, missing required members and
 optional members written as empty; it pins every case input against a fixture
 derived from the composed artifacts; it pins `reply_type_rules`; and it
-re-derives every expectation: the canonical request bytes and the truncation,
-the request-gate class of every refused input, the client result of every
-ACK, the reject class of every issued link (with a real issuer-signature
-check against the composed trust anchor and a real CRID derivation from the
-signed resource key), and the sanitized view of every `redirectInfo` value.
-Every ACK case declared a link also has to pass those link checks.
+re-derives every expectation: the canonical request bytes with the truncation
+and the omission of the user agent, the request-gate class of every refused
+input, the client result of every ACK, the reject class of every issued link
+(with a real issuer-signature check against the composed trust anchor and a
+real CRID derivation from the signed resource key), and the sanitized view of
+every `redirectInfo` value. Every ACK case declared a link also has to pass
+those link checks.
 
 The npm and Python packages carry byte-identical copies and expose thin
 accessors; they do not inherit the Go loader's validation. This repository's

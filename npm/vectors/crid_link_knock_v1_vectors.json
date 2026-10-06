@@ -6,6 +6,7 @@
     "Every CRID, link, address and identifier in this artifact is synthetic conformance data. The fixture link is the published qURL v2 vector link: its issuer key, its resource key and the proof-of-possession secret inside its fragment are public test material. Never admit that issuer key or its kid to a production trust store, and never use those keys outside conformance tests.",
     "This artifact starts after packet decryption: every body is application JSON and no packet bytes appear here. relay_knock_golden.json remains the artifact for the knock and ACK packet format.",
     "request_cases[].serialized is the canonical byte form of request_cases[].body: compact JSON, members in the listed order, strings escaped exactly as JavaScript JSON.stringify escapes them and otherwise emitted as UTF-8.",
+    "A v1 client leaves usrData.qurl_user_agent out of the request when the user agent holds a control character (U+0000 to U+001F, or U+007F), U+2028 or U+2029, because JSON encoders do not all write these characters the same way. It looks at the whole user agent before it truncates it. Two request_cases pin the rule: user_agent_omitted_for_line_separator holds one U+2028, and user_agent_omitted_before_truncation holds one U+007F after 256 bytes that hold nothing wrong. Every other character of the rule is treated the same way. The two inputs write these characters as JSON escapes, and no serialized value holds one.",
     "Member order inside an ACK body is not part of the contract. errMsg is diagnostic text: clients decide on errCode alone, and the errMsg strings here are examples.",
     "An issued link is used only after every client verification check passes. A check that fails is a hard error and nothing from that reply is shown. The link is compared with constants.link_origin as text, not as a parsed URL: it is the link origin, an optional slash, a number sign and the fragment, and nothing else.",
     "redirectInfo is display-only metadata. The publisher name is self-declared and unverified, and nothing in redirectInfo is covered by the link signature or by the CRID. Each display string a client takes from it (qurl_id, expires_at, resource_created_at and publisher.name) is kept only when it is a non-empty string of at most constants.info_text_max_code_points Unicode code points. A longer string is dropped, never shortened.",
@@ -222,6 +223,38 @@
         }
       },
       "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\",\"qurl_user_agent\":\"qurl-conformance/1.0 (boundary) ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}}"
+    },
+    {
+      "name": "user_agent_omitted_for_line_separator",
+      "input": {
+        "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+        "user_agent": "qurl-conformance/1.0 (line\u2028separator)"
+      },
+      "body": {
+        "headerType": 1,
+        "aspId": "qurl",
+        "resId": "qurl-crid",
+        "usrData": {
+          "qurl_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a"
+        }
+      },
+      "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\"}}"
+    },
+    {
+      "name": "user_agent_omitted_before_truncation",
+      "input": {
+        "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+        "user_agent": "qurl-conformance/1.0 (late) dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\u007fddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "body": {
+        "headerType": 1,
+        "aspId": "qurl",
+        "resId": "qurl-crid",
+        "usrData": {
+          "qurl_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a"
+        }
+      },
+      "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\"}}"
     }
   ],
   "invalid_request_cases": [

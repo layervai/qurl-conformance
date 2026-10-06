@@ -183,9 +183,10 @@ type CRIDLinkKnockV1Fixtures struct {
 }
 
 // CRIDLinkKnockV1RequestInput is what a caller hands the request builder.
-// UserAgent is nil when the caller has none to report. No case carries a
-// user agent that holds a control character, U+2028 or U+2029: a v1 client
-// leaves the member out for such a value, and no case pins that rule yet.
+// UserAgent is nil when the caller has none to report. A v1 client leaves
+// the member out when the user agent holds a control character, U+2028 or
+// U+2029; user_agent_omitted_for_line_separator and
+// user_agent_omitted_before_truncation pin that.
 type CRIDLinkKnockV1RequestInput struct {
 	CRID      string  `json:"crid"`
 	UserAgent *string `json:"user_agent,omitempty"`
@@ -398,6 +399,13 @@ var (
 	// 253 ASCII bytes, then one four-byte character that straddles the limit,
 	// then one more byte: 258 bytes but only 256 UTF-16 code units.
 	cridLinkKnockV1UserAgentBoundary = "qurl-conformance/1.0 (boundary) " + strings.Repeat("c", 221) + "\U0001F600c"
+	// One U+2028 in a short user agent: the member is left out.
+	cridLinkKnockV1UserAgentLineSeparator = "qurl-conformance/1.0 (line" + string(rune(0x2028)) + "separator)"
+	// 256 ASCII bytes with nothing wrong in them, then U+007F as byte 257,
+	// then 43 more bytes: 300 in all. The member is left out, because a
+	// client looks at the whole user agent before it truncates. A client
+	// that truncated first would find nothing wrong in what it kept.
+	cridLinkKnockV1UserAgentLateControl = "qurl-conformance/1.0 (late) " + strings.Repeat("d", 228) + string(rune(0x7f)) + strings.Repeat("d", 43)
 
 	cridLinkKnockV1PublisherNameAtLimit   = cridLinkKnockV1AtLimit("")
 	cridLinkKnockV1PublisherNameOverLimit = cridLinkKnockV1OverLimit("")
@@ -409,6 +417,8 @@ var (
 		"user_agent_at_limit":      &cridLinkKnockV1UserAgentAtLimit,
 		"user_agent_truncated":     &cridLinkKnockV1UserAgentOverLimit,
 		"user_agent_truncated_at_code_point_boundary": &cridLinkKnockV1UserAgentBoundary,
+		"user_agent_omitted_for_line_separator":       &cridLinkKnockV1UserAgentLineSeparator,
+		"user_agent_omitted_before_truncation":        &cridLinkKnockV1UserAgentLateControl,
 	}
 
 	cridLinkKnockV1InvalidRequestFixtures = map[string]func(env *cridLinkKnockV1Environment) string{
@@ -1089,10 +1099,20 @@ type cridLinkKnockV1WireUserData struct {
 	UserAgent string `json:"qurl_user_agent,omitempty"`
 }
 
+// cridLinkKnockV1LeavesUserAgentOut reports whether one character keeps a
+// whole user agent out of the request: a control character (U+0000 to U+001F,
+// or U+007F), U+2028 or U+2029. Encoders do not agree on how to write one of
+// these. This encoder, for one, escapes the last two, which JSON.stringify
+// writes as UTF-8.
+func cridLinkKnockV1LeavesUserAgentOut(r rune) bool {
+	return r < 0x20 || r == 0x7f || r == 0x2028 || r == 0x2029
+}
+
 // cridLinkKnockV1SerializeRequest is the reference request builder. It
-// returns the canonical bytes and the user agent actually sent. The canonical
-// form is what JavaScript's JSON.stringify emits for the body object; this
-// stdlib encoder agrees with it for every string the gate below admits.
+// returns the canonical bytes and the user agent actually sent, which is
+// empty when the member is left out. The canonical form is what JavaScript's
+// JSON.stringify emits for the body object; this stdlib encoder agrees with
+// it for every string that reaches it.
 func cridLinkKnockV1SerializeRequest(input CRIDLinkKnockV1RequestInput) (serialized, sentUserAgent string, err error) {
 	if outcome, rejectClass := cridLinkKnockV1RequestExpectation(input.CRID); outcome != ExpectAccept {
 		return "", "", fmt.Errorf("CRID fails the request gate with class %q", rejectClass)
@@ -1104,20 +1124,17 @@ func cridLinkKnockV1SerializeRequest(input CRIDLinkKnockV1RequestInput) (seriali
 		UserData:      cridLinkKnockV1WireUserData{CRID: input.CRID},
 	}
 	if input.UserAgent != nil {
-		for _, r := range *input.UserAgent {
-			// A v1 client leaves the member out when its user agent holds a
-			// control character (U+0000 to U+001F, or U+007F), U+2028 or
-			// U+2029, because encoders do not agree on how to write one: this
-			// encoder escapes the last two, which JSON.stringify writes as
-			// UTF-8. No case pins that rule yet, so a fixture that holds one
-			// is refused here. An invalid sequence is refused for another
-			// reason: this encoder rewrites it, so a fixture that used one
-			// would pin this encoder, not the contract.
-			if r < 0x20 || r == 0x7f || r == 0x2028 || r == 0x2029 || r == utf8.RuneError {
-				return "", "", fmt.Errorf("user agent contains %U, which a request case must not carry", r)
-			}
+		// An invalid sequence is refused: this encoder rewrites it, so a
+		// fixture that used one would pin this encoder, not the contract.
+		if strings.ContainsRune(*input.UserAgent, utf8.RuneError) {
+			return "", "", errors.New("user agent holds an invalid sequence or U+FFFD, which a request case must not carry")
 		}
-		wire.UserData.UserAgent = cridLinkKnockV1TruncateUserAgent(*input.UserAgent)
+		// The client looks at the whole user agent first and truncates
+		// after, so a character past the byte limit leaves the member out
+		// too.
+		if !strings.ContainsFunc(*input.UserAgent, cridLinkKnockV1LeavesUserAgentOut) {
+			wire.UserData.UserAgent = cridLinkKnockV1TruncateUserAgent(*input.UserAgent)
+		}
 	}
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)

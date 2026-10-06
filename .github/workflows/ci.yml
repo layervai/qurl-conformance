@@ -459,9 +459,16 @@ jobs:
             }
             return kept;
           };
+          // A user agent that holds a control character, U+2028 or U+2029 is
+          // left out whole. The client looks at the whole string first and
+          // truncates after.
+          const leavesUserAgentOut = value => [...value].some(character => {
+            const codePoint = character.codePointAt(0);
+            return codePoint < 0x20 || codePoint === 0x7f || codePoint === 0x2028 || codePoint === 0x2029;
+          });
           for (const request of lk.request_cases) {
             const usrData = { [lk.constants.user_data_keys.crid]: request.input.crid };
-            if ('user_agent' in request.input) {
+            if ('user_agent' in request.input && !leavesUserAgentOut(request.input.user_agent)) {
               usrData[lk.constants.user_data_keys.user_agent] = truncateUserAgent(request.input.user_agent);
             }
             const body = {
@@ -479,6 +486,15 @@ jobs:
             }
           }
           assert.ok(!lk.constants.forbidden_user_data_keys.some(key => Object.values(lk.constants.user_data_keys).includes(key)));
+          // Two cases report a user agent and send none. The second holds
+          // nothing wrong in the bytes a client would keep, so it pins the order.
+          const leftOut = lk.request_cases.filter(request =>
+            'user_agent' in request.input && !(lk.constants.user_data_keys.user_agent in request.body.usrData));
+          assert.deepStrictEqual(
+            leftOut.map(request => request.name),
+            ['user_agent_omitted_for_line_separator', 'user_agent_omitted_before_truncation'],
+          );
+          assert.ok(!leavesUserAgentOut(truncateUserAgent(leftOut[1].input.user_agent)), leftOut[1].name);
           // The request gate is the CRID v1 local gate plus one rule: the version
           // byte must be an active registry row at that row's digest length,
           // the only kind of CRID a client can verify an issued link against.
@@ -996,9 +1012,15 @@ jobs:
                   kept += character
               return kept
 
+          # A user agent that holds a control character, U+2028 or U+2029 is
+          # left out whole. The client looks at the whole string first and
+          # truncates after.
+          def leaves_user_agent_out(value):
+              return any(ord(character) < 0x20 or ord(character) in (0x7f, 0x2028, 0x2029) for character in value)
+
           for request in lk['request_cases']:
               user_data = {lk['constants']['user_data_keys']['crid']: request['input']['crid']}
-              if 'user_agent' in request['input']:
+              if 'user_agent' in request['input'] and not leaves_user_agent_out(request['input']['user_agent']):
                   user_data[lk['constants']['user_data_keys']['user_agent']] = truncate_user_agent(
                       request['input']['user_agent']
                   )
@@ -1010,6 +1032,18 @@ jobs:
               }
               for body in (built, request['body']):
                   assert json.dumps(body, separators=(',', ':'), ensure_ascii=False) == request['serialized'], request['name']
+          # Two cases report a user agent and send none. The second holds
+          # nothing wrong in the bytes a client would keep, so it pins the order.
+          left_out = [
+              request for request in lk['request_cases']
+              if 'user_agent' in request['input']
+              and lk['constants']['user_data_keys']['user_agent'] not in request['body']['usrData']
+          ]
+          assert [request['name'] for request in left_out] == [
+              'user_agent_omitted_for_line_separator',
+              'user_agent_omitted_before_truncation',
+          ]
+          assert not leaves_user_agent_out(truncate_user_agent(left_out[1]['input']['user_agent'])), left_out[1]['name']
 
           # The request gate is the CRID v1 local gate plus one rule: the version
           # byte must be an active registry row at that row's digest length,

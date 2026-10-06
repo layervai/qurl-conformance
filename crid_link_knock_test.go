@@ -32,7 +32,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 10 || len(lf.RejectClasses) != 7 {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
-	if len(lf.RequestCases) != 6 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
+	if len(lf.RequestCases) != 8 || len(lf.InvalidRequestCases) != 7 || len(lf.ACKCases) != 17 ||
 		len(lf.ClientVerificationCases) != 31 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
@@ -69,8 +69,11 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 			}
 		}
 		sent, hasUserAgent := usrData[lf.Constants.UserDataKeys.UserAgent].(string)
-		if hasUserAgent != (c.Input.UserAgent != nil) {
-			t.Errorf("request %q user agent presence = %t, input presence = %t", c.Name, hasUserAgent, c.Input.UserAgent != nil)
+		// A user agent the caller reports is sent, except in the two cases
+		// that pin when it is left out.
+		leftOut := c.Name == "user_agent_omitted_for_line_separator" || c.Name == "user_agent_omitted_before_truncation"
+		if wantUserAgent := c.Input.UserAgent != nil && !leftOut; hasUserAgent != wantUserAgent {
+			t.Errorf("request %q user agent presence = %t, want %t (input presence %t)", c.Name, hasUserAgent, wantUserAgent, c.Input.UserAgent != nil)
 			continue
 		}
 		if !hasUserAgent {
@@ -935,43 +938,92 @@ func TestCRIDLinkKnockV1TruncateUserAgent(t *testing.T) {
 	}
 }
 
-// TestCRIDLinkKnockV1RequestCasesHoldNoUserAgentAClientLeavesOut keeps one
-// sentence of the README true: no vector contains a control character, U+2028
-// or U+2029. A v1 client leaves the user agent out when it holds one of
-// them, and no case pins that rule yet, so no request case may carry one, in
-// its input or in what it sends. The reference request builder refuses a
-// fixture that does.
-func TestCRIDLinkKnockV1RequestCasesHoldNoUserAgentAClientLeavesOut(t *testing.T) {
+// TestCRIDLinkKnockV1UserAgentIsLeftOutWhole pins the omission rule. A v1
+// client sends no user agent that holds a control character, U+2028 or
+// U+2029, and it looks at the whole user agent before it truncates. Two
+// request cases carry the rule, and nothing a case sends holds one of these
+// characters.
+func TestCRIDLinkKnockV1UserAgentIsLeftOutWhole(t *testing.T) {
 	lf, err := CRIDLinkKnockV1()
 	if err != nil {
 		t.Fatal(err)
 	}
+	limit := lf.Constants.UserAgentMaxBytes
 	leftOut := func(r rune) bool { return r < 0x20 || r == 0x7f || r == 0x2028 || r == 0x2029 }
+	requests := make(map[string]CRIDLinkKnockV1RequestCase, len(lf.RequestCases))
+	var holders []string
 	for _, c := range lf.RequestCases {
-		var sent cridLinkKnockV1WireRequest
-		if err := json.Unmarshal([]byte(c.Serialized), &sent); err != nil {
-			t.Fatalf("request %q serialized: %v", c.Name, err)
+		requests[c.Name] = c
+		if strings.ContainsFunc(c.Serialized, leftOut) {
+			t.Errorf("request case %q sends a control character, U+2028 or U+2029", c.Name)
 		}
-		if strings.ContainsFunc(sent.UserData.UserAgent, leftOut) ||
-			(c.Input.UserAgent != nil && strings.ContainsFunc(*c.Input.UserAgent, leftOut)) {
-			t.Errorf("request case %q carries a control character, U+2028 or U+2029 in its user agent", c.Name)
+		if c.Input.UserAgent != nil && strings.ContainsFunc(*c.Input.UserAgent, leftOut) {
+			holders = append(holders, c.Name)
 		}
 	}
-	build := func(r rune) error {
-		userAgent := "agent/1.0 " + string(r) + " end"
-		_, _, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: lf.Fixtures.CRID, UserAgent: &userAgent})
-		return err
+	// Exactly these two inputs hold such a character, and each sends the
+	// bytes of a request with no user agent.
+	if want := []string{"user_agent_omitted_for_line_separator", "user_agent_omitted_before_truncation"}; !slices.Equal(holders, want) {
+		t.Fatalf("request cases whose user agent holds a control character, U+2028 or U+2029 = %v, want %v", holders, want)
 	}
-	// Every ASCII character, then the two separators with the code point on
-	// each side of them.
+	for _, name := range holders {
+		if requests[name].Serialized != requests["minimal"].Serialized {
+			t.Errorf("%s does not send the bytes of a request with no user agent", name)
+		}
+	}
+	// The first is short, so truncation plays no part, and its one U+2028 is
+	// all that is wrong with it.
+	lineSeparator := string(rune(0x2028))
+	short := *requests["user_agent_omitted_for_line_separator"].Input.UserAgent
+	if len(short) > limit || strings.Count(short, lineSeparator) != 1 || strings.ContainsFunc(strings.Replace(short, lineSeparator, "", 1), leftOut) {
+		t.Errorf("user_agent_omitted_for_line_separator must be at most %d bytes and hold one U+2028 and no other character of the rule", limit)
+	}
+	// The second pins the order. Its first 256 bytes hold nothing wrong, so a
+	// client that truncated first would send them. U+007F is byte 257.
+	late := *requests["user_agent_omitted_before_truncation"].Input.UserAgent
+	if len(late) <= limit+1 || late[limit] != 0x7f || strings.ContainsFunc(late[:limit], leftOut) ||
+		strings.ContainsFunc(late[limit+1:], leftOut) || cridLinkKnockV1TruncateUserAgent(late) != late[:limit] {
+		t.Errorf("user_agent_omitted_before_truncation must hold %d bytes with nothing wrong, then U+007F, then bytes with nothing wrong", limit)
+	}
+
+	// The reference builder leaves the member out for every character of the
+	// rule, before the byte limit and past it, and for nothing next to the
+	// rule: every ASCII character, and the two separators with the code point
+	// on each side of them. A user agent it does send past the limit is
+	// truncated as before.
+	sentFor := func(userAgent string) string {
+		t.Helper()
+		serialized, sent, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: lf.Fixtures.CRID, UserAgent: &userAgent})
+		if err != nil {
+			t.Fatalf("the reference request builder refuses %q: %v", userAgent, err)
+		}
+		if (sent == "") != (serialized == requests["minimal"].Serialized) {
+			t.Fatalf("the reference request builder reports sending %q but serializes %s", sent, serialized)
+		}
+		return sent
+	}
 	runes := []rune{0x2027, 0x2028, 0x2029, 0x202a}
 	for r := rune(0); r <= 0x7f; r++ {
 		runes = append(runes, r)
 	}
 	for _, r := range runes {
-		if err := build(r); leftOut(r) != (err != nil) {
-			t.Errorf("the reference request builder gives %v for a user agent that holds %U; it refuses the control characters, U+2028 and U+2029, and nothing next to them", err, r)
+		early := "agent/1.0 " + string(r) + " end"
+		wantEarly, wantLate := early, strings.Repeat("a", limit)
+		if leftOut(r) {
+			wantEarly, wantLate = "", ""
 		}
+		if sent := sentFor(early); sent != wantEarly {
+			t.Errorf("a user agent that holds %U: the reference request builder sends %q, want %q", r, sent, wantEarly)
+		}
+		if sent := sentFor(strings.Repeat("a", limit) + string(r) + " end"); sent != wantLate {
+			t.Errorf("a user agent that holds %U past the byte limit: the reference request builder sends %d bytes, want %d", r, len(sent), len(wantLate))
+		}
+	}
+	// An invalid sequence is not part of the rule. No case may hold one, and
+	// the reference refuses it and does not guess.
+	invalid := "agent/1.0 " + string([]byte{0xff})
+	if _, _, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: lf.Fixtures.CRID, UserAgent: &invalid}); err == nil {
+		t.Error("the reference request builder built a request for a user agent that is not valid UTF-8")
 	}
 }
 
@@ -1331,6 +1383,32 @@ func TestParseCRIDLinkKnockV1FileFailsClosed(t *testing.T) {
 			c := requestCase(t, lf, "user_agent_truncated_at_code_point_boundary")
 			c.Serialized = strings.Replace(c.Serialized, `c"}}`, "c\U0001F600\"}}", 1)
 		}), "serialized does not re-derive")
+	})
+	t.Run("request left-out user agent sent", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_omitted_for_line_separator")
+			c.Serialized = strings.Replace(c.Serialized, `"}}`, `","qurl_user_agent":"qurl-conformance/1.0 (line separator)"}}`, 1)
+		}), "serialized does not re-derive")
+	})
+	t.Run("request left-out user agent truncated first", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_omitted_before_truncation")
+			kept := (*c.Input.UserAgent)[:lf.Constants.UserAgentMaxBytes]
+			c.Serialized = strings.Replace(c.Serialized, `"}}`, `","qurl_user_agent":"`+kept+`"}}`, 1)
+		}), "serialized does not re-derive")
+	})
+	t.Run("request left-out user agent cleaned", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_omitted_for_line_separator")
+			*c.Input.UserAgent = strings.ReplaceAll(*c.Input.UserAgent, string(rune(0x2028)), " ")
+		}), "input does not match its fixture")
+	})
+	t.Run("request left-out user agent moved inside the limit", func(t *testing.T) {
+		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
+			c := requestCase(t, lf, "user_agent_omitted_before_truncation")
+			late := *c.Input.UserAgent
+			*c.Input.UserAgent = late[:10] + string(rune(0x7f)) + late[10:lf.Constants.UserAgentMaxBytes] + late[lf.Constants.UserAgentMaxBytes+1:]
+		}), "input does not match its fixture")
 	})
 	t.Run("request body member order", func(t *testing.T) {
 		assertRejects(t, mutate(t, func(lf *CRIDLinkKnockV1File) {
