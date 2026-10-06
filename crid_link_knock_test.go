@@ -935,6 +935,39 @@ func TestCRIDLinkKnockV1TruncateUserAgent(t *testing.T) {
 	}
 }
 
+// TestCRIDLinkKnockV1RequestCasesHoldNoControlCharacter keeps one sentence of
+// the README true: no vector contains a control character. A v1 client
+// leaves the user agent out when it holds one, and no case pins that rule
+// yet, so no request case may carry one, in its input or in what it sends.
+// The reference request builder refuses a fixture that does.
+func TestCRIDLinkKnockV1RequestCasesHoldNoControlCharacter(t *testing.T) {
+	lf, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	isControl := func(r rune) bool { return r < 0x20 || r == 0x7f }
+	for _, c := range lf.RequestCases {
+		var sent cridLinkKnockV1WireRequest
+		if err := json.Unmarshal([]byte(c.Serialized), &sent); err != nil {
+			t.Fatalf("request %q serialized: %v", c.Name, err)
+		}
+		if strings.ContainsFunc(sent.UserData.UserAgent, isControl) ||
+			(c.Input.UserAgent != nil && strings.ContainsFunc(*c.Input.UserAgent, isControl)) {
+			t.Errorf("request case %q carries a control character in its user agent", c.Name)
+		}
+	}
+	build := func(r rune) error {
+		userAgent := "agent/1.0 " + string(r) + " end"
+		_, _, err := cridLinkKnockV1SerializeRequest(CRIDLinkKnockV1RequestInput{CRID: lf.Fixtures.CRID, UserAgent: &userAgent})
+		return err
+	}
+	for r := rune(0); r <= 0x7f; r++ {
+		if err := build(r); isControl(r) != (err != nil) {
+			t.Errorf("the reference request builder gives %v for a user agent that holds %U; it refuses the control characters and nothing else in ASCII", err, r)
+		}
+	}
+}
+
 func TestCRIDLinkKnockV1WarningsRemainProminent(t *testing.T) {
 	lf, err := CRIDLinkKnockV1()
 	if err != nil {

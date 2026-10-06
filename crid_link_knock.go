@@ -44,7 +44,9 @@ const (
 	// cookie reply. It is not an ACK, carries no outcome code, and means busy.
 	CRIDLinkKnockV1CookieHeaderType = 7
 	// CRIDLinkKnockV1UserAgentMaxBytes bounds the UTF-8 length of the user
-	// agent a client sends. A longer value is truncated, never rejected.
+	// agent a client sends. A longer value is truncated, never rejected. A
+	// user agent that holds a control character (U+0000 to U+001F, or U+007F)
+	// is not sent at all.
 	CRIDLinkKnockV1UserAgentMaxBytes = 256
 	// CRIDLinkKnockV1InfoTextMaxCodePoints bounds every display string a
 	// client keeps from redirectInfo: the qURL id, the two timestamps and the
@@ -181,7 +183,9 @@ type CRIDLinkKnockV1Fixtures struct {
 }
 
 // CRIDLinkKnockV1RequestInput is what a caller hands the request builder.
-// UserAgent is nil when the caller has none to report.
+// UserAgent is nil when the caller has none to report. No case carries a
+// user agent that holds a control character: a v1 client leaves the member
+// out for such a value, and no case pins that rule yet.
 type CRIDLinkKnockV1RequestInput struct {
 	CRID      string  `json:"crid"`
 	UserAgent *string `json:"user_agent,omitempty"`
@@ -1101,11 +1105,16 @@ func cridLinkKnockV1SerializeRequest(input CRIDLinkKnockV1RequestInput) (seriali
 	}
 	if input.UserAgent != nil {
 		for _, r := range *input.UserAgent {
-			// Go escapes control characters and U+2028/U+2029 differently
-			// from JSON.stringify, and rewrites an invalid sequence, so a
-			// fixture that used one would pin this encoder, not the contract.
-			if r < 0x20 || r == 0x2028 || r == 0x2029 || r == utf8.RuneError {
-				return "", "", fmt.Errorf("user agent contains %U, which this reference cannot serialize canonically", r)
+			// A v1 client leaves the member out when its user agent holds a
+			// control character (U+0000 to U+001F, or U+007F), because
+			// encoders do not agree on how to escape one. No case pins that
+			// rule yet, so a fixture that holds one is refused here. U+2028,
+			// U+2029 and an invalid sequence are refused for another reason:
+			// this encoder escapes the first two, which JSON.stringify writes
+			// as UTF-8, and it rewrites the third, so a fixture that used one
+			// would pin this encoder, not the contract.
+			if r < 0x20 || r == 0x7f || r == 0x2028 || r == 0x2029 || r == utf8.RuneError {
+				return "", "", fmt.Errorf("user agent contains %U, which a request case must not carry", r)
 			}
 		}
 		wire.UserData.UserAgent = cridLinkKnockV1TruncateUserAgent(*input.UserAgent)

@@ -43,7 +43,7 @@ a fresh random key for every request.
 | `aspId` | `qurl` (`constants.auth_service_id`) |
 | `resId` | `qurl-crid` (`constants.resource_id`): a fixed sentinel, not a resource key |
 | `usrData.qurl_crid` | the CRID, exactly as issued |
-| `usrData.qurl_user_agent` | optional: the client's user agent, at most 256 bytes of UTF-8 |
+| `usrData.qurl_user_agent` | optional: the client's user agent, at most 256 bytes of UTF-8; left out when the user agent holds a control character |
 
 `aspId`, `resId` and a string `usrData.qurl_crid` together make the knock a
 link request. A v1 client sends no other member. In particular the body never
@@ -78,6 +78,15 @@ body's canonical bytes:
   `user_agent_json_escaping` and `user_agent_at_limit` pin these rules. No
   vector contains a control character.
 
+A control character never reaches these bytes. A v1 client sends
+`usrData.qurl_user_agent` only when the user agent holds no control
+character: none of U+0000 to U+001F, and not U+007F. Otherwise it leaves the
+member out. JSON has a short and a long escape for some of these characters,
+and encoders do not agree on which one to write: `JSON.stringify` writes
+U+0008 and U+000C as `\b` and `\f`, and Go's `encoding/json` wrote `\u0008`
+and `\u000c` before Go 1.22. The member is optional and only for display, so
+a request without it loses nothing. No case pins this rule yet.
+
 A consumer builds the body from `input` with its real request builder and
 compares the result with `serialized` byte for byte. A serializer that
 escapes more than that by default needs it turned off: Go's `encoding/json`
@@ -90,10 +99,12 @@ committed `body` object lists its members in the same order, so
 ### User agent
 
 `usrData.qurl_user_agent` is omitted when the client has no user agent to
-report. A value longer than `constants.user_agent_max_bytes` is truncated,
-never rejected: the client keeps the longest prefix that is at most 256 bytes
-of UTF-8 and ends on a code point boundary, so what it sends is always valid
-UTF-8.
+report. It is also omitted when the user agent holds a control character, as
+"Canonical bytes" says. The client looks at the whole user agent for that,
+before it truncates anything. A value longer than
+`constants.user_agent_max_bytes` is truncated, never rejected: the client
+keeps the longest prefix that is at most 256 bytes of UTF-8 and ends on a
+code point boundary, so what it sends is always valid UTF-8.
 
 | Case | Input | Sent |
 | --- | --- | --- |
