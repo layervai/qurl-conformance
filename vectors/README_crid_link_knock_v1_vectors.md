@@ -39,33 +39,52 @@ a fresh random key for every request, with one exception.
 
 A client that holds the key of a registered device may send one more request
 for the same CRID, with the device key as the initiator static key. It does so
-only after a request under a fresh random key was answered `52602`, and only
-once. The server knows who asks from that key, so it may issue a link for a
-resource that this device is allowed to open and that a request under a
-random key cannot open.
+only after a request under a fresh random key was answered `52602`. The server
+knows who asks from that key, so it may issue a link for a resource that this
+device is allowed to open and that a request under a random key cannot open.
+How a device is registered, and how it gets its key, is not part of this
+artifact.
 
-- The second request has the same body and the same shapes as the first. Its
-  answer is read by the same rules, and a link in it passes the same checks.
+**This subsection is a rule for clients, and no vector pins it.** The vectors
+pin each single request and each single reply. They hold no case with two
+requests and no case under a device key. A consumer that passes the consumer
+algorithm below has shown nothing about this rule. A case family for it would
+need a new `schema_version`.
+
+- Only `52602` leads to the second request. No other outcome does: for
+  example not `52601`, not `52603`, not `52604` to `52606`, not
+  `server_error`, `protocol_violation` or `busy`, not a transport error, not a
+  link that fails a check, and not a request that got no reply. A fault of the
+  moment must not make a device name itself.
 - The first request is never sent under the device key. A resource that opens
   for anyone is answered there, under a key that says nothing about the
   client.
-- No other answer leads to the second request: not `52601`, not `52603`, not
-  a reply that fails a check, and not a request that got no answer. A fault
-  of the moment must not make a device name itself.
-- After the second answer there is no third request.
+- The second request has the same body and the same shapes as the first. Its
+  answer is read by the same rules, and a link in it passes the same checks.
+- The second request ends the attempt, whatever its answer is. There is no
+  third request. When its answer is one that the table below calls retryable,
+  the user may try again later, as the table says; that later attempt starts
+  again with a request under a fresh random key.
+- Whether a client may use the device key at all is the choice of the
+  application that calls it. Once the application has chosen so, the client
+  sends the second request by itself, with no further question to the user.
+- `retryable` is `no` for `52602`. That column is about sending the same
+  request again under the same key, and that stays forbidden. The second
+  request is a different request.
 
 A long-lived key gives the relay more than a random key does. The header
-digest of a reply is not keyed and covers the initiator's public key. A
-device's public key is known outside the device, so a relay that holds it can
-recognise the reply to that device, can see from the size of the reply
-whether a link was issued, and can hand the client a header with no usable
-answer. It cannot forge a link or a refusal, and it cannot read the request
-or the reply. With a random key the relay can do none of these. A client
-treats a reply to the second request that carries no usable answer as "no
-answer", not as a statement of the server.
-
-No vector in this artifact uses a device key. The request and reply shapes
-are the ones pinned here; only the initiator key differs.
+digest of a packet is not keyed: `README_agent_session_control_vectors.md`
+gives its input for a request ("RKN header digest"), and for a reply the
+public key in that input is the initiator's. A device's public key is known
+outside the device. So a relay that holds it can recognise the reply to that
+device and can see from the size of the reply whether a link was issued. It
+can also hand the client a header whose content it removed or replaced: the
+client then reports `busy`, `protocol_violation` or a transport error,
+whatever the server answered. A client must not read these three, on the
+second request, as a statement of the server. The relay cannot forge a link or
+any outcome code, and it cannot read the request or the reply. With a random
+key it can do none of the things in this paragraph, beyond dropping or
+delaying a request.
 
 ## Request body
 
@@ -244,7 +263,7 @@ and there is no `sessId`, because the request opens nothing.
 | --- | --- | --- | --- | --- | --- |
 | `52600` | `link_issued` | `link` | no | a link was issued; `redirectUrl` carries it | run the checks below, then open it |
 | `52601` | `unavailable` | `unavailable` | yes | a link cannot be issued right now | let the user try again later |
-| `52602` | `not_found` | `not_found` | no | the CRID is unknown, retired or malformed, or this client may not open it; the answer does not say which | do not send the same request again. A registered device may ask once more under its device key (see "A request under a registered device key"). Otherwise ask the user to check the CRID and their access |
+| `52602` | `not_found` | `not_found` | no | the CRID is unknown, retired or malformed, or this client may not open it; the answer does not say which | do not send the same request again; a registered device may send the one further request of "A request under a registered device key". When no link follows, ask the user to check the CRID and their access |
 | `52603` | `rate_limited` | `rate_limited` | yes | too many requests from this client or for this CRID | let the user try again later |
 | `52604` | `resource_offline` | `offline` | yes | the resource exists and this client may open it, but its publisher is offline | tell the user the publisher is offline |
 | `52605` | `resource_closed` | `closed` | no | the resource exists and this client may open it, but it has been closed | do not retry |
