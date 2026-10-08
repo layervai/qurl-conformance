@@ -70,21 +70,37 @@ need a new `schema_version`.
   sends the second request by itself, with no further question to the user.
 - `retryable` is `no` for `52602`. That column is about sending the same
   request again under the same key, and that stays forbidden. The second
-  request is a different request.
+  request is a request under a different key.
 
-A long-lived key gives the relay more than a random key does. The header
-digest of a packet is not keyed: `README_agent_session_control_vectors.md`
-gives its input for a request ("RKN header digest"), and for a reply the
-public key in that input is the initiator's. A device's public key is known
-outside the device. So a relay that holds it can recognise the reply to that
-device and can see from the size of the reply whether a link was issued. It
-can also hand the client a header whose content it removed or replaced: the
-client then reports `busy`, `protocol_violation` or a transport error,
-whatever the server answered. A client must not read these three, on the
-second request, as a statement of the server. The relay cannot forge a link or
-any outcome code, and it cannot read the request or the reply. With a random
-key it can do none of the things in this paragraph, beyond dropping or
-delaying a request.
+The relay is not trusted on either request. On every request, with any key,
+it sees the size of the reply, and a reply with a link is larger than a
+refusal. It can drop or delay a request. It can hand back bytes that are not
+the server's reply, and the client reports a transport error. A transport
+error is never a statement of the server.
+
+A long-lived key adds two things. The header digest of a packet is not keyed.
+`README_agent_session_control_vectors.md` gives its input for a normal
+request (in the section "RKN header digest"): a fixed string, the static
+public key of the receiver, and the header. For a reply the receiver is the
+initiator. No artifact in this repository pins the reply direction. A
+device's public key is known outside the device, so a relay that holds it:
+
+- can tell that a reply belongs to that device, and so knows which device got
+  a link;
+- can make a header that passes the digest check, with the content removed or
+  replaced. The client then reports `busy` or `protocol_violation`, whatever
+  the server answered. A relay can also send an old `busy` reply to the same
+  device again.
+
+So on the second request a client must not read `busy` or
+`protocol_violation` as a statement of the server either. Under a random key
+a changed header does not pass the digest check. On neither request can the
+relay forge a link or an outcome code, or read the request or the reply.
+
+The server learns the device key whenever it answers `52602`, also for a CRID
+that names nothing. An application that lets its client use the device key
+accepts this: the server learns which device asked, for every CRID that does
+not open for anyone.
 
 ## Request body
 
@@ -523,6 +539,9 @@ for.
   valid CRID of a different key.
 
 ## Consumer algorithm
+
+These steps cover single requests and single replies. They say nothing about
+the rule in "A request under a registered device key", which no vector pins.
 
 Consumers derive every declared outcome through their production paths:
 
