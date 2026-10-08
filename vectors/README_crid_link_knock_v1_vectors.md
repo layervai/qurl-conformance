@@ -58,7 +58,9 @@ need a new `schema_version`.
   moment must not make a device name itself.
 - The first request is never sent under the device key. A resource that opens
   for anyone is answered there, under a key that says nothing about the
-  client.
+  client. When a second request follows, this no longer holds for that
+  attempt: the two requests are close in time and come from one address, so
+  whoever recognises the second knows whose the first was.
 - The second request has the same body and the same shapes as the first. Its
   answer is read by the same rules, and a link in it passes the same checks.
 - The second request ends the attempt, whatever its answer is. There is no
@@ -80,22 +82,30 @@ error is never a statement of the server.
 
 A long-lived key adds two things. The header digest of a packet is not keyed.
 `README_agent_session_control_vectors.md` gives its input for a normal
-request (in the section "RKN header digest"): a fixed string, the static
-public key of the receiver, and the header. For a reply the receiver is the
-initiator. No artifact in this repository pins the reply direction. A
-device's public key is known outside the device, so a relay that holds it:
+request (in the section "RKN header digest"): an initial hash, the static
+public key of the receiver, and the header up to the digest. For a reply the
+receiver is the initiator. No artifact in this repository pins the reply
+direction. A device's public key is known outside the device, so a relay that
+holds it:
 
 - can tell that a reply belongs to that device, and so knows which device got
   a link;
-- can make a header that passes the digest check, with the content removed or
-  replaced. The client then reports `busy` or `protocol_violation`, whatever
-  the server answered. A relay can also send an old `busy` reply to the same
-  device again.
+- can make a header that passes the digest check and has no body. Two such
+  headers are known. A cookie header: the client reports `busy`. An ACK
+  header with an empty body, which no body seal covers: the Go SDK reports a
+  protocol error for it. A relay can also send an old `busy` reply to the
+  same device again.
 
-So on the second request a client must not read `busy` or
-`protocol_violation` as a statement of the server either. Under a random key
-a changed header does not pass the digest check. On neither request can the
-relay forge a link or an outcome code, or read the request or the reply.
+So on the second request a client must not read `busy`, or a protocol error
+for an ACK with no body, as a statement of the server either.
+
+Under a random key the relay cannot compute the digest. A client that checks
+the header digest of a reply before it reads the reply type, as the Go SDK
+does, refuses such a header and reports a transport error. A client that
+reads the reply type first can be given `busy` by the relay on any request.
+A client should check the digest first: `busy` on the first request decides
+whether a second request follows. On neither request can the relay forge a
+link or an outcome code, or read the request or the reply.
 
 The server learns the device key whenever it answers `52602`, also for a CRID
 that names nothing. An application that lets its client use the device key
