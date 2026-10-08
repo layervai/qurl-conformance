@@ -328,11 +328,10 @@ jobs:
         if: success()
         # v1.0.183 includes the v1.0.180 fixes that keep interactive commands on
         # the same fail-closed runner as automatic review and avoid the
-        # v1.0.140/141 issue-comment crash. Do not move to v1.0.187: it rewrites
-        # the credential-free local origin even in API-signing mode, which the
-        # terminal snapshot guard correctly rejects. Re-audit and advance once
-        # an upstream release restores origin compatibility. Evidence:
-        # qurl-conformance#98 runs 32534585579 and 32535437700.
+        # v1.0.140/141 issue-comment crash. v1.0.187 and later rewrite the local
+        # origin even in API-signing mode; the verify step below asserts the
+        # origin's destination instead of an exact pin, so later releases are
+        # compatible.
         uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -399,7 +398,7 @@ jobs:
           # restoreConfigFromBase() fetches the base branch through it. Asserting the
           # LOCAL_ORIGIN pin survived therefore tested the action's version, not
           # Claude's behavior, and failed closed on every real PR (#268). Still
-          # present at v1.0.210, so bumping does not fix it.
+          # present at v1.0.238, so bumping does not fix it.
           #
           # The property that pin bought still has to hold: origin may only ever
           # address THIS repository, so no credential-bearing remote can point

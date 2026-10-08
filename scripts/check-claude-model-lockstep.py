@@ -25,6 +25,7 @@ ACTION_PATTERN = re.compile(
     re.MULTILINE,
 )
 MODEL_PATTERN = re.compile(r"\bclaude_args:\s*['\"]?[^\n]*?--model\s+([A-Za-z0-9._-]+)")
+EFFORT_PATTERN = re.compile(r"\bclaude_args:\s*['\"]?[^\n]*?--effort\s+([a-z]+)")
 
 
 def unique_match(pattern: re.Pattern[str], text: str, label: str, path: Path) -> tuple[str, ...]:
@@ -36,28 +37,30 @@ def unique_match(pattern: re.Pattern[str], text: str, label: str, path: Path) ->
 
 
 def main() -> int:
-    dependencies: list[tuple[str, str, str]] = []
+    dependencies: list[tuple[str, str, str, str]] = []
     try:
         for path in WORKFLOWS:
             text = path.read_text(encoding="utf-8")
             action_sha, action_tag = unique_match(ACTION_PATTERN, text, "pinned Claude action", path)
             (model,) = unique_match(MODEL_PATTERN, text, "Claude model", path)
-            dependencies.append((action_sha, action_tag, model))
+            (effort,) = unique_match(EFFORT_PATTERN, text, "Claude effort", path)
+            dependencies.append((action_sha, action_tag, model, effort))
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
     if len(set(dependencies)) != 1:
-        for path, (action_sha, action_tag, model) in zip(WORKFLOWS, dependencies, strict=True):
+        for path, (action_sha, action_tag, model, effort) in zip(WORKFLOWS, dependencies, strict=True):
             print(
-                f"error: {path.relative_to(ROOT)} uses action {action_sha} ({action_tag}) and model {model}",
+                f"error: {path.relative_to(ROOT)} uses action {action_sha} ({action_tag}), "
+                f"model {model}, and effort {effort}",
                 file=sys.stderr,
             )
-        print("error: Claude workflows must use the same action SHA, tag annotation, and model", file=sys.stderr)
+        print("error: Claude workflows must use the same action SHA, tag annotation, model, and effort", file=sys.stderr)
         return 1
 
-    action_sha, action_tag, model = dependencies[0]
-    print(f"Claude workflows agree on action {action_sha} ({action_tag}) and model {model}")
+    action_sha, action_tag, model, effort = dependencies[0]
+    print(f"Claude workflows agree on action {action_sha} ({action_tag}), model {model}, and effort {effort}")
     return 0
 
 
