@@ -33,7 +33,39 @@ A v1 client sends step 1 through the deployment's relay, exactly as it sends
 every browser knock. The relay base URL and the server static public key come
 from the deployment configuration the client ships with; this artifact carries
 neither. The initiator static key may be any X25519 key, and a v1 client uses
-a fresh random key for every request.
+a fresh random key for every request, with one exception.
+
+### A request under a registered device key
+
+A client that holds the key of a registered device may send one more request
+for the same CRID, with the device key as the initiator static key. It does so
+only after a request under a fresh random key was answered `52602`, and only
+once. The server knows who asks from that key, so it may issue a link for a
+resource that this device is allowed to open and that a request under a
+random key cannot open.
+
+- The second request has the same body and the same shapes as the first. Its
+  answer is read by the same rules, and a link in it passes the same checks.
+- The first request is never sent under the device key. A resource that opens
+  for anyone is answered there, under a key that says nothing about the
+  client.
+- No other answer leads to the second request: not `52601`, not `52603`, not
+  a reply that fails a check, and not a request that got no answer. A fault
+  of the moment must not make a device name itself.
+- After the second answer there is no third request.
+
+A long-lived key gives the relay more than a random key does. The header
+digest of a reply is not keyed and covers the initiator's public key. A
+device's public key is known outside the device, so a relay that holds it can
+recognise the reply to that device, can see from the size of the reply
+whether a link was issued, and can hand the client a header with no usable
+answer. It cannot forge a link or a refusal, and it cannot read the request
+or the reply. With a random key the relay can do none of these. A client
+treats a reply to the second request that carries no usable answer as "no
+answer", not as a statement of the server.
+
+No vector in this artifact uses a device key. The request and reply shapes
+are the ones pinned here; only the initiator key differs.
 
 ## Request body
 
@@ -212,7 +244,7 @@ and there is no `sessId`, because the request opens nothing.
 | --- | --- | --- | --- | --- | --- |
 | `52600` | `link_issued` | `link` | no | a link was issued; `redirectUrl` carries it | run the checks below, then open it |
 | `52601` | `unavailable` | `unavailable` | yes | a link cannot be issued right now | let the user try again later |
-| `52602` | `not_found` | `not_found` | no | the CRID is unknown, retired or malformed, or this client may not open it; the answer does not say which | do not retry; ask the user to check the CRID and their access |
+| `52602` | `not_found` | `not_found` | no | the CRID is unknown, retired or malformed, or this client may not open it; the answer does not say which | do not send the same request again. A registered device may ask once more under its device key (see "A request under a registered device key"). Otherwise ask the user to check the CRID and their access |
 | `52603` | `rate_limited` | `rate_limited` | yes | too many requests from this client or for this CRID | let the user try again later |
 | `52604` | `resource_offline` | `offline` | yes | the resource exists and this client may open it, but its publisher is offline | tell the user the publisher is offline |
 | `52605` | `resource_closed` | `closed` | no | the resource exists and this client may open it, but it has been closed | do not retry |
