@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.17.3](https://github.com/layervai/qurl-conformance/compare/v0.17.2...v0.17.3) (2026-10-08)
+
+
+### Continuous Integration
+
+* **claude:** allowlist host and userinfo in the Claude origin check ([#156](https://github.com/layervai/qurl-conformance/issues/156)) ([fb4873e](https://github.com/layervai/qurl-conformance/commit/fb4873e340377cf6ebbe4950e9f6048b3ef60def))
+* correct the comments on the Claude origin check ([#157](https://github.com/layervai/qurl-conformance/issues/157)) ([308896f](https://github.com/layervai/qurl-conformance/commit/308896f3a0dca29d5b198510fec180f4f5f9bb65))
+* document the Claude review model and effort setting ([#155](https://github.com/layervai/qurl-conformance/issues/155)) ([814a7f5](https://github.com/layervai/qurl-conformance/commit/814a7f5a76ddf6f8267bf3cd9d0edc747b0c60f4))
+* run Claude review on Opus 5.5 at medium effort ([#153](https://github.com/layervai/qurl-conformance/issues/153)) ([ca59ef1](https://github.com/layervai/qurl-conformance/commit/ca59ef1bd496a5b3af9360086b440c2dbf97b263))
+
 ## [0.17.2](https://github.com/layervai/qurl-conformance/compare/v0.17.1...v0.17.2) (2026-10-06)
 
 
