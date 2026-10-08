@@ -66,17 +66,18 @@ need a new `schema_version`.
 - The second request ends the attempt, whatever its answer is. There is no
   third request. When its answer is one that the table below calls retryable,
   the user may try again later, as the table says; that later attempt starts
-  again with a request under a fresh random key.
+  again with a request under a fresh random key. "Once" is once for each
+  attempt: a user who tries N times shows the device key up to N times.
 - Whether a client may use the device key at all is the choice of the
   application that calls it. Once the application has chosen so, the client
   sends the second request by itself, with no further question to the user.
-- `retryable` is `no` for `52602`. That column is about sending the same
-  request again under the same key, and that stays forbidden. The second
-  request is a request under a different key.
+- `retryable` is `no` for `52602`, and it stays `no`: the same question gets
+  the same answer. The request under the device key is not a retry. The
+  device key tells the server who asks, so it is a different question.
 
 The relay is not trusted on either request. On every request, with any key,
-it sees the size of the reply, and a reply with a link is larger than a
-refusal. It can drop or delay a request. It can hand back bytes that are not
+it sees the size of the reply, and a reply with a link is usually larger
+than a refusal. It can drop or delay a request. It can hand back bytes that are not
 the server's reply, and the client reports a transport error. A transport
 error is never a statement of the server.
 
@@ -92,20 +93,25 @@ holds it:
   a link;
 - can make a header that passes the digest check and has no body. Two such
   headers are known. A cookie header: the client reports `busy`. An ACK
-  header with an empty body, which no body seal covers: the Go SDK reports a
-  protocol error for it. A relay can also send an old `busy` reply to the
-  same device again.
+  header with an empty body, which no body seal covers: a client that takes
+  it for an ACK finds no `errCode` in it, which is `protocol_violation`. A
+  relay can also send an old `busy` reply to the same device again.
 
-So on the second request a client must not read `busy`, or a protocol error
-for an ACK with no body, as a statement of the server either.
+So on the second request a client must not read `busy`, or
+`protocol_violation` for an ACK with no body, as a statement of the server
+either. There is no third request, so what is left is what the client tells
+its caller: that the attempt did not complete, not that the CRID was not
+found or that the server is busy.
 
 Under a random key the relay cannot compute the digest. A client that checks
-the header digest of a reply before it reads the reply type, as the Go SDK
-does, refuses such a header and reports a transport error. A client that
-reads the reply type first can be given `busy` by the relay on any request.
-A client should check the digest first: `busy` on the first request decides
-whether a second request follows. On neither request can the relay forge a
-link or an outcome code, or read the request or the reply.
+the header digest of a reply before it reads the reply type refuses such a
+header and reports a transport error. A client that reads the reply type
+first can be given `busy` by the relay on any request, and a forged `busy` on
+the first request suppresses the second request for good, with no sign to
+the client. So a client should check the digest first. It is "should" and not
+"must" only because no vector pins it yet; treat it as a rule. On neither
+request can the relay forge a link or an outcome code, or read the request or
+the reply.
 
 The server learns the device key whenever it answers `52602`, also for a CRID
 that names nothing. An application that lets its client use the device key
