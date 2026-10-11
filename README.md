@@ -1,8 +1,19 @@
-# qurl-conformance
+# qURL protocol conformance tests and test vectors
 
-The single public source of truth for the **qURL cross-language conformance
-vectors**: the language-agnostic wire-truth that every qURL verifier re-runs
-against its own implementation. Separate artifact ids keep the qURL v2 verify
+Use these language-neutral **qURL™ protocol test vectors** to check an SDK
+or verifier against the public wire contracts. The repository publishes JSON
+fixtures, expected accept/reject outcomes, and Go, npm, and Python loaders for
+cross-language conformance testing. Consumers run the vectors through their
+own implementations.
+
+Start with the [artifact layout](#layout), [Go usage](#using-it-from-go),
+[other language usage](#using-it-from-another-language),
+[protocol scope](#scope), or [release process](#releases). For application
+development rather than protocol verification, see the
+[LayerV SDKs](https://layerv.ai/sdk/).
+
+This is the single public source of truth for these conformance vectors.
+Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
 registered-agent knock application bodies, registered-agent session control,
 control-plane API-key IDs, assignment tickets, Hub LST return-routability
