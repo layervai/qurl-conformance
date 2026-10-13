@@ -332,7 +332,7 @@ jobs:
         # origin even in API-signing mode; the verify step below asserts the
         # origin's destination instead of an exact pin, so later releases are
         # compatible.
-        uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Omit github_token so the action uses its OIDC/GitHub App token path.
