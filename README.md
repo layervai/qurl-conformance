@@ -1,35 +1,16 @@
 # qURL protocol conformance tests and test vectors
 
-Use these language-neutral **qURL™ protocol test vectors** to check an SDK
-or verifier against the public wire contracts. The repository publishes JSON
-fixtures, expected accept/reject outcomes, and Go, npm, and Python loaders for
-cross-language conformance testing. Consumers run the vectors through their
-own implementations.
+Use these language-neutral **qURL™ protocol test vectors** to check an SDK or verifier against the public wire contracts. The repository publishes JSON fixtures, expected accept/reject outcomes, and Go, npm, and Python loaders for cross-language conformance testing. Consumers run the vectors through their own implementations.
 
-Start with the [artifact layout](#layout), [Go usage](#using-it-from-go),
-[other language usage](#using-it-from-another-language),
-[protocol scope](#scope), or [release process](#releases). For application
-development rather than protocol verification, see the
-[LayerV SDKs](https://layerv.ai/sdk/).
+Start with the [artifact layout](#layout), [Go usage](#using-it-from-go), [other language usage](#using-it-from-another-language), [protocol scope](#scope), or [release process](#releases). For application development rather than protocol verification, see the [LayerV SDKs](https://layerv.ai/sdk/).
 
-[Sharing context](#what-these-tests-support) ·
-[Consumer workflow](#validate-an-sdk-or-verifier) ·
-[Conformance questions](#conformance-and-sharing-questions) ·
-[Product overview](https://layerv.ai/qurl/) · [Private links](https://qurl.link/)
+[Sharing context](#what-these-tests-support) · [Consumer workflow](#validate-an-sdk-or-verifier) · [Conformance questions](#conformance-and-sharing-questions) · [Product overview](https://layerv.ai/qurl/) · [Private links](https://qurl.link/)
 
 ## What these tests support
 
-[qURL by LayerV](https://layerv.ai/qurl/) lets people and AI agents share
-localhost web apps, private APIs, and files through expiring access links.
-Examples include a development preview on a laptop, an internal dashboard,
-or a selected document shared for review.
+[qURL by LayerV](https://layerv.ai/qurl/) lets people and AI agents share localhost web apps, private APIs, and files through expiring access links. Examples include a development preview on a laptop, an internal dashboard, or a selected document shared for review.
 
-This repository provides the protocol fixtures used to validate implementations
-behind those workflows. A test-vector package does not publish localhost,
-upload a file, or issue a live access link. Use the
-[CLI sharing quickstart](https://github.com/layervai/qurl-integrations#share-a-localhost-web-app),
-[MCP file tools](https://github.com/layervai/qurl-mcp#let-an-ai-agent-share-a-pdf-or-image),
-or the language SDK for those operations.
+This repository provides the protocol fixtures used to validate implementations behind those workflows. A test-vector package does not publish localhost, upload a file, or issue a live access link. Use the [CLI sharing quickstart](https://github.com/layervai/qurl-integrations#share-a-localhost-web-app), [MCP file tools](https://github.com/layervai/qurl-mcp#let-an-ai-agent-share-a-pdf-or-image), or the language SDK for those operations.
 
 | Sharing behavior | Relevant contract examples |
 | --- | --- |
@@ -38,68 +19,38 @@ or the language SDK for those operations.
 | Request access from a resource identifier | [CRID link request](vectors/README_crid_link_knock_v1_vectors.md) fixtures. |
 | Authenticate a private upload request | [Private upload signing](vectors/README_private_upload_v1_vectors.md) fixtures; these test the signing contract rather than host an upload service. |
 
-The [scope](#scope) section defines each artifact's actual guarantees and
-producer requirements. No single artifact proves every part of a complete
-app or file-sharing deployment.
+The [scope](#scope) section defines each artifact's actual guarantees and producer requirements. No single artifact proves every part of a complete app or file-sharing deployment.
 
 ## Validate an SDK or verifier
 
-Use these packages when implementing an SDK, checking protocol compatibility,
-or testing that malformed links and packets are rejected:
+Use these packages when implementing an SDK, checking protocol compatibility, or testing that malformed links and packets are rejected:
 
-1. Select the artifact for the operation your implementation performs. Record
-   the release and artifact ID; consult its schema and scope.
-2. Load the fixtures with the [Go loader](#using-it-from-go),
-   [npm or Python loader](#using-it-from-another-language), or the published JSON.
-3. Run the actual parser, signer, verifier, or state machine against each case.
-   Assert the specified output or accept/reject result and reject class where
-   the artifact requires one. Merely loading JSON is not protocol validation.
-4. Run the checks in the consumer's own test suite. When adopting a new artifact
-   release, follow [releases](#releases) and the applicable producer and consumer
-   verification requirements.
+1. Select the artifact for the operation your implementation performs. Record the release and artifact ID; consult its schema and scope.
+2. Load the fixtures with the [Go loader](#using-it-from-go), [npm or Python loader](#using-it-from-another-language), or the published JSON.
+3. Run the actual parser, signer, verifier, or state machine against each case. Assert the specified output or accept/reject result and reject class where the artifact requires one. Merely loading JSON is not protocol validation.
+4. Run the checks in the consumer's own test suite. When adopting a new artifact release, follow [releases](#releases) and the applicable producer and consumer verification requirements.
 
-An application team using an existing SDK should also test its live recipient
-flow, app login, expiry, and origin availability. Those deployment checks are
-separate from this repository's wire-contract fixtures.
+An application team using an existing SDK should also test its live recipient flow, app login, expiry, and origin availability. Those deployment checks are separate from this repository's wire-contract fixtures.
 
 ## Conformance and sharing questions
 
 ### Can this package create a localhost or file-sharing link?
 
-No. It supplies test vectors and loaders. The CLI, SDKs, MCP server, and
-configured serving or upload components implement live sharing.
+No. It supplies test vectors and loaders. The CLI, SDKs, MCP server, and configured serving or upload components implement live sharing.
 
 ### Does passing a loader smoke test prove my SDK is conformant?
 
-No. It proves the artifact can be loaded. Your implementation must execute
-the contract's cases and check the required results. Verify the relevant
-consumer coverage rather than treating stored fixture values as a test run.
+No. It proves the artifact can be loaded. Your implementation must execute the contract's cases and check the required results. Verify the relevant consumer coverage rather than treating stored fixture values as a test run.
 
 ### Should every language use the same release?
 
-Pin a release and record the artifact IDs your consumer adopts. Mirror bytes
-must match the published artifacts, and producer/consumer adoption must follow
-the release requirements. Package names alone do not establish compatibility.
+Pin a release and record the artifact IDs your consumer adopts. Mirror bytes must match the published artifacts, and producer/consumer adoption must follow the release requirements. Package names alone do not establish compatibility.
 
-This is the single public source of truth for these conformance vectors.
-Separate artifact ids keep the qURL v2 verify
-path, Noise-handshake packets, agent registration, NHP assignment/completion,
-registered-agent knock application bodies, registered-agent session control,
-control-plane API-key IDs, assignment tickets, Hub LST return-routability
-cookies, same-agent device-credential recovery, Connector resource discovery,
-CRID v1 resource identifiers, CRID link requests, qURL Connector target paths,
-and private upload application signatures decoupled by layer.
+This is the single public source of truth for these conformance vectors. Separate artifact ids keep the qURL v2 verify path, Noise-handshake packets, agent registration, NHP assignment/completion, registered-agent knock application bodies, registered-agent session control, control-plane API-key IDs, assignment tickets, Hub LST return-routability cookies, same-agent device-credential recovery, Connector resource discovery, CRID v1 resource identifiers, CRID link requests, qURL Connector target paths, and private upload application signatures decoupled by layer.
 
-Everything here is a contract a third-party SDK implements. Platform-internal
-contracts between the NHP runtime, the Connector Hub, and the Connector
-Authority live in a private conformance module and are not published here.
+Everything here is a contract a third-party SDK implements. Platform-internal contracts between the NHP runtime, the Connector Hub, and the Connector Authority live in a private conformance module and are not published here.
 
-The verify-path vectors are **behavioral**. Each class names the verifier
-operation it targets and the input shape it consumes; a consumer feeds that input
-through its real parser/validator and asserts the declared accept/reject outcome
-(and, where the class is about the distinction, the `reject_class`). A verifier
-that drifts from the contract fails its own run — there are no stored booleans to
-trust.
+The verify-path vectors are **behavioral**. Each class names the verifier operation it targets and the input shape it consumes; a consumer feeds that input through its real parser/validator and asserts the declared accept/reject outcome (and, where the class is about the distinction, the `reject_class`). A verifier that drifts from the contract fails its own run — there are no stored booleans to trust.
 
 ## Layout
 
@@ -159,342 +110,53 @@ pu, err := conformance.PrivateUploadV1()              // strict-parsed private u
 raw := conformance.QV2Vectors()                    // raw bytes, if you drive your own parser
 ```
 
-The loaders fail (never return an empty document) on a malformed or unexpected
-artifact, so the contract can never silently drop out of a test suite.
+The loaders fail (never return an empty document) on a malformed or unexpected artifact, so the contract can never silently drop out of a test suite.
 
 ## Using it from another language
 
-Copy the artifact your implementation consumes (and, for qURL v2,
-`qv2_conformance_vectors.json` **and** `issuer_signature_vectors.json`)
-verbatim (same bytes, no reformatting), load them with a strict JSON reader that
-rejects duplicate keys and unknown fields, route each class's input to your real
-entry point, and assert the declared outcome. Treat a missing fixture as a hard
-failure, not a skip. See `vectors/README_qv2_conformance_vectors.md` for the full
-schema and vocabulary. For target-path validation, consume
-`target_path_v1_vectors.json` through the real SDK option gate; do not copy its
-rules into a private fixture. qURL v2 schema version 2 is a deliberate breaking shape:
-typed consumers must update their loader for `transport_contract` and the
-`transport` class before adopting this release. Private upload clients consume
-`private_upload_v1_vectors.json` through their real request signer and run each
-mutation against the same preflight used in production. CRID link request
-clients consume `crid_link_knock_v1_vectors.json` through their real request
-builder and reply interpreter, together with `issuer_signature_vectors.json`,
-which supplies the trust anchor for its fixture link.
+Copy the artifact your implementation consumes (and, for qURL v2, `qv2_conformance_vectors.json` **and** `issuer_signature_vectors.json`) verbatim (same bytes, no reformatting), load them with a strict JSON reader that rejects duplicate keys and unknown fields, route each class's input to your real entry point, and assert the declared outcome. Treat a missing fixture as a hard failure, not a skip. See `vectors/README_qv2_conformance_vectors.md` for the full schema and vocabulary. For target-path validation, consume `target_path_v1_vectors.json` through the real SDK option gate; do not copy its rules into a private fixture. qURL v2 schema version 2 is a deliberate breaking shape: typed consumers must update their loader for `transport_contract` and the `transport` class before adopting this release. Private upload clients consume `private_upload_v1_vectors.json` through their real request signer and run each mutation against the same preflight used in production. CRID link request clients consume `crid_link_knock_v1_vectors.json` through their real request builder and reply interpreter, together with `issuer_signature_vectors.json`, which supplies the trust anchor for its fixture link.
 
 ## Scope
 
-This module hosts sixteen artifacts across fifteen protocol families. Each
-artifact has its own `artifact` id:
+This module hosts sixteen artifacts across fifteen protocol families. Each artifact has its own `artifact` id:
 
-- **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the
-  issuer-signature golden bytes) — the share-safe qv2t1 outer transport and the
-  claims/secret/base64/canonical-fragment/relay/server-id classes described
-  above. The outer transport splits every data component at 240 characters and
-  reconstructs the exact unchanged qv2 security fragment before parsing and
-  verification. Legacy qv2 is not an accepted outer URL format.
-- **Relay/NHP handshake** (`qurl-relay-knock-golden-vectors`,
-  `relay_knock_golden.json`) — the Noise-handshake golden packets, kept in a
-  separate artifact because the qURL verify path does not import the handshake
-  layer. The `knock` packet is **deterministic**: a conformant initiator must
-  reproduce its `packet_hex` byte-for-byte from the listed inputs. The `ack`
-  reply is sealed at origin with a **random** server ephemeral key, so it is
-  **not** reproducible by a client — consumers can only decrypt it and assert the
-  recovered fields. It is re-hosted here verbatim as a frozen golden value. These
-  packets originate from the NHP cross-language handshake fixtures and are pinned
-  here.
-- **NHP agent registration** (`qurl-agent-registration-golden-vectors`,
-  `agent_registration_golden.json`) — the OTP/REG/RAK Noise-handshake golden
-  packets for agent enrollment, again a separate artifact from the verify path.
-  The `otp`, `reg_emailed`, and `reg_preissued` requests are **deterministic**: a
-  conformant initiator must reproduce each `packet_hex` byte-for-byte. The REG body
-  is `{usrId, devId, aspId, otp, usrData}` with `usrData` =
-  `{hostname, version, takeover}` (fields omitted when empty/false), matching the
-  live agent implementations byte-for-byte. The two REG packets differ in the body
-  `otp` value (an emailed code vs a pre-issued key secret) and in `usrData.takeover`
-  (omitted vs `true`); the framing is identical. The `rak_success` / `rak_error`
-  replies are
-  sealed at origin with a **random** server ephemeral, so they are **frozen**
-  decrypt-only, mirroring the relay-knock `ack`. The RAK cases echo
-  `reg_emailed`'s counter, so a consumer can validate the RAK-must-echo-its-REG
-  counter contract against a positive fixture. All keys/ids/secrets are synthetic.
-- **NHP agent assignment and completion**
-  (`qurl-agent-assignment-golden-vectors`, `agent_assignment_golden.json`) —
-  complete deterministic NHP_LST (type 5) / NHP_LRT (type 6) exchanges for
-  initial hub assignment, registered-agent assignment refresh, and assigned-cell
-  registration completion, plus the intervening assigned-cell NHP_REG (type 13)
-  / NHP_RAK (type 14) activation. Every result echoes its request counter.
-  Initial and refresh packets authenticate the hub; REG and completion
-  authenticate the distinct cell public key returned by assignment. The initial
-  and refresh LST bodies are strictly parsed and require a canonical,
-  CSPRNG-generated 32-byte `request_nonce`.
-  An SDK mints it once per logical assignment operation and reuses the exact
-  body through every nested retry, while a later operation mints a fresh nonce.
-  It is never echoed in LRT and never exposes the Hub's private replay key. The
-  private Hub request-ID artifact freezes that derivation outside this module.
-  The opaque ticket returned by initial assignment appears byte-for-byte in REG `usrData`
-  and is consumed there. Ordinary refresh returns only the current assignment
-  binding and never issues a registration ticket, while completion deliberately
-  carries no ticket. Public initial-assignment `registration.key_kind` is closed
-  to `bootstrap`, `connector_bootstrap`, `account`, or `agent`;
-  `tunnel_bootstrap` remains a private control-plane `key_type` and is rejected
-  if it crosses the LRT wire. The `account_credential_otp` section
-  freezes the exact one-way NHP_OTP (type 12) request bytes sent to the assigned
-  cell: `{usrId,devId,aspId,pass,usrData:{query,version,assignment_ticket}}`.
-  Its secret-bearing decrypted body must be consumed from the exact RawBody;
-  the Noise-authenticated peer key is a separate trusted input, and no public
-  key or placement field is allowed in the body. Only `key_kind=account` uses
-  OTP. The `bootstrap`, `connector_bootstrap`, and `agent` paths are explicitly
-  OTP-free and proceed directly to one REG. Binding cases isolate the exact
-  ticket token, peer key, devId, credential id/hash/fence/kind, environment,
-  cell, expiry, inclusive 630-second lifetime boundary, and 629-second reject.
-  The challenge-store metadata freezes `ticket_jti` as its lookup key and binds
-  that ticket to the authenticated peer key, devId, credential id, environment,
-  and cell, with an exact one-field mismatch suite.
-  `recomputed_credential_fence_b64` is the frozen expected result of the
-  qat1/authority-owned strong-row derivation; this artifact freezes its compare
-  inputs and mismatch outcome rather than locally reimplementing that derivation.
-  Binding and challenge cases are declarative mutation recipes that authority
-  consumers must execute against their own implementation. Packet-size
-  cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet
-  limit and max+1. This remains contract data: it does not implement ticket
-  verification, OTP state, rate limiting, email delivery, SDK callbacks, or a
-  plugin. Schema v3 introduced the required assignment request nonce; schema v4
-  adds the 52205 case's exact accepted request phases. Each is a deliberate
-  breaking shape for strict consumers, which must update their typed loader
-  before adopting the corresponding release. The completion request carries the
-  synthetic SDK-generated device-key candidate
-  that must be persisted before send; its result `list` contains exactly
-  `query`, `version`, and `device_api_key_id`—no agent metadata, secret,
-  secret-derived hash, or candidate commitment. The artifact also carries the
-  closed 522xx/523xx LRT
-  and ticket/quota 521xx RAK error taxonomy, including retry-delay rules and
-  malformed-body rejects. The assignment-family 52205 response is explicitly
-  accepted for both initial and refresh requests so a Hub can reject a
-  malformed, unidentifiable mode without guessing the intended exchange. Its
-  compact authenticated request/result case sets
-  separately pin duplicate-aware JSON parsing, exact case-sensitive keys,
-  unknown-field rejection, phase semantics, secret non-disclosure, and the rule
-  that clients cannot supply owner identity or cell placement. The artifact
-  notes define the consumer-neutral reject vocabulary so non-Go consumers do
-  not need to infer meanings from Go constants. The loader
-  verifies canonical lowercase hex, positive decimal transaction fields,
-  canonical padded base64 endpoint keys, and each static X25519 keypair. The
-  artifact pins `layervai/qurl-go` packet-codec revision
-  `c4729832bf29b0f356964035864707f6904b1982`, which built and opened all nine
-  deterministic packets through its low-level codec. That revision
-  pin does not claim the higher-level qurl-go assignment request builder already
-  supports the current artifact schema; the conformance artifact intentionally
-  lands first. The
-  error taxonomy is pinned to merged NHP revision
-  `9653fcb185c77629b787ad046c13c760baba88f4`, which reserves 52110-52112 and
-  the 522xx/523xx ranges and adds list-result `retryAfterSeconds`. Exact OTP
-  RawBody preservation and the authenticated-peer plugin boundary are pinned
-  separately to merged NHP revision
-  `2072546e1fc76eb76bd7e5c22d37856019ba33e7`. All packets,
-  identities, credentials, tickets, hosts,
-  timestamps, and error messages are synthetic conformance values.
-- **Registered-agent knock application contract**
-  (`qurl-agent-knock-application-vectors`,
-  `agent_knock_application_vectors.json`) — the exact compact six-field KNK
-  body, authenticated RunID request-policy cases, and synthetic,
-  already-decrypted reply dispositions for ACK success,
-  authenticated deny, cookie challenge, wrong resource, malformed/missing maps,
-  the complete current ACK producer envelope, required pre-access actions, and
-  reply counter/type mismatch. Generic protocol parsing keeps RunID optional,
-  while the native qURL Connector gate requires one canonical 16-character
-  lowercase-hex value. Standard success includes exact-resource
-  `preActions: null`; any non-null action requires NHP_ACC and fails closed until
-  that phase is implemented. Optional `aspToken` / `redirectUrl` metadata never
-  replaces the requested resource's `acTokens` / `resHost` authorization result.
-  ACK consumers inspect present raw `sessId` occurrences before generic body
-  decoding: shape, type, range, and duplicate violations are `session_id` and
-  take precedence over an independent `body_parse` defect. A well-formed
-  successful ACK that omits `sessId` is also `session_id`; an ordinary
-  structural defect that prevents establishing a successful ACK remains
-  `body_parse`, as do duplicates of other fields.
-  It contains no Noise packets or key material; consumers compose it with their
-  real body serializer, request-policy gates, reply parser, and transport
-  correlation gates. Its `resId` semantic is the placement-neutral NHP
-  `knock_resource_id`, not the verification key `resource_public_key`. See
-  `vectors/README_agent_knock_application_vectors.md`.
-- **Registered-agent session control**
-  (`qurl-agent-session-control-vectors`,
-  `agent_session_control_vectors.json`, schema version 4) — deterministic full packets for the
-  overload path KNK -> COK -> RKN -> ACK and exact-session EXT -> ACK, pinned to
-  `layervai/qurl-go` producer revision
-  `b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed
-  commit on qurl-go main whose deterministic regeneration gate reproduces the
-  committed artifact. The COK wire
-  counter is deliberately unconstrained; its authenticated body `trxId` must
-  equal the originating KNK counter. RKN authenticates a canonical padded
-  standard-base64 32-byte cookie by extending the header digest with the raw
-  cookie bytes. KNK and RKN carry one canonical RunID and positive uint64
-  `runAttempt`. The RKN ACK counter echoes RKN and the successful ACK carries
-  the exact immutable `cellId`, nonzero uint64 `sessId`, positive
-  `sessIssuedAtMillis`, `runId`, and `runAttempt` receipt. Its raw JSON `sessId` number can
-  exceed JavaScript's safe-integer range, so JavaScript consumers must parse it
-  losslessly into `BigInt` rather than pass it through an ordinary
-  `JSON.parse` number. EXT carries that exact receipt and receives a dedicated
-  counter-echoing ACK that repeats it and adds a canonical `closeEventId` plus
-  `closing` or `closed` state. Denials omit every receipt and close-event field.
-  Resource-scoped and bodyless/global exit shapes are rejected. The
-  artifact freezes both static X25519 identities, every
-  deterministic ephemeral key, body byte, header digest, and packet byte, plus
-  closed cookie and flow reject suites. Consumers must rebuild initiator
-  packets, authenticate replies against the assigned cell key, and enforce the
-  application-body and correlation gates after decryption. See
-  `vectors/README_agent_session_control_vectors.md`.
-- **Agent API-key ID contract** (`qurl-agent-api-key-id-vectors`,
-  `agent_api_key_id_vectors.json`) — deterministic issuer suffix fixtures,
-  direct string validation cases, and raw response-field cases for
-  `registration-info.key_id` and completion `device_api_key_id`. It freezes the
-  exact `key_` plus 12 ASCII-alphanumeric grammar without reinterpreting the
-  synthetic NHP registration packet `usrId`. See
-  `vectors/README_agent_api_key_id_vectors.md`.
-- **Assignment ticket v1** (`qurl-assignment-ticket-v1-vectors`,
-  `assignment_ticket_v1_vectors.json`) — exact qat1 claims bytes, signing digest,
-  synthetic KMS DER-to-raw-low-S conversion, complete ticket, credential/cell/
-  existing-assignment fences, NHP size budget, and closed reject suites. NHP
-  carries this ticket opaquely. See
-  `vectors/README_assignment_ticket_v1_vectors.md`.
-- **Connector resource discovery LST/LRT v1**
-  (`qurl-connector-resource-lst-v1-vectors`,
-  `connector_resource_lst_v1_vectors.json`) — a dedicated post-registration
-  `connector_resource` v1 exchange over standard NHP_LST/NHP_LRT. The
-  authenticated peer binds exact `usrId=devId=agent_id`; owner and entitlement
-  remain server-side. One request resolves one connector and returns exact
-  resource, routing, knock, required CRID, and `found_existing` values. The
-  optional `expected_crid` is read-only fail-closed continuity: only the
-  same active resource succeeds; absent, revoked, tombstoned, or different
-  state returns terminal 52503 without creating or reclaiming a replacement.
-  Replay preserves the byte-identical first result, while a fresh nonce
-  reauthorizes. The artifact freezes strict 52500-52506 errors and conservative
-  pre-seal size budgets; the NHP reference integration owns the real sealed
-  1,232-byte proof. No HTTP fallback or hostname-derived placement is allowed.
-  See `vectors/README_connector_resource_lst_v1_vectors.md`.
-- **Connector Hub LST return-routability cookie v1**
-  (`qurl-connector-hub-lst-cookie-v1-vectors`,
-  `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing,
-  the Hub-LST-only `0x0004` proof flag and digest input, initial and refresh
-  flows, strict zero-flag COK parsing (including terminal compressed and
-  unknown-flag rejects), dynamic no-amplification bounds, and silent
-  pre-Authority rejects. It neither changes nor reuses the existing overload
-  KNK/RKN cookie domain. See
-  `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
-- **Agent credential recovery v1**
-  (`qurl-agent-credential-recovery-v1-vectors`,
-  `agent_credential_recovery_v1_vectors.json`) — the SDK-facing half of
-  explicit same-agent device-credential recovery: strict UDP-only Hub and
-  assigned-cell bodies, the additive Hub-cookie proof/size composition,
-  request and result rejects, logical-request replay outcomes, grant bindings,
-  the no-takeover/no-placement-hint policy, exact-candidate replay, the
-  per-episode immutable 90-day horizon, and closed `524xx` outcomes. The
-  platform's internal invocation bodies and replay-key derivation are not part
-  of it. See `vectors/README_agent_credential_recovery_v1_vectors.md`.
-- **CRID v1** (`qurl-crid-v1-vectors`, `crid_v1_vectors.json`) — exact
-  derivation of the Cryptographic Resource ID from a DER
-  `SubjectPublicKeyInfo` (domain-separated SHA-256, big-endian CRC32C,
-  lowercase unpadded RFC 4648 base32), the closed version-byte registry with
-  its environment bit, the local validation gate with its five-class reject
-  vocabulary, and the delivered-key match rule. The gate is local-only:
-  `accept` means forward to the authoritative validator, unknown version
-  bytes are forwarded rather than rejected, and a delivered public key is
-  used only when its re-derived CRID equals the held CRID. This family is
-  fully stdlib-derivable, so the strict Go loader re-derives every golden
-  from the DER key bytes. See `vectors/README_crid_v1_vectors.md`.
-- **CRID link knock v1** (`qurl-crid-link-knock-v1-vectors`,
-  `crid_link_knock_v1_vectors.json`) — the client contract for turning a CRID
-  into a qURL link without an account or an HTTP API. The client sends an
-  ordinary knock whose body names the CRID and receives the link in a
-  deliberately non-success ACK; it then opens that link with the unchanged
-  qURL v2 knock. The artifact freezes the canonical request body bytes
-  (including user-agent truncation to 256 bytes of valid UTF-8), the CRIDs a
-  client must refuse to request (including a well-formed one whose version it
-  could not verify a link against), the closed `52600`-`52606` outcome codes
-  with their retry flags and client results, the rules that a success code or
-  a non-string code is a protocol violation and that the overload cookie
-  reply means `busy`, and the checks a client runs before it uses an issued
-  link: link origin compared as text, bare fragment shape, `qv2t1` transport,
-  issuer signature, and a resource key that derives the requested CRID. Publisher
-  metadata in the reply is display-only and unverified, and malformed or
-  over-long metadata degrades instead of failing. The fixture link is the
-  published qURL v2 accept link, so the strict Go loader verifies its issuer
-  signature and re-derives its CRID instead of trusting stored labels. See
-  `vectors/README_crid_link_knock_v1_vectors.md`.
-- **qURL Connector target path** (`qurl-target-path-v1-vectors`,
-  `target_path_v1_vectors.json`) — the shared local preflight and service input
-  grammar for the optional per-qURL path and query on a tunnel resource. The
-  vectors keep omission distinct from explicit empty, cover the exact 2,048-byte
-  boundary and all closed rejection classes, reject non-canonical path escapes
-  and segments before dispatch, and preserve accepted bytes without decoding or
-  normalization. Schema version 2 removes apostrophe from the whole-value
-  alphabet and adds the path-only `forbidden_path_ascii` set. Every accepted
-  value is safe to open. See
-  `vectors/README_target_path_v1_vectors.md`.
-- **Private upload application signing v1**
-  (`qurl-private-upload-v1-vectors`, `private_upload_v1_vectors.json`) — exact
-  POST and PATCH application signatures for the private upload path reached
-  after an authenticated NHP 1.1 ACK. The signature binds the protected ACK URL
-  authority, exact method and path, body digest and length, caller key, and
-  request ID. Upload also binds the audience key, media type, filename, and
-  authority horizon. The artifact publishes strict request construction rules,
-  byte-exact goldens, stable request digests, canonical low-S DER signatures,
-  and executable HTTP and client-preflight rejects. It adds no NHP packet
-  format and defines no CLI or OAuth credential path. See
-  `vectors/README_private_upload_v1_vectors.md`.
+- **qURL v2 read path** (`qurl-v2-conformance-vectors`, composing the issuer-signature golden bytes) — the share-safe qv2t1 outer transport and the claims/secret/base64/canonical-fragment/relay/server-id classes described above. The outer transport splits every data component at 240 characters and reconstructs the exact unchanged qv2 security fragment before parsing and verification. Legacy qv2 is not an accepted outer URL format.
+- **Relay/NHP handshake** (`qurl-relay-knock-golden-vectors`, `relay_knock_golden.json`) — the Noise-handshake golden packets, kept in a separate artifact because the qURL verify path does not import the handshake layer. The `knock` packet is **deterministic**: a conformant initiator must reproduce its `packet_hex` byte-for-byte from the listed inputs. The `ack` reply is sealed at origin with a **random** server ephemeral key, so it is **not** reproducible by a client — consumers can only decrypt it and assert the recovered fields. It is re-hosted here verbatim as a frozen golden value. These packets originate from the NHP cross-language handshake fixtures and are pinned here.
+- **NHP agent registration** (`qurl-agent-registration-golden-vectors`, `agent_registration_golden.json`) — the OTP/REG/RAK Noise-handshake golden packets for agent enrollment, again a separate artifact from the verify path. The `otp`, `reg_emailed`, and `reg_preissued` requests are **deterministic**: a conformant initiator must reproduce each `packet_hex` byte-for-byte. The REG body is `{usrId, devId, aspId, otp, usrData}` with `usrData` = `{hostname, version, takeover}` (fields omitted when empty/false), matching the live agent implementations byte-for-byte. The two REG packets differ in the body `otp` value (an emailed code vs a pre-issued key secret) and in `usrData.takeover` (omitted vs `true`); the framing is identical. The `rak_success` / `rak_error` replies are sealed at origin with a **random** server ephemeral, so they are **frozen** decrypt-only, mirroring the relay-knock `ack`. The RAK cases echo `reg_emailed`'s counter, so a consumer can validate the RAK-must-echo-its-REG counter contract against a positive fixture. All keys/ids/secrets are synthetic.
+- **NHP agent assignment and completion** (`qurl-agent-assignment-golden-vectors`, `agent_assignment_golden.json`) — complete deterministic NHP_LST (type 5) / NHP_LRT (type 6) exchanges for initial hub assignment, registered-agent assignment refresh, and assigned-cell registration completion, plus the intervening assigned-cell NHP_REG (type 13) / NHP_RAK (type 14) activation. Every result echoes its request counter. Initial and refresh packets authenticate the hub; REG and completion authenticate the distinct cell public key returned by assignment. The initial and refresh LST bodies are strictly parsed and require a canonical, CSPRNG-generated 32-byte `request_nonce`. An SDK mints it once per logical assignment operation and reuses the exact body through every nested retry, while a later operation mints a fresh nonce. It is never echoed in LRT and never exposes the Hub's private replay key. The private Hub request-ID artifact freezes that derivation outside this module. The opaque ticket returned by initial assignment appears byte-for-byte in REG `usrData` and is consumed there. Ordinary refresh returns only the current assignment binding and never issues a registration ticket, while completion deliberately carries no ticket. Public initial-assignment `registration.key_kind` is closed to `bootstrap`, `connector_bootstrap`, `account`, or `agent`; `tunnel_bootstrap` remains a private control-plane `key_type` and is rejected if it crosses the LRT wire. The `account_credential_otp` section freezes the exact one-way NHP_OTP (type 12) request bytes sent to the assigned cell: `{usrId,devId,aspId,pass,usrData:{query,version,assignment_ticket}}`. Its secret-bearing decrypted body must be consumed from the exact RawBody; the Noise-authenticated peer key is a separate trusted input, and no public key or placement field is allowed in the body. Only `key_kind=account` uses OTP. The `bootstrap`, `connector_bootstrap`, and `agent` paths are explicitly OTP-free and proceed directly to one REG. Binding cases isolate the exact ticket token, peer key, devId, credential id/hash/fence/kind, environment, cell, expiry, inclusive 630-second lifetime boundary, and 629-second reject. The challenge-store metadata freezes `ticket_jti` as its lookup key and binds that ticket to the authenticated peer key, devId, credential id, environment, and cell, with an exact one-field mismatch suite. `recomputed_credential_fence_b64` is the frozen expected result of the qat1/authority-owned strong-row derivation; this artifact freezes its compare inputs and mismatch outcome rather than locally reimplementing that derivation. Binding and challenge cases are declarative mutation recipes that authority consumers must execute against their own implementation. Packet-size cases drive the producer at the exact 3,840-byte plaintext / 4,096-byte packet limit and max+1. This remains contract data: it does not implement ticket verification, OTP state, rate limiting, email delivery, SDK callbacks, or a plugin. Schema v3 introduced the required assignment request nonce; schema v4 adds the 52205 case's exact accepted request phases. Each is a deliberate breaking shape for strict consumers, which must update their typed loader before adopting the corresponding release. The completion request carries the synthetic SDK-generated device-key candidate that must be persisted before send; its result `list` contains exactly `query`, `version`, and `device_api_key_id`—no agent metadata, secret, secret-derived hash, or candidate commitment. The artifact also carries the closed 522xx/523xx LRT and ticket/quota 521xx RAK error taxonomy, including retry-delay rules and malformed-body rejects. The assignment-family 52205 response is explicitly accepted for both initial and refresh requests so a Hub can reject a malformed, unidentifiable mode without guessing the intended exchange. Its compact authenticated request/result case sets separately pin duplicate-aware JSON parsing, exact case-sensitive keys, unknown-field rejection, phase semantics, secret non-disclosure, and the rule that clients cannot supply owner identity or cell placement. The artifact notes define the consumer-neutral reject vocabulary so non-Go consumers do not need to infer meanings from Go constants. The loader verifies canonical lowercase hex, positive decimal transaction fields, canonical padded base64 endpoint keys, and each static X25519 keypair. The artifact pins `layervai/qurl-go` packet-codec revision `c4729832bf29b0f356964035864707f6904b1982`, which built and opened all nine deterministic packets through its low-level codec. That revision pin does not claim the higher-level qurl-go assignment request builder already supports the current artifact schema; the conformance artifact intentionally lands first. The error taxonomy is pinned to merged NHP revision `9653fcb185c77629b787ad046c13c760baba88f4`, which reserves 52110-52112 and the 522xx/523xx ranges and adds list-result `retryAfterSeconds`. Exact OTP RawBody preservation and the authenticated-peer plugin boundary are pinned separately to merged NHP revision `2072546e1fc76eb76bd7e5c22d37856019ba33e7`. All packets, identities, credentials, tickets, hosts, timestamps, and error messages are synthetic conformance values.
+- **Registered-agent knock application contract** (`qurl-agent-knock-application-vectors`, `agent_knock_application_vectors.json`) — the exact compact six-field KNK body, authenticated RunID request-policy cases, and synthetic, already-decrypted reply dispositions for ACK success, authenticated deny, cookie challenge, wrong resource, malformed/missing maps, the complete current ACK producer envelope, required pre-access actions, and reply counter/type mismatch. Generic protocol parsing keeps RunID optional, while the native qURL Connector gate requires one canonical 16-character lowercase-hex value. Standard success includes exact-resource `preActions: null`; any non-null action requires NHP_ACC and fails closed until that phase is implemented. Optional `aspToken` / `redirectUrl` metadata never replaces the requested resource's `acTokens` / `resHost` authorization result. ACK consumers inspect present raw `sessId` occurrences before generic body decoding: shape, type, range, and duplicate violations are `session_id` and take precedence over an independent `body_parse` defect. A well-formed successful ACK that omits `sessId` is also `session_id`; an ordinary structural defect that prevents establishing a successful ACK remains `body_parse`, as do duplicates of other fields. It contains no Noise packets or key material; consumers compose it with their real body serializer, request-policy gates, reply parser, and transport correlation gates. Its `resId` semantic is the placement-neutral NHP `knock_resource_id`, not the verification key `resource_public_key`. See `vectors/README_agent_knock_application_vectors.md`.
+- **Registered-agent session control** (`qurl-agent-session-control-vectors`, `agent_session_control_vectors.json`, schema version 4) — deterministic full packets for the overload path KNK -> COK -> RKN -> ACK and exact-session EXT -> ACK, pinned to `layervai/qurl-go` producer revision `b962ee4aa82f643d507ddf75adc3c110df8dff9d`. This is the signed commit on qurl-go main whose deterministic regeneration gate reproduces the committed artifact. The COK wire counter is deliberately unconstrained; its authenticated body `trxId` must equal the originating KNK counter. RKN authenticates a canonical padded standard-base64 32-byte cookie by extending the header digest with the raw cookie bytes. KNK and RKN carry one canonical RunID and positive uint64 `runAttempt`. The RKN ACK counter echoes RKN and the successful ACK carries the exact immutable `cellId`, nonzero uint64 `sessId`, positive `sessIssuedAtMillis`, `runId`, and `runAttempt` receipt. Its raw JSON `sessId` number can exceed JavaScript's safe-integer range, so JavaScript consumers must parse it losslessly into `BigInt` rather than pass it through an ordinary `JSON.parse` number. EXT carries that exact receipt and receives a dedicated counter-echoing ACK that repeats it and adds a canonical `closeEventId` plus `closing` or `closed` state. Denials omit every receipt and close-event field. Resource-scoped and bodyless/global exit shapes are rejected. The artifact freezes both static X25519 identities, every deterministic ephemeral key, body byte, header digest, and packet byte, plus closed cookie and flow reject suites. Consumers must rebuild initiator packets, authenticate replies against the assigned cell key, and enforce the application-body and correlation gates after decryption. See `vectors/README_agent_session_control_vectors.md`.
+- **Agent API-key ID contract** (`qurl-agent-api-key-id-vectors`, `agent_api_key_id_vectors.json`) — deterministic issuer suffix fixtures, direct string validation cases, and raw response-field cases for `registration-info.key_id` and completion `device_api_key_id`. It freezes the exact `key_` plus 12 ASCII-alphanumeric grammar without reinterpreting the synthetic NHP registration packet `usrId`. See `vectors/README_agent_api_key_id_vectors.md`.
+- **Assignment ticket v1** (`qurl-assignment-ticket-v1-vectors`, `assignment_ticket_v1_vectors.json`) — exact qat1 claims bytes, signing digest, synthetic KMS DER-to-raw-low-S conversion, complete ticket, credential/cell/ existing-assignment fences, NHP size budget, and closed reject suites. NHP carries this ticket opaquely. See `vectors/README_assignment_ticket_v1_vectors.md`.
+- **Connector resource discovery LST/LRT v1** (`qurl-connector-resource-lst-v1-vectors`, `connector_resource_lst_v1_vectors.json`) — a dedicated post-registration `connector_resource` v1 exchange over standard NHP_LST/NHP_LRT. The authenticated peer binds exact `usrId=devId=agent_id`; owner and entitlement remain server-side. One request resolves one connector and returns exact resource, routing, knock, required CRID, and `found_existing` values. The optional `expected_crid` is read-only fail-closed continuity: only the same active resource succeeds; absent, revoked, tombstoned, or different state returns terminal 52503 without creating or reclaiming a replacement. Replay preserves the byte-identical first result, while a fresh nonce reauthorizes. The artifact freezes strict 52500-52506 errors and conservative pre-seal size budgets; the NHP reference integration owns the real sealed 1,232-byte proof. No HTTP fallback or hostname-derived placement is allowed. See `vectors/README_connector_resource_lst_v1_vectors.md`.
+- **Connector Hub LST return-routability cookie v1** (`qurl-connector-hub-lst-cookie-v1-vectors`, `connector_hub_lst_cookie_v1_vectors.json`) — exact stateless HMAC framing, the Hub-LST-only `0x0004` proof flag and digest input, initial and refresh flows, strict zero-flag COK parsing (including terminal compressed and unknown-flag rejects), dynamic no-amplification bounds, and silent pre-Authority rejects. It neither changes nor reuses the existing overload KNK/RKN cookie domain. See `vectors/README_connector_hub_lst_cookie_v1_vectors.md`.
+- **Agent credential recovery v1** (`qurl-agent-credential-recovery-v1-vectors`, `agent_credential_recovery_v1_vectors.json`) — the SDK-facing half of explicit same-agent device-credential recovery: strict UDP-only Hub and assigned-cell bodies, the additive Hub-cookie proof/size composition, request and result rejects, logical-request replay outcomes, grant bindings, the no-takeover/no-placement-hint policy, exact-candidate replay, the per-episode immutable 90-day horizon, and closed `524xx` outcomes. The platform's internal invocation bodies and replay-key derivation are not part of it. See `vectors/README_agent_credential_recovery_v1_vectors.md`.
+- **CRID v1** (`qurl-crid-v1-vectors`, `crid_v1_vectors.json`) — exact derivation of the Cryptographic Resource ID from a DER `SubjectPublicKeyInfo` (domain-separated SHA-256, big-endian CRC32C, lowercase unpadded RFC 4648 base32), the closed version-byte registry with its environment bit, the local validation gate with its five-class reject vocabulary, and the delivered-key match rule. The gate is local-only: `accept` means forward to the authoritative validator, unknown version bytes are forwarded rather than rejected, and a delivered public key is used only when its re-derived CRID equals the held CRID. This family is fully stdlib-derivable, so the strict Go loader re-derives every golden from the DER key bytes. See `vectors/README_crid_v1_vectors.md`.
+- **CRID link knock v1** (`qurl-crid-link-knock-v1-vectors`, `crid_link_knock_v1_vectors.json`) — the client contract for turning a CRID into a qURL link without an account or an HTTP API. The client sends an ordinary knock whose body names the CRID and receives the link in a deliberately non-success ACK; it then opens that link with the unchanged qURL v2 knock. The artifact freezes the canonical request body bytes (including user-agent truncation to 256 bytes of valid UTF-8), the CRIDs a client must refuse to request (including a well-formed one whose version it could not verify a link against), the closed `52600`-`52606` outcome codes with their retry flags and client results, the rules that a success code or a non-string code is a protocol violation and that the overload cookie reply means `busy`, and the checks a client runs before it uses an issued link: link origin compared as text, bare fragment shape, `qv2t1` transport, issuer signature, and a resource key that derives the requested CRID. Publisher metadata in the reply is display-only and unverified, and malformed or over-long metadata degrades instead of failing. The fixture link is the published qURL v2 accept link, so the strict Go loader verifies its issuer signature and re-derives its CRID instead of trusting stored labels. See `vectors/README_crid_link_knock_v1_vectors.md`.
+- **qURL Connector target path** (`qurl-target-path-v1-vectors`, `target_path_v1_vectors.json`) — the shared local preflight and service input grammar for the optional per-qURL path and query on a tunnel resource. The vectors keep omission distinct from explicit empty, cover the exact 2,048-byte boundary and all closed rejection classes, reject non-canonical path escapes and segments before dispatch, and preserve accepted bytes without decoding or normalization. Schema version 2 removes apostrophe from the whole-value alphabet and adds the path-only `forbidden_path_ascii` set. Every accepted value is safe to open. See `vectors/README_target_path_v1_vectors.md`.
+- **Private upload application signing v1** (`qurl-private-upload-v1-vectors`, `private_upload_v1_vectors.json`) — exact POST and PATCH application signatures for the private upload path reached after an authenticated NHP 1.1 ACK. The signature binds the protected ACK URL authority, exact method and path, body digest and length, caller key, and request ID. Upload also binds the audience key, media type, filename, and authority horizon. The artifact publishes strict request construction rules, byte-exact goldens, stable request digests, canonical low-S DER signatures, and executable HTTP and client-preflight rejects. It adds no NHP packet format and defines no CLI or OAuth credential path. See `vectors/README_private_upload_v1_vectors.md`.
 
-This module is intentionally dependency-free (stdlib only). The generator for
-key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once when
-its key-dependent artifact must change. It never runs in CI because ECDSA
-signatures use random nonces and are not reproducible. The committed JSON is the artifact.
-Vectors are edited under `vectors/`.
+This module is intentionally dependency-free (stdlib only). The generator for key-dependent vectors lives at `tools/gen`; run `make gen-vectors` once when its key-dependent artifact must change. It never runs in CI because ECDSA signatures use random nonces and are not reproducible. The committed JSON is the artifact. Vectors are edited under `vectors/`.
 
 ## NHP protocol version
 
-Every NHP packet in this repository — relay-knock, agent-registration,
-agent-assignment, and agent-session — carries **protocol 1.1** in
-`HeaderCommon[8:10]` (`01 01`), exposed as `NHPProtocolVersionMajor` /
-`NHPProtocolVersionMinor`. All four families moved from 1.0 together and the
-loaders assert the bytes.
+Every NHP packet in this repository — relay-knock, agent-registration, agent-assignment, and agent-session — carries **protocol 1.1** in `HeaderCommon[8:10]` (`01 01`), exposed as `NHPProtocolVersionMajor` / `NHPProtocolVersionMinor`. All four families moved from 1.0 together and the loaders assert the bytes.
 
-1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it
-as the body-seal AAD, so **editing any header field breaks the body open**.
-Under 1.0 the flag word, header type and declared payload size rode outside
-every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone
-holding the peer's static *public* key can recompute — so those fields were
-forgeable. Chain-key derivation, the body key, the nonce, and the header-digest
-input are unchanged.
+1.1 folds the 24-byte serialized `HeaderCommon` into the chain hash and uses it as the body-seal AAD, so **editing any header field breaks the body open**. Under 1.0 the flag word, header type and declared payload size rode outside every AEAD, covered only by the unkeyed BLAKE2s header digest that anyone holding the peer's static *public* key can recompute — so those fields were forgeable. Chain-key derivation, the body key, the nonce, and the header-digest input are unchanged.
 
-A 1.1 receiver rejects a 1.0 sender by design, so senders must never lead
-receivers on a rollout. Reject a lower minor on the version byte rather than on
-an AEAD tag, so the failure is explicit; admit a higher minor so a later
-compatible release cannot strand deployed clients.
+A 1.1 receiver rejects a 1.0 sender by design, so senders must never lead receivers on a rollout. Reject a lower minor on the version byte rather than on an AEAD tag, so the failure is explicit; admit a higher minor so a later compatible release cannot strand deployed clients.
 
 ## Who authenticates these bytes
 
-This repository publishes wire truth. The module is stdlib-only by rule
-(`go.mod` carries no `require`), so no BLAKE2s or AEAD primitive exists here and
-no in-repo check can recompute an NHP packet, a header digest, or the Hub proof
-digest. Those in-repo gates are **structural**: framing, lengths, canonical
-hex/base64, key roles, counter and version bytes, and cross-field correlation. A
-transcription error inside an otherwise well-formed regenerated `packet_hex`
-would pass CI here.
+This repository publishes wire truth. The module is stdlib-only by rule (`go.mod` carries no `require`), so no BLAKE2s or AEAD primitive exists here and no in-repo check can recompute an NHP packet, a header digest, or the Hub proof digest. Those in-repo gates are **structural**: framing, lengths, canonical hex/base64, key roles, counter and version bytes, and cross-field correlation. A transcription error inside an otherwise well-formed regenerated `packet_hex` would pass CI here.
 
-Cryptographic verification belongs to the consumers, which rebuild and open
-these exact bytes against their real codecs in their own CI. Regenerating any
-packet family therefore hands verification to a release gate, not to this
-repository's tests — see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+Cryptographic verification belongs to the consumers, which rebuild and open these exact bytes against their real codecs in their own CI. Regenerating any packet family therefore hands verification to a release gate, not to this repository's tests — see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Releases
 
-Versioning is automated with [Release Please](https://github.com/googleapis/release-please)
-in manifest mode: the Go module, the npm package, and the Python package are
-released together under one linked version (see `release-please-config.json`).
-Merging the release PR tags the repo, which is what releases the Go module.
+Versioning is automated with [Release Please](https://github.com/googleapis/release-please) in manifest mode: the Go module, the npm package, and the Python package are released together under one linked version (see `release-please-config.json`). Merging the release PR tags the repo, which is what releases the Go module.
 
-npm and PyPI **registry publishing on release is a token-gated follow-up** (it needs
-`NPM_TOKEN` / PyPI trusted publishing wired up); for now Release Please only
-automates the version-bump PRs and the Go tag.
+npm and PyPI **registry publishing on release is a token-gated follow-up** (it needs `NPM_TOKEN` / PyPI trusted publishing wired up); for now Release Please only automates the version-bump PRs and the Go tag.
 
 ## License
 
