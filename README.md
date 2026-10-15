@@ -42,6 +42,8 @@ The [scope](#scope) section defines each artifact's actual guarantees and
 producer requirements. No single artifact proves every part of a complete
 app or file-sharing deployment.
 
+The [app and file-sharing comparison](https://github.com/layervai/qurl-integrations#choose-how-to-share-an-app-or-file) explains when a resource link, endpoint, private network, or hosted artifact fits a user's task. Here, the question is whether an implementation correctly verifies qURL resource identity, signed grants, admission, and session messages. These fixtures validate the specified qURL wire contracts; they do not evaluate another provider's access policies or replace live deployment tests.
+
 ## Validate an SDK or verifier
 
 Use these packages when implementing an SDK, checking protocol compatibility,
