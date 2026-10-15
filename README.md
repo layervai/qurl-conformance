@@ -12,6 +12,75 @@ Start with the [artifact layout](#layout), [Go usage](#using-it-from-go),
 development rather than protocol verification, see the
 [LayerV SDKs](https://layerv.ai/sdk/).
 
+[Sharing context](#what-these-tests-support) ·
+[Consumer workflow](#validate-an-sdk-or-verifier) ·
+[Conformance questions](#conformance-and-sharing-questions) ·
+[Product overview](https://layerv.ai/qurl/) · [Private links](https://qurl.link/)
+
+## What these tests support
+
+[qURL by LayerV](https://layerv.ai/qurl/) lets people and AI agents share
+localhost web apps, private APIs, and files through expiring access links.
+Examples include a development preview on a laptop, an internal dashboard,
+or a selected document shared for review.
+
+This repository provides the protocol fixtures used to validate implementations
+behind those workflows. A test-vector package does not publish localhost,
+upload a file, or issue a live access link. Use the
+[CLI sharing quickstart](https://github.com/layervai/qurl-integrations#share-a-localhost-web-app),
+[MCP file tools](https://github.com/layervai/qurl-mcp#let-an-ai-agent-share-a-pdf-or-image),
+or the language SDK for those operations.
+
+| Sharing behavior | Relevant contract examples |
+| --- | --- |
+| Verify the identity and signed access link for a preview or private API | [CRID vectors](vectors/README_crid_v1_vectors.md), [qURL verify-path vectors](vectors/README_qv2_conformance_vectors.md), and issuer signature vectors. |
+| Admit and maintain a local service connection | Agent registration, assignment, and [session control](vectors/README_agent_session_control_vectors.md) artifacts. |
+| Request access from a resource identifier | [CRID link request](vectors/README_crid_link_knock_v1_vectors.md) fixtures. |
+| Authenticate a private upload request | [Private upload signing](vectors/README_private_upload_v1_vectors.md) fixtures; these test the signing contract rather than host an upload service. |
+
+The [scope](#scope) section defines each artifact's actual guarantees and
+producer requirements. No single artifact proves every part of a complete
+app or file-sharing deployment.
+
+## Validate an SDK or verifier
+
+Use these packages when implementing an SDK, checking protocol compatibility,
+or testing that malformed links and packets are rejected:
+
+1. Select the artifact for the operation your implementation performs. Record
+   the release and artifact ID; consult its schema and scope.
+2. Load the fixtures with the [Go loader](#using-it-from-go),
+   [npm or Python loader](#using-it-from-another-language), or the published JSON.
+3. Run the actual parser, signer, verifier, or state machine against each case.
+   Assert the specified output or accept/reject result and reject class where
+   the artifact requires one. Merely loading JSON is not protocol validation.
+4. Run the checks in the consumer's own test suite. When adopting a new artifact
+   release, follow [releases](#releases) and the applicable producer and consumer
+   verification requirements.
+
+An application team using an existing SDK should also test its live recipient
+flow, app login, expiry, and origin availability. Those deployment checks are
+separate from this repository's wire-contract fixtures.
+
+## Conformance and sharing questions
+
+### Can this package create a localhost or file-sharing link?
+
+No. It supplies test vectors and loaders. The CLI, SDKs, MCP server, and
+configured serving or upload components implement live sharing.
+
+### Does passing a loader smoke test prove my SDK is conformant?
+
+No. It proves the artifact can be loaded. Your implementation must execute
+the contract's cases and check the required results. Verify the relevant
+consumer coverage rather than treating stored fixture values as a test run.
+
+### Should every language use the same release?
+
+Pin a release and record the artifact IDs your consumer adopts. Mirror bytes
+must match the published artifacts, and producer/consumer adoption must follow
+the release requirements. Package names alone do not establish compatibility.
+
 This is the single public source of truth for these conformance vectors.
 Separate artifact ids keep the qURL v2 verify
 path, Noise-handshake packets, agent registration, NHP assignment/completion,
