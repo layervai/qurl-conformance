@@ -412,9 +412,16 @@ in manifest mode: the Go module, the npm package, and the Python package are
 released together under one linked version (see `release-please-config.json`).
 Merging the release PR tags the repo, which is what releases the Go module.
 
-npm and PyPI **registry publishing on release is a token-gated follow-up** (it needs
-`NPM_TOKEN` / PyPI trusted publishing wired up); for now Release Please only
-automates the version-bump PRs and the Go tag.
+The release workflow also publishes npm and PyPI packages automatically when
+Release Please creates their releases. Each job checks out its exact release tag.
+Both use OIDC trusted publishing with `id-token: write`; no registry token is
+required. npm publishes with provenance in the `npm-publish` environment. PyPI
+publishes with attestations in the `pypi` environment.
+
+Before publishing, configure each registry to trust this repository and
+`release-please.yml`, with its matching GitHub environment (`npm-publish` or
+`pypi`). The environments and any required approvals must also be set up in
+GitHub. See `.github/workflows/release-please.yml` for the publishing jobs.
 
 ## License
 
