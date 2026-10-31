@@ -50,3 +50,49 @@ func TestDERToRawLowSRejectsUnexpectedSequenceElement(t *testing.T) {
 		t.Fatal("DER with an unexpected sequence element was accepted")
 	}
 }
+
+func TestExecutableFenceRejectBoundaries(t *testing.T) {
+	af, err := conformance.AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, base := range af.FenceVectors {
+		if got := fenceInputBoundary(base.Parts, base.Parts); got != "" {
+			t.Fatalf("positive %s rejected at %s", base.Kind, got)
+		}
+	}
+	count := 0
+	for _, reject := range af.FenceRejects {
+		for _, input := range reject.Inputs {
+			count++
+			t.Run(input.Name, func(t *testing.T) {
+				var base conformance.AssignmentTicketFenceVector
+				for _, v := range af.FenceVectors {
+					if v.Kind == input.Kind {
+						base = v
+					}
+				}
+				if got := fenceInputBoundary(input.Parts, base.Parts); got != input.Boundary {
+					t.Fatalf("boundary=%q want=%q", got, input.Boundary)
+				}
+			})
+		}
+	}
+	if count != 13 {
+		t.Fatalf("executed %d inputs, want 13", count)
+	}
+	// A renamed boundary or an accidentally restored positive must fail even when
+	// the caller bypasses the artifact loader's structural checks.
+	af.FenceRejects[0].Inputs[0].Parts = af.FenceVectors[0].Parts
+	if err := verifyFenceRejectInputs(af); err == nil {
+		t.Fatal("accepted positive input as a reject")
+	}
+	af, err = conformance.AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.FenceRejects[0].Inputs[0].Boundary = "unknown"
+	if err := verifyFenceRejectInputs(af); err == nil {
+		t.Fatal("accepted unknown boundary")
+	}
+}

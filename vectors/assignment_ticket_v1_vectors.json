@@ -1,6 +1,6 @@
 {
   "artifact": "qurl-assignment-ticket-v1-vectors",
-  "schema_version": 1,
+  "schema_version": 2,
   "description": "Synthetic qat1 assignment-ticket signing, strict-verification, and optimistic-fence vectors. Every credential, key, identifier, and signature is test-only.",
   "contract": {
     "token_prefix": "qat1",
@@ -432,7 +432,11 @@
       "name": "claims_part_too_large",
       "reject_class": "size",
       "reason": "The claims segment cannot exceed 2048 characters.",
-      "derivation": {"target": "claims_part", "ascii_char": "A", "count": 2049},
+      "derivation": {
+        "target": "claims_part",
+        "ascii_char": "A",
+        "count": 2049
+      },
       "expected_environment_id": "sandbox",
       "trusted_kid": "assignment-2026-01",
       "verify_at_unix": 1784160030
@@ -614,42 +618,955 @@
       "fence_kind": "credential",
       "reject_class": "key_length",
       "reason": "The raw credential hash part must be exactly 32 bytes.",
-      "mutation": "truncate credential_key_hash to 31 bytes"
+      "mutation": "truncate credential_key_hash to 31 bytes",
+      "inputs": [
+        {
+          "name": "credential_hash_wrong_length",
+          "kind": "credential",
+          "boundary": "key_length",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxQ",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "2",
+              "bytes_hex": "0000000000000002"
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:write",
+              "bytes_hex": "7175726c3a7772697465"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "credential_scopes_unsorted",
       "fence_kind": "credential",
       "reject_class": "fence_input",
       "reason": "Scopes must be a canonical lexical byte-order set before framing.",
-      "mutation": "swap scope_0 and scope_1"
+      "mutation": "swap scope_0 and scope_1",
+      "inputs": [
+        {
+          "name": "credential_scopes_unsorted",
+          "kind": "credential",
+          "boundary": "canonical_scopes",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "2",
+              "bytes_hex": "0000000000000002"
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:write",
+              "bytes_hex": "7175726c3a7772697465"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "credential_scopes_duplicate",
       "fence_kind": "credential",
       "reject_class": "fence_input",
       "reason": "Duplicate scopes are forbidden before framing.",
-      "mutation": "set scope_1 equal to scope_0"
+      "mutation": "set scope_1 equal to scope_0",
+      "inputs": [
+        {
+          "name": "credential_scopes_duplicate",
+          "kind": "credential",
+          "boundary": "canonical_scopes",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "2",
+              "bytes_hex": "0000000000000002"
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "uint64_negative_or_overflow",
       "fence_kind": "all",
       "reject_class": "fence_input",
       "reason": "Integer parts are unsigned 64-bit big-endian.",
-      "mutation": "supply -1 or a value greater than 18446744073709551615"
+      "mutation": "supply -1 or a value greater than 18446744073709551615",
+      "inputs": [
+        {
+          "name": "credential.scope_count.negative",
+          "kind": "credential",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "-1",
+              "bytes_hex": ""
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:write",
+              "bytes_hex": "7175726c3a7772697465"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        },
+        {
+          "name": "credential.scope_count.overflow",
+          "kind": "credential",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "18446744073709551616",
+              "bytes_hex": ""
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:write",
+              "bytes_hex": "7175726c3a7772697465"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        },
+        {
+          "name": "cell.endpoint_revision.negative",
+          "kind": "cell",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "endpoint_revision",
+              "encoding": "uint64_be",
+              "value": "-1",
+              "bytes_hex": ""
+            },
+            {
+              "name": "nhp_host",
+              "encoding": "utf8",
+              "value": "cell0.nhp.layerv.ai",
+              "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+            },
+            {
+              "name": "nhp_port",
+              "encoding": "uint64_be",
+              "value": "443",
+              "bytes_hex": "00000000000001bb"
+            },
+            {
+              "name": "server_public_key_b64",
+              "encoding": "utf8",
+              "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+              "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+            },
+            {
+              "name": "selection_weight_storage",
+              "encoding": "utf8",
+              "value": "100",
+              "bytes_hex": "313030"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:55:00.123456789Z",
+              "bytes_hex": "323032362d30372d31355432333a35353a30302e3132333435363738395a"
+            }
+          ]
+        },
+        {
+          "name": "cell.endpoint_revision.overflow",
+          "kind": "cell",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "endpoint_revision",
+              "encoding": "uint64_be",
+              "value": "18446744073709551616",
+              "bytes_hex": ""
+            },
+            {
+              "name": "nhp_host",
+              "encoding": "utf8",
+              "value": "cell0.nhp.layerv.ai",
+              "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+            },
+            {
+              "name": "nhp_port",
+              "encoding": "uint64_be",
+              "value": "443",
+              "bytes_hex": "00000000000001bb"
+            },
+            {
+              "name": "server_public_key_b64",
+              "encoding": "utf8",
+              "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+              "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+            },
+            {
+              "name": "selection_weight_storage",
+              "encoding": "utf8",
+              "value": "100",
+              "bytes_hex": "313030"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:55:00.123456789Z",
+              "bytes_hex": "323032362d30372d31355432333a35353a30302e3132333435363738395a"
+            }
+          ]
+        },
+        {
+          "name": "cell.nhp_port.negative",
+          "kind": "cell",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "endpoint_revision",
+              "encoding": "uint64_be",
+              "value": "7",
+              "bytes_hex": "0000000000000007"
+            },
+            {
+              "name": "nhp_host",
+              "encoding": "utf8",
+              "value": "cell0.nhp.layerv.ai",
+              "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+            },
+            {
+              "name": "nhp_port",
+              "encoding": "uint64_be",
+              "value": "-1",
+              "bytes_hex": ""
+            },
+            {
+              "name": "server_public_key_b64",
+              "encoding": "utf8",
+              "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+              "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+            },
+            {
+              "name": "selection_weight_storage",
+              "encoding": "utf8",
+              "value": "100",
+              "bytes_hex": "313030"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:55:00.123456789Z",
+              "bytes_hex": "323032362d30372d31355432333a35353a30302e3132333435363738395a"
+            }
+          ]
+        },
+        {
+          "name": "cell.nhp_port.overflow",
+          "kind": "cell",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "endpoint_revision",
+              "encoding": "uint64_be",
+              "value": "7",
+              "bytes_hex": "0000000000000007"
+            },
+            {
+              "name": "nhp_host",
+              "encoding": "utf8",
+              "value": "cell0.nhp.layerv.ai",
+              "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+            },
+            {
+              "name": "nhp_port",
+              "encoding": "uint64_be",
+              "value": "18446744073709551616",
+              "bytes_hex": ""
+            },
+            {
+              "name": "server_public_key_b64",
+              "encoding": "utf8",
+              "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+              "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+            },
+            {
+              "name": "selection_weight_storage",
+              "encoding": "utf8",
+              "value": "100",
+              "bytes_hex": "313030"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:55:00.123456789Z",
+              "bytes_hex": "323032362d30372d31355432333a35353a30302e3132333435363738395a"
+            }
+          ]
+        },
+        {
+          "name": "existing.assignment_generation.negative",
+          "kind": "existing",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "agent_id",
+              "encoding": "utf8",
+              "value": "agent-final-id",
+              "bytes_hex": "6167656e742d66696e616c2d6964"
+            },
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "assignment_generation",
+              "encoding": "uint64_be",
+              "value": "-1",
+              "bytes_hex": ""
+            },
+            {
+              "name": "state",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "created_at_storage",
+              "encoding": "utf8",
+              "value": "2026-06-01T12:00:00Z",
+              "bytes_hex": "323032362d30362d30315431323a30303a30305a"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:50:00.000000000Z",
+              "bytes_hex": "323032362d30372d31355432333a35303a30302e3030303030303030305a"
+            }
+          ]
+        },
+        {
+          "name": "existing.assignment_generation.overflow",
+          "kind": "existing",
+          "boundary": "uint64",
+          "parts": [
+            {
+              "name": "agent_id",
+              "encoding": "utf8",
+              "value": "agent-final-id",
+              "bytes_hex": "6167656e742d66696e616c2d6964"
+            },
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "assignment_generation",
+              "encoding": "uint64_be",
+              "value": "18446744073709551616",
+              "bytes_hex": ""
+            },
+            {
+              "name": "state",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "created_at_storage",
+              "encoding": "utf8",
+              "value": "2026-06-01T12:00:00Z",
+              "bytes_hex": "323032362d30362d30315431323a30303a30305a"
+            },
+            {
+              "name": "updated_at_storage",
+              "encoding": "utf8",
+              "value": "2026-07-15T23:50:00.000000000Z",
+              "bytes_hex": "323032362d30372d31355432333a35303a30302e3030303030303030305a"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "bool_not_single_byte",
       "fence_kind": "credential",
       "reject_class": "fence_input",
       "reason": "Boolean parts are exactly one byte 00 or 01.",
-      "mutation": "encode has_counter as UTF-8 false"
+      "mutation": "encode has_counter as UTF-8 false",
+      "inputs": [
+        {
+          "name": "bool_not_single_byte",
+          "kind": "credential",
+          "boundary": "encoding",
+          "parts": [
+            {
+              "name": "credential_key_hash",
+              "encoding": "raw_bytes_b64url",
+              "value": "PNsenCFGocn55-WBjGoN3gDjL4YmESxv7p0lg-cUxac",
+              "bytes_hex": "3cdb1e9c2146a1c9f9e7e5818c6a0dde00e32f8626112c6fee9d2583e714c5a7"
+            },
+            {
+              "name": "credential_key_id",
+              "encoding": "utf8",
+              "value": "key_AbCdEf123456",
+              "bytes_hex": "6b65795f416243644566313233343536"
+            },
+            {
+              "name": "owner_id",
+              "encoding": "utf8",
+              "value": "owner-qat1-vector",
+              "bytes_hex": "6f776e65722d716174312d766563746f72"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "raw_key_type",
+              "encoding": "utf8",
+              "value": "tunnel_bootstrap",
+              "bytes_hex": "74756e6e656c5f626f6f747374726170"
+            },
+            {
+              "name": "scope_count",
+              "encoding": "uint64_be",
+              "value": "2",
+              "bytes_hex": "0000000000000002"
+            },
+            {
+              "name": "scope_0",
+              "encoding": "utf8",
+              "value": "qurl:agent",
+              "bytes_hex": "7175726c3a6167656e74"
+            },
+            {
+              "name": "scope_1",
+              "encoding": "utf8",
+              "value": "qurl:write",
+              "bytes_hex": "7175726c3a7772697465"
+            },
+            {
+              "name": "expires_at",
+              "encoding": "utf8",
+              "value": "2026-07-16T00:30:00Z",
+              "bytes_hex": "323032362d30372d31365430303a33303a30305a"
+            },
+            {
+              "name": "tunnel_slug",
+              "encoding": "utf8",
+              "value": "connector-qat1",
+              "bytes_hex": "636f6e6e6563746f722d71617431"
+            },
+            {
+              "name": "has_counter",
+              "encoding": "utf8",
+              "value": "false",
+              "bytes_hex": "66616c7365"
+            },
+            {
+              "name": "has_agent_counter",
+              "encoding": "bool_byte",
+              "value": "false",
+              "bytes_hex": "00"
+            },
+            {
+              "name": "consumed_at",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            },
+            {
+              "name": "consumed_agent_id",
+              "encoding": "utf8",
+              "value": "",
+              "bytes_hex": ""
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "missing_required_cell_part",
       "fence_kind": "cell",
       "reject_class": "fence_input",
       "reason": "A fence cannot silently omit a snapshot field.",
-      "mutation": "omit updated_at_storage"
+      "mutation": "omit updated_at_storage",
+      "inputs": [
+        {
+          "name": "missing_required_cell_part",
+          "kind": "cell",
+          "boundary": "required_part",
+          "parts": [
+            {
+              "name": "cell_id",
+              "encoding": "utf8",
+              "value": "cell0",
+              "bytes_hex": "63656c6c30"
+            },
+            {
+              "name": "status",
+              "encoding": "utf8",
+              "value": "active",
+              "bytes_hex": "616374697665"
+            },
+            {
+              "name": "endpoint_revision",
+              "encoding": "uint64_be",
+              "value": "7",
+              "bytes_hex": "0000000000000007"
+            },
+            {
+              "name": "nhp_host",
+              "encoding": "utf8",
+              "value": "cell0.nhp.layerv.ai",
+              "bytes_hex": "63656c6c302e6e68702e6c61796572762e6169"
+            },
+            {
+              "name": "nhp_port",
+              "encoding": "uint64_be",
+              "value": "443",
+              "bytes_hex": "00000000000001bb"
+            },
+            {
+              "name": "server_public_key_b64",
+              "encoding": "utf8",
+              "value": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+              "bytes_hex": "494345694979516c4a69636f4b536f724c4330754c7a41784d6a4d304e5459334f446b364f7a7739506a383d"
+            },
+            {
+              "name": "selection_weight_storage",
+              "encoding": "utf8",
+              "value": "100",
+              "bytes_hex": "313030"
+            }
+          ]
+        }
+      ]
     }
   ],
   "trust_key_rejects": [
