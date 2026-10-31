@@ -92,7 +92,7 @@ const (
 // reject_class vocabulary. These constants are the fixed cross-language vocabulary
 // the README pins, so every consumer can switch on a closed, known set. They are
 // pinned precisely only where the class is about the distinction (transport;
-// signature high_s vs wrong_length; encoding; key_length); JSON-schema faults
+// signature scalar_range vs high_s vs wrong_length; encoding; key_length); JSON-schema faults
 // use the coarse "parse" because a conformant verifier may surface any of
 // several internal sentinels for them.
 const (
@@ -116,6 +116,8 @@ const (
 	RejectClassHighS = "high_s"
 	// RejectClassWrongLength is a signature that is not exactly 64 bytes (raw r||s).
 	RejectClassWrongLength = "wrong_length"
+	// RejectClassScalarRange is a signature whose r or s is outside [1, N-1].
+	RejectClassScalarRange = "scalar_range"
 )
 
 // Signature-class tamper derivation identifiers. These pin the artifact's
@@ -488,9 +490,9 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 			}
 		case ExpectReject:
 			switch v.RejectClass {
-			case RejectClassHighS, RejectClassWrongLength:
+			case RejectClassHighS, RejectClassWrongLength, RejectClassScalarRange:
 			default:
-				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength)
+				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q, %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength, RejectClassScalarRange)
 			}
 		default:
 			return nil, fmt.Errorf("conformance: signature vector %q has expect %q, want accept|reject", v.Name, v.Expect)
