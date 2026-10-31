@@ -117,13 +117,33 @@ value, unexpected elements inside the ECDSA sequence, zero `r`, and an
 out-of-range `s`. `fence_rejects` and `trust_key_rejects` freeze the remaining
 typed-input and P-256 trust-store boundaries.
 
-`fence_rejects` are deliberately advisory typed-mutation recipes, not alternate
-golden byte strings: consumers apply each recipe to their own fence builder and
-assert rejection before hashing. The `fence_kind=all` recipe is a cross-cutting
-integer-encoding boundary rather than the name of a fourth fence. By contrast,
-`claims_rejects` carry executable parser inputs. The `wrong_audience` complete-
-verifier case includes a valid signature for its altered claims, so it isolates
-the claims boundary without depending on claims-before-signature check order.
+Artifact schema 2 adds complete typed `inputs` to each `fence_rejects` entry.
+The ticket wire, positive fence preimages/digests, keys and signatures remain
+unchanged. The loader still accepts schema 1, where `mutation` is advisory and
+executable inputs are forbidden. Schema 2 requires the complete closed input
+set; it does not reinterpret a schema 1 recipe.
+
+Each input names its fence `kind`, complete ordered `parts`, and expected
+validation `boundary` before framing or hashing: `key_length`,
+`canonical_scopes`, `uint64`, `encoding`, or `required_part`. The boundary names the typed rejection before framing or hashing. Integer
+rejects have empty `bytes_hex` because their values cannot be represented.
+Their names are `<kind>.<part>.<negative|overflow>`. Integer parsing precedes
+byte agreement for these unrepresentable values. Decimal fixture spelling is
+metadata: leading zeros denote the same unsigned integer bytes. Committed
+cases use the ordinary decimal rendering. The six recipes
+expand to 13 executable inputs. The `fence_kind=all` integer recipe covers
+negative and overflowing values for credential scope count, cell endpoint
+revision, cell port, and existing-assignment generation. It is not a fourth
+fence kind. The independent Go verifier and npm consumer execute every input;
+unknown, missing, duplicate or changed inputs fail closed. Consumers with
+fixed arrays, native booleans or derived scope counts must assert those type
+boundaries as well as runtime builder rejection. Issuance consumers must also
+exercise their optimistic-write path; fixture checks alone do not establish
+that a stale snapshot is refused there.
+
+`claims_rejects` carry executable parser inputs. The `wrong_audience`
+complete-verifier case includes a valid signature for its altered claims, so
+it isolates the claims boundary without relying on validation order.
 Trust-key rejects also carry concrete SPKI bytes: the independent verifier
 parses each input and proves the empty, malformed, and non-P256 cases reject.
 

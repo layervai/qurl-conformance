@@ -37,6 +37,10 @@ that handoff real rather than assumed.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`
+- [ ] `go run ./tools/verify-assignment-ticket` and
+      `node tools/verify-assignment-fences.cjs` check the positive fences and
+      every schema-2 typed reject. Typed-input-only changes preserve existing
+      keys, claims, signatures, preimages and digests; do not regenerate them.
 - [ ] `python3 scripts/check-claude-model-lockstep.py`
 - [ ] npm and Python package smokes green (CI job `vectors + go + cross-language`)
 - [ ] `go.mod` still has no `require` line

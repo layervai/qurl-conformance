@@ -279,7 +279,8 @@ artifact has its own `artifact` id:
 - **Assignment ticket v1** (`qurl-assignment-ticket-v1-vectors`,
   `assignment_ticket_v1_vectors.json`) — exact qat1 claims bytes, signing digest,
   synthetic KMS DER-to-raw-low-S conversion, complete ticket, credential/cell/
-  existing-assignment fences, NHP size budget, and closed reject suites. NHP
+  existing-assignment fences, NHP size budget, and closed reject suites. Artifact
+  schema 2 executes 13 typed fence rejects; schema 1 stays advisory. NHP
   carries this ticket opaquely. See
   `vectors/README_assignment_ticket_v1_vectors.md`.
 - **Connector resource discovery LST/LRT v1**
