@@ -75,7 +75,7 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       open the frozen replies against these exact committed bytes, with its real
       codec, and report green. Today that is `layervai/qurl-go`
       (`TestBuildMessage_*Golden`, `TestDecryptReply_*Golden`,
-      `TestBuildKnock_GoldenVector`) run against a `replace` directive or a
+      `TestBuildKnock_GoldenVector`, `TestMatchedCounterEchoGolden`) run against a `replace` directive or a
       pre-release pin pointing at this branch. Record where it ran in the PR.
       Until that has happened the bytes are unverified by anyone.
 - [ ] **Confirm every real ACK denial producer emits the strict lifetime.** At

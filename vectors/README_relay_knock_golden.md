@@ -10,7 +10,8 @@ request context supplies the reply counter. A client must decrypt it, recover
 ACK type and body, and require its counter to equal `knock.counter`.
 
 The new reply uses the same synthetic peers and response body as the existing
-fixtures. It was generated once with a random server ephemeral and is frozen;
+fixtures. Consumers must decompress and compare plaintext, not ciphertext
+length. It was generated once with a random server ephemeral and is frozen;
 clients cannot reproduce its bytes. No old packet, key or signature was changed.
 
 `knock.counter` is a canonical decimal uint64 string. `matched_ack.counter_hex`
@@ -28,5 +29,5 @@ as a negative control for request/reply correlation.
 
 The registration corpus already contains a matched `reg_emailed` to
 `rak_success`/`rak_error` pair. Execute both families to cover KNK→ACK and REG→RAK
-counter echo. A release waits for reference-producer, Go and independent
-TypeScript/WebCrypto checks against the exact committed packet bytes.
+counter echo. Release checks against the exact committed bytes are specified
+in [RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md).

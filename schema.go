@@ -658,12 +658,13 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 		return nil, errors.New("conformance: relay-knock file missing ack.body_hex")
 	}
 	type packetCase struct {
-		name string
-		c    RelayKnockCase
+		name       string
+		c          RelayKnockCase
+		headerType uint32
 	}
-	cases := []packetCase{{"knock", rf.Knock}, {"ack", rf.Ack}}
+	cases := []packetCase{{"knock", rf.Knock, 1}, {"ack", rf.Ack, 2}}
 	if rf.MatchedAck != nil {
-		cases = append(cases, packetCase{"matched_ack", *rf.MatchedAck})
+		cases = append(cases, packetCase{"matched_ack", *rf.MatchedAck, 2})
 	}
 	for _, c := range cases {
 		packet, err := hex.DecodeString(c.c.PacketHex)
@@ -672,6 +673,12 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 		}
 		if err := validateNHPPacketProtocolVersion("relay-knock "+c.name+".packet_hex", packet); err != nil {
 			return nil, err
+		}
+		if rf.SchemaVersion == 2 {
+			headerType := (binary.BigEndian.Uint32(packet[:4]) ^ binary.BigEndian.Uint32(packet[4:8])) >> 16
+			if headerType != c.headerType {
+				return nil, fmt.Errorf("conformance: relay-knock %s packet header type %d, want %d", c.name, headerType, c.headerType)
+			}
 		}
 		if rf.SchemaVersion == 2 && (c.name == "knock" || c.name == "matched_ack") {
 			if len(packet) < 24 {

@@ -49,6 +49,34 @@ func TestRelayMatchedCounterRejectsDrift(t *testing.T) {
 	}
 }
 
+func TestRelayMatchedRejectsWrongHeaderType(t *testing.T) {
+	for _, name := range []string{"knock", "matched_ack"} {
+		t.Run(name, func(t *testing.T) {
+			f, err := RelayKnockGolden()
+			if err != nil {
+				t.Fatal(err)
+			}
+			c := &f.Knock
+			if name == "matched_ack" {
+				c = f.MatchedAck
+			}
+			packet, err := hex.DecodeString(c.PacketHex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			packet[5] ^= 3
+			c.PacketHex = hex.EncodeToString(packet)
+			b, err := json.Marshal(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ParseRelayKnockFile(b); err == nil || !strings.Contains(err.Error(), "packet header type") {
+				t.Fatalf("want header-type rejection, got %v", err)
+			}
+		})
+	}
+}
+
 func TestRelayMatchedCounterRejectsShortHeader(t *testing.T) {
 	for size := 10; size < 24; size++ {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
