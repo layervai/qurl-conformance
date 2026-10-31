@@ -545,9 +545,9 @@ const RelayKnockArtifactID = "qurl-relay-knock-golden-vectors"
 
 // RelayKnockFile is the top-level relay/NHP-handshake golden artifact: a
 // deterministic knock packet a conformant initiator must reproduce byte-for-byte,
-// plus frozen ACK replies (schema v2 adds a counter-matched reply). Each is
-// sealed at origin with a random server ephemeral, so it
-// is NOT reproducible by a client — only decryptable). All cases decode into the
+// plus frozen ACK replies (schema v2 adds a counter-matched reply). Each reply
+// is sealed at origin with a random server ephemeral, so clients can only
+// decrypt it. All cases decode into the
 // same RelayKnockCase, which carries the UNION of the fields either case uses.
 type RelayKnockFile struct {
 	Artifact      string         `json:"artifact"`
@@ -615,25 +615,29 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	switch rf.SchemaVersion {
 	case 1:
 		if rf.MatchedAck != nil {
-			return nil, errors.New("conformance: schema v1 cannot carry matched_ack")
+			return nil, errors.New("conformance: relay-knock schema v1 cannot carry matched_ack")
 		}
 	case 2:
 		if rf.MatchedAck == nil || rf.MatchedAck.PacketHex == "" || rf.MatchedAck.BodyHex == "" {
-			return nil, errors.New("conformance: schema v2 requires matched_ack packet and body")
+			return nil, errors.New("conformance: relay-knock schema v2 requires matched_ack packet and body")
+		}
+		sendTime, err := strconv.ParseInt(rf.MatchedAck.TimestampNanos, 10, 64)
+		if err != nil || sendTime <= 0 || strconv.FormatInt(sendTime, 10) != rf.MatchedAck.TimestampNanos {
+			return nil, errors.New("conformance: relay-knock matched_ack.timestamp_nanos must be canonical positive int64")
 		}
 		requestCounter, err := strconv.ParseUint(rf.Knock.Counter, 10, 64)
 		if err != nil || strconv.FormatUint(requestCounter, 10) != rf.Knock.Counter {
-			return nil, errors.New("conformance: knock.counter must be a canonical uint64")
+			return nil, errors.New("conformance: relay-knock knock.counter must be a canonical uint64")
 		}
 		matchedCounter, err = strconv.ParseUint(rf.MatchedAck.CounterHex, 16, 64)
 		if err != nil || strconv.FormatUint(matchedCounter, 16) != rf.MatchedAck.CounterHex {
-			return nil, errors.New("conformance: matched_ack.counter_hex must be a canonical uint64")
+			return nil, errors.New("conformance: relay-knock matched_ack.counter_hex must be a canonical uint64")
 		}
 		if matchedCounter != requestCounter {
-			return nil, errors.New("conformance: matched_ack counter does not echo knock")
+			return nil, errors.New("conformance: relay-knock matched_ack counter does not echo knock")
 		}
 		if rf.MatchedAck.ServerStaticPubHex != rf.Knock.ServerStaticPubHex || rf.MatchedAck.AgentStaticPrivHex != rf.Knock.DeviceStaticPrivHex {
-			return nil, errors.New("conformance: matched_ack keys differ from knock")
+			return nil, errors.New("conformance: relay-knock matched_ack keys differ from knock")
 		}
 	default:
 		return nil, fmt.Errorf("conformance: unsupported relay-knock schema_version %d", rf.SchemaVersion)
@@ -671,10 +675,10 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 		}
 		if rf.SchemaVersion == 2 && (c.name == "knock" || c.name == "matched_ack") {
 			if len(packet) < 24 {
-				return nil, fmt.Errorf("conformance: %s packet lacks a complete counter", c.name)
+				return nil, fmt.Errorf("conformance: relay-knock %s packet lacks a complete counter", c.name)
 			}
 			if binary.BigEndian.Uint64(packet[16:24]) != matchedCounter {
-				return nil, fmt.Errorf("conformance: %s packet counter differs from the matched pair", c.name)
+				return nil, fmt.Errorf("conformance: relay-knock %s packet counter differs from the matched pair", c.name)
 			}
 		}
 	}

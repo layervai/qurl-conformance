@@ -16,7 +16,9 @@ clients cannot reproduce its bytes. No old packet, key or signature was changed.
 `knock.counter` is a canonical decimal uint64 string. `matched_ack.counter_hex`
 is a canonical lowercase uint64 hex string with no prefix or padding. The
 24-byte common header stores the counter as big-endian bytes 16 through 23.
-Both packet headers and both metadata values must agree. Go's loader checks
+Both packet headers and both metadata values must agree.
+`matched_ack.timestamp_nanos` is a canonical positive int64 decimal string;
+consumers must compare it with the authenticated send time. Go's loader checks
 these structural facts, required fields, peers and supported versions 1/2; it
 does not replace the consumers' real handshake decryption tests.
 

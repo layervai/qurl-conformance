@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -60,8 +61,8 @@ func TestRelayMatchedCounterRejectsShortHeader(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := ParseRelayKnockFile(b); err == nil {
-				t.Fatal("accepted header without a complete counter")
+			if _, err := ParseRelayKnockFile(b); err == nil || !strings.Contains(err.Error(), "packet lacks a complete counter") {
+				t.Fatalf("want incomplete-counter rejection, got %v", err)
 			}
 		})
 	}
@@ -83,5 +84,24 @@ func TestRelayKnockLegacySchemaCompatibility(t *testing.T) {
 	}
 	if _, err := ParseRelayKnockFile(b); err != nil {
 		t.Fatalf("legacy corpus must still load: %v", err)
+	}
+}
+
+func TestRelayMatchedAckRejectsInvalidTimestamp(t *testing.T) {
+	for _, timestamp := range []string{"", "0", "-1", "+1", "01", "9223372036854775808"} {
+		t.Run(timestamp, func(t *testing.T) {
+			f, err := RelayKnockGolden()
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.MatchedAck.TimestampNanos = timestamp
+			b, err := json.Marshal(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ParseRelayKnockFile(b); err == nil || !strings.Contains(err.Error(), "timestamp_nanos must be canonical positive int64") {
+				t.Fatalf("want timestamp rejection, got %v", err)
+			}
+		})
 	}
 }
