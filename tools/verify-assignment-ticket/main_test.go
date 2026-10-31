@@ -104,3 +104,11 @@ func TestExecutableFenceRejectBoundaries(t *testing.T) {
 		t.Fatal("accepted unknown boundary")
 	}
 }
+
+func TestFenceIntegerFixtureSpelling(t *testing.T) {
+	part := conformance.AssignmentTicketFencePart{Encoding: "uint64_be", Value: "0002"}
+	raw, err := fencePartBytes(part)
+	if err != nil || len(raw) != 8 || raw[7] != 2 {
+		t.Fatalf("zero-padded decimal = %x/%v", raw, err)
+	}
+}

@@ -125,10 +125,12 @@ set; it does not reinterpret a schema 1 recipe.
 
 Each input names its fence `kind`, complete ordered `parts`, and expected
 validation `boundary` before framing or hashing: `key_length`,
-`canonical_scopes`, `uint64`, `encoding`, or `required_part`. The boundary is
-the first typed check that fails, before byte agreement or framing. Integer
+`canonical_scopes`, `uint64`, `encoding`, or `required_part`. The boundary names the typed rejection before framing or hashing. Integer
 rejects have empty `bytes_hex` because their values cannot be represented.
-Their names are `<kind>.<part>.<negative|overflow>`. The six recipes
+Their names are `<kind>.<part>.<negative|overflow>`. Integer parsing precedes
+byte agreement for these unrepresentable values. Decimal fixture spelling is
+metadata: leading zeros denote the same unsigned integer bytes. Committed
+cases use the ordinary decimal rendering. The six recipes
 expand to 13 executable inputs. The `fence_kind=all` integer recipe covers
 negative and overflowing values for credential scope count, cell endpoint
 revision, cell port, and existing-assignment generation. It is not a fourth

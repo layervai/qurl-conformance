@@ -21,7 +21,7 @@ function validate(kind, parts) {
     if (part.encoding !== expected) return 'encoding';
     let raw;
     if (expected === 'uint64_be') {
-      if (!/^(0|[1-9][0-9]*)$/.test(part.value) || BigInt(part.value) > 18446744073709551615n) return 'uint64';
+      if (!/^[0-9]+$/.test(part.value) || BigInt(part.value) > 18446744073709551615n) return 'uint64';
       raw = Buffer.alloc(8); raw.writeBigUInt64BE(BigInt(part.value));
     } else if (expected === 'bool_byte') {
       if (!['true', 'false'].includes(part.value)) return 'encoding';
@@ -51,6 +51,10 @@ for (const vector of artifact.fence_vectors) {
   assert.equal(preimage.toString('hex'), vector.preimage_hex);
   assert.equal(crypto.createHash('sha256').update(preimage).digest('hex'), vector.digest_hex);
 }
+// Decimal fixture spelling is metadata; leading zeros have the same uint64 bytes.
+const zeroPadded = structuredClone(artifact.fence_vectors.find(x => x.kind === 'credential').parts);
+zeroPadded.find(x => x.name === 'scope_count').value = '0002';
+assert.equal(validate('credential', zeroPadded), '');
 // UTF-8 byte order differs from JavaScript UTF-16 order at these code points.
 const unicodeParts = structuredClone(artifact.fence_vectors.find(x => x.kind === 'credential').parts);
 for (const [name, value] of [['scope_0', '\uE000'], ['scope_1', '\u{10000}']]) {
