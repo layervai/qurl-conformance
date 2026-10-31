@@ -432,11 +432,7 @@
       "name": "claims_part_too_large",
       "reject_class": "size",
       "reason": "The claims segment cannot exceed 2048 characters.",
-      "derivation": {
-        "target": "claims_part",
-        "ascii_char": "A",
-        "count": 2049
-      },
+      "derivation": {"target": "claims_part", "ascii_char": "A", "count": 2049},
       "expected_environment_id": "sandbox",
       "trusted_kid": "assignment-2026-01",
       "verify_at_unix": 1784160030

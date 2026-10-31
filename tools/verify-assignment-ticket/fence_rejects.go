@@ -23,6 +23,9 @@ func verifyFenceRejectInputs(af *conformance.AssignmentTicketFile) error {
 			return fmt.Errorf("fence reject %s has no executable inputs", reject.Name)
 		}
 		for _, input := range reject.Inputs {
+			if reject.FenceKind != "all" && reject.FenceKind != input.Kind {
+				return fmt.Errorf("fence reject %s kind disagrees with input", reject.Name)
+			}
 			base, ok := bases[input.Kind]
 			if !ok {
 				return fmt.Errorf("fence reject %s has unknown kind %s", input.Name, input.Kind)

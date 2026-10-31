@@ -35,7 +35,7 @@ function validate(kind, parts) {
     if (part.name === 'scope_count') count = BigInt(part.value);
     else if (part.name.startsWith('scope_')) scopes.push(part.value);
   }
-  if (BigInt(scopes.length) !== count || scopes.some((scope, i) => !scope || (i > 0 && scopes[i - 1] >= scope))) return 'canonical_scopes';
+  if (BigInt(scopes.length) !== count || scopes.some((scope, i) => !scope || (i > 0 && Buffer.compare(Buffer.from(scopes[i - 1]), Buffer.from(scope)) >= 0))) return 'canonical_scopes';
   return '';
 }
 assert.equal(artifact.schema_version, 2);
@@ -51,11 +51,23 @@ for (const vector of artifact.fence_vectors) {
   assert.equal(preimage.toString('hex'), vector.preimage_hex);
   assert.equal(crypto.createHash('sha256').update(preimage).digest('hex'), vector.digest_hex);
 }
+// UTF-8 byte order differs from JavaScript UTF-16 order at these code points.
+const unicodeParts = structuredClone(artifact.fence_vectors.find(x => x.kind === 'credential').parts);
+for (const [name, value] of [['scope_0', '\uE000'], ['scope_1', '\u{10000}']]) {
+  Object.assign(unicodeParts.find(x => x.name === name), { value, bytes_hex: Buffer.from(value).toString('hex') });
+}
+assert.equal(validate('credential', unicodeParts), '');
+const a = unicodeParts.find(x => x.name === 'scope_0');
+const b = unicodeParts.find(x => x.name === 'scope_1');
+[a.value, b.value] = [b.value, a.value];
+[a.bytes_hex, b.bytes_hex] = [b.bytes_hex, a.bytes_hex];
+assert.equal(validate('credential', unicodeParts), 'canonical_scopes');
 const names = ['credential_hash_wrong_length', 'credential_scopes_unsorted', 'credential_scopes_duplicate', 'uint64_negative_or_overflow', 'bool_not_single_byte', 'missing_required_cell_part'];
 assert.deepEqual(artifact.fence_rejects.map(x => x.name), names);
 let count = 0;
 for (const reject of artifact.fence_rejects) {
   assert.ok(reject.inputs.length > 0);
+  assert.equal(reject.fence_kind, reject.name === 'uint64_negative_or_overflow' ? 'all' : reject.inputs[0].kind);
   for (const input of reject.inputs) {
     assert.equal(validate(input.kind, input.parts), input.boundary, input.name);
     count++;

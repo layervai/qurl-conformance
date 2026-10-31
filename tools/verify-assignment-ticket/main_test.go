@@ -61,9 +61,17 @@ func TestExecutableFenceRejectBoundaries(t *testing.T) {
 			t.Fatalf("positive %s rejected at %s", base.Kind, got)
 		}
 	}
+	boundaries := map[string]string{
+		"credential_hash_wrong_length": "key_length", "credential_scopes_unsorted": "canonical_scopes",
+		"credential_scopes_duplicate": "canonical_scopes", "uint64_negative_or_overflow": "uint64",
+		"bool_not_single_byte": "encoding", "missing_required_cell_part": "required_part",
+	}
 	count := 0
 	for _, reject := range af.FenceRejects {
 		for _, input := range reject.Inputs {
+			if expected, ok := boundaries[reject.Name]; !ok || input.Boundary != expected {
+				t.Fatalf("recipe %s boundary=%s", reject.Name, input.Boundary)
+			}
 			count++
 			t.Run(input.Name, func(t *testing.T) {
 				var base conformance.AssignmentTicketFenceVector

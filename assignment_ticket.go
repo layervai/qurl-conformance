@@ -300,7 +300,7 @@ func ParseAssignmentTicketFile(data []byte) (*AssignmentTicketFile, error) {
 		return nil, fmt.Errorf("conformance: parse assignment-ticket file: %w", err)
 	}
 	if af.Artifact != AssignmentTicketArtifactID || (af.SchemaVersion != 1 && af.SchemaVersion != AssignmentTicketSchemaVersion) {
-		return nil, fmt.Errorf("conformance: assignment-ticket identity = %q/v%d, want %q/v%d", af.Artifact, af.SchemaVersion, AssignmentTicketArtifactID, AssignmentTicketSchemaVersion)
+		return nil, fmt.Errorf("conformance: assignment-ticket identity = %q/v%d, want %q/v1 or v%d", af.Artifact, af.SchemaVersion, AssignmentTicketArtifactID, AssignmentTicketSchemaVersion)
 	}
 	if af.Description == "" {
 		return nil, errors.New("conformance: assignment-ticket description is empty")

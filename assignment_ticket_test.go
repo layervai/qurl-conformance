@@ -131,7 +131,9 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 
 func TestAssignmentFenceExecutableInputsAreClosed(t *testing.T) {
 	changes := map[string]func(*AssignmentTicketFile){
-		"missing": func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs = nil },
+		"wrong permitted kind": func(a *AssignmentTicketFile) { a.FenceRejects[0].FenceKind = "cell" },
+		"wrong all-kind label": func(a *AssignmentTicketFile) { a.FenceRejects[3].FenceKind = "credential" },
+		"missing":              func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs = nil },
 		"duplicate": func(a *AssignmentTicketFile) {
 			a.FenceRejects[0].Inputs = append(a.FenceRejects[0].Inputs, a.FenceRejects[0].Inputs[0])
 		},

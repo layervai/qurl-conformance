@@ -23,7 +23,7 @@ func validateAssignmentFenceRejectInputs(af *AssignmentTicketFile) error {
 	for _, reject := range af.FenceRejects {
 		if af.SchemaVersion == 1 {
 			if len(reject.Inputs) != 0 {
-				return fmt.Errorf("conformance: v1 fence rejects are advisory")
+				return fmt.Errorf("conformance: v1 fence reject %q is advisory", reject.Name)
 			}
 			continue
 		}
@@ -31,7 +31,11 @@ func validateAssignmentFenceRejectInputs(af *AssignmentTicketFile) error {
 		if err != nil {
 			return err
 		}
-		if !reflect.DeepEqual(reject.Inputs, expected) {
+		kind := "all"
+		if reject.Name != "uint64_negative_or_overflow" {
+			kind = expected[0].Kind
+		}
+		if reject.FenceKind != kind || !reflect.DeepEqual(reject.Inputs, expected) {
 			return fmt.Errorf("conformance: fence reject %q executable inputs drifted", reject.Name)
 		}
 	}
