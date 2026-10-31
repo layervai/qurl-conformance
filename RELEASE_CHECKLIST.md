@@ -102,7 +102,8 @@ fragment/transport accept fixture changes.
 Reject-only additions derived from frozen signature bytes do not rotate keys or
 regenerate accept signatures: do not run the generator for them. Confirm all
 existing vector entries, keys and signing inputs are unchanged, sync the package
-copies, and run the exact-byte consumer checks below. The regeneration steps
+copies, and run the exact-byte consumer checks below. Leave the generator and
+fragment-regeneration checkboxes unchecked for reject-only additions. The regeneration steps
 apply when accept/key bytes change.
 
 - [ ] Run the generator exactly once. Do not rerun it to make a test pass: the

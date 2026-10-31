@@ -226,9 +226,13 @@ func run() error {
 		if err := verifyRawIssuerSignature(pub, claimsB64, sig); err == nil {
 			return fmt.Errorf("scalar-range vector %s was accepted", boundary.name)
 		}
+		scalar := "r"
+		if boundary.offset == 32 {
+			scalar = "s"
+		}
 		signatureVectors = append(signatureVectors, map[string]any{
 			"name": boundary.name, "expect": "reject", "reject_class": "scalar_range",
-			"reason":     "r or s is outside the P-256 scalar range [1, N-1]",
+			"reason":     fmt.Sprintf("%s is outside the P-256 scalar range [1, N-1]", scalar),
 			"claims_b64": claimsB64, "sig_b64": raw(sig), "sig_encoding": "raw_r_s",
 			"signing_input_b64": raw(signingInput),
 		})

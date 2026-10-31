@@ -18,8 +18,14 @@ func TestIssuerScalarRangeBoundaries(t *testing.T) {
 	for _, v := range vf.Vectors {
 		byName[v.Name] = v
 	}
-	accept := byName["accept_valid_low_s"]
+	accept, ok := byName["accept_valid_low_s"]
+	if !ok {
+		t.Fatal("missing accept signature")
+	}
 	original := decodeRawBase64URL(t, "accept signature", accept.SigB64Raw)
+	if len(original) != 64 {
+		t.Fatal("accept signature must be 64 bytes")
+	}
 	order := elliptic.P256().Params().N
 	cases := []struct {
 		name   string
