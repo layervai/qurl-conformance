@@ -99,6 +99,12 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 Applies whenever `issuer_signature_vectors.json` changes or the canonical qv2
 fragment/transport accept fixture changes.
 
+Reject-only additions derived from frozen signature bytes do not rotate keys or
+regenerate accept signatures: do not run the generator for them. Confirm all
+existing vector entries, keys and signing inputs are unchanged, sync the package
+copies, and run the exact-byte consumer checks below. The regeneration steps
+apply when accept/key bytes change.
+
 - [ ] Run the generator exactly once. Do not rerun it to make a test pass: the
       issuer signature uses a random ECDSA nonce, so each run creates a different
       artifact. Fix the generator or the committed result without another key

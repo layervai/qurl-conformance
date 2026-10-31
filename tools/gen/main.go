@@ -208,6 +208,32 @@ func run() error {
 		return fmt.Errorf("tampered claims were accepted")
 	}
 
+	signatureVectors := []map[string]any{
+		{"name": "accept_valid_low_s", "expect": "accept", "reason": "valid 64-byte low-S raw r||s signature over the exact claims bytes", "claims_b64": claimsB64, "sig_b64": raw(rawSig), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
+		{"name": "reject_high_s", "expect": "reject", "reason": "signature is not low-S normalized", "reject_class": "high_s", "claims_b64": claimsB64, "sig_b64": raw(highRaw), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
+		{"name": "reject_wrong_length_der", "expect": "reject", "reason": "signature is not exactly 64 bytes (raw r||s)", "reject_class": "wrong_length", "claims_b64": claimsB64, "sig_b64": raw(der), "sig_encoding": "der", "signing_input_b64": raw(signingInput)},
+	}
+	for _, boundary := range []struct {
+		name   string
+		offset int
+		value  *big.Int
+	}{
+		{"reject_r_zero", 0, new(big.Int)}, {"reject_r_order", 0, n},
+		{"reject_s_zero", 32, new(big.Int)}, {"reject_s_order", 32, n},
+	} {
+		sig := bytes.Clone(rawSig)
+		boundary.value.FillBytes(sig[boundary.offset : boundary.offset+32])
+		if err := verifyRawIssuerSignature(pub, claimsB64, sig); err == nil {
+			return fmt.Errorf("scalar-range vector %s was accepted", boundary.name)
+		}
+		signatureVectors = append(signatureVectors, map[string]any{
+			"name": boundary.name, "expect": "reject", "reject_class": "scalar_range",
+			"reason":     "r or s is outside the P-256 scalar range [1, N-1]",
+			"claims_b64": claimsB64, "sig_b64": raw(sig), "sig_encoding": "raw_r_s",
+			"signing_input_b64": raw(signingInput),
+		})
+	}
+
 	doc := map[string]any{
 		"description":              fmt.Sprintf("qURL v2 issuer-signature golden vectors: P-256 raw r||s low-S wire signatures over the exact claims bytes. These are VERIFY fixtures (ECDSA's nonce is random, so signatures are re-verified by consumers, never reproduced). The issuer private scalar is 32 bytes of 0x%02x and the resource private scalar is 32 bytes of 0x%02x; both are public test material. Never admit either key or this kid to a production trust store.", issuerPrivateScalarFill, resourcePrivateScalarFill),
 		"algorithm":                "ECC_NIST_P256 / ECDSA_SHA_256, wire = raw r||s (64 bytes), low-S",
@@ -217,11 +243,7 @@ func run() error {
 			"spki_der_b64": raw(spki),
 			"jwk":          map[string]any{"kty": "EC", "crv": "P-256", "x": raw(xb), "y": raw(yb)},
 		},
-		"vectors": []map[string]any{
-			{"name": "accept_valid_low_s", "expect": "accept", "reason": "valid 64-byte low-S raw r||s signature over the exact claims bytes", "claims_b64": claimsB64, "sig_b64": raw(rawSig), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
-			{"name": "reject_high_s", "expect": "reject", "reason": "signature is not low-S normalized", "reject_class": "high_s", "claims_b64": claimsB64, "sig_b64": raw(highRaw), "sig_encoding": "raw_r_s", "signing_input_b64": raw(signingInput)},
-			{"name": "reject_wrong_length_der", "expect": "reject", "reason": "signature is not exactly 64 bytes (raw r||s)", "reject_class": "wrong_length", "claims_b64": claimsB64, "sig_b64": raw(der), "sig_encoding": "der", "signing_input_b64": raw(signingInput)},
-		},
+		"vectors": signatureVectors,
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
