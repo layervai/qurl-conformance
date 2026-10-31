@@ -70,6 +70,18 @@ jobs:
           const net = require('node:net');
           const c = require('./npm');
 
+          const matchedRelay = c.relayKnockVectors();
+          assert.equal(matchedRelay.schema_version, 2);
+          assert.equal(matchedRelay.matched_ack.server_static_pub_hex, matchedRelay.knock.server_static_pub_hex);
+          assert.equal(matchedRelay.matched_ack.agent_static_priv_hex, matchedRelay.knock.device_static_priv_hex);
+          const matchedCounter = BigInt(matchedRelay.knock.counter);
+          assert.equal(BigInt('0x' + matchedRelay.matched_ack.counter_hex), matchedCounter);
+          for (const packetCase of [matchedRelay.knock, matchedRelay.matched_ack]) {
+            const packet = Buffer.from(packetCase.packet_hex, 'hex');
+            assert.ok(packet.length >= 24);
+            assert.equal(packet.readBigUInt64BE(16), matchedCounter);
+          }
+
           const files = {
             qv2Vectors: 'qv2_conformance_vectors.json',
             issuerSignatureVectors: 'issuer_signature_vectors.json',
@@ -790,6 +802,18 @@ jobs:
           import unicodedata
 
           import qurl_conformance as q
+
+          matched_relay = q.relay_knock_vectors()
+          assert matched_relay['schema_version'] == 2
+          matched_counter = int(matched_relay['knock']['counter'])
+          assert int(matched_relay['matched_ack']['counter_hex'], 16) == matched_counter
+          assert matched_relay['matched_ack']['server_static_pub_hex'] == matched_relay['knock']['server_static_pub_hex']
+          assert matched_relay['matched_ack']['agent_static_priv_hex'] == matched_relay['knock']['device_static_priv_hex']
+          for packet_case in (matched_relay['knock'], matched_relay['matched_ack']):
+              packet = bytes.fromhex(packet_case['packet_hex'])
+              assert len(packet) >= 24
+              assert int.from_bytes(packet[16:24], 'big') == matched_counter
+
 
           files = {
               'qv2_vectors': 'qv2_conformance_vectors.json',
