@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.18.0](https://github.com/layervai/qurl-conformance/compare/v0.17.2...v0.18.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vectors:** execute assignment fence rejection inputs ([#167](https://github.com/layervai/qurl-conformance/issues/167))
+* **vectors:** add a reference matched-counter ACK ([#166](https://github.com/layervai/qurl-conformance/issues/166))
+* **vectors:** add scalar-range issuer signature rejects ([#165](https://github.com/layervai/qurl-conformance/issues/165))
+
+### Features
+
+* **vectors:** add a reference matched-counter ACK ([#166](https://github.com/layervai/qurl-conformance/issues/166)) ([f43f8bb](https://github.com/layervai/qurl-conformance/commit/f43f8bb5c4adc2aee65b18cf3be8ef1b083a1378))
+* **vectors:** add scalar-range issuer signature rejects ([#165](https://github.com/layervai/qurl-conformance/issues/165)) ([ea6801b](https://github.com/layervai/qurl-conformance/commit/ea6801bc6fb9863163dc8807392b98a7b28abc7c))
+* **vectors:** execute assignment fence rejection inputs ([#167](https://github.com/layervai/qurl-conformance/issues/167)) ([f33ea73](https://github.com/layervai/qurl-conformance/commit/f33ea732bce8ea9e06a64a8e476affd03bf59947))
+
+
+### Continuous Integration
+
+* adopt verified age-check workflows v0.15.0 ([#168](https://github.com/layervai/qurl-conformance/issues/168)) ([44d0a21](https://github.com/layervai/qurl-conformance/commit/44d0a21d9db310866712799479175f5bde57ec45))
+* **claude:** allowlist host and userinfo in the Claude origin check ([#156](https://github.com/layervai/qurl-conformance/issues/156)) ([fb4873e](https://github.com/layervai/qurl-conformance/commit/fb4873e340377cf6ebbe4950e9f6048b3ef60def))
+* correct the comments on the Claude origin check ([#157](https://github.com/layervai/qurl-conformance/issues/157)) ([308896f](https://github.com/layervai/qurl-conformance/commit/308896f3a0dca29d5b198510fec180f4f5f9bb65))
+* document the Claude review model and effort setting ([#155](https://github.com/layervai/qurl-conformance/issues/155)) ([814a7f5](https://github.com/layervai/qurl-conformance/commit/814a7f5a76ddf6f8267bf3cd9d0edc747b0c60f4))
+* rerun age checks when bypass labels change ([#169](https://github.com/layervai/qurl-conformance/issues/169)) ([74ac613](https://github.com/layervai/qurl-conformance/commit/74ac613ea322f6c8ca6dd163c61c02eab2667523))
+* run Claude review on Opus 5.5 at medium effort ([#153](https://github.com/layervai/qurl-conformance/issues/153)) ([ca59ef1](https://github.com/layervai/qurl-conformance/commit/ca59ef1bd496a5b3af9360086b440c2dbf97b263))
+
 ## [0.17.2](https://github.com/layervai/qurl-conformance/compare/v0.17.1...v0.17.2) (2026-10-06)
 
 
