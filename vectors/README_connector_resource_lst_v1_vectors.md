@@ -84,7 +84,9 @@ a request that carries this assertion.
 
 The replay key is the authenticated peer, query, and decoded request nonce.
 The operation also stores a fingerprint of the exact semantic request;
-`origin_product` is annotation only and does not enter that fingerprint:
+`origin_product` is annotation only and does not enter that fingerprint.
+`same_nonce_changed_origin_product` pins an added annotation returning the original
+byte-identical result without mutation:
 
 - the same replay key and same semantics return the byte-identical first
   result, including `found_existing=false` after a first creation;

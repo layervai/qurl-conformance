@@ -553,9 +553,10 @@ func validateConnectorResourceLSTV1ReplayCases(cases []ConnectorResourceLSTV1Rep
 		outcome, errorCode string
 		mutation           bool
 	}{
-		"exact_create_replay":          {ConnectorResourceLSTV1OutcomeAccept, "", false},
-		"same_nonce_changed_semantics": {ConnectorResourceLSTV1OutcomeError, ConnectorResourceLSTV1ErrorInvalidRequest, false},
-		"fresh_nonce_after_create":     {ConnectorResourceLSTV1OutcomeAccept, "", false},
+		"exact_create_replay":               {ConnectorResourceLSTV1OutcomeAccept, "", false},
+		"same_nonce_changed_origin_product": {ConnectorResourceLSTV1OutcomeAccept, "", false},
+		"same_nonce_changed_semantics":      {ConnectorResourceLSTV1OutcomeError, ConnectorResourceLSTV1ErrorInvalidRequest, false},
+		"fresh_nonce_after_create":          {ConnectorResourceLSTV1OutcomeAccept, "", false},
 	}
 	if len(cases) != len(required) {
 		return fmt.Errorf("conformance: Connector resource LST replay case count = %d, want %d", len(cases), len(required))
@@ -582,6 +583,20 @@ func validateConnectorResourceLSTV1ReplayCases(cases []ConnectorResourceLSTV1Rep
 			return fmt.Errorf("conformance: Connector resource LST replay case %q expectation drift", test.Name)
 		}
 		switch test.Name {
+		case "same_nonce_changed_origin_product":
+			original, _, err := parseConnectorResourceLSTV1Request([]byte(test.ReplayRequestBodyJSON), fixtures.AgentID)
+			if err != nil {
+				return err
+			}
+			changed, class, err := parseConnectorResourceLSTV1Request([]byte(test.ChangedRequestBodyJSON), fixtures.AgentID)
+			if err != nil || class != "" || changed.UsrData.OriginProduct != "desktop" {
+				return errors.New("conformance: changed origin replay must carry valid attribution")
+			}
+			changed.UsrData.OriginProduct = original.UsrData.OriginProduct
+			if !reflect.DeepEqual(original, changed) {
+				return errors.New("conformance: changed origin replay must preserve all request semantics")
+			}
+			fallthrough
 		case "exact_create_replay":
 			if test.ExpectedResultBodyJSON != first.Result.BodyJSON || test.FoundExistingOnResponse == nil || *test.FoundExistingOnResponse {
 				return errors.New("conformance: exact_create_replay must preserve byte-identical found_existing=false")

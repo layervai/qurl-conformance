@@ -136,6 +136,9 @@ func TestParseConnectorResourceLSTV1FileFailsClosed(t *testing.T) {
 		{"transport", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.HTTPFallbackAllowed = true }), "contract drift"},
 		{"continuity", mutate(func(f *ConnectorResourceLSTV1File) { f.Contract.ExpectedCRIDRule = "create_if_absent" }), "contract drift"},
 		{"replay", mutate(func(f *ConnectorResourceLSTV1File) { f.ReplayCases[0].MutationAllowed = true }), "expectation drift"},
+		{"origin replay semantics", mutate(func(f *ConnectorResourceLSTV1File) {
+			f.ReplayCases[0].ChangedRequestBodyJSON = strings.Replace(f.ReplayCases[0].ChangedRequestBodyJSON, "prod-dashboard", "other-dashboard", 1)
+		}), "preserve all request semantics"},
 		{"size", mutate(func(f *ConnectorResourceLSTV1File) { f.SizeCases[0].SizeBudgetBytes++ }), "size/outcome drift"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -168,14 +171,14 @@ func TestConnectorResourceOriginProductIsOptionalNonAuthorizingMetadata(t *testi
 		t.Fatal(err)
 	}
 	base := file.SuccessExchanges[0].Request.BodyJSON
-	for _, value := range []string{"desktop", "cli", "qurl_link", "other", "unknown", "unrecognized"} {
-		body := strings.Replace(base, `"connector_id":`, `"origin_product":"`+value+`","connector_id":`, 1)
+	for _, value := range []string{"desktop", "cli", "qurl_link", "other", "unknown", "unrecognized", "", "Desktop"} {
+		body := strings.TrimSuffix(base, `}}`) + `,"origin_product":"` + value + `"}}`
 		request, err := ParseConnectorResourceLSTV1RequestBody([]byte(body), file.Fixtures.AgentID)
 		if err != nil {
 			t.Fatalf("origin %q rejected: %v", value, err)
 		}
 		want := value
-		if value == "unrecognized" {
+		if value == "unrecognized" || value == "" || value == "Desktop" {
 			want = "unknown"
 		}
 		encoded, err := json.Marshal(request)
@@ -187,7 +190,7 @@ func TestConnectorResourceOriginProductIsOptionalNonAuthorizingMetadata(t *testi
 		}
 	}
 	for _, raw := range []string{"null", "false", "123", "{}", "[]"} {
-		body := strings.Replace(base, `"connector_id":`, `"origin_product":`+raw+`,"connector_id":`, 1)
+		body := strings.TrimSuffix(base, `}}`) + `,"origin_product":` + raw + `}}`
 		if _, err := ParseConnectorResourceLSTV1RequestBody([]byte(body), file.Fixtures.AgentID); rejectClass(t, err) != ConnectorResourceLSTV1RejectWrongType {
 			t.Fatalf("accepted wrong type %s: %v", raw, err)
 		}
