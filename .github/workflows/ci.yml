@@ -486,6 +486,11 @@ jobs:
             if ('user_agent' in request.input && !leavesUserAgentOut(request.input.user_agent)) {
               usrData[lk.constants.user_data_keys.user_agent] = truncateUserAgent(request.input.user_agent);
             }
+            if ('origin_product' in request.input) {
+              const origin = request.input.origin_product;
+              usrData[lk.constants.user_data_keys.origin_product] =
+                ['desktop', 'cli', 'qurl_link', 'other', 'unknown'].includes(origin) ? origin : 'unknown';
+            }
             const body = {
               headerType: lk.constants.knock_header_type,
               aspId: lk.constants.auth_service_id,
@@ -494,8 +499,8 @@ jobs:
             };
             assert.equal(JSON.stringify(body), request.serialized, request.name);
             assert.equal(JSON.stringify(request.body), request.serialized, request.name);
-            // A request carries the CRID, an optional user agent and nothing
-            // else: in particular none of the members it must never carry.
+            // A request carries the CRID and optional user-agent/product metadata,
+            // but none of the forbidden authorization members.
             for (const forbidden of lk.constants.forbidden_user_data_keys) {
               assert.ok(!(forbidden in request.body.usrData), `${request.name} carries ${forbidden}`);
             }
@@ -1062,6 +1067,11 @@ jobs:
               if 'user_agent' in request['input'] and not leaves_user_agent_out(request['input']['user_agent']):
                   user_data[lk['constants']['user_data_keys']['user_agent']] = truncate_user_agent(
                       request['input']['user_agent']
+                  )
+              if 'origin_product' in request['input']:
+                  origin = request['input']['origin_product']
+                  user_data[lk['constants']['user_data_keys']['origin_product']] = (
+                      origin if origin in ('desktop', 'cli', 'qurl_link', 'other', 'unknown') else 'unknown'
                   )
               built = {
                   'headerType': lk['constants']['knock_header_type'],
