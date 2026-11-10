@@ -127,9 +127,10 @@ not open for anyone.
 | `resId` | `qurl-crid` (`constants.resource_id`): a fixed sentinel, not a resource key |
 | `usrData.qurl_crid` | the CRID, exactly as issued |
 | `usrData.qurl_user_agent` | optional: the client's user agent, at most 256 bytes of UTF-8; left out when the user agent holds a control character, U+2028 or U+2029 (`user_agent_omitted_for_line_separator`, `user_agent_omitted_before_truncation`) |
+| `usrData.qurl_origin_product` | optional originating product, normalized before serialization; see “Originating product annotation” |
 
 `aspId`, `resId` and a string `usrData.qurl_crid` together make the knock a
-link request. A v1 client sends no other member. In particular the body never
+link request. A v1 client sends no member other than those listed above. In particular the body never
 carries a key from `constants.forbidden_user_data_keys`. The first four,
 `qurl_access_token`, `qurl_claims_b64`, `qurl_issuer_sig_b64` and
 `qurl_session_secret`, belong to the knocks that open a link, and
@@ -227,6 +228,18 @@ Python all write it as UTF-8. A client that leaves out every character its
 language calls a control character fails this case. In the vector file the
 input writes the character as the JSON escape `\u0085`. `body` and
 `serialized` hold the character itself, because they are the canonical form.
+
+### Originating product annotation
+
+`usrData.qurl_origin_product` is an optional string, separate from the unchanged
+`qurl_user_agent` used by access policies. Recognized values are `desktop`, `cli`,
+`qurl_link`, `other`, and `unknown`; unrecognized strings normalize to `unknown`.
+Matching is case-sensitive; an explicit empty string also normalizes to `unknown`.
+Clients normalize before serialization, and receivers apply the same rule to
+non-conforming client strings. Clients omit it when unavailable. It is self-reported statistics metadata, never
+identity, authorization, or proof of a browser origin. `with_origin_product`
+and `unknown_origin_product` pin the encoding without changing earlier goldens.
+Deploy accepting receivers before clients send the field.
 
 ### CRID gate
 
@@ -672,15 +685,3 @@ author has no reason to look here. In the same change:
    every 60-character `01` CRID this artifact asks a link for is refused. That
    needs a new `schema_version` as well;
 4. run `scripts/sync-vectors.sh`.
-
-### Originating product annotation
-
-`usrData.qurl_origin_product` is an optional string, separate from the unchanged
-`qurl_user_agent` used by access policies. Recognized values are `desktop`, `cli`,
-`qurl_link`, `other`, and `unknown`; unrecognized strings normalize to `unknown`.
-Matching is case-sensitive; an explicit empty string also normalizes to `unknown`.
-Clients normalize before serialization, and receivers apply the same rule to
-non-conforming client strings. Clients omit it when unavailable. It is self-reported statistics metadata, never
-identity, authorization, or proof of a browser origin. `with_origin_product`
-and `unknown_origin_product` pin the encoding without changing earlier goldens.
-Deploy accepting receivers before clients send the field.

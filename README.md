@@ -297,6 +297,8 @@ artifact has its own `artifact` id:
   reauthorizes. The artifact freezes strict 52500-52506 errors and conservative
   pre-seal size budgets; the NHP reference integration owns the real sealed
   1,232-byte proof. No HTTP fallback or hostname-derived placement is allowed.
+  Schema 2 adds the optional originating-product annotation and its cases;
+  strict loaders must adopt schema 2 before updating to this release.
   See `vectors/README_connector_resource_lst_v1_vectors.md`.
 - **Connector Hub LST return-routability cookie v1**
   (`qurl-connector-hub-lst-cookie-v1-vectors`,
@@ -346,7 +348,9 @@ artifact has its own `artifact` id:
   over-long metadata degrades instead of failing. The fixture link is the
   published qURL v2 accept link, so the strict Go loader verifies its issuer
   signature and re-derives its CRID instead of trusting stored labels. See
-  `vectors/README_crid_link_knock_v1_vectors.md`.
+  `vectors/README_crid_link_knock_v1_vectors.md`. Schema 2 adds the optional
+  originating-product annotation and cases; strict loaders must adopt schema 2
+  before updating to this release.
 - **qURL Connector target path** (`qurl-target-path-v1-vectors`,
   `target_path_v1_vectors.json`) — the shared local preflight and service input
   grammar for the optional per-qURL path and query on a tunnel resource. The

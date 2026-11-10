@@ -174,7 +174,7 @@ CRID, or other cross-wired resource values.
 Both the 60-character full form and the 47-character truncated CRID form
 are valid in this profile. The 60-character form sets the maximum size budget.
 
-### Optional originating product
+## Optional originating product
 
 `usrData.origin_product` optionally names the originating product: `desktop`,
 `cli`, `qurl_link`, `other`, or `unknown`. A client that embeds the CLI sends its
