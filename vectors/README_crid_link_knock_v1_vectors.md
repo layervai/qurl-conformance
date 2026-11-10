@@ -6,7 +6,7 @@ for a short-lived link over an ordinary knock, checks the link that comes
 back, and then opens it exactly as it opens any other qURL link. No account,
 API key or HTTP API call is involved.
 
-The artifact id is `qurl-crid-link-knock-v1-vectors`; `schema_version` is `1`.
+The artifact id is `qurl-crid-link-knock-v1-vectors`; `schema_version` is `2`.
 It starts after packet decryption: every body is application JSON, and no
 packet bytes appear here. `relay_knock_golden.json` remains the artifact for
 the knock and ACK packet format, and `crid_v1_vectors.json` remains the
@@ -585,6 +585,9 @@ A missing vector is a hard failure, never a skipped test.
 
 ## Versioning
 
+Schema 2 adds the optional product key and its request cases. All schema 1
+request golden bytes remain unchanged when the annotation is absent.
+
 `error_codes`, `client_results`, `reject_classes`, `reply_type_rules` with its
 `handling` values, `constants.forbidden_user_data_keys` and the case names
 are closed. Adding, removing or renaming an entry, or changing what an
@@ -675,7 +678,9 @@ author has no reason to look here. In the same change:
 `usrData.qurl_origin_product` is an optional string, separate from the unchanged
 `qurl_user_agent` used by access policies. Recognized values are `desktop`, `cli`,
 `qurl_link`, `other`, and `unknown`; unrecognized strings normalize to `unknown`.
-Clients omit it when unavailable. It is self-reported statistics metadata, never
+Matching is case-sensitive; an explicit empty string also normalizes to `unknown`.
+Clients normalize before serialization, and receivers apply the same rule to
+non-conforming client strings. Clients omit it when unavailable. It is self-reported statistics metadata, never
 identity, authorization, or proof of a browser origin. `with_origin_product`
 and `unknown_origin_product` pin the encoding without changing earlier goldens.
 Deploy accepting receivers before clients send the field.

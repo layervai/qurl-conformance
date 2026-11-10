@@ -151,7 +151,9 @@ bytes without fragmentation.
 `request_cases`, `result_reject_cases`, `error_reject_cases`, and `size_cases`
 are mandatory executable suites. A consumer supports this artifact only when
 it accepts every success/error case and rejects every negative case with the
-declared `reject_class`.
+declared `reject_class`. `request_cases` includes both `accept` and `reject`
+outcomes; consumers must branch on `outcome`, and accepted cases have no reject
+class. The `max_fields_request` budget uses maximum-length recognized values.
 
 `expected_crid` is a byte-exact echo of the CRID returned by this operation.
 The issued spelling is stable for the resource lifetime; clients do not derive
@@ -174,7 +176,8 @@ are valid in this profile. The 60-character form sets the maximum size budget.
 `usrData.origin_product` optionally names the originating product: `desktop`,
 `cli`, `qurl_link`, `other`, or `unknown`. A client that embeds the CLI sends its
 own product, so Desktop remains Desktop. Omission stays absent; unrecognized
-strings normalize to `unknown`. A null, non-string, or duplicate field remains
+strings normalize to `unknown` at the receiver. Matching is case-sensitive;
+an explicit empty string also becomes `unknown`. A null, non-string, or duplicate field remains
 an invalid request. This annotation grants no authority and is excluded from
 request and replay identity. A replay preserves the original creation receipt.
 Receivers must accept this optional field before clients begin sending it.

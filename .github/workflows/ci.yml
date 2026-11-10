@@ -465,7 +465,7 @@ jobs:
           const lk = c.cridLinkKnockV1Vectors();
           const issuer = c.issuerSignatureVectors();
           assert.equal(lk.artifact, 'qurl-crid-link-knock-v1-vectors');
-          assert.equal(lk.schema_version, 1);
+          assert.equal(lk.schema_version, 2);
           const truncateUserAgent = value => {
             let kept = '';
             for (const character of value) {
@@ -1046,7 +1046,7 @@ jobs:
           # runtime's serializer, tie the fixture link to its CRIDs, and
           # re-run the display-metadata gate.
           lk = q.crid_link_knock_v1_vectors()
-          assert lk['artifact'] == 'qurl-crid-link-knock-v1-vectors' and lk['schema_version'] == 1
+          assert lk['artifact'] == 'qurl-crid-link-knock-v1-vectors' and lk['schema_version'] == 2
 
           def truncate_user_agent(value):
               kept = ''

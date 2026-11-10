@@ -24,7 +24,7 @@ const (
 	// client contract for asking the server for a qURL link by CRID.
 	CRIDLinkKnockV1ArtifactID = "qurl-crid-link-knock-v1-vectors"
 	// CRIDLinkKnockV1SchemaVersion is the only schema accepted by this release.
-	CRIDLinkKnockV1SchemaVersion = 1
+	CRIDLinkKnockV1SchemaVersion = 2
 
 	// CRIDLinkKnockV1AuthServiceID and CRIDLinkKnockV1ResourceID, together with
 	// a string under CRIDLinkKnockV1UserDataCRIDKey, make a knock a link

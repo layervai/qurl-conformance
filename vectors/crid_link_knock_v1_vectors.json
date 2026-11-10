@@ -1,6 +1,6 @@
 {
   "artifact": "qurl-crid-link-knock-v1-vectors",
-  "schema_version": 1,
+  "schema_version": 2,
   "description": "Client-facing contract for asking the server for a qURL link when the client holds only a CRID: the exact knock application body, the closed set of ACK outcome codes, the checks a client runs on an issued link before using it, and the handling of unverified publisher metadata. Every body here is already-decrypted application JSON.",
   "notes": [
     "Every CRID, link, address and identifier in this artifact is synthetic conformance data. The fixture link is the published qURL v2 vector link: its issuer key, its resource key and the proof-of-possession secret inside its fragment are public test material. Never admit that issuer key or its kid to a production trust store, and never use those keys outside conformance tests.",
