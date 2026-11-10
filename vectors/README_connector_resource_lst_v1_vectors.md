@@ -6,7 +6,10 @@ resource through standard NHP `NHP_LST` / `NHP_LRT` messages. The customer
 runtime does not call an HTTP resource API, use a relay, or carry a Hub cookie
 for this operation.
 
-The application query is `connector_resource`, version `1`. One request names
+The artifact schema is `2`, reflecting the added optional product vocabulary
+and request/replay cases. Consumers adopt this schema with its package release;
+existing request golden bytes remain unchanged when attribution is absent.
+The application query is still `connector_resource`, version `1`. One request names
 one Connector. Multi-route clients issue independent exchanges so each sealed
 reply remains suitable for an unfragmented 1,232-byte UDP path.
 

@@ -25,7 +25,7 @@ const (
 	ConnectorResourceLSTV1ArtifactID = "qurl-connector-resource-lst-v1-vectors"
 	// ConnectorResourceLSTV1SchemaVersion is the only artifact schema accepted
 	// by this release.
-	ConnectorResourceLSTV1SchemaVersion = 1
+	ConnectorResourceLSTV1SchemaVersion = 2
 
 	ConnectorResourceLSTV1Query   = "connector_resource"
 	ConnectorResourceLSTV1Version = 1

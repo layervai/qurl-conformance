@@ -1,6 +1,6 @@
 {
   "artifact": "qurl-connector-resource-lst-v1-vectors",
-  "schema_version": 1,
+  "schema_version": 2,
   "description": "Byte-exact registered-agent NHP_LST/NHP_LRT application contract for resolving or idempotently creating one qURL Connector resource without customer-runtime HTTP.",
   "notes": [
     "This application profile begins only after assigned-cell registration. Unlike pre-registration assignment and completion requests, usrId and devId are both the final agent_id and must match the agent identity independently mapped from the Noise-authenticated static key.",
