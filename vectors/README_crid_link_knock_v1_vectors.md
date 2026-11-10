@@ -154,7 +154,7 @@ body's canonical bytes:
 
 - compact JSON with no insignificant whitespace;
 - members in the order `headerType`, `aspId`, `resId`, `usrData`, and inside
-  `usrData` the order `qurl_crid`, `qurl_user_agent`;
+  `usrData` the order `qurl_crid`, `qurl_user_agent`, `qurl_origin_product`;
 - strings escaped only where JSON requires it: `"` becomes `\"` and `\`
   becomes `\\`. `/`, `<`, `>` and `&` are written as they are, and every
   non-ASCII character is emitted as UTF-8 rather than as a `\u` escape.
@@ -669,3 +669,13 @@ author has no reason to look here. In the same change:
    every 60-character `01` CRID this artifact asks a link for is refused. That
    needs a new `schema_version` as well;
 4. run `scripts/sync-vectors.sh`.
+
+### Originating product annotation
+
+`usrData.qurl_origin_product` is an optional string, separate from the unchanged
+`qurl_user_agent` used by access policies. Recognized values are `desktop`, `cli`,
+`qurl_link`, `other`, and `unknown`; unrecognized strings normalize to `unknown`.
+Clients omit it when unavailable. It is self-reported statistics metadata, never
+identity, authorization, or proof of a browser origin. `with_origin_product`
+and `unknown_origin_product` pin the encoding without changing earlier goldens.
+Deploy accepting receivers before clients send the field.

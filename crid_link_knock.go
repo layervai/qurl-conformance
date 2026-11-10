@@ -29,10 +29,11 @@ const (
 	// CRIDLinkKnockV1AuthServiceID and CRIDLinkKnockV1ResourceID, together with
 	// a string under CRIDLinkKnockV1UserDataCRIDKey, make a knock a link
 	// request. The resource id is a fixed sentinel, not a resource key.
-	CRIDLinkKnockV1AuthServiceID        = "qurl"
-	CRIDLinkKnockV1ResourceID           = "qurl-crid"
-	CRIDLinkKnockV1UserDataCRIDKey      = "qurl_crid"
-	CRIDLinkKnockV1UserDataUserAgentKey = "qurl_user_agent"
+	CRIDLinkKnockV1AuthServiceID            = "qurl"
+	CRIDLinkKnockV1ResourceID               = "qurl-crid"
+	CRIDLinkKnockV1UserDataCRIDKey          = "qurl_crid"
+	CRIDLinkKnockV1UserDataUserAgentKey     = "qurl_user_agent"
+	CRIDLinkKnockV1UserDataOriginProductKey = "qurl_origin_product"
 
 	// CRIDLinkKnockV1KnockHeaderType is the packet header type of the request
 	// and the value its body repeats as headerType.
@@ -128,11 +129,11 @@ type CRIDLinkKnockV1Constants struct {
 	LinkOrigin            string                      `json:"link_origin"`
 }
 
-// CRIDLinkKnockV1UserDataKeys names the only two user-data members a v1
-// client sends.
+// CRIDLinkKnockV1UserDataKeys names the request metadata members a v1 client sends.
 type CRIDLinkKnockV1UserDataKeys struct {
-	CRID      string `json:"crid"`
-	UserAgent string `json:"user_agent"`
+	CRID          string `json:"crid"`
+	UserAgent     string `json:"user_agent"`
+	OriginProduct string `json:"origin_product"`
 }
 
 // CRIDLinkKnockV1Composes names the sibling artifacts this one reuses by
@@ -188,8 +189,9 @@ type CRIDLinkKnockV1Fixtures struct {
 // U+2029; user_agent_omitted_for_line_separator and
 // user_agent_omitted_before_truncation pin that.
 type CRIDLinkKnockV1RequestInput struct {
-	CRID      string  `json:"crid"`
-	UserAgent *string `json:"user_agent,omitempty"`
+	CRID          string  `json:"crid"`
+	UserAgent     *string `json:"user_agent,omitempty"`
+	OriginProduct *string `json:"origin_product,omitempty"`
 }
 
 // CRIDLinkKnockV1RequestCase pins one request. Body is the application body
@@ -415,11 +417,13 @@ var (
 	cridLinkKnockV1PublisherNameOverLimit = cridLinkKnockV1OverLimit("")
 
 	cridLinkKnockV1RequestFixtures = map[string]*string{
-		"minimal":                  nil,
-		"with_user_agent":          cridLinkKnockV1StringPointer(cridLinkKnockV1UserAgentBrowser),
-		"user_agent_json_escaping": cridLinkKnockV1StringPointer(cridLinkKnockV1UserAgentEscaping),
-		"user_agent_at_limit":      &cridLinkKnockV1UserAgentAtLimit,
-		"user_agent_truncated":     &cridLinkKnockV1UserAgentOverLimit,
+		"minimal":                                     nil,
+		"with_user_agent":                             cridLinkKnockV1StringPointer(cridLinkKnockV1UserAgentBrowser),
+		"with_origin_product":                         cridLinkKnockV1StringPointer(cridLinkKnockV1UserAgentBrowser),
+		"unknown_origin_product":                      nil,
+		"user_agent_json_escaping":                    cridLinkKnockV1StringPointer(cridLinkKnockV1UserAgentEscaping),
+		"user_agent_at_limit":                         &cridLinkKnockV1UserAgentAtLimit,
+		"user_agent_truncated":                        &cridLinkKnockV1UserAgentOverLimit,
 		"user_agent_truncated_at_code_point_boundary": &cridLinkKnockV1UserAgentBoundary,
 		"user_agent_omitted_for_line_separator":       &cridLinkKnockV1UserAgentLineSeparator,
 		"user_agent_omitted_before_truncation":        &cridLinkKnockV1UserAgentLateControl,
@@ -641,8 +645,9 @@ func validateCRIDLinkKnockV1Vocabularies(lf *CRIDLinkKnockV1File) error {
 		AuthServiceID: CRIDLinkKnockV1AuthServiceID,
 		ResourceID:    CRIDLinkKnockV1ResourceID,
 		UserDataKeys: CRIDLinkKnockV1UserDataKeys{
-			CRID:      CRIDLinkKnockV1UserDataCRIDKey,
-			UserAgent: CRIDLinkKnockV1UserDataUserAgentKey,
+			CRID:          CRIDLinkKnockV1UserDataCRIDKey,
+			UserAgent:     CRIDLinkKnockV1UserDataUserAgentKey,
+			OriginProduct: CRIDLinkKnockV1UserDataOriginProductKey,
 		},
 		ForbiddenUserDataKeys: cridLinkKnockV1ForbiddenUserDataKeys,
 		KnockHeaderType:       CRIDLinkKnockV1KnockHeaderType,
@@ -698,7 +703,14 @@ func (env *cridLinkKnockV1Environment) validateRequestCases(cases []CRIDLinkKnoc
 	}
 	for _, c := range cases {
 		userAgent := cridLinkKnockV1RequestFixtures[c.Name]
-		if c.Input.CRID != env.crid || !equalOptionalString(c.Input.UserAgent, userAgent) {
+		var origin *string
+		switch c.Name {
+		case "with_origin_product":
+			origin = cridLinkKnockV1StringPointer("qurl_link")
+		case "unknown_origin_product":
+			origin = cridLinkKnockV1StringPointer("unrecognized")
+		}
+		if c.Input.CRID != env.crid || !equalOptionalString(c.Input.UserAgent, userAgent) || !equalOptionalString(c.Input.OriginProduct, origin) {
 			return fmt.Errorf("conformance: CRID link knock request case %q input does not match its fixture", c.Name)
 		}
 		serialized, sent, err := cridLinkKnockV1SerializeRequest(c.Input)
@@ -1107,8 +1119,9 @@ type cridLinkKnockV1WireRequest struct {
 }
 
 type cridLinkKnockV1WireUserData struct {
-	CRID      string `json:"qurl_crid"`
-	UserAgent string `json:"qurl_user_agent,omitempty"`
+	CRID          string `json:"qurl_crid"`
+	UserAgent     string `json:"qurl_user_agent,omitempty"`
+	OriginProduct string `json:"qurl_origin_product,omitempty"`
 }
 
 // cridLinkKnockV1LeavesUserAgentOut reports whether one character keeps a
@@ -1147,6 +1160,9 @@ func cridLinkKnockV1SerializeRequest(input CRIDLinkKnockV1RequestInput) (seriali
 		if !strings.ContainsFunc(*input.UserAgent, cridLinkKnockV1LeavesUserAgentOut) {
 			wire.UserData.UserAgent = cridLinkKnockV1TruncateUserAgent(*input.UserAgent)
 		}
+	}
+	if input.OriginProduct != nil {
+		wire.UserData.OriginProduct = normalizeOriginProduct(*input.OriginProduct)
 	}
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)

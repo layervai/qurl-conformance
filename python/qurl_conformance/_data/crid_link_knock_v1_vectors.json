@@ -17,7 +17,8 @@
     "resource_id": "qurl-crid",
     "user_data_keys": {
       "crid": "qurl_crid",
-      "user_agent": "qurl_user_agent"
+      "user_agent": "qurl_user_agent",
+      "origin_product": "qurl_origin_product"
     },
     "forbidden_user_data_keys": [
       "qurl_access_token",
@@ -272,6 +273,42 @@
         }
       },
       "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\",\"qurl_user_agent\":\"qurl-conformance/1.0 (nextline)\"}}"
+    },
+    {
+      "name": "with_origin_product",
+      "input": {
+        "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+        "origin_product": "qurl_link"
+      },
+      "body": {
+        "headerType": 1,
+        "aspId": "qurl",
+        "resId": "qurl-crid",
+        "usrData": {
+          "qurl_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+          "qurl_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+          "qurl_origin_product": "qurl_link"
+        }
+      },
+      "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\",\"qurl_user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15\",\"qurl_origin_product\":\"qurl_link\"}}"
+    },
+    {
+      "name": "unknown_origin_product",
+      "input": {
+        "crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+        "origin_product": "unrecognized"
+      },
+      "body": {
+        "headerType": 1,
+        "aspId": "qurl",
+        "resId": "qurl-crid",
+        "usrData": {
+          "qurl_crid": "ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a",
+          "qurl_origin_product": "unknown"
+        }
+      },
+      "serialized": "{\"headerType\":1,\"aspId\":\"qurl\",\"resId\":\"qurl-crid\",\"usrData\":{\"qurl_crid\":\"ah6cpcch4cf74t5o2qj66wzz5cf42rn6yrfgllvz3s75fz25dmjrzru5db7a\",\"qurl_origin_product\":\"unknown\"}}"
     }
   ],
   "invalid_request_cases": [

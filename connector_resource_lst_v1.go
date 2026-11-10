@@ -274,11 +274,12 @@ type connectorResourceLSTV1RequestWire struct {
 }
 
 type connectorResourceLSTV1RequestUserDataWire struct {
-	Query        string  `json:"query"`
-	Version      int     `json:"version"`
-	RequestNonce string  `json:"request_nonce"`
-	ConnectorID  string  `json:"connector_id"`
-	ExpectedCRID *string `json:"expected_crid,omitempty"`
+	Query         string  `json:"query"`
+	Version       int     `json:"version"`
+	RequestNonce  string  `json:"request_nonce"`
+	ConnectorID   string  `json:"connector_id"`
+	ExpectedCRID  *string `json:"expected_crid,omitempty"`
+	OriginProduct string  `json:"origin_product,omitempty"`
 }
 
 type connectorResourceLSTV1ResultWire struct {
@@ -368,8 +369,8 @@ func ParseConnectorResourceLSTV1File(data []byte) (*ConnectorResourceLSTV1File, 
 	if file.Artifact != ConnectorResourceLSTV1ArtifactID || file.SchemaVersion != ConnectorResourceLSTV1SchemaVersion || file.Description != connectorResourceLSTV1Description {
 		return nil, errors.New("conformance: Connector resource LST artifact identity is invalid")
 	}
-	if len(file.Notes) != 8 {
-		return nil, fmt.Errorf("conformance: Connector resource LST notes count = %d, want 8", len(file.Notes))
+	if len(file.Notes) != 9 {
+		return nil, fmt.Errorf("conformance: Connector resource LST notes count = %d, want 9", len(file.Notes))
 	}
 	if err := validateConnectorResourceLSTV1Contract(file.Contract); err != nil {
 		return nil, err
@@ -409,7 +410,7 @@ func validateConnectorResourceLSTV1Contract(contract ConnectorResourceLSTV1Contr
 		AspID:                         ConnectorResourceLSTV1AspID,
 		RequestOuterFields:            []string{"usrId", "devId", "aspId", "usrData"},
 		RequestUserDataRequiredFields: []string{"query", "version", "request_nonce", "connector_id"},
-		RequestUserDataOptionalFields: []string{"expected_crid"},
+		RequestUserDataOptionalFields: []string{"expected_crid", "origin_product"},
 		SuccessOuterFields:            []string{"errCode", "list"},
 		SuccessListRequiredFields:     []string{"query", "version", "agent_id", "connector_id", "resource_public_key", "connector_routing_id", "knock_resource_id", "crid", "found_existing"},
 		SuccessListOptionalFields:     []string{},
@@ -604,6 +605,11 @@ func validateConnectorResourceLSTV1ReplayCases(cases []ConnectorResourceLSTV1Rep
 
 func validateConnectorResourceLSTV1RequestCases(cases []ConnectorResourceLSTV1BodyCase, fixtures ConnectorResourceLSTV1Fixtures) error {
 	required := map[string]string{
+		"accept_origin_product_desktop":      "",
+		"accept_origin_product_unrecognized": "",
+		"reject_null_origin_product":         ConnectorResourceLSTV1RejectWrongType,
+		"reject_object_origin_product":       ConnectorResourceLSTV1RejectWrongType,
+		"reject_duplicate_origin_product":    ConnectorResourceLSTV1RejectBodyParse,
 		"reject_legacy_expected_resource_id": ConnectorResourceLSTV1RejectUnknownField,
 		"reject_duplicate_outer_dev_id":      ConnectorResourceLSTV1RejectBodyParse,
 		"reject_unknown_outer_field":         ConnectorResourceLSTV1RejectUnknownField,
@@ -739,7 +745,11 @@ func validateConnectorResourceLSTV1BodyCases(group string, cases []ConnectorReso
 			return fmt.Errorf("conformance: duplicate Connector resource LST %s case %q", group, test.Name)
 		}
 		seen[test.Name] = struct{}{}
-		if test.Outcome != ConnectorResourceLSTV1OutcomeReject || test.RejectClass != wantClass {
+		wantOutcome := ConnectorResourceLSTV1OutcomeReject
+		if wantClass == "" {
+			wantOutcome = ConnectorResourceLSTV1OutcomeAccept
+		}
+		if test.Outcome != wantOutcome || test.RejectClass != wantClass {
 			return fmt.Errorf("conformance: Connector resource LST %s case %q declared expectation drift", group, test.Name)
 		}
 		if gotClass := classify([]byte(test.BodyJSON)); gotClass != wantClass {
@@ -850,7 +860,7 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 	}
 	userData, class, err := connectorResourceLSTV1ExactObject(outer["usrData"],
 		[]string{"query", "version", "request_nonce", "connector_id"},
-		[]string{"query", "version", "request_nonce", "connector_id", "expected_crid"})
+		[]string{"query", "version", "request_nonce", "connector_id", "expected_crid", "origin_product"})
 	if err != nil {
 		return nil, class, err
 	}
@@ -861,6 +871,9 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 	}
 	if expected, ok := userData["expected_crid"]; ok && (string(expected) == "null" || len(expected) == 0 || expected[0] != '"') {
 		return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("expected_crid must be a string when present")
+	}
+	if origin, ok := userData["origin_product"]; ok && (string(origin) == "null" || len(origin) == 0 || origin[0] != '"') {
+		return nil, ConnectorResourceLSTV1RejectWrongType, errors.New("origin_product must be a string when present")
 	}
 	if string(userData["version"]) != "1" {
 		if len(userData["version"]) == 0 || (userData["version"][0] != '-' && (userData["version"][0] < '0' || userData["version"][0] > '9')) {
@@ -888,6 +901,9 @@ func parseConnectorResourceLSTV1Request(body []byte, authoritativeAgentID string
 		if err := ValidateConnectorResourceLSTV1CRID(*request.UsrData.ExpectedCRID); err != nil {
 			return nil, ConnectorResourceLSTV1RejectSemantic, err
 		}
+	}
+	if _, present := userData["origin_product"]; present {
+		request.UsrData.OriginProduct = normalizeOriginProduct(request.UsrData.OriginProduct)
 	}
 	return &request, "", nil
 }

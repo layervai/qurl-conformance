@@ -161,3 +161,35 @@ func rejectClass(t *testing.T, err error) string {
 	}
 	return validation.RejectClass
 }
+
+func TestConnectorResourceOriginProductIsOptionalNonAuthorizingMetadata(t *testing.T) {
+	file, err := ConnectorResourceLSTV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := file.SuccessExchanges[0].Request.BodyJSON
+	for _, value := range []string{"desktop", "cli", "qurl_link", "other", "unknown", "unrecognized"} {
+		body := strings.Replace(base, `"connector_id":`, `"origin_product":"`+value+`","connector_id":`, 1)
+		request, err := ParseConnectorResourceLSTV1RequestBody([]byte(body), file.Fixtures.AgentID)
+		if err != nil {
+			t.Fatalf("origin %q rejected: %v", value, err)
+		}
+		want := value
+		if value == "unrecognized" {
+			want = "unknown"
+		}
+		encoded, err := json.Marshal(request)
+		if err != nil || !bytes.Contains(encoded, []byte(`"origin_product":"`+want+`"`)) {
+			t.Fatalf("normalized request = %s, %v", encoded, err)
+		}
+		if _, err := ParseConnectorResourceLSTV1ResultBody([]byte(file.SuccessExchanges[0].Result.BodyJSON), request); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, raw := range []string{"null", "false", "123", "{}", "[]"} {
+		body := strings.Replace(base, `"connector_id":`, `"origin_product":`+raw+`,"connector_id":`, 1)
+		if _, err := ParseConnectorResourceLSTV1RequestBody([]byte(body), file.Fixtures.AgentID); rejectClass(t, err) != ConnectorResourceLSTV1RejectWrongType {
+			t.Fatalf("accepted wrong type %s: %v", raw, err)
+		}
+	}
+}

@@ -18,8 +18,8 @@ The request body is an exact object:
 {"usrId":"agent-conform","devId":"agent-conform","aspId":"agent","usrData":{"query":"connector_resource","version":1,"request_nonce":"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8","connector_id":"prod-dashboard"}}
 ```
 
-`expected_crid` is the only optional member of `usrData` and follows
-`connector_id` when present. Duplicate keys, case aliases, unknown members,
+`expected_crid` and `origin_product` are optional members of `usrData`.
+Canonical clients write them after `connector_id`, in that order when present. Duplicate keys, case aliases, unknown members,
 null optionals, invalid UTF-8, alternate numeric spellings, and trailing JSON
 reject.
 
@@ -83,7 +83,8 @@ Authority must never create, reclaim, or substitute a resource while processing
 a request that carries this assertion.
 
 The replay key is the authenticated peer, query, and decoded request nonce.
-The operation also stores a fingerprint of the exact semantic request:
+The operation also stores a fingerprint of the exact semantic request;
+`origin_product` is annotation only and does not enter that fingerprint:
 
 - the same replay key and same semantics return the byte-identical first
   result, including `found_existing=false` after a first creation;
@@ -165,3 +166,13 @@ CRID, or other cross-wired resource values.
 
 Both the 60-character full form and the 47-character truncated CRID form
 are valid in this profile. The 60-character form sets the maximum size budget.
+
+### Optional originating product
+
+`usrData.origin_product` optionally names the originating product: `desktop`,
+`cli`, `qurl_link`, `other`, or `unknown`. A client that embeds the CLI sends its
+own product, so Desktop remains Desktop. Omission stays absent; unrecognized
+strings normalize to `unknown`. A null, non-string, or duplicate field remains
+an invalid request. This annotation grants no authority and is excluded from
+request and replay identity. A replay preserves the original creation receipt.
+Receivers must accept this optional field before clients begin sending it.

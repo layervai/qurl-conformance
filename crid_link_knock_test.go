@@ -32,7 +32,7 @@ func TestEmbeddedCRIDLinkKnockV1Loads(t *testing.T) {
 	if len(lf.ErrorCodes) != 7 || len(lf.ClientResults) != 10 || len(lf.RejectClasses) != 7 {
 		t.Fatalf("vocabulary counts = codes:%d results:%d classes:%d", len(lf.ErrorCodes), len(lf.ClientResults), len(lf.RejectClasses))
 	}
-	if len(lf.RequestCases) != 9 || len(lf.InvalidRequestCases) != 8 || len(lf.ACKCases) != 17 ||
+	if len(lf.RequestCases) != 11 || len(lf.InvalidRequestCases) != 8 || len(lf.ACKCases) != 17 ||
 		len(lf.ClientVerificationCases) != 31 || len(lf.RedirectInfoSanitizationCases) != 20 {
 		t.Fatalf("fixture counts = requests:%d invalid:%d acks:%d verification:%d sanitization:%d",
 			len(lf.RequestCases), len(lf.InvalidRequestCases), len(lf.ACKCases),
@@ -698,7 +698,7 @@ func TestCRIDLinkKnockV1LinkOriginIsComparedAsText(t *testing.T) {
 // TestCRIDLinkKnockV1ForbiddenUserDataKeys pins the members a link request
 // never carries: four that belong to the knocks that open a link, and the one
 // name reserved for a later revision. No request case carries any of them, and
-// the two members a request does carry are not among them.
+// the members a request does carry are not among them.
 func TestCRIDLinkKnockV1ForbiddenUserDataKeys(t *testing.T) {
 	lf, err := CRIDLinkKnockV1()
 	if err != nil {
@@ -708,7 +708,7 @@ func TestCRIDLinkKnockV1ForbiddenUserDataKeys(t *testing.T) {
 	if !slices.Equal(lf.Constants.ForbiddenUserDataKeys, want) {
 		t.Fatalf("forbidden_user_data_keys = %v, want %v", lf.Constants.ForbiddenUserDataKeys, want)
 	}
-	for _, sent := range []string{lf.Constants.UserDataKeys.CRID, lf.Constants.UserDataKeys.UserAgent} {
+	for _, sent := range []string{lf.Constants.UserDataKeys.CRID, lf.Constants.UserDataKeys.UserAgent, lf.Constants.UserDataKeys.OriginProduct} {
 		if slices.Contains(lf.Constants.ForbiddenUserDataKeys, sent) {
 			t.Errorf("%q is both sent and forbidden", sent)
 		}
@@ -723,7 +723,7 @@ func TestCRIDLinkKnockV1ForbiddenUserDataKeys(t *testing.T) {
 				t.Fatalf("request %q %s: %v", c.Name, form, err)
 			}
 			for key := range members.UserData {
-				if key != lf.Constants.UserDataKeys.CRID && key != lf.Constants.UserDataKeys.UserAgent {
+				if key != lf.Constants.UserDataKeys.CRID && key != lf.Constants.UserDataKeys.UserAgent && key != lf.Constants.UserDataKeys.OriginProduct {
 					t.Errorf("request %q %s sends the user-data member %q, which a v1 client never sends", c.Name, form, key)
 				}
 			}
@@ -1954,6 +1954,28 @@ func TestCRIDLinkKnockV1SanitizationNeverTripsTheHardCheck(t *testing.T) {
 		}
 		if !reflect.DeepEqual(*got.Info, c.Expected) {
 			t.Errorf("sanitization case %q in a link-issued ACK keeps %+v, want %+v", c.Name, *got.Info, c.Expected)
+		}
+	}
+}
+
+func TestCRIDLinkOriginProductDoesNotAlterUserAgent(t *testing.T) {
+	file, err := CRIDLinkKnockV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, product := range []string{"qurl_link", "desktop", "unrecognized"} {
+		var input CRIDLinkKnockV1RequestInput
+		body := `{"crid":"` + file.Fixtures.CRID + `","user_agent":"Mozilla/policy-match","origin_product":"` + product + `"}`
+		if err := json.Unmarshal([]byte(body), &input); err != nil {
+			t.Fatal(err)
+		}
+		encoded, userAgent, err := cridLinkKnockV1SerializeRequest(input)
+		want := product
+		if product == "unrecognized" {
+			want = "unknown"
+		}
+		if err != nil || userAgent != "Mozilla/policy-match" || !strings.Contains(encoded, `"qurl_origin_product":"`+want+`"`) {
+			t.Fatalf("product %q: encoded=%s userAgent=%q err=%v", product, encoded, userAgent, err)
 		}
 	}
 }
