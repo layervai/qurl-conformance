@@ -14,12 +14,14 @@ import (
 // npm scope can bypass this check.
 var layerVRepositoryReference = regexp.MustCompile(`(?i)(?:^|[^\w])layervai/([a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)`)
 
-// Each entry was verified as public on 2026-09-06. Additions require the same
+// Entries were verified as public on 2026-09-06 unless noted. Additions require the same
 // check. A private repository must never be added to silence a failure.
 var reviewedPublicLayerVRepositories = map[string]bool{
 	"ops-routines-workflows": true,
 	"qurl-conformance":       true,
 	"qurl-go":                true,
+	"qurl-integrations":      true, // Verified public on 2026-10-15.
+	"qurl-mcp":               true, // Verified public on 2026-10-15.
 	"qurl-typescript":        true,
 }
 
