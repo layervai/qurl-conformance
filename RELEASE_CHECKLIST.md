@@ -37,6 +37,10 @@ that handoff real rather than assumed.
 - [ ] `go build ./... && go vet ./... && go test -count=1 ./...`
 - [ ] `gofmt -l .` is empty
 - [ ] `bash scripts/check-sync.sh`
+- [ ] `go run ./tools/verify-assignment-ticket` and
+      `node tools/verify-assignment-fences.cjs` check the positive fences and
+      every schema-2 typed reject. Typed-input-only changes preserve existing
+      keys, claims, signatures, preimages and digests; do not regenerate them.
 - [ ] `python3 scripts/check-claude-model-lockstep.py`
 - [ ] npm and Python package smokes green (CI job `vectors + go + cross-language`)
 - [ ] `go.mod` still has no `require` line
@@ -75,7 +79,7 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
       open the frozen replies against these exact committed bytes, with its real
       codec, and report green. Today that is `layervai/qurl-go`
       (`TestBuildMessage_*Golden`, `TestDecryptReply_*Golden`,
-      `TestBuildKnock_GoldenVector`) run against a `replace` directive or a
+      `TestBuildKnock_GoldenVector`, `TestMatchedCounterEchoGolden`) run against a `replace` directive or a
       pre-release pin pointing at this branch. Record where it ran in the PR.
       Until that has happened the bytes are unverified by anyone.
 - [ ] **Confirm every real ACK denial producer emits the strict lifetime.** At
@@ -98,6 +102,13 @@ Applies whenever any `packet_hex`, `header_digest_hex`, `header_prefix_hex` or
 
 Applies whenever `issuer_signature_vectors.json` changes or the canonical qv2
 fragment/transport accept fixture changes.
+
+Reject-only additions derived from frozen signature bytes do not rotate keys or
+regenerate accept signatures: do not run the generator for them. Confirm all
+existing vector entries, keys and signing inputs are unchanged, sync the package
+copies, and run the exact-byte consumer checks below. Leave the generator and
+fragment-regeneration checkboxes unchecked for reject-only additions. The regeneration steps
+apply when accept/key bytes change.
 
 - [ ] Run the generator exactly once. Do not rerun it to make a test pass: the
       issuer signature uses a random ECDSA nonce, so each run creates a different

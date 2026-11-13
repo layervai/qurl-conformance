@@ -71,6 +71,7 @@ import (
 	"crypto/ecdh"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -92,7 +93,7 @@ const (
 // reject_class vocabulary. These constants are the fixed cross-language vocabulary
 // the README pins, so every consumer can switch on a closed, known set. They are
 // pinned precisely only where the class is about the distinction (transport;
-// signature high_s vs wrong_length; encoding; key_length); JSON-schema faults
+// signature scalar_range vs high_s vs wrong_length; encoding; key_length); JSON-schema faults
 // use the coarse "parse" because a conformant verifier may surface any of
 // several internal sentinels for them.
 const (
@@ -116,6 +117,8 @@ const (
 	RejectClassHighS = "high_s"
 	// RejectClassWrongLength is a signature that is not exactly 64 bytes (raw r||s).
 	RejectClassWrongLength = "wrong_length"
+	// RejectClassScalarRange is a signature whose r or s is outside [1, N-1].
+	RejectClassScalarRange = "scalar_range"
 )
 
 // Signature-class tamper derivation identifiers. These pin the artifact's
@@ -488,9 +491,9 @@ func ParseVectorFile(data []byte) (*VectorFile, error) {
 			}
 		case ExpectReject:
 			switch v.RejectClass {
-			case RejectClassHighS, RejectClassWrongLength:
+			case RejectClassHighS, RejectClassWrongLength, RejectClassScalarRange:
 			default:
-				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength)
+				return nil, fmt.Errorf("conformance: reject signature vector %q has reject_class %q, want %q, %q or %q", v.Name, v.RejectClass, RejectClassHighS, RejectClassWrongLength, RejectClassScalarRange)
 			}
 		default:
 			return nil, fmt.Errorf("conformance: signature vector %q has expect %q, want accept|reject", v.Name, v.Expect)
@@ -542,8 +545,9 @@ const RelayKnockArtifactID = "qurl-relay-knock-golden-vectors"
 
 // RelayKnockFile is the top-level relay/NHP-handshake golden artifact: a
 // deterministic knock packet a conformant initiator must reproduce byte-for-byte,
-// plus a frozen ack reply (sealed at origin with a random server ephemeral, so it
-// is NOT reproducible by a client — only decryptable). Both cases decode into the
+// plus frozen ACK replies (schema v2 adds a counter-matched reply). Each reply
+// is sealed at origin with a random server ephemeral, so clients can only
+// decrypt it. All cases decode into the
 // same RelayKnockCase, which carries the UNION of the fields either case uses.
 type RelayKnockFile struct {
 	Artifact      string         `json:"artifact"`
@@ -553,6 +557,8 @@ type RelayKnockFile struct {
 	Notes         []string       `json:"notes"`
 	Knock         RelayKnockCase `json:"knock"`
 	Ack           RelayKnockCase `json:"ack"`
+	// MatchedAck is required by schema v2 and echoes Knock.Counter.
+	MatchedAck *RelayKnockCase `json:"matched_ack,omitempty"`
 }
 
 // RelayKnockCase is one golden packet (knock or ack). Every value is the exact
@@ -605,8 +611,36 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	if rf.Artifact != RelayKnockArtifactID {
 		return nil, fmt.Errorf("conformance: relay-knock file has artifact %q, want %q", rf.Artifact, RelayKnockArtifactID)
 	}
-	if rf.SchemaVersion == 0 {
-		return nil, errors.New("conformance: relay-knock file missing schema_version")
+	var matchedCounter uint64
+	switch rf.SchemaVersion {
+	case 1:
+		if rf.MatchedAck != nil {
+			return nil, errors.New("conformance: relay-knock schema v1 cannot carry matched_ack")
+		}
+	case 2:
+		if rf.MatchedAck == nil || rf.MatchedAck.PacketHex == "" || rf.MatchedAck.BodyHex == "" {
+			return nil, errors.New("conformance: relay-knock schema v2 requires matched_ack packet and body")
+		}
+		sendTime, err := strconv.ParseInt(rf.MatchedAck.TimestampNanos, 10, 64)
+		if err != nil || sendTime <= 0 || strconv.FormatInt(sendTime, 10) != rf.MatchedAck.TimestampNanos {
+			return nil, errors.New("conformance: relay-knock matched_ack.timestamp_nanos must be canonical positive int64")
+		}
+		requestCounter, err := strconv.ParseUint(rf.Knock.Counter, 10, 64)
+		if err != nil || strconv.FormatUint(requestCounter, 10) != rf.Knock.Counter {
+			return nil, errors.New("conformance: relay-knock knock.counter must be a canonical uint64")
+		}
+		matchedCounter, err = strconv.ParseUint(rf.MatchedAck.CounterHex, 16, 64)
+		if err != nil || strconv.FormatUint(matchedCounter, 16) != rf.MatchedAck.CounterHex {
+			return nil, errors.New("conformance: relay-knock matched_ack.counter_hex must be a canonical uint64")
+		}
+		if matchedCounter != requestCounter {
+			return nil, errors.New("conformance: relay-knock matched_ack counter does not echo knock")
+		}
+		if rf.MatchedAck.ServerStaticPubHex != rf.Knock.ServerStaticPubHex || rf.MatchedAck.AgentStaticPrivHex != rf.Knock.DeviceStaticPrivHex {
+			return nil, errors.New("conformance: relay-knock matched_ack keys differ from knock")
+		}
+	default:
+		return nil, fmt.Errorf("conformance: unsupported relay-knock schema_version %d", rf.SchemaVersion)
 	}
 	// Fail closed on a blank load-bearing field: a consumer that re-runs the
 	// golden bytes (rebuild knock.packet_hex / decrypt ack.packet_hex) must not
@@ -623,16 +657,36 @@ func ParseRelayKnockFile(data []byte) (*RelayKnockFile, error) {
 	if rf.Ack.BodyHex == "" {
 		return nil, errors.New("conformance: relay-knock file missing ack.body_hex")
 	}
-	for _, c := range []struct {
-		name string
-		c    RelayKnockCase
-	}{{"knock", rf.Knock}, {"ack", rf.Ack}} {
+	type packetCase struct {
+		name       string
+		c          RelayKnockCase
+		headerType uint32
+	}
+	cases := []packetCase{{"knock", rf.Knock, 1}, {"ack", rf.Ack, 2}}
+	if rf.MatchedAck != nil {
+		cases = append(cases, packetCase{"matched_ack", *rf.MatchedAck, 2})
+	}
+	for _, c := range cases {
 		packet, err := hex.DecodeString(c.c.PacketHex)
 		if err != nil || hex.EncodeToString(packet) != c.c.PacketHex {
 			return nil, fmt.Errorf("conformance: relay-knock %s.packet_hex is not canonical lowercase hex", c.name)
 		}
 		if err := validateNHPPacketProtocolVersion("relay-knock "+c.name+".packet_hex", packet); err != nil {
 			return nil, err
+		}
+		if rf.SchemaVersion == 2 {
+			headerType := (binary.BigEndian.Uint32(packet[:4]) ^ binary.BigEndian.Uint32(packet[4:8])) >> 16
+			if headerType != c.headerType {
+				return nil, fmt.Errorf("conformance: relay-knock %s packet header type %d, want %d", c.name, headerType, c.headerType)
+			}
+		}
+		if rf.SchemaVersion == 2 && (c.name == "knock" || c.name == "matched_ack") {
+			if len(packet) < 24 {
+				return nil, fmt.Errorf("conformance: relay-knock %s packet lacks a complete counter", c.name)
+			}
+			if binary.BigEndian.Uint64(packet[16:24]) != matchedCounter {
+				return nil, fmt.Errorf("conformance: relay-knock %s packet counter differs from the matched pair", c.name)
+			}
 		}
 	}
 	return &rf, nil
