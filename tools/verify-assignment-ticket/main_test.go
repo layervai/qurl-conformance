@@ -50,3 +50,65 @@ func TestDERToRawLowSRejectsUnexpectedSequenceElement(t *testing.T) {
 		t.Fatal("DER with an unexpected sequence element was accepted")
 	}
 }
+
+func TestExecutableFenceRejectBoundaries(t *testing.T) {
+	af, err := conformance.AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, base := range af.FenceVectors {
+		if got := fenceInputBoundary(base.Parts, base.Parts); got != "" {
+			t.Fatalf("positive %s rejected at %s", base.Kind, got)
+		}
+	}
+	boundaries := map[string]string{
+		"credential_hash_wrong_length": "key_length", "credential_scopes_unsorted": "canonical_scopes",
+		"credential_scopes_duplicate": "canonical_scopes", "uint64_negative_or_overflow": "uint64",
+		"bool_not_single_byte": "encoding", "missing_required_cell_part": "required_part",
+	}
+	count := 0
+	for _, reject := range af.FenceRejects {
+		for _, input := range reject.Inputs {
+			if expected, ok := boundaries[reject.Name]; !ok || input.Boundary != expected {
+				t.Fatalf("recipe %s boundary=%s", reject.Name, input.Boundary)
+			}
+			count++
+			t.Run(input.Name, func(t *testing.T) {
+				var base conformance.AssignmentTicketFenceVector
+				for _, v := range af.FenceVectors {
+					if v.Kind == input.Kind {
+						base = v
+					}
+				}
+				if got := fenceInputBoundary(input.Parts, base.Parts); got != input.Boundary {
+					t.Fatalf("boundary=%q want=%q", got, input.Boundary)
+				}
+			})
+		}
+	}
+	if count != 13 {
+		t.Fatalf("executed %d inputs, want 13", count)
+	}
+	// A renamed boundary or an accidentally restored positive must fail even when
+	// the caller bypasses the artifact loader's structural checks.
+	af.FenceRejects[0].Inputs[0].Parts = af.FenceVectors[0].Parts
+	if err := verifyFenceRejectInputs(af); err == nil {
+		t.Fatal("accepted positive input as a reject")
+	}
+	af, err = conformance.AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	af.FenceRejects[0].Inputs[0].Boundary = "unknown"
+	if err := verifyFenceRejectInputs(af); err == nil {
+		t.Fatal("accepted unknown boundary")
+	}
+}
+
+func TestFenceIntegerFixtureSpelling(t *testing.T) {
+	part := conformance.AssignmentTicketFencePart{Encoding: "uint64_be", Value: "0002"}
+	raw, err := fencePartBytes(part)
+	if err != nil || len(raw) != 8 || raw[7] != 2 {
+		t.Fatalf("zero-padded decimal = %x/%v", raw, err)
+	}
+}
