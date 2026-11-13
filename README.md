@@ -27,6 +27,7 @@ trust.
 | --- | --- |
 | `vectors/qv2_conformance_vectors.json` | the conformance classes: share-safe qv2t1 outer transport, claims/secret parse, strict base64url, canonical fragment shape, relay allowlist, server-id, and the composed signature class |
 | `vectors/issuer_signature_vectors.json` | the issuer-signature golden vectors (P-256 raw r\|\|s low-S) the signature class composes by reference |
+| `vectors/README_relay_knock_golden.md` | relay schema versions, matched counters and consumer gates |
 | `vectors/relay_knock_golden.json` | the relay/NHP-handshake golden packets (X25519 / AES-256-GCM / BLAKE2s): a deterministic knock packet plus a frozen, server-sealed ack reply (see Scope) |
 | `vectors/agent_registration_golden.json` | the NHP agent-registration golden packets (X25519 / AES-256-GCM / BLAKE2s): deterministic OTP/REG requests plus frozen, server-sealed RAK replies (see Scope) |
 | `vectors/agent_assignment_golden.json` | deterministic hub LST/LRT assignment, account-only assigned-cell OTP, REG/RAK activation, completion LST/LRT packets, strict request/binding/size/result rejects, and the producer-pinned closed error-body taxonomy (see Scope) |
@@ -121,7 +122,11 @@ artifact has its own `artifact` id:
   **not** reproducible by a client — consumers can only decrypt it and assert the
   recovered fields. It is re-hosted here verbatim as a frozen golden value. These
   packets originate from the NHP cross-language handshake fixtures and are pinned
-  here.
+  here. Schema v2 adds `matched_ack`, which echoes `knock.counter` through
+  the authenticated reference response path. The old `ack` stays unchanged as
+  an intentionally uncorrelated negative control. Strict typed consumers must
+  support v2 and execute its matched counter case before adopting this artifact;
+  v1 loading remains supported. See [the relay schema notes](vectors/README_relay_knock_golden.md).
 - **NHP agent registration** (`qurl-agent-registration-golden-vectors`,
   `agent_registration_golden.json`) — the OTP/REG/RAK Noise-handshake golden
   packets for agent enrollment, again a separate artifact from the verify path.
@@ -274,7 +279,8 @@ artifact has its own `artifact` id:
 - **Assignment ticket v1** (`qurl-assignment-ticket-v1-vectors`,
   `assignment_ticket_v1_vectors.json`) — exact qat1 claims bytes, signing digest,
   synthetic KMS DER-to-raw-low-S conversion, complete ticket, credential/cell/
-  existing-assignment fences, NHP size budget, and closed reject suites. NHP
+  existing-assignment fences, NHP size budget, and closed reject suites. Artifact
+  schema 2 executes 13 typed fence rejects; schema 1 stays advisory. NHP
   carries this ticket opaquely. See
   `vectors/README_assignment_ticket_v1_vectors.md`.
 - **Connector resource discovery LST/LRT v1**
@@ -412,9 +418,16 @@ in manifest mode: the Go module, the npm package, and the Python package are
 released together under one linked version (see `release-please-config.json`).
 Merging the release PR tags the repo, which is what releases the Go module.
 
-npm and PyPI **registry publishing on release is a token-gated follow-up** (it needs
-`NPM_TOKEN` / PyPI trusted publishing wired up); for now Release Please only
-automates the version-bump PRs and the Go tag.
+The release workflow also publishes npm and PyPI packages automatically when
+Release Please creates their releases. Each job checks out its exact release tag.
+Both use OIDC trusted publishing with `id-token: write`; no registry token is
+required. npm publishes with provenance in the `npm-publish` environment. PyPI
+publishes with attestations in the `pypi` environment.
+
+Before publishing, configure each registry to trust this repository and
+`release-please.yml`, with its matching GitHub environment (`npm-publish` or
+`pypi`). The environments and any required approvals must also be set up in
+GitHub. See `.github/workflows/release-please.yml` for the publishing jobs.
 
 ## License
 

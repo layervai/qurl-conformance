@@ -12,8 +12,8 @@ import (
 const (
 	// AssignmentTicketArtifactID identifies the standalone qat1 artifact.
 	AssignmentTicketArtifactID = "qurl-assignment-ticket-v1-vectors"
-	// AssignmentTicketSchemaVersion is the only schema accepted by this release.
-	AssignmentTicketSchemaVersion = 1
+	// AssignmentTicketSchemaVersion is current; schema 1 retains advisory rejects.
+	AssignmentTicketSchemaVersion = 2
 
 	AssignmentTicketPrefix        = "qat1"
 	AssignmentTicketSigningDomain = "qurl-agent-assignment-ticket-v1"
@@ -178,11 +178,12 @@ type AssignmentTicketDERCase struct {
 
 // AssignmentTicketFenceReject freezes invalid typed fence input classes.
 type AssignmentTicketFenceReject struct {
-	Name        string `json:"name"`
-	FenceKind   string `json:"fence_kind"`
-	RejectClass string `json:"reject_class"`
-	Reason      string `json:"reason"`
-	Mutation    string `json:"mutation"`
+	Name        string                             `json:"name"`
+	FenceKind   string                             `json:"fence_kind"`
+	RejectClass string                             `json:"reject_class"`
+	Reason      string                             `json:"reason"`
+	Mutation    string                             `json:"mutation"`
+	Inputs      []AssignmentTicketFenceRejectInput `json:"inputs,omitempty"`
 }
 
 // AssignmentTicketTrustReject freezes invalid verifier-key inputs.
@@ -298,8 +299,8 @@ func ParseAssignmentTicketFile(data []byte) (*AssignmentTicketFile, error) {
 	if err := strictDecodeArtifact(data, &af); err != nil {
 		return nil, fmt.Errorf("conformance: parse assignment-ticket file: %w", err)
 	}
-	if af.Artifact != AssignmentTicketArtifactID || af.SchemaVersion != AssignmentTicketSchemaVersion {
-		return nil, fmt.Errorf("conformance: assignment-ticket identity = %q/v%d, want %q/v%d", af.Artifact, af.SchemaVersion, AssignmentTicketArtifactID, AssignmentTicketSchemaVersion)
+	if af.Artifact != AssignmentTicketArtifactID || (af.SchemaVersion != 1 && af.SchemaVersion != AssignmentTicketSchemaVersion) {
+		return nil, fmt.Errorf("conformance: assignment-ticket identity = %q/v%d, want %q/v1 or v%d", af.Artifact, af.SchemaVersion, AssignmentTicketArtifactID, AssignmentTicketSchemaVersion)
 	}
 	if af.Description == "" {
 		return nil, errors.New("conformance: assignment-ticket description is empty")
@@ -511,6 +512,9 @@ func validateAssignmentTicketCaseInputs(af *AssignmentTicketFile) error {
 		if _, ok := assignmentTicketFenceRejectKinds[c.FenceKind]; !ok {
 			return fmt.Errorf("conformance: assignment-ticket fence reject %q has unknown fence kind %q", c.Name, c.FenceKind)
 		}
+	}
+	if err := validateAssignmentFenceRejectInputs(af); err != nil {
+		return err
 	}
 	for _, c := range af.TrustKeyRejects {
 		if c.RejectClass == "" || c.Reason == "" {

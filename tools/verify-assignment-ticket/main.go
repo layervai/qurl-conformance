@@ -61,6 +61,9 @@ func verify() error {
 			return err
 		}
 	}
+	if err := verifyFenceRejectInputs(af); err != nil {
+		return err
+	}
 	if err := verifyDERCases(af.KMSDERCases); err != nil {
 		return err
 	}

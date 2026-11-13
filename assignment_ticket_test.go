@@ -128,3 +128,83 @@ func TestParseAssignmentTicketFileFailsClosed(t *testing.T) {
 		}), "ambiguous")
 	})
 }
+
+func TestAssignmentFenceExecutableInputsAreClosed(t *testing.T) {
+	changes := map[string]func(*AssignmentTicketFile){
+		"wrong permitted kind": func(a *AssignmentTicketFile) { a.FenceRejects[0].FenceKind = "cell" },
+		"wrong all-kind label": func(a *AssignmentTicketFile) { a.FenceRejects[3].FenceKind = "credential" },
+		"missing":              func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs = nil },
+		"duplicate": func(a *AssignmentTicketFile) {
+			a.FenceRejects[0].Inputs = append(a.FenceRejects[0].Inputs, a.FenceRejects[0].Inputs[0])
+		},
+		"unknown case":   func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs[0].Name = "unknown" },
+		"unknown kind":   func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs[0].Kind = "unknown" },
+		"wrong boundary": func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs[0].Boundary = "unknown" },
+		"missing part": func(a *AssignmentTicketFile) {
+			a.FenceRejects[0].Inputs[0].Parts = a.FenceRejects[0].Inputs[0].Parts[1:]
+		},
+		"duplicate part":           func(a *AssignmentTicketFile) { p := a.FenceRejects[0].Inputs[0].Parts; p[1] = p[0] },
+		"malformed bytes":          func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs[0].Parts[0].BytesHex = "zz" },
+		"changed input":            func(a *AssignmentTicketFile) { a.FenceRejects[0].Inputs[0].Parts[0].Value = "" },
+		"missing all-kind variant": func(a *AssignmentTicketFile) { a.FenceRejects[3].Inputs = a.FenceRejects[3].Inputs[1:] },
+	}
+	for name, change := range changes {
+		t.Run(name, func(t *testing.T) {
+			af, err := AssignmentTicket()
+			if err != nil {
+				t.Fatal(err)
+			}
+			change(af)
+			body, err := json.Marshal(af)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ParseAssignmentTicketFile(body); err == nil || !strings.Contains(err.Error(), "executable inputs drifted") {
+				t.Fatalf("error=%v", err)
+			}
+		})
+	}
+	af, err := AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(af)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range []string{`"boundary":"key_length","unknown":true`, `"boundary":"key_length","boundary":"key_length"`} {
+		changed := strings.Replace(string(body), `"boundary":"key_length"`, extra, 1)
+		if changed == string(body) {
+			t.Fatal("test did not edit input")
+		}
+		if _, err := ParseAssignmentTicketFile([]byte(changed)); err == nil {
+			t.Fatal("accepted unknown or duplicate nested input field")
+		}
+	}
+}
+
+func TestAssignmentFenceSchemaVersions(t *testing.T) {
+	af, err := AssignmentTicket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []int{0, 3} {
+		af.SchemaVersion = version
+		body, _ := json.Marshal(af)
+		if _, err := ParseAssignmentTicketFile(body); err == nil {
+			t.Fatalf("accepted schema %d", version)
+		}
+	}
+	af.SchemaVersion = 1
+	body, _ := json.Marshal(af)
+	if _, err := ParseAssignmentTicketFile(body); err == nil {
+		t.Fatal("v1 silently accepted executable v2 inputs")
+	}
+	for i := range af.FenceRejects {
+		af.FenceRejects[i].Inputs = nil
+	}
+	body, _ = json.Marshal(af)
+	if _, err := ParseAssignmentTicketFile(body); err != nil {
+		t.Fatalf("legacy advisory v1 rejected: %v", err)
+	}
+}

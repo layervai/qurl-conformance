@@ -189,7 +189,7 @@ matches.
 
 | Class | Verifier operation | Accept means | Reject class(es) |
 | --- | --- | --- | --- |
-| `signature` (composed) | issuer-signature verify | sig verifies over the claims | `high_s` / `wrong_length` (+ derived `tamper`) |
+| `signature` (composed) | issuer-signature verify | sig verifies over the claims | `scalar_range` / `high_s` / `wrong_length` (+ derived `tamper`) |
 | `claims_parse` | strict claims parse | strict-parses to a `Claims` | `parse` |
 | `secret_parse` | strict secret parse | strict-parses to a `Secret` | `parse` / `key_length` |
 | `strict_base64` | strict base64url decode | decodes | `encoding` |
@@ -220,6 +220,7 @@ sentinels for them.
 | `fragment` | fragment wire-shape rejection | `fragment` |
 | `transport` | qv2t1 prefix/count/chunk/size/alphabet framing rejection | `transport` |
 | `relay_url` | `relay_url` HTTPS/allowlist rejection | `relay_allowlist` |
+| `scalar_range` | r or s is outside the P-256 scalar range [1, N-1] | `signature` (in the composed file's `reject_class`) |
 | `high_s` | signature is not low-S normalized | `signature` (in the composed file's `reject_class`) |
 | `wrong_length` | signature is not exactly 64 bytes (raw r\|\|s) | `signature` (in the composed file's `reject_class`) |
 | `tamper` | valid signature verified against a (flipped) different message | `signature` (in `signature_class.tamper_derivation`, derived not stored) |
@@ -358,3 +359,13 @@ outcome, editing any reject vector to `"accept"` (or vice versa) turns the run
 RED. The **only** class without an accept/reject flip is `server_id`: it is a
 recompute-equality derivation with no reject branch, so its runner fails loudly on
 any non-accept `expect` rather than silently honoring a flip.
+
+### Scalar-range signature rejects
+
+The four scalar-range cases replace only r or s in the frozen accept signature
+with zero or the P-256 order N. Keys, claims, signing input and every existing
+signature remain byte-identical. No key rotation or signing run is required.
+For a 64-byte raw signature, check scalar range before low-S normalization:
+s=N is `scalar_range`, not `high_s`. A wrong-length input remains `wrong_length`.
+This extends the closed signature taxonomy. Consumers must adopt `scalar_range`
+in lockstep before a release of this artifact; old closed switches fail loudly.

@@ -72,6 +72,11 @@ conformance vectors. Keep it small, stdlib-only, and stable.
   is why `.release-please-manifest.json` can legitimately read `".": 0.12.3`
   against `npm`/`python` at `0.12.2`; it is not drift to be "corrected".
 - Merging the release PR tags the repo and thereby releases the Go module.
-- npm/PyPI registry publishing on release is a token-gated follow-up (needs
-  `NPM_TOKEN` / PyPI trusted publishing); Release Please currently automates only
-  the version PRs + the Go tag.
+- npm/PyPI publishing runs automatically when Release Please creates each
+  package release. Both jobs check out the exact release tag and use OIDC
+  trusted publishing (`id-token: write`), without registry tokens. npm uses
+  provenance and the `npm-publish` environment; PyPI uses attestations and
+  the `pypi` environment.
+- Each registry must trust this repository, `release-please.yml`, and its
+  matching GitHub environment. Configure those environments and any required
+  approvals before publishing.
